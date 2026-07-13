@@ -1,0 +1,42 @@
+ACCEPT
+n-module 1.1-10.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-9.1
+    n-operatordefinition 2.1-9.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setofrcds 2.7-9.1
+        lsb 2.7-2.7 [
+        n-fieldset 3.3-5.8
+          identifier 3.3-3.5 foo
+          colon 3.7-3.7 :
+          n-conjlist 4.5-5.8
+            n-conjitem 4.5-4.8
+              and 4.5-4.6 /\\
+              n-number 4.8-4.8
+                number-literal 4.8-4.8 1
+            n-conjitem 5.5-5.8
+              and 5.5-5.6 /\\
+              n-number 5.8-5.8
+                number-literal 5.8-5.8 2
+        comma 5.9-5.9 ,
+        n-fieldset 6.7-8.12
+          identifier 6.7-6.9 bar
+          colon 6.11-6.11 :
+          n-disjlist 7.9-8.12
+            n-disjitem 7.9-7.12
+              or 7.9-7.10 \\/
+              n-number 7.12-7.12
+                number-literal 7.12-7.12 3
+            n-disjitem 8.9-8.12
+              or 8.9-8.10 \\/
+              n-number 8.12-8.12
+                number-literal 8.12-8.12 4
+        rsb 9.1-9.1 ]
+  n-endmodule 10.1-10.4
+    end-module 10.1-10.4 ====

@@ -1,0 +1,21 @@
+ACCEPT
+MODULE A 1.1-7.4
+  var x L1 3.10-3.10
+  def Init arity=0 local=n L1 4.1-4.13
+    apply = opkind=BuiltInKind L1 4.9-4.13
+      apply x opkind=VariableDeclKind L1 4.9-4.9
+      num 0 L0 4.13-4.13
+  def Next arity=0 local=n L2 5.1-5.18
+    apply = opkind=BuiltInKind L2 5.9-5.18
+      apply ' opkind=BuiltInKind L2 5.9-5.10
+        apply x opkind=VariableDeclKind L1 5.9-5.9
+      apply + opkind=UserDefinedOpKind L1 5.14-5.18
+        apply x opkind=VariableDeclKind L1 5.14-5.14
+        num 1 L0 5.18-5.18
+  def Spec arity=0 local=n L3 6.1-6.26
+    apply \land opkind=BuiltInKind L3 6.9-6.26
+      apply Init opkind=UserDefinedOpKind L1 6.9-6.12
+      apply [] opkind=BuiltInKind L3 6.17-6.26
+        apply $SquareAct opkind=BuiltInKind L2 6.19-6.26
+          apply Next opkind=UserDefinedOpKind L2 6.20-6.23
+          apply x opkind=VariableDeclKind L1 6.26-6.26

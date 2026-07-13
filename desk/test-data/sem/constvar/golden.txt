@@ -1,0 +1,4 @@
+ACCEPT
+MODULE A 1.1-4.4
+  const N arity=0 L0 2.10-2.10
+  var x L1 3.10-3.10

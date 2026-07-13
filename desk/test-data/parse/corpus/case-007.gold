@@ -1,0 +1,43 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.6
+    n-operatordefinition 2.1-7.6
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-conjlist 3.3-7.6
+        n-conjitem 3.3-6.17
+          and 3.3-3.4 /\\
+          n-case 3.6-6.17
+            case 3.6-3.9 CASE
+            n-casearm 3.11-5.10
+              n-number 3.11-3.11
+                number-literal 3.11-3.11 1
+              arrow 3.13-3.14 ->
+              n-conjlist 4.7-5.10
+                n-conjitem 4.7-4.10
+                  and 4.7-4.8 /\\
+                  n-number 4.10-4.10
+                    number-literal 4.10-4.10 2
+                n-conjitem 5.7-5.10
+                  and 5.7-5.8 /\\
+                  n-number 5.10-5.10
+                    number-literal 5.10-5.10 3
+            casesep 6.9-6.10 []
+            n-casearm 6.12-6.17
+              n-number 6.12-6.12
+                number-literal 6.12-6.12 4
+              arrow 6.14-6.15 ->
+              n-number 6.17-6.17
+                number-literal 6.17-6.17 5
+        n-conjitem 7.3-7.6
+          and 7.3-7.4 /\\
+          n-number 7.6-7.6
+            number-literal 7.6-7.6 6
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

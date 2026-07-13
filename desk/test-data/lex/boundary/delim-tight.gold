@@ -1,0 +1,7 @@
+T bm1 1.1 1.10 ----MODULE
+T identifier 1.12 1.12 T
+T separator 1.13 1.16 ----
+T identifier 2.1 2.1 x
+T def 2.3 2.4 ==
+T number-literal 2.6 2.6 1
+T end-module 3.1 3.9 =========

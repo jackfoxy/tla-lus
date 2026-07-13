@@ -1,0 +1,22 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/SemanticUndef.tla
+Parsing file <TLCTMP>/Naturals.tla (jar:file:<REPO>/tlatools/org.lamport.tlatools/dist/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Semantic processing of module Naturals
+Semantic processing of module SemanticUndef
+Semantic errors:
+
+*** Errors: 2
+
+line 4, col 9 to line 4, col 19 of module SemanticUndef
+
+Unknown operator: `undefinedOp'.
+
+
+line 5, col 13 to line 5, col 15 of module SemanticUndef
+
+The operator Plus requires 2 arguments.
+
+
+exit-code: 4

@@ -1,0 +1,22 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T instance 2.1 2.8 INSTANCE
+T identifier 2.10 2.10 M
+T with 2.12 2.15 WITH
+T identifier 3.3 3.3 A
+T substitute 3.5 3.6 <-
+T identifier 3.8 3.8 a
+T comma 3.9 3.9 ,
+T op-114 4.3 4.8 SUBSET
+T substitute 4.10 4.11 <-
+T identifier 4.13 4.13 b
+T comma 4.14 4.14 ,
+T op-79 5.3 5.3 *
+T substitute 5.5 5.6 <-
+T identifier 5.8 5.8 c
+T comma 5.9 5.9 ,
+T op-57 6.3 6.3 '
+T substitute 6.5 6.6 <-
+T identifier 6.8 6.8 d
+T end-module 7.1 7.4 ====

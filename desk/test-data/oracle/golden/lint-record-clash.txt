@@ -1,0 +1,17 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/LintRecordClash.tla
+Semantic processing of module LintRecordClash
+Linting of module LintRecordClash
+line 3, col 7 to line 3, col 9 of module LintRecordClash
+
+The field name "bar" in the record constructor is identical to the existing definition or declaration
+named bar, located at line 2, col 1 to line 2, col 9 of module LintRecordClash.
+The field in the record will not take the value of the bar definition or declaration.
+In TLA+, field names in records are strings, regardless of any similarly named declarations or definitions.
+Therefore, DOMAIN [bar |-> ...] = {"bar"} holds true.
+
+
+
+exit-code: 0

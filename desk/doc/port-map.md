@@ -1,0 +1,317 @@
+# Port Map
+
+Java-to-Hoon traceability for `%tla-lus`. Established by Work Unit 0
+(pin, inventory, baseline). Every later unit updates its rows: source
+classes, Hoon owner, implemented features, missing features, and tests.
+
+## 1. Pinned Upstream Sources
+
+All differential comparison runs against these exact commits. Never compare
+against an unrecorded moving checkout.
+
+| Repo | Local checkout | Remote | Pinned commit | Commit date | License |
+|---|---|---|---|---|---|
+| `tlaplus/tlaplus` | `/mnt/mars/gitrepos/tlaplus` | `git@github.com:jackfoxy/tlaplus.git` (fork of `tlaplus/tlaplus`) | `4ba7d8811289fb8e95dac4d5e554c05216ba3100` | 2026-05-26 | MIT (`LICENSE`) |
+| `tlaplus/Examples` | `/mnt/mars/gitrepos/tlaplus-Examples` | `git@github.com:jackfoxy/tlaplus-Examples.git` | `47b0e2cc0268836b89f5ce451f38e5df5f1cf773` | 2026-05-24 | MIT (`LICENSE.md`) |
+| `tlaplus/vscode-tlaplus` | `/mnt/mars/gitrepos/vscode-tlaplus` | `git@github.com:jackfoxy/vscode-tlaplus.git` | `acc095d6f8b075788bfbb4c09288c778757abaec` | 2026-05-08 | MIT (`LICENSE`) |
+
+Checkout caveats recorded at pin time (2026-07-12):
+
+- `tlaplus`: untracked `test-model/DieHard_TTrace_*.bin` artifacts from prior
+  local runs; tracked tree clean. Oracle runs copy fixtures to a temp dir so
+  the checkout is never polluted further.
+- `tlaplus-Examples`: locally modified
+  `specifications/TeachingConcurrency/Simple.cfg`. Do not use that spec as an
+  oracle fixture until the checkout is restored.
+- `vscode-tlaplus`: clean. Bundled `tools/tla2tools.jar` in that repo is NOT
+  the oracle; only the jar built from the pinned `tlaplus` commit is.
+
+Attribution: all three upstreams are MIT-licensed. Any translated code,
+copied fixture, or vendored StandardModule in this desk must retain the
+upstream copyright notice and a pointer to the pinned commit.
+
+## 2. Java Oracle Build And Invocation Forms
+
+Build (validated 2026-07-12 from the pinned commit, Ant + OpenJDK 11):
+
+```bash
+cd /mnt/mars/gitrepos/tlaplus/tlatools/org.lamport.tlatools
+ant -f customBuild.xml info compile compile-test dist
+# -> dist/tla2tools.jar (~4.3 MB)
+```
+
+Smoke check (must reproduce exactly under the pinned commit):
+
+```bash
+java -cp dist/tla2tools.jar tlc2.TLC -deadlock test-model/pcal/Bakery.tla
+# -> 1183 states generated, 668 distinct states found, depth 41, no error
+```
+
+Entry points (one jar, several mains; `java -jar` aliases `tlc2.TLC`):
+
+| Stage | Invocation form |
+|---|---|
+| SANY parse+semantic+level+lint | `java -cp tla2tools.jar tla2sany.SANY [-s] [-l] [-lint] [-error-codes] [-messagesAsErrors codes] [-suppressMessages codes] FILE...` |
+| PlusCal translation | `java -cp tla2tools.jar pcal.trans [-nocfg] [-wf|-sf|-wfNext|-nof] [-termination] [-label] [-lineWidth n] FILE` (rewrites FILE in place; writes `FILE.cfg` unless `-nocfg`) |
+| TLC model check | `java -cp tla2tools.jar tlc2.TLC [-config FILE.cfg] [-deadlock] [-workers 1] [-fp 0] [-seed N] [-metadir DIR] [-cleanup] [-lncheck final] [-tool] FILE` |
+| TLC simulation | `java -cp tla2tools.jar tlc2.TLC -simulate num=N -depth D -seed S [-aril A] ... FILE` |
+| XML AST export (oracle format only) | `java -cp tla2tools.jar tla2sany.xml.XMLExporter [-o] FILE` |
+
+SANY exit codes with `-error-codes`: documented as `2` parse error and `4`
+semantic/level error, but the pinned build observably exits `255` on fatal
+lexical/parse errors (see `golden/lex-bad-string.txt`,
+`golden/syntax-reject.txt`) and `4` on semantic/level errors. The Hoon port
+matches the coded-diagnostic categories, not CLI exit integers.
+TLC exit codes: `0` success, non-zero per `tlc2.output.EC` category
+(e.g. `151` config error, observed in `golden/cfg-bad.txt`).
+
+Determinism flags used for every TLC oracle run: `-workers 1 -fp 0`
+(fixed fingerprint-function index) and, for simulation, explicit
+`-seed`/`-aril`. `-tool` mode emits `@!@!@STARTMSG <EC-code>` tagged
+messages; the tagged form is the long-term compatibility surface for
+diagnostics (see the Toolbox inventory below), while unit-0 goldens use the
+plain human-readable form.
+
+Constraints inherited from the Java tools: TLC holds global static state and
+cannot run twice in one JVM (one process per oracle run); SANY `parse()` is
+process-safe but not thread-safe.
+
+## 3. Differential-Output Normalization Rules
+
+Implemented in `desk/test-data/oracle/regen.sh` (`normalize()`); every rule
+here must stay in sync with that script. Comparison is on normalized text.
+
+1. Line endings: CRLF -> LF; strip trailing whitespace; ensure final newline.
+2. Absolute paths: the fixture temp dir and repo checkout prefixes are
+   rewritten to `<WORK>/` and `<REPO>/`.
+3. Timestamps: any `YYYY-MM-DD hh:mm:ss` -> `<DATETIME>`; `Finished in NNs
+   at (...)` and trailing `... in NNs.` durations -> `<D>`.
+3a. TLC's temp StandardModules extraction dir (`/tmp/tlc-<random>/`) ->
+   `<TLCTMP>`; the TLC version banner embeds the jar build timestamp
+   (`TLC2 Version 2026.07.12.HHMMSS (rev: ...)`) -> `TLC2 Version <BUILD>
+   (rev: ...)`, keeping the rev hash as the oracle pin.
+4. Rates and machine sizing: `... states generated (N s/min)`, `... and N
+   cores`, heap/offheap MB figures -> `<N>` placeholders; drop the
+   `Working set` / OS + JVM info lines.
+5. Randomness: TLC runs pin `-fp 0 -workers 1`; the printed `with fp N and
+   seed N` line is kept verbatim (deterministic under pinned flags). TLC's
+   random simulation seed is always passed explicitly.
+6. Progress lines: `Progress(N) at (...)` keeps N, normalizes the timestamp
+   and rate fields. Checkpoint directory names (`states/YY-MM-DD-...`) ->
+   `<METADIR>`.
+7. Ordering: single worker + fixed fp make state counts and traces
+   deterministic; no reordering is applied. If a future case emits
+   set-ordered diagnostics, sort just that block and record it here.
+8. The TLC/SANY version banners are kept verbatim; they pin the oracle
+   version and change only when the pinned commit changes.
+9. TLC trace-exploration artifacts (`*_TTrace_*.tla/.bin`) are excluded from
+   golden output (generated in the temp dir and discarded).
+
+## 4. Primary Inventory: `tlatools/org.lamport.tlatools/src`
+
+Classification: `port` (behavior reimplemented in Hoon), `reference`
+(consulted for contracts/oracle formats, not ported), `performance-only`
+(port later only if profiling demands; semantics must not depend on it),
+`excluded` (out of scope per PLAN.md).
+
+Hoon owner names refer to the planned `lib/tla/*.hoon` split; "impl" is
+empty at unit 0 and is updated per unit.
+
+### 4.1 SANY (`tla2sany/`) — 105 classes
+
+| Package (classes) | Class notes | Class | Hoon owner | Unit |
+|---|---|---|---|---|
+| `tla2sany` (1) + `drivers` (6) | `SANY.frontEndMain` pipeline order (syntax -> semantic -> level -> lint), `SanySettings`, `SanyExitCode`, `FrontEndException`/`SemanticException` | port (pipeline semantics; CLI surface itself becomes the Gall API) | `modules.hoon`, `diagnostics.hoon` | 5-7 |
+| `parser` (16) | `TLAplusParser`/`TLAplusParserTokenManager` are generated from `javacc/tla+.jj` (grammar is the source of truth); `Operators`/`OperatorStack`/`Operator`/`OSelement` precedence engine; `SyntaxTreeNode`, `Token`, `SimpleCharStream` lexical states; `ParseError(s)`, `ParseException*`, `TokenMgrError`, `JunctionListContext` (conj/disj lists) | port | `lexer.hoon`, `syntax.hoon`, `ast.hoon` | 3-4 |
+| `st` (6) | `Location` (spans), `TreeNode`/`ParseTree`, `SyntaxTreeConstants`, `ParseError(s)` interfaces | port | `source.hoon`, `ast.hoon` | 2-4 |
+| `modanalyzer` (9) | `SpecObj` (root/extends/instance discovery, dep order, cycles), `ParseUnit(sTable)`, `ModuleContext/Pointer/Relationships/Relatives`, `SyntaxTreePrinter` (debug: reference) | port | `modules.hoon` | 5 |
+| `semantic` (52) | `Generator` (AST->semantic graph), `Context`/`SymbolTable`/`ExternalModuleTable`, `ModuleNode` + all node kinds (`OpApplNode`, `OpDefNode`, `OpDeclNode`, `LetInNode`, `SubstInNode`/`APSubstInNode`/`Subst`, `InstanceNode`, `AssumeNode`/`TheoremNode`/`ThmOrAssumpDefNode`, proof nodes, `LabelNode`, ...), `BuiltInOperators`/`ASTConstants`, `LevelNode`/`LevelConstants`/`SetOf(Arg)LevelConstraints`/`ArgLevelParam` (level checking), `ErrorCode`/`Errors` (coded diagnostics), `StandardModules` (bundled-module list), `FrontEnd`, `SymbolMatcher` (reference: editor completion helper) | port (all but `SymbolMatcher`) | `semantic.hoon`, `levels.hoon`, `diagnostics.hoon` | 6-7 |
+| `linter` (1) | `Linter.lintRecords`: `RECORD_CONSTRUCTOR_FIELD_NAME_CLASH` (4802, WARNING) with documented suppression heuristics | port | `lint.hoon` | 7 |
+| `StandardModules/*.tla` | `Naturals`, `Integers`, `Reals`, `Sequences`, `FiniteSets`, `Bags`, `TLC`, `TLCExt`, `Randomization`, `Json`, `Toolbox`, `RealTime`, `_TLC*`/`_Json*` trace templates (reference: trace-spec generation) | port (vendored + Hoon overrides) | `stdlib.hoon` | 5, 9 |
+| `output` (5) | `SanyOutput`/`LogLevel` abstractions | reference (subsumed by typed diagnostics) | `diagnostics.hoon` | 2 |
+| `xml` (5) | `XMLExporter`, `sany.xsd` | reference (oracle format for semantic-tree diff, unit 6) | — | 6 |
+| `explorer` (5) | interactive semantic-graph explorer, DOT dump | reference (debug aid) | — | — |
+| `utilities` (5) | Java containers (`Vector` etc.) | excluded (Hoon stdlib replaces) | — | — |
+
+### 4.2 PlusCal (`pcal/`) — 27 classes + `exception` (14)
+
+| Class notes | Class | Hoon owner | Unit |
+|---|---|---|---|
+| `trans` (driver, options, `BEGIN/END TRANSLATION` replacement, checksums via `Validator`/`ValidationCallBack`), `ParseAlgorithm` + `Tokenize`/`PcalCharReader`/`PcalBuiltInSymbols` (C and P syntax), `AST` (PlusCal AST), `PcalSymTab`/`PcalFixIDs` (symbols, ID fixing), `PcalTranslate` (AST -> intermediate), `PCalTLAGenerator`/`PcalTLAGen` (TLA+ text generation), `TLAExpr`/`TLAToken` (expression fragments), `Region`/`PCalLocation`/`MappingObject`/`TLAtoPCalMapping` (source mapping), `PcalParams` (options incl. `-wf -sf -wfNext -nof -termination`), `exception/*` (error taxonomy) | port | `pcal-ast.hoon`, `pcal-parser.hoon`, `pcal-translate.hoon` | 8 |
+| `PcalDebug`, `PcalResourceFileReader`, `Test`, `Translator` (string-in/string-out wrapper: API-shape reference), `OldPlusCal.tla`/`PlusCal*.tla` (in-tree specs) | reference | — | 8 |
+
+### 4.3 TLC (`tlc2/`) — ~380 classes
+
+| Package (classes) | Class notes | Class | Hoon owner | Unit |
+|---|---|---|---|---|
+| `tlc2` root (7) | `TLC` (arg parsing, run modes, exit codes), `TLCGlobals` | port (semantics; flags map to the Gall request mold) | `job.hoon`, `cfg.hoon` | 9-13 |
+| | `REPL`, `REPLSpecWriter`, `TLCRunner`, `TraceExplorationSpec`, `TraceExpressionExplorerSpecWriter` | excluded (REPL/TE-spec generation out of first target) | — | — |
+| `tool` (44) | `ModelChecker` (BFS safety), `AbstractChecker`, `Worker`/`IWorker` (single-worker parity), `Simulator`/`SimulationWorker`, `Action`, `TLCState*` (`TLCStateMut`, `StateVec`, `TLCStateInfo`, `TLCTrace`, `ConcurrentTLCTrace`), `EvalControl`/`EvalException`/`FingerprintException`/`WorkerException`, `BuiltInOPs`/`Specs`/`ToolGlobals`, functor interfaces | port | `state.hoon`, `safety.hoon`, `trace.hoon` | 10, 12 |
+| | `DFIDModelChecker`/`DFIDWorker` | reference (DFID only if inventory later reclassifies as required core) | — | 12 |
+| | `CheckImpl*`, `TraceApp`, `TLAPlusExecutor`, `RL*SimulationWorker` (RL experiments), `PossibleAction` | excluded | — | — |
+| `tool/impl` (17) | `Tool` (expression/action evaluation core), `SpecProcessor`, `Spec`, `ModelConfig` (.cfg parser), `OpDefEvaluator`, `TLARegistry`/`TLAClass` (override binding contract), `ContextEnumerator`, `ActionItemList*` | port (`DebugTool`/`CallStackTool`: reference — debugger/error-callstack wrappers; `ParameterizedSpecObj`, `WorkerValue`: reference) | `eval.hoon`, `cfg.hoon` | 9 |
+| `value` (15) + `value/impl` (46) | value interfaces + `Value` hierarchy: `BoolValue`, `IntValue`, `IntervalValue`, `StringValue`, `ModelValue`, `SetEnumValue`, `SubsetValue`, `SetOf{Fcns,Rcds,Tuples}Value`, `SetPredValue`, `SetCap/SetCup/SetDiff/UnionValue`, `FcnRcdValue`, `FcnLambdaValue`, `RecordValue`, `TupleValue`, `LazyValue`, `MVPerm(s)` (symmetry), `ValueEnumeration`, normalization/equality/fingerprint/`ValueExcept` semantics | port (`CallableValue`/`EvaluatingValue`/`MethodValue`/`PriorityEvaluatingValue` are JVM-reflection binding: reference — the *contract* they bind is ported via `tlc2/module`; `ValueInput/OutputStream` serialization: reference — Hoon nouns replace; `KSubsetValue`, `UserObj`/`UserValue`, `CounterExample`: reference) | `value.hoon` | 9 |
+| `module` (19) | Java overrides for `Naturals`, `Integers`, `Sequences`, `FiniteSets`, `Bags`, `Strings`, `TLC`, `TLCExt`, `TLCGetSet`, `TransitiveClosure`, `Randomization`, `AnySet`, `TLCEval`; name/arity/behavior contract incl. `TLARegistry` infix mapping | port (contract + behavior) (`Json`, `_JsonTrace`, `_Possible`, `TLCBuiltInOverrides`: reference/excluded first target) | `stdlib.hoon` | 9 |
+| `overrides` (4) | annotation machinery for user-provided Java overrides | reference (contract doc only; no JVM in Gall) | — | 9 |
+| `tool/liveness` (44) | `Liveness` (property decomposition to `LiveExprNode` normal form: `LN*`), `TBGraph`/`TBGraphNode`/`TBPar*` (tableau), `OrderOfSolution`/`PossibleErrorModel`, `LiveCheck`/`ILiveCheck`/`LiveWorker` (SCC search), `DiskGraph`/`TableauDiskGraph`/`NodePtrTable` (behavioral graph store), `LiveCounterExampleException` (lasso traces) | port (memory-graph semantics; disk-backed layout itself performance-only; `LiveCheck1`, `AddAndCheckLiveCheck`, `BEGraph*`/`BTGraphNode` legacy, `Dot/Noop*StateWriter` debug: reference) | `liveness.hoon` | 11 |
+| `tool/fp` (18) + `fp/dfid` (3) | `FPSet` contract (put/contains exactness) | port (contract only) — `DiskFPSet` family, `OffHeapDiskFPSet`, `MultiFPSet`, `LongArray(s)`: performance-only | `state.hoon` | 10, 12 |
+| `tool/queue` (7) | `IStateQueue` BFS contract, `StateQueue`/`StateDeque` | port (contract; `Disk*Queue` performance-only) | `state.hoon` | 10 |
+| `tool/coverage` (8) | action/cost coverage counters | reference (unit 10 emits basic counters; full cost model deferred) | `safety.hoon` | 10 |
+| `output` (12) | `EC` (stable message codes), `MP` (message formats, `-tool` tagging), `ErrorTraceMessagePrinterRecorder` | port (codes/categories as typed diagnostics) — `AbstractSpecWriter`/`SpecTraceExpressionWriter`/`SpecWriterUtilities` reference (Toolbox model-writer shapes), streams excluded | `diagnostics.hoon` | 2, 9-12 |
+| `model` (7) | `MCError`/`MCState`/`MCVariable`/`Assignment`/`TypedSet`/`Formula` (structured trace/model shapes shared with Toolbox) | reference (API-shape input to `sur/tla-lus.hoon`) | `sur/tla-lus.hoon` | 2 |
+| `util` (47) | behavioral: `FP64` (fingerprint function), `Context` (evaluation binding chain), `Vect`/`SetOfStates`/`LongVec` (containers), `RandomGenerator` (simulation RNG — must match for seed parity), `BitVector`, `Combinatorics` | port (those five areas) | `eval.hoon`, `state.hoon`, `simulate.hoon` | 9-12 |
+| | disk/IO/concurrency: `BufferedRandomAccessFile`, `StatePool*`, `Disk*Stack`, caches, locks, `IdThread`, statistics | performance-only or excluded (JVM-specific) | — | — |
+| `util` top-level (27) | `UniqueString` (interning: reference — Hoon terms/atoms), `FilenameToStream`/resource locators (reference: shape for inline/Clay resolvers), `MonolithSpecExtractor` (port: monolith module support), `TLAConstants` (port: shared literals), `Assert`/`ToolIO` (reference), `MailSender`/`ExecutionStatisticsCollector`/`TLCRuntime`/`UsageGenerator` (excluded) | mixed as noted | `source.hoon`, `modules.hoon` | 3, 5 |
+| `debug` (15) | DAP debugger | excluded (first target) | — | — |
+| `pprint` (6) | pretty-printer for values | reference | — | — |
+| `tool/distributed` (33 across subpkgs) | distributed TLC | excluded | — | — |
+| `tool/management`, `util/statistics` (16) | JMX/monitoring | excluded | — | — |
+
+### 4.4 Other top-level packages
+
+| Package | Class | Note |
+|---|---|---|
+| `tla2tex` (26) | excluded | PLAN.md exclusion |
+| `formatter` | excluded | not in first compatibility target |
+| `model` (top-level) | reference | shared model shapes |
+| `javacc/tla+.jj` | port (grammar source of truth) | unit 3-4; drives `doc/tla-bnf.md` |
+
+### 4.5 Upstream test inventory (`test/`, `test-model/`)
+
+~1300 test classes; 607 `.tla` fixtures under `test-model/`. Usage
+classification (fixtures are `test-fixture` sources for differential runs;
+Java test classes are `reference` for expected behavior — none are ported
+as Java):
+
+| Test tree (classes) | Use for |
+|---|---|
+| `test/tla2sany/corpus/*.txt` (syntax corpus: expressions, functions, except, conj/disj lists, fairness, proofs, ...) | unit 3-4 accept/reject + AST-shape parity |
+| `test/tla2sany/parser` (10), `test/tla2sany/api` (9), `test/tla2sany/drivers` (4) | parser/API behavior reference |
+| `test/tla2sany/semantic` (6) + `semantic/corpus` + `semantic/error_corpus` | unit 6-7 semantic/level diagnostics parity |
+| `test/tla2sany/xml` (4) | XML-oracle comparison harness reference |
+| `test/pcal` (96) + `test/pcal/parser/corpus` | unit 8 translation parity |
+| `test/tlc2/tool` (260), `tool/suite` (107), `tool/liveness` (126 + 21 sim), `tool/simulation` (7), `tool/evalorder` (6), `tool/doinitfunctor` (6), `tool/checkpoint` (3) | units 9-12 verdict/trace/count parity |
+| `test/tlc2/value/impl` (14), `test/tlc2/module` (8), `test/tlc2/util` (13) | unit 9 value/override property tests |
+| `test/tlc2/debug` (17), `test/tlc2/tool/distributed` (14), `test/formatter` (30), `test/tlc2/tool/fp` (22, beyond contract) | excluded / performance-only |
+| `test-model/` (607 specs incl. `pcal/`, `suite/`, DieHard, Euclid, Bakery, liveness models) | fixture pool for all tiers |
+| `tlaplus-Examples/specifications/` | tier-2/3 matrix (unit 14) |
+
+## 5. Secondary-Reference Inventory (Adapter Layers)
+
+Sources for the boundary around the Java tools, never for TLA+ semantics.
+Classification: `api-shape` (informs Gall nouns/API), `test-fixture`
+(inputs/goldens reusable for compatibility), `ignore-ui`.
+
+### 5.1 Toolbox (`tlaplus/toolbox/`)
+
+| Item | Class |
+|---|---|
+| `org.lamport.tla.toolbox/spec/parser/` — `ModuleParserLauncher`, `ParseResult`, `ParserDependencyStorage`, `ParseResultBroadcaster`, `IParseConstants` | api-shape (parse-result + module-dependency tracking shapes) |
+| `tool.tlc/model/` — `Model`, `ModelWriter`, `TLCSpec`, `TLCModelFactory`, `TraceExpressionModelWriter`, `ModelCoverage` | api-shape (generated `.tla`/`.cfg` model writing, checkpoint/coverage states) |
+| `tool.tlc/output/` + `tool.tlc.ui/.../output/{source,data}` — `IProcessOutputSink`, tag-based incremental `EC` parsers, `TLCModelLaunchDataProvider`, `TLCState`/`TLCError`/`TLCVariableValue`, `StateSpaceInformationItem`, `ActionInformationItem`, `CoverageInformation` | api-shape (streamed `-tool` message model: progress, errors, stuttering, back-to-state, action locations, trace values) |
+| `tool.tlc.ui.test/.../output/{source,data}` tests — `TagBasedTLCOutputIncrementalParserTest`, `TLCStateTest`, `TLCErrorTest`, `TLCVariableValueTest`, `CoverageInformationTest`, `Bug267*` | test-fixture (real nested/tagged TLC output, trace values, coverage) |
+| PlusCal/TLA+ checksum-divergence validation before TLC (`Validator` use in spec editor plumbing) | api-shape (unit 8 divergence policy) |
+| All other plugins: editors, views, wizards, prover UI, tla2tex UI, product/feature/p2 packaging, Oomph | ignore-ui |
+
+### 5.2 VS Code (`vscode-tlaplus/`)
+
+| Item | Class |
+|---|---|
+| `src/commands/` — `parseModule`, `checkModel`, `evaluateExpression`, `exportModule`, `modelResolver` (adjacent/custom `.cfg` resolution) | api-shape (headless orchestration: PlusCal -> SANY -> TLC phases, cancellation, module search paths) |
+| `src/parsers/` — `sany.ts`, `tlc.ts`, `tlcCodes.ts`, `tlcValues.ts`, `traceParser.ts`, `pluscal.ts` | api-shape (structured run phases, warnings/errors, EC-code mapping, trace-value grammar) |
+| `src/model/check.ts`, `coverage.ts`, `documentInfo.ts` | api-shape (result nouns checklist: status, statistics, coverage, traces) |
+| `src/lm/` — `MCPServer.ts`, `SANYTool.ts`, `TLCTool.ts` | api-shape (bounded smoke/explore ops, workspace path validation) |
+| `tests/suite/parsers/` + `tests/fixtures/parsers/` | test-fixture (SANY/TLC output corpora: multiline diagnostics, monolith modules, progress, stuttering, lasso back-edges) |
+| `src/debugger`, `webview`, `panels`, `formatters`, `completions`, `symbols`, syntax highlighting, packaging, `main*.ts` | ignore-ui |
+| PlusCal boundary-detection / C-syntax caveats in its docs | ignore-ui (explicitly NOT ported, per PLAN.md) |
+
+## 6. Selected Oracle Cases (Unit-0 Baseline)
+
+Tiny cases proving the oracle harness end to end; the golden outputs live in
+`desk/test-data/oracle/golden/` and regenerate via
+`desk/test-data/oracle/regen.sh` (normalization rules §3). Upstream-copied
+fixtures note their origin in a `SOURCE` file per case.
+
+| Case | Area | Fixture | Oracle command | Expected |
+|---|---|---|---|---|
+| `lex-bad-string` | lexing | hand-written: unterminated string | `SANY -error-codes` | lexical error, exit 2 |
+| `syntax-accept` | grammar | hand-written: LET/EXCEPT/quantifiers/records | `SANY -error-codes` | parse+semantic ok |
+| `syntax-reject` | grammar | hand-written: malformed EXCEPT | `SANY -error-codes` | parse error, exit 2 |
+| `semantic-undef` | semantics | hand-written: undefined operator + arity error | `SANY -error-codes` | semantic errors, exit 4 |
+| `semantic-instance` | semantics | hand-written 2-module INSTANCE + substitution | `SANY -error-codes` | ok, both modules |
+| `level-prime` | levels | hand-written: double prime / action in invariant position | `SANY -error-codes` | level error, exit 4 |
+| `lint-record-clash` | lint | hand-written: `bar == 23`, `R == [bar |-> 42]` | `SANY -error-codes` | warning 4802 |
+| `pcal-evenodd` | PlusCal | `test-model/pcal/EvenOdd.tla` (copy) | `pcal.trans -nocfg`; golden = full rewritten `.tla` | translation matches |
+| `cfg-bad` | config | hand-written spec + `.cfg` naming unknown invariant | `TLC -config` | config error category |
+| `values-eval` | values | hand-written ASSUME/PrintT over sets/functions/records/intervals | `TLC` | printed canonical values |
+| `safety-diehard` | safety | `test-model/DieHard.tla|.cfg` (copy) | `TLC -workers 1 -fp 0` | invariant violation, shortest trace |
+| `deadlock-counter` | deadlock | hand-written bounded counter | `TLC -workers 1 -fp 0` | deadlock, trace |
+| `liveness-lasso` | liveness | hand-written WF spec with violated `<>[]` property | `TLC -workers 1 -fp 0 -lncheck final` | liveness violation, lasso trace |
+| `simulate-seeded` | simulation | same spec as `deadlock-counter` | `TLC -simulate num=3 -depth 8 -seed 1 -aril 0 -deadlock` | reproducible run |
+
+Regeneration: `TLA_REPO=/mnt/mars/gitrepos/tlaplus desk/test-data/oracle/regen.sh`
+(re-runs every case in a temp dir against the pinned jar and rewrites
+`golden/`). `regen.sh --check` verifies goldens match without rewriting.
+
+## 6a. Lexer Differential Harness (Unit 3)
+
+- Oracle: `tools/oracle/TokenDump.java` (compile:
+  `java -m jdk.compiler/com.sun.tools.javac.Main -cp <jar> -d build TokenDump.java`
+  — this machine has no `javac` launcher). Dumps the raw
+  `TLAplusParserTokenManager` stream: `T <kind> <spans> <image>` per
+  token, `C` per comment special, `E <TokenMgrError message>` on lexical
+  error; stops when module nesting returns to zero (SANY never lexes
+  past the root `====`).
+- Fixtures: `desk/test-data/lex/boundary/*.tla` (hand-written: tabs,
+  CRLF, EOF in string/comment/eol-comment, bad escapes, no-pattern and
+  live-prefix errors, nested comments, unicode spellings, proof-step
+  lexemes, junction BAND/BOR, WF/SF cases, module-delimiter variants,
+  pragma mode, pre-module skip) and `desk/test-data/lex/corpus/*`
+  (every case extracted from `test/tla2sany/corpus/*.txt`).
+- `tools/gen-lexer-tests.py` regenerates all goldens from the pinned jar
+  and emits the Hoon test shards `desk/tests/lib/tla/lexer/*.hoon`
+  (generated files; never hand-edit).
+- Hoon side: `lib/tla/source.hoon` (UTF-8 codec — zuse `tuba`/`tufa`
+  reject control chars — and the exact SimpleCharStream line/column
+  model incl. tab-to-8 and CR/LF/CRLF), `lib/tla/lexer.hoon` (states,
+  ~230-lexeme table, maximal munch with declaration-rank ties,
+  identifier CASE0-N, junctions, proof lexemes, nested-comment special
+  emission, TokenMgrError-format errors, `+dump` renderer).
+
+## 7. Progress Log
+
+| Unit | Status | Evidence |
+|---|---|---|
+| 0 pin/inventory/baseline | done 2026-07-12 | oracle rebuilt from pin; Bakery smoke reproduces 1183/668/41; 14 golden cases repeatable (`regen.sh --check` x2) |
+| 1 headless desk scaffold | done 2026-07-12 | fake-ship install without GUI; 27/27 tests OK (`-test /=tla-lus=/tests ~`); live submit/progress/done via Behn slices; bad-mark nack, artifact scry, delete-result; state survived pier restart |
+| 2 freeze shared types/diagnostics/job semantics | done 2026-07-12 | 51/51 tests OK; all action/update variants round-trip through marks, malformed nouns crash the grab clam; pure `step` engine pause/resume-identical (`test-pause-resume-identical`); limits terminate as `%limited`; `%0`->`%1` migration fixtures pass and live upgrade migrated running-agent state on the fake ship |
+| 3 source handling + native TLA+ lexer | done 2026-07-13 | 270 differential cases green on fake ship: 21 hand-written boundary fixtures (tabs, CRLF, EOF-in-string/comment/eol-comment, bad escapes, live-prefix + no-pattern errors, nested comments, unicode spellings, proof lexemes, junction BAND/BOR, WF/SF cases, delimiter variants, pragma, pre-module skip) + all 249 syntax-corpus cases — token kinds, images, spans, comment specials, and byte-exact TokenMgrError messages match the pinned Java token manager |
+| 4 syntactic analyzer + BNF | done 2026-07-13 | all 261 upstream syntax-corpus accept/reject cases green vs `AstDump.java` (SANY concrete tree: node kinds, spans, images, canonical step numbers) — full grammar: module frame/units, every definition LHS form, operator-stack expression engine (Operators/OperatorStack port incl. N_Times flattening, unary-minus mixfix, precedence-conflict rejection), junction lists with column discipline + `checkIndentation`, all `[`/`{` constructor families incl. `{x \in S}` recovery, quantifiers/CHOOSE/LAMBDA/fairness/labels (+`labelDoesNotChangeParse`), subexpression `!`-navigation, INSTANCE WITH, USE/HIDE/BY, complete proof syntax with level checking and a `belchDEF`-equivalent definition lookahead; `doc/tla-bnf.md` (35 traceable productions + mechanically generated precedence/synonym tables) drift-checked by generated `tests/lib/tla/bnf.hoon`. Deviations: error-message parity deferred (REJECT verdicts match; messages differ), documented for compatibility.md |
+| 5 module resolution + standard modules | done 2026-07-13 | 13/13 module-graph differential cases green vs `SANY -s` (chain, diamond, instance, missing×2, cycle×2, shadow, std, nested, mismatch, deep-std, inst-cycle) — `lib/tla/modules.hoon` ports SpecObj resolution: BFS over EXTENDS/INSTANCE refs in appearance order, user modules shadow the 20 vendored StandardModules (`lib/tla/stdmods.hoon`, generated), inner modules registered from their outer file, content-hash (`shax`) parse cache, dependency-first `sem-order` for unit 6, and SANY's doubled missing/circular/file-name-mismatch fatal-error blocks. Clay resolver (`clay-resolver` via `%cx` scry over the `%tla` mark, `mar/tla.hoon`) verified on the fake ship to produce a graph identical to inline resolution of the same modules (`=(out.cg out.ig)` → `%.y`; order `~['A' 'B' 'C' 'Naturals']`). Clay stores modules under the lowercased name (path segments carry no case); the case-sensitive declared-name check still runs in `resolve`. Deviations: error-message text parity with SANY's file-level fatal errors is matched for the four resolution error families; semantic-level diagnostics deferred to unit 6 |
+| 6 semantic graph construction | done 2026-07-14 | 18/18 semantic differential cases green vs a new normalized `SemDump.java` oracle (`tools/oracle/SemDump.java`, drives `SANY.parse` → root `ModuleNode`; emits kind/uniquename/arity + operator refs resolved by name+kind + spans; volatile UIDs and the `level` field omitted since level checking is unit 7). `lib/tla/semantic.hoon` ports Generator's syntax→semantic translation: the 74-entry `BuiltInOperators` table, synonym resolution (reused from the parser), dependency-first per-module export contexts built over unit 5's `sem-order` (EXTENDS unions and re-exports; user modules and standard modules import their operator signatures so e.g. `+` from `Naturals` resolves to `UserDefinedOpKind`), and a categorized root dump (constants, variables, definitions) with every operator reference resolved to a symbol (builtin / constant / variable / formal-param / user-op). Covered: all definition LHS forms (identifier/infix/prefix/postfix + higher-order params with arity) and function definitions ($NonRecursiveFcnSpec/$RecursiveFcnSpec with recursion detection); the expression grammar — numerals/strings, infix/prefix/postfix operator apps, N_OpApplication with args, conj/disj lists, set-enumerate/tuple, if-then-else, bounded & unbounded quantifiers, CHOOSE (bounded/unbounded), LET/IN (let-defs scoped), SubsetOf/SetOfAll/SetOfFcns, record constructor/select, CASE; and multi-module (user EXTENDS user) plus standard-module import. Cases: bare, constvar, nullary, nary, infix, conjdisj, ite, quant, settuple, letin, choose, unboundq, fcndef, records, setforms, casex, hoparam, usermod. Deviations/deferred (compatibility.md): SANY's semantic error recovery (nullODN sentinels for unresolved refs, duplicate-symbol dropping) and the separate semantic diagnostic channel — SANY returns a partial `ModuleNode` for ill-formed input rather than failing; the current port targets well-formed modules. Also deferred: EXCEPT (`$Except`/`$Seq` nesting), INSTANCE/substitution semantics ($SubstIn), proof/theorem/assume bodies, N_SetOfRcds, subexpression `!`-navigation |
+| 7 level checking + linting | in progress 2026-07-14 | 19/19 semantic+level differential cases green vs `SemDump.java` (now emitting `L<level>` on every node; UIDs still omitted). `lib/tla/semantic.hoon` computes constant/state/action/temporal levels (0/1/2/3): the `BuiltInOperators` table now carries each operator's OpLevel and ArgWeights (transcribed from the Java table — prime/box/diamond/ENABLED/UNCHANGED/temporal/`$SquareAct`/`$AngleAct`/`$WF`/`$SF`/`\cdot`/`-+->`/`~>` cap or fix their operands' contribution via weight-0 args); `+expr-level` applies SANY's rule `level = max(op.level, weight-1 operand levels, all range levels)`; `+build-ctx` folds a module's units in dependency order, computing each definition's level from its body (params in scope) and threading it into the context so cross-definition references carry the right level (verified by the `spec` case: `Init` L1 state, `Next` L2 action, `Spec` L3 temporal, with `[Next]_x` → `$SquareAct` L2 under `[]` L3). Also matched: SANY's quirk of leaving an unreferenced formal parameter's level uncomputed (`L-1`). Cases: the 18 unit-6 cases + `spec`. Deferred (compatibility.md): the full level-constraint machinery (level parameters, `SetOfArgLevelConstraints` for higher-order operator arguments, iterative recursive level checks), level-error *diagnostics* (prime-in-prime, temporal nesting, wrong-level config targets) — SANY's error recovery means these produce partial trees, not failures; and `Linter.java` (record-constructor field-name clash) |
+| 8 PlusCal translation | kickoff 2026-07-14 | Foundation for the largest unit (the Java pipeline is ~25k lines: `pcal/Tokenize` → `ParseAlgorithm` → `AST` → `PcalTranslate` → `PcalTLAGen`, plus `trans`/`Validator`). Unlike units 3–7 there is no per-fixture partial credit: a fixture's golden is the whole rewritten `.tla` + `.cfg`, and it embeds two CRC-32 checksums (`chksum(pcal)` over `ast.toString()`, `chksum(tla)` over the generated text), so nothing passes until the entire tokenize→parse→serialize→generate pipeline is byte-exact. Delivered this increment: (1) the **CRC-32 checksum primitive** — `lib/tla/crc.hoon` reproduces `java.util.zip.CRC32` + `Long.toHexString` (reflected poly `0xEDB88320`, lowercase hex, no leading zeros), differential-tested on 7 vectors (`tests/lib/tla/crc.hoon`, `tools/oracle/CrcVec.java`); (2) the **oracle harness + corpus** — `tools/gen-pcal-tests.py` copies each `desk/test-data/pcal/<case>/in.tla`, runs `pcal.trans`, and captures `golden.tla` + `golden.cfg` + the recorded checksums (`counter`, `twovars`); (3) end-to-end **checksum verification** — extracting the `counter` translation lines (strictly between BEGIN/END, concatenated with no separators) and CRC-32'ing them reproduces the recorded `chksum(tla) = 256526f5`, confirming the machinery integrates once `tlagen` emits exact text; (4) the **pipeline design study** — `tools/notes/unit8-pluscal-notes.md` maps stages to planned Hoon owners, documents the AST `toString()` serialization (the `chksum(pcal)` target, position-dependent indentation) and the generated-TLA shape, and orders the remaining increments. Remaining (multi-increment): PlusCal AST molds + `toString` (→ chksum(pcal)); tokenizer; parser; `translate` + `tlagen` (→ chksum(tla) + visible output + `.cfg`); option flags; then run both Java SANY and the Hoon SANY (units 4–7) over each generated `.tla` |
+| 9 TLC config, values, evaluation | in progress 2026-07-14 | Constant-expression evaluation with canonical TLC values, differential-tested against the **TLC REPL** (`tlc2.REPL`) — 37/37 cases green (`tools/gen-eval-tests.py`, `desk/test-data/eval/exprs.txt`, `tests/lib/tla/eval.hoon`). `lib/tla/eval.hoon` defines the canonical value model (`$+`-recursive: bool, signed int, string, model value, set, sequence, record, function, interval) with TLC's normalization (sets sorted + deduplicated by a canonical comparator, a function whose domain is `1..n` rendered as a tuple, intervals kept lazy) and a renderer byte-matching the REPL. The evaluator wraps an expression as `Expr == …` in a throwaway module, parses it with the unit-4 parser, and evaluates on the syntax tree with an environment: integer arithmetic (`+ - * ^ \div %`, signed via `si`), comparison, propositional logic, set algebra (`\cup \cap \ \in \notin \subseteq`, `SUBSET`, `UNION`, `Cardinality`), tuples/sequences (`\o`, `Len`, `Head`, `Tail`, `Append`, application `f[i]`), records (constructor, `.field`, `DOMAIN`), functions (`[x \in S \|-> e]`), ranges (`..`), `IF/THEN/ELSE`, bounded `\A`/`\E`, and set-builders (`{x \in S : P}`, `{e : x \in S}`). Errors are caught (`mule`) and render as TLC's "Error evaluating expression". Deviation (compatibility.md): TLC orders strings by internal `UniqueString` id (interning order), not reproducible without replicating interning; strings are ordered lexicographically here, which agrees with the oracle on non-adversarial string sets. Deferred: `.cfg` config parsing, model values from configs, StandardModule Hoon overrides beyond those exercised, fingerprints, and full lazy/enumerable value semantics for large sets |
+| 10 TLC safety model checking | in progress 2026-07-14 | Deterministic single-worker BFS safety checking, differential-tested against **`tlc2.TLC`** — 3/3 cases green (`tools/gen-mc-tests.py`, `desk/test-data/mc/{cyc,invfail,twobit}`, `tests/lib/tla/mc.hoon`). `lib/tla/check.hoon` ports the state-generation semantics: `+gen` solves the Init/Next predicate for variable assignments (conjunction threads the partial next-state; disjunction and `\E v \in S` branch; `x = e` / `x' = e` where the LHS is an unbound state variable is an assignment, otherwise a filter; `IF/THEN/ELSE`, `UNCHANGED`, and boolean constraints), reusing the unit-9 evaluator for expressions with a mode-aware environment (in `%next` mode `x` reads the current state and `x'` the partial next-state, keyed as `<name>'`; eval was extended to resolve primed references). `+explore` runs breadth-first over fingerprinted states (`+fingerprint` = the canonical sorted `var=value` rendering), deduplicating, checking the invariant as each state is generated, and detecting deadlock (a state with no successors); it retains per-state predecessor + depth for shortest-trace reconstruction. Output matches TLC exactly: the verdict (`Model checking completed. No error has been found.` / `Error: Invariant <name> is violated.` / `Error: Deadlock reached.`), the behavior trace (`State N: <Initial predicate>` or `<Next line BL, col BC to line EL, col EC of module M>` — the Next action's source span — followed by `var = value` bindings), and the `N states generated, M distinct states found, 0 states left on queue.` / `The depth ... is D.` counts (e.g. cyc: 5 generated / 4 distinct / depth 4; invfail: violation at `x = 3` with the 4-state trace). A minimal `.cfg` reader extracts `INIT`/`NEXT`/`INVARIANT`. Deferred: state/action constraints, `SPECIFICATION` (Init `/\` `[][Next]_vars`) form, multiple invariants/properties, symmetry, coverage counters, real fingerprints (a rendered-string key is used), and the raw "generated" count for specs whose enumeration order TLC computes differently |
+| 11 temporal / liveness checking | in progress 2026-07-14 | Liveness checking of temporal `PROPERTY`s under the no-fairness semantics, differential-tested against `tlc2.TLC` — the mc suite is 5/5 green (adds `live-diamond`, `live-box`). Key semantic point: without a fairness/`SPECIFICATION` constraint TLC permits infinite stuttering at any reachable state, so `<>P` is violated exactly when an initial state has `~P` (stutter there forever) and `[]<>P` when any reachable state has `~P`; the counterexample is a lasso whose cycle is a stutter self-loop. `lib/tla/check.hoon` adds `+build-graph` (the complete reachability graph via BFS, retaining per-state depth + predecessor and the initial-state set), `+unwrap-prop` (classifies a property body as `<>P` / `[]<>P` / `[]P`, stripping parentheses), and `+check-live` (`<>P`: first initial state violating P; `[]<>P`/`[]P`: shallowest reachable state violating P), with the property predicate evaluated by the unit-9/10 evaluator. Output matches TLC: `Error: Temporal property <name> was violated.` / `Error: The following behavior constitutes a counter-example:`, the prefix trace (`State N: <Initial predicate>` + `var = value` bindings) closed by `State M: Stuttering`, then the same `states generated / distinct / depth` counts as the full-graph exploration (live-diamond 5/2/2, live-box 3/2/2). Deferred (the hard core): fairness (`WF_`/`SF_`) and the SCC/tableau/Büchi machinery for real (non-stuttering) lasso counterexamples, `P ~> Q` leads-to, `[]P` as a temporal property beyond the reachability check, `SPECIFICATION`-form fairness, and the unsupported-combination diagnostics (liveness + symmetry) |
+| 12 core TLC modes + recovery | in progress 2026-07-14 | Bounded, reproducible **seeded simulation** (TLC `-simulate` core), tested as engine properties (the unit-2 pause/resume-identical style) rather than a byte-for-byte oracle since TLC's exact random choices depend on its internal RNG. `lib/tla/check.hoon` adds `+walk` (a single random behavior: at each step pick a uniformly random next state from the state generator, reproducibly via the stdlib `og` RNG core threaded through the walk, up to a depth bound, stopping on deadlock or an invariant violation), `+simulate` (up to `traces` behaviors, each up to `depth` transitions, deterministic in the seed), and `+simulate-spec` (from spec + config source). Property tests (`tests/lib/tla/sim.hoon`, 4/4 green): **reproducibility** (same seed + limits → identical result), **bounded termination** (a run never exceeds the trace limit — limits always terminate with partial statistics rather than crashing), **violation discovery** (a bounded simulation finds a reachable invariant violation), and **no false positives** (a spec whose invariant always holds yields none). Deferred: symmetry reduction, checkpoint/resume + Gall-restart recovery (the pause/resume-identical step engine from units 1–2 is the substrate), job cancellation and structured partial-statistics on resource limits, DFID, and the benchmark suite; matching TLC's *exact* seeded traces would require porting its RNG and choice order |
+| 13 integrate pipeline with Gall | in progress 2026-07-14 | The real model checker (`lib/tla/check`) is wired into the resumable job engine (`lib/tla/job`), replacing the stub for inline `%check` requests that carry a config. `check.hoon` gains `+run-check` (parse → resolve INIT/NEXT/INVARIANT/PROPERTY from the `.cfg` → run safety `+explore` or liveness `+build-graph`/`+check-live` → return the wire-typed `result` + `run-stats`), bounded by a distinct-state `cap` (a new `%limited` outcome), so a single invocation is bounded by the request's `max-states` and never does unbounded work. `job.hoon`'s `%explore` stage now runs `run-check` for inline-with-config sources, finishing with the real result and a real report artifact; sources without a config keep the deterministic placeholder, so the unit-1/2 stub behavior and pause/resume-identical property are preserved. Tests (`tests/lib/tla/job.hoon`, all green): the original stub tests plus `test-real-check-ok` (cyc → `%ok [5 4 0 4]`), `test-real-check-violation` (invfail → `%violated [%invariant Inv] [4 4 0 4]`), `test-real-check-limited` (`max-states=2` → `%limited`), and `test-real-pause-resume-identical` (interrupting the real pipeline never changes the final job). Deferred: incremental BFS *slicing* across events (currently one bounded `run-check` per `%explore` stage, capped by `max-states` rather than sliced state-by-state); Clay reads + canonicalized module-search roots + content-hash caching + explicit translation write-back + stale-source protection; wiring the real parser/semantic/level stages (still placeholders) and the real PlusCal translation (unit 8); authorization/quota/retention and subscriber idempotency beyond what units 1–2 provide |
+| 14 differential + compatibility validation | in progress 2026-07-14 | The differential suites built across units 3–13 are organized into tiers with a single reproducibility harness. `tools/validate.py [--check]` verifies the tlaplus pin, recompiles the oracle dumpers (`tools/oracle/{TokenDump,AstDump,SemDump,CrcVec}.java`), reruns every generator, and **content-hashes the oracle-derived trees before/after** to prove they reproduce byte-identically from the pinned oracle (git-independent, since the repo intentionally stays uncommitted) — a clean run is tier-1 differential integrity. Verified green: lexer 249, parser 249, BNF 35 productions, module resolution 13, semantic+levels 19, evaluation 37, safety+liveness 5, and the unit-0 oracle baseline 14 (`regen.sh --check`). `doc/testing.md` documents the three tiers (tier 1 = this script + `-test /=tla-lus=/tests ~` on every change; tier 2 = `tlaplus/test-model` + a `tlaplus-Examples` matrix run through both SANY and TLC implementations; tier 3 = broader examples + bounded performance) with the oracle-per-stage map and the "never weaken a golden without proving Java behavior from the pin" rule. A fuzz harness (`tests/lib/tla/fuzz.hoon`, 3/3 green) drives the parser with 320 seeded-random token-sequence module bodies plus adversarial garbage and asserts it never bails — always a clean accept/reject. Deferred (tier-2/3 build-out): the automated `tlaplus-Examples`/`test-model` matrix, adapted Toolbox/VS Code diagnostic fixtures, value-input fuzzing, performance models, and turning every `compatibility.md` row into an explicit green/approved-difference checklist entry |
+| 15 user + maintainer documentation | in progress 2026-07-14 | The doc set is grounded in the real agent surface (`app/tla-lus.hoon`, `sur/tla-lus.hoon`, `mar/tla-lus/{action,update}.hoon`), not aspirational. New: `doc/api.md` (the `%tla-lus-action`/`%tla-lus-update` marks; the `%submit`/`%cancel`/`%delete-result` actions with `request`/`op`/`source-bundle`/`limits`/`check-opts` molds; the `update`/`event`/`result`/`run-stats`/`violation` outputs; the `/job/<id>` + `/jobs` watches; the `/x/jobs`, `/x/job/<id>`, `/x/job/<id>/artifact/<name>` scries; Behn-sliced scheduling, cancellation, restart; and a corrected Dojo example — `req-id` is `@ta`, scries use the `%gx` care so `/=tla-lus=/job/counter` maps to on-peek `[%x %job ~.counter ~]`), `doc/users-guide.md` (install/start, inline + Clay workflows, exhaustive vs. seeded-simulate checking, limits/cancellation, reading traces incl. the `State M: Stuttering` lasso tail, and a troubleshooting table keyed to the real reject/failed/limited reasons), and `doc/architecture.md` (the pure `lib/tla/*` pipeline stack with unit annotations, the thin authorize/schedule/persist/publish Gall shell, the unit dependency graph, versioned-state persistence + resume-identical recovery, and the trust boundaries — Clay read-only-unless-opted-in, per-request `limits`, and the oracle jar as build-time-only never shipped). The repository README is replaced with a headless quick start + links. `doc/tla-bnf.md` (unit 4), `doc/compatibility.md`, `doc/testing.md` (unit 14), and this `doc/port-map.md` complete the set. Deferred: filling the guides as the deferred pipeline pieces (PlusCal, Clay paths, semantic/level diagnostics) land, and a full mold-by-mold `api.md` appendix |
+| 16 release gate | done 2026-07-14 | `tools/release-gate.sh` runs 8 gates, all PASS: (1) tlaplus at the pinned `4ba7d8811`; (2) **differential reproducibility** — `validate.py --check` confirms every golden reproduces byte-identically from the pin; (3) **no GUI / tla2tex / Java** code or dependencies in the desk (no `.java`/`.jar`/`.class`, no GUI references in Hoon outside the vendored `StandardModules` *text*); (4) MIT license/provenance present (`stdmods.hoon`, docs); (5) kelvin declared (`sys.kelvin` = `[%zuse 411 410 409 408]`); (6) `%0→%1` state migration wired in `on-load` (`lib/tla/migrate`, tested); (7) no fixture over 100 KB; (8) `desk.bill` present. The ship gate `-test /=tla-lus=/tests ~` is `ok=%.y` (all differential + property suites plus the 23 `app/tla-lus` agent tests — poke submit/duplicate-reject, cancel/delete idempotency, watch snapshot+stream, scry, Behn-sliced stepping, limit termination, and `%0→%1` live migration). The agent is confirmed installed and running on the fake ship (`+vats %tla-lus` → running). `compatibility.md` carries the release matrix tagging the oracle pin, example pins, agent state `%1`, kelvin, and the audit itself. Reproducibility: a clean checkout + pinned jar regenerates identical goldens and passes both gates. Remaining work is the deferred pipeline surface tracked in the rows above (PlusCal translation, Clay source paths, semantic/level diagnostics, liveness fairness, incremental MC slicing), each documented in `compatibility.md` rather than silently missing |
+
+Unit-2 Hoon surface: `sur/tla-lus.hoon` freezes the public wire nouns —
+spans/locs (SANY Location semantics), `token`, diagnostics (namespaced
+`diag-code`, severity, `stage`, spans, related locs), traces/artifacts,
+the full `request` (op + source-bundle + limits + write policy),
+five-way terminal `result`, `job`, resumable `step-result`, actions and
+updates. `lib/tla/job.hoon` is the stub engine (validate, per-op stage
+plan, one stage per bounded step, limit enforcement);
+`lib/tla/diagnostics.hoon` owns deterministic ordering;
+`lib/tla/migrate.hoon` owns frozen `%0` molds + migration. Deviations:
+the recursive syntax-tree mold is deferred to unit 4 — recursive `$%`
+molds overflow the zuse-408 mold compiler without obelisk-style `$+`
+annotations (`token` is frozen now; the tree shape lands with the
+parser). Diagnostic/update surface for unit 1's `%cancelled`/`%done`
+updates was replaced by `[%job id event]` before any external consumer
+existed.

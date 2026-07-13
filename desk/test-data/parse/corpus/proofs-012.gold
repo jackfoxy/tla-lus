@@ -1,0 +1,25 @@
+ACCEPT
+n-module 1.1-5.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-4.13
+    n-theorem 2.1-4.13
+      theorem 2.1-2.7 THEOREM
+      n-generalid 2.9-2.12
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.12 TRUE
+      n-proof 3.1-4.13
+        n-proofstep 3.1-3.20
+          proofstepdotlexeme 3.1-3.9 <1>a.....
+          n-nonlocalinstance 3.11-3.20
+            instance 3.11-3.18 INSTANCE
+            identifier 3.20-3.20 M
+        n-proofstep 4.1-4.13
+          proofstepdotlexeme 4.1-4.9 <1>b.....
+          n-qedstep 4.11-4.13
+            qed 4.11-4.13 QED
+  n-endmodule 5.1-5.4
+    end-module 5.1-5.4 ====

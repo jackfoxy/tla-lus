@@ -1,0 +1,11 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T lab 2.7 2.8 <<
+T string-literal 2.9 2.13 "/\\\\"
+T comma 2.14 2.14 ,
+T string-literal 2.16 2.20 "\\\\/"
+T rab 2.21 2.22 >>
+T end-module 3.1 3.4 ====

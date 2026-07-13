@@ -1,0 +1,48 @@
+ACCEPT
+n-module 1.1-9.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-8.17
+    n-theorem 2.1-8.17
+      theorem 2.1-2.7 THEOREM
+      n-generalid 2.9-2.12
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.12 TRUE
+      n-proof 3.1-8.17
+        n-proofstep 3.1-7.12
+          barelevellexeme 3.1-3.3 <*>
+          n-assertstep 3.5-4.8
+            n-conjlist 3.5-4.8
+              n-conjitem 3.5-3.8
+                and 3.5-3.6 /\\
+                n-number 3.8-3.8
+                  number-literal 3.8-3.8 1
+              n-conjitem 4.5-4.8
+                and 4.5-4.6 /\\
+                n-number 4.8-4.8
+                  number-literal 4.8-4.8 2
+          n-proof 5.7-7.12
+            n-proofstep 5.7-7.12
+              barelevellexeme 5.7-5.9 <+>
+              n-qedstep 5.11-5.13
+                qed 5.11-5.13 QED
+              n-terminalproof 5.15-7.12
+                by 5.15-5.16 BY
+                n-disjlist 6.9-7.12
+                  n-disjitem 6.9-6.12
+                    or 6.9-6.10 \\/
+                    n-number 6.12-6.12
+                      number-literal 6.12-6.12 1
+                  n-disjitem 7.9-7.12
+                    or 7.9-7.10 \\/
+                    n-number 7.12-7.12
+                      number-literal 7.12-7.12 2
+        n-proofstep 8.11-8.17
+          barelevellexeme 8.11-8.13 <*>
+          n-qedstep 8.15-8.17
+            qed 8.15-8.17 QED
+  n-endmodule 9.1-9.4
+    end-module 9.1-9.4 ====

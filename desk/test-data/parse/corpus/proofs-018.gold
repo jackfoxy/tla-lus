@@ -1,0 +1,82 @@
+ACCEPT
+n-module 1.1-18.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-17.7
+    n-theorem 2.1-17.7
+      proposition 2.1-2.5 LEMMA
+      n-generalid 2.7-2.10
+        n-idprefix ~ N_IdPrefix
+        identifier 2.7-2.10 TRUE
+      n-proof 3.1-17.7
+        proof 3.1-3.5 PROOF
+        n-proofstep 4.1-7.14
+          barelevellexeme 4.1-4.3 <*>
+          n-assertstep 4.5-4.5
+            n-number 4.5-4.5
+              number-literal 4.5-4.5 1
+          n-proof 5.3-7.14
+            n-proofstep 5.3-5.7
+              barelevellexeme 5.3-5.5 <+>
+              n-assertstep 5.7-5.7
+                n-number 5.7-5.7
+                  number-literal 5.7-5.7 2
+            n-proofstep 6.3-7.14
+              barelevellexeme 6.3-6.5 <1>
+              n-qedstep 6.7-6.9
+                qed 6.7-6.9 QED
+              n-terminalproof 7.5-7.14
+                proof 7.5-7.9 PROOF
+                by 7.11-7.12 BY
+                n-generalid 7.14-7.14
+                  n-idprefix ~ N_IdPrefix
+                  identifier 7.14-7.14 P
+        n-proofstep 8.1-11.11
+          barelevellexeme 8.1-8.3 <*>
+          n-assertstep 8.5-8.5
+            n-number 8.5-8.5
+              number-literal 8.5-8.5 3
+          n-proof 9.3-11.11
+            n-proofstep 9.3-9.7
+              barelevellexeme 9.3-9.5 <+>
+              n-assertstep 9.7-9.7
+                n-number 9.7-9.7
+                  number-literal 9.7-9.7 4
+            n-proofstep 10.3-11.11
+              barelevellexeme 10.3-10.5 <1>
+              n-qedstep 10.7-10.9
+                qed 10.7-10.9 QED
+              n-terminalproof 11.5-11.11
+                obvious 11.5-11.11 OBVIOUS
+        n-proofstep 12.1-15.17
+          barelevellexeme 12.1-12.3 <*>
+          n-assertstep 12.5-12.5
+            n-number 12.5-12.5
+              number-literal 12.5-12.5 5
+          n-proof 13.3-15.17
+            n-proofstep 13.3-13.7
+              barelevellexeme 13.3-13.5 <+>
+              n-assertstep 13.7-13.7
+                n-number 13.7-13.7
+                  number-literal 13.7-13.7 6
+            n-proofstep 14.3-15.17
+              barelevellexeme 14.3-14.5 <1>
+              n-qedstep 14.7-14.9
+                qed 14.7-14.9 QED
+              n-terminalproof 15.5-15.17
+                proof 15.5-15.9 PROOF
+                omitted 15.11-15.17 OMITTED
+        n-proofstep 16.1-16.5
+          barelevellexeme 16.1-16.3 <*>
+          n-assertstep 16.5-16.5
+            n-number 16.5-16.5
+              number-literal 16.5-16.5 7
+        n-proofstep 17.1-17.7
+          barelevellexeme 17.1-17.3 <0>
+          n-qedstep 17.5-17.7
+            qed 17.5-17.7 QED
+  n-endmodule 18.1-18.4
+    end-module 18.1-18.4 ====

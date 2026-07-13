@@ -1,0 +1,14 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T and 3.3 3.4 /\\
+T let 3.6 3.8 LET
+T recursive 3.10 3.18 RECURSIVE
+T identifier 3.20 3.20 f
+T letin 3.22 3.23 IN
+T identifier 3.25 3.25 P
+T and 4.3 4.4 /\\
+T identifier 4.6 4.6 Q
+T end-module 5.1 5.4 ====

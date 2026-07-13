@@ -1,0 +1,17 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T theorem 2.1 2.7 THEOREM
+T identifier 2.9 2.11 thm
+T def 2.13 2.14 ==
+T assume 3.3 3.8 ASSUME
+T identifier 3.10 3.12 asm
+T coloncolon 3.14 3.15 ::
+T assume 4.5 4.10 ASSUME
+T identifier 4.12 4.12 P
+T prove 5.5 5.9 PROVE
+T identifier 5.11 5.11 Q
+T prove 6.3 6.7 PROVE
+T identifier 6.9 6.9 C
+T omitted 7.1 7.7 OMITTED
+T end-module 8.1 8.4 ====

@@ -1,0 +1,87 @@
+ACCEPT
+n-module 1.1-15.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-13.10
+    n-operatordefinition 3.1-3.7
+      n-prefixlhs 3.1-3.2
+        op-58 3.1-3.1 ~
+        identifier 3.2-3.2 x
+      def 3.4-3.5 ==
+      n-number 3.7-3.7
+        number-literal 3.7-3.7 1
+    n-operatordefinition 4.1-4.12
+      n-prefixlhs 4.1-4.7
+        op-26 4.1-4.5 \\lnot
+        identifier 4.7-4.7 x
+      def 4.9-4.10 ==
+      n-number 4.12-4.12
+        number-literal 4.12-4.12 2
+    n-operatordefinition 5.1-5.11
+      n-prefixlhs 5.1-5.6
+        op-29 5.1-5.4 \\neg
+        identifier 5.6-5.6 x
+      def 5.8-5.9 ==
+      n-number 5.11-5.11
+        number-literal 5.11-5.11 3
+    n-operatordefinition 6.1-6.12
+      n-prefixlhs 6.1-6.7
+        op-115 6.1-6.5 UNION
+        identifier 6.7-6.7 x
+      def 6.9-6.10 ==
+      n-number 6.12-6.12
+        number-literal 6.12-6.12 4
+    n-operatordefinition 7.1-7.13
+      n-prefixlhs 7.1-7.8
+        op-114 7.1-7.6 SUBSET
+        identifier 7.8-7.8 x
+      def 7.10-7.11 ==
+      n-number 7.13-7.13
+        number-literal 7.13-7.13 5
+    n-operatordefinition 8.1-8.13
+      n-prefixlhs 8.1-8.8
+        op-116 8.1-8.6 DOMAIN
+        identifier 8.8-8.8 x
+      def 8.10-8.11 ==
+      n-number 8.13-8.13
+        number-literal 8.13-8.13 6
+    n-operatordefinition 9.1-9.9
+      n-prefixlhs 9.1-9.4
+        op-76 9.1-9.2 -.
+        identifier 9.4-9.4 x
+      def 9.6-9.7 ==
+      n-number 9.9-9.9
+        number-literal 9.9-9.9 7
+    n-operatordefinition 10.1-10.14
+      n-prefixlhs 10.1-10.9
+        op-112 10.1-10.7 ENABLED
+        identifier 10.9-10.9 x
+      def 10.11-10.12 ==
+      n-number 10.14-10.14
+        number-literal 10.14-10.14 8
+    n-operatordefinition 11.1-11.16
+      n-prefixlhs 11.1-11.11
+        op-113 11.1-11.9 UNCHANGED
+        identifier 11.11-11.11 x
+      def 11.13-11.14 ==
+      n-number 11.16-11.16
+        number-literal 11.16-11.16 9
+    n-operatordefinition 12.1-12.10
+      n-prefixlhs 12.1-12.4
+        casesep 12.1-12.2 []
+        identifier 12.4-12.4 x
+      def 12.6-12.7 ==
+      n-number 12.9-12.10
+        number-literal 12.9-12.10 10
+    n-operatordefinition 13.1-13.10
+      n-prefixlhs 13.1-13.4
+        op-61 13.1-13.2 <>
+        identifier 13.4-13.4 x
+      def 13.6-13.7 ==
+      n-number 13.9-13.10
+        number-literal 13.9-13.10 11
+  n-endmodule 15.1-15.4
+    end-module 15.1-15.4 ====

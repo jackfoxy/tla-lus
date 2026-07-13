@@ -1,0 +1,61 @@
+ACCEPT
+n-module 1.1-3.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-2.55
+    n-operatordefinition 2.1-2.55
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-subsetof 2.7-2.55
+        lbc 2.7-2.7 {
+        n-identifiertuple 2.8-2.18
+          lab 2.8-2.9 <<
+          identifier 2.10-2.10 x
+          comma 2.11-2.11 ,
+          identifier 2.13-2.13 y
+          comma 2.14-2.14 ,
+          identifier 2.16-2.16 z
+          rab 2.17-2.18 >>
+        t-in 2.20-2.22 \\in
+        n-times 2.24-2.41
+          n-generalid 2.24-2.26
+            n-idprefix ~ N_IdPrefix
+            identifier 2.24-2.26 Nat
+          n-geninfixop 2.28-2.29
+            n-idprefix ~ N_IdPrefix
+            n-infixop 2.28-2.29 \\X
+          n-generalid 2.31-2.33
+            n-idprefix ~ N_IdPrefix
+            identifier 2.31-2.33 Int
+          n-geninfixop 2.35-2.36
+            n-idprefix ~ N_IdPrefix
+            n-infixop 2.35-2.36 \\X
+          n-generalid 2.38-2.41
+            n-idprefix ~ N_IdPrefix
+            identifier 2.38-2.41 Real
+        colon 2.43-2.43 :
+        n-opapplication 2.45-2.54
+          n-generalid 2.45-2.45
+            n-idprefix ~ N_IdPrefix
+            identifier 2.45-2.45 P
+          n-opargs 2.46-2.54
+            lbr 2.46-2.46 (
+            n-generalid 2.47-2.47
+              n-idprefix ~ N_IdPrefix
+              identifier 2.47-2.47 x
+            comma 2.48-2.48 ,
+            n-generalid 2.50-2.50
+              n-idprefix ~ N_IdPrefix
+              identifier 2.50-2.50 y
+            comma 2.51-2.51 ,
+            n-generalid 2.53-2.53
+              n-idprefix ~ N_IdPrefix
+              identifier 2.53-2.53 z
+            rbr 2.54-2.54 )
+        rbc 2.55-2.55 }
+  n-endmodule 3.1-3.4
+    end-module 3.1-3.4 ====

@@ -1,0 +1,12 @@
+ACCEPT
+MODULE A 1.1-7.4
+  const P arity=0 L0 2.10-2.10
+  const Q arity=0 L0 2.13-2.13
+  def Both arity=0 local=n L0 3.1-4.12
+    apply $ConjList opkind=BuiltInKind L0 3.9-4.12
+      apply P opkind=ConstantDeclKind L0 3.12-3.12
+      apply Q opkind=ConstantDeclKind L0 4.12-4.12
+  def Either arity=0 local=n L0 5.1-6.14
+    apply $DisjList opkind=BuiltInKind L0 5.11-6.14
+      apply P opkind=ConstantDeclKind L0 5.14-5.14
+      apply Q opkind=ConstantDeclKind L0 6.14-6.14

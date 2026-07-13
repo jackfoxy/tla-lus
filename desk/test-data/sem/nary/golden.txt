@@ -1,0 +1,6 @@
+ACCEPT
+MODULE A 1.1-3.4
+  def Foo arity=2 local=n L0 2.1-2.14
+    param a arity=0 L0 2.5-2.5
+    param b arity=0 L-1 2.8-2.8
+    apply a opkind=FormalParamKind L0 2.14-2.14

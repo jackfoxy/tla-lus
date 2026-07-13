@@ -1,0 +1,24 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.1 r
+T def 2.3 2.4 ==
+T lsb 2.6 2.6 [
+T identifier 2.7 2.7 a
+T except 2.9 2.14 EXCEPT
+T bang 2.16 2.16 !
+T lsb 2.17 2.17 [
+T number-literal 2.18 2.18 2
+T rsb 2.19 2.19 ]
+T lsb 2.20 2.20 [
+T string-literal 2.21 2.23 "a"
+T rsb 2.24 2.24 ]
+T lsb 2.25 2.25 [
+T number-literal 2.26 2.26 3
+T rsb 2.27 2.27 ]
+T equals 2.29 2.29 =
+T identifier 2.31 2.31 @
+T op-81 2.33 2.33 +
+T number-literal 2.35 2.35 1
+T rsb 2.36 2.36 ]
+T end-module 3.1 3.4 ====

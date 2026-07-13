@@ -1,0 +1,100 @@
+ACCEPT
+n-module 1.1-27.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-26.20
+    n-operatordefinition 2.1-4.6
+      n-identlhs 2.1-2.3
+        identifier 2.1-2.3 op1
+      def 2.5-2.6 ==
+      n-conjlist 3.3-4.6
+        n-conjitem 3.3-3.6
+          and 3.3-3.4 /\\
+          n-number 3.6-3.6
+            number-literal 3.6-3.6 1
+        n-conjitem 4.3-4.6
+          and 4.3-4.4 /\\
+          n-number 4.6-4.6
+            number-literal 4.6-4.6 2
+    n-assumption 5.7-5.14
+      assume 5.7-5.12 ASSUME
+      n-generalid 5.14-5.14
+        n-idprefix ~ N_IdPrefix
+        identifier 5.14-5.14 x
+    n-operatordefinition 7.1-9.6
+      n-identlhs 7.1-7.3
+        identifier 7.1-7.3 op2
+      def 7.5-7.6 ==
+      n-conjlist 8.3-9.6
+        n-conjitem 8.3-8.6
+          and 8.3-8.4 /\\
+          n-number 8.6-8.6
+            number-literal 8.6-8.6 3
+        n-conjitem 9.3-9.6
+          and 9.3-9.4 /\\
+          n-number 9.6-9.6
+            number-literal 9.6-9.6 4
+    n-instance 10.7-10.31
+      local 10.7-10.11 LOCAL
+      n-nonlocalinstance 10.13-10.31
+        instance 10.13-10.20 INSTANCE
+        identifier 10.22-10.31 ModuleName
+    n-operatordefinition 12.1-14.6
+      n-identlhs 12.1-12.3
+        identifier 12.1-12.3 op3
+      def 12.5-12.6 ==
+      n-conjlist 13.3-14.6
+        n-conjitem 13.3-13.6
+          and 13.3-13.4 /\\
+          n-number 13.6-13.6
+            number-literal 13.6-13.6 5
+        n-conjitem 14.3-14.6
+          and 14.3-14.4 /\\
+          n-number 14.6-14.6
+            number-literal 14.6-14.6 6
+    separator 15.7-15.23 -----------------
+    n-operatordefinition 17.1-19.6
+      n-identlhs 17.1-17.3
+        identifier 17.1-17.3 op4
+      def 17.5-17.6 ==
+      n-conjlist 18.3-19.6
+        n-conjitem 18.3-18.6
+          and 18.3-18.4 /\\
+          n-number 18.6-18.6
+            number-literal 18.6-18.6 7
+        n-conjitem 19.3-19.6
+          and 19.3-19.4 /\\
+          n-number 19.6-19.6
+            number-literal 19.6-19.6 8
+    n-module 20.7-21.10
+      n-beginmodule 20.7-20.29
+        bm0 20.7-20.17 ---- MODULE
+        identifier 20.19-20.24 Nested
+        separator 20.26-20.29 ----
+      n-extends ~ N_Extends
+      n-body ~ N_Body
+      n-endmodule 21.7-21.10
+        end-module 21.7-21.10 ====
+    n-operatordefinition 23.1-25.7
+      n-identlhs 23.1-23.3
+        identifier 23.1-23.3 op5
+      def 23.5-23.6 ==
+      n-conjlist 24.3-25.7
+        n-conjitem 24.3-24.6
+          and 24.3-24.4 /\\
+          n-number 24.6-24.6
+            number-literal 24.6-24.6 9
+        n-conjitem 25.3-25.7
+          and 25.3-25.4 /\\
+          n-number 25.6-25.7
+            number-literal 25.6-25.7 10
+    n-variabledeclaration 26.7-26.20
+      variable 26.7-26.15 VARIABLES
+      identifier 26.17-26.17 x
+      comma 26.18-26.18 ,
+      identifier 26.20-26.20 y
+  n-endmodule 27.1-27.4
+    end-module 27.1-27.4 ====

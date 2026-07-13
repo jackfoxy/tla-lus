@@ -1,0 +1,57 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.11
+    n-instance 2.1-7.11
+      n-nonlocalinstance 2.1-7.11
+        instance 2.1-2.8 INSTANCE
+        identifier 2.10-2.10 M
+        with 2.12-2.15 WITH
+        n-substitution 3.3-3.11
+          identifier 3.3-3.3 A
+          substitute 3.5-3.6 <-
+          n-conjlist 3.8-3.11
+            n-conjitem 3.8-3.11
+              and 3.8-3.9 /\\
+              n-number 3.11-3.11
+                number-literal 3.11-3.11 1
+        comma 3.12-3.12 ,
+        n-substitution 4.3-4.11
+          identifier 4.3-4.3 B
+          substitute 4.5-4.6 <-
+          n-conjlist 4.8-4.11
+            n-conjitem 4.8-4.11
+              and 4.8-4.9 /\\
+              n-number 4.11-4.11
+                number-literal 4.11-4.11 2
+        comma 4.12-4.12 ,
+        n-substitution 5.3-6.14
+          identifier 5.3-5.3 C
+          substitute 5.5-5.6 <-
+          n-conjlist 5.8-6.14
+            n-conjitem 5.8-6.14
+              and 5.8-5.9 /\\
+              n-disjlist 5.11-6.14
+                n-disjitem 5.11-5.14
+                  or 5.11-5.12 \\/
+                  n-number 5.14-5.14
+                    number-literal 5.14-5.14 3
+                n-disjitem 6.11-6.14
+                  or 6.11-6.12 \\/
+                  n-number 6.14-6.14
+                    number-literal 6.14-6.14 4
+        comma 6.15-6.15 ,
+        n-substitution 7.3-7.11
+          identifier 7.3-7.3 D
+          substitute 7.5-7.6 <-
+          n-disjlist 7.8-7.11
+            n-disjitem 7.8-7.11
+              or 7.8-7.9 \\/
+              n-number 7.11-7.11
+                number-literal 7.11-7.11 5
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

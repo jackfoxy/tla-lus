@@ -1,0 +1,61 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.12
+    n-operatordefinition 2.1-2.9
+      n-identlhs 2.1-2.3
+        identifier 2.1-2.3 Nat
+      def 2.5-2.6 ==
+      n-setenumerate 2.8-2.9
+        lbc 2.8-2.8 {
+        rbc 2.9-2.9 }
+    n-operatordefinition 3.1-3.11
+      n-identlhs 3.1-3.2
+        identifier 3.1-3.2 op
+      def 3.4-3.5 ==
+      n-generalid 3.7-3.11
+        n-idprefix 3.7-3.8
+          n-idprefixelement 3.7-3.8
+            identifier 3.7-3.7 A
+            bang 3.8-3.8 !
+        identifier 3.9-3.11 Nat
+    n-operatordefinition 4.1-4.9
+      n-identlhs 4.1-4.3
+        identifier 4.1-4.3 Int
+      def 4.5-4.6 ==
+      n-setenumerate 4.8-4.9
+        lbc 4.8-4.8 {
+        rbc 4.9-4.9 }
+    n-operatordefinition 5.1-5.11
+      n-identlhs 5.1-5.2
+        identifier 5.1-5.2 op
+      def 5.4-5.5 ==
+      n-generalid 5.7-5.11
+        n-idprefix 5.7-5.8
+          n-idprefixelement 5.7-5.8
+            identifier 5.7-5.7 A
+            bang 5.8-5.8 !
+        identifier 5.9-5.11 Int
+    n-operatordefinition 6.1-6.10
+      n-identlhs 6.1-6.4
+        identifier 6.1-6.4 Real
+      def 6.6-6.7 ==
+      n-setenumerate 6.9-6.10
+        lbc 6.9-6.9 {
+        rbc 6.10-6.10 }
+    n-operatordefinition 7.1-7.12
+      n-identlhs 7.1-7.2
+        identifier 7.1-7.2 op
+      def 7.4-7.5 ==
+      n-generalid 7.7-7.12
+        n-idprefix 7.7-7.8
+          n-idprefixelement 7.7-7.8
+            identifier 7.7-7.7 A
+            bang 7.8-7.8 !
+        identifier 7.9-7.12 Real
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

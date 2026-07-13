@@ -1,0 +1,9 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file A.tla
+Parsing file Bags.tla
+Parsing file TLC.tla
+Parsing file Naturals.tla
+Parsing file Sequences.tla
+Parsing file FiniteSets.tla

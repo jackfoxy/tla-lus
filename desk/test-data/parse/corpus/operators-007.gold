@@ -1,0 +1,66 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.6
+    n-operatordefinition 2.1-7.6
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-conjlist 3.3-7.6
+        n-conjitem 3.3-3.11
+          and 3.3-3.4 /\\
+          n-infixexpr 3.6-3.11
+            n-generalid 3.6-3.6
+              n-idprefix ~ N_IdPrefix
+              identifier 3.6-3.6 A
+            n-geninfixop 3.8-3.9
+              n-idprefix ~ N_IdPrefix
+              n-infixop 3.8-3.9 :>
+            n-generalid 3.11-3.11
+              n-idprefix ~ N_IdPrefix
+              identifier 3.11-3.11 B
+        n-conjitem 4.3-4.11
+          and 4.3-4.4 /\\
+          n-infixexpr 4.6-4.11
+            n-generalid 4.6-4.6
+              n-idprefix ~ N_IdPrefix
+              identifier 4.6-4.6 A
+            n-geninfixop 4.8-4.9
+              n-idprefix ~ N_IdPrefix
+              n-infixop 4.8-4.9 :=
+            n-generalid 4.11-4.11
+              n-idprefix ~ N_IdPrefix
+              identifier 4.11-4.11 B
+        n-conjitem 5.3-5.12
+          and 5.3-5.4 /\\
+          n-infixexpr 5.6-5.12
+            n-generalid 5.6-5.6
+              n-idprefix ~ N_IdPrefix
+              identifier 5.6-5.6 A
+            n-geninfixop 5.8-5.10
+              n-idprefix ~ N_IdPrefix
+              n-infixop 5.8-5.10 ::=
+            n-generalid 5.12-5.12
+              n-idprefix ~ N_IdPrefix
+              identifier 5.12-5.12 B
+        n-conjitem 6.3-6.11
+          and 6.3-6.4 /\\
+          n-label 6.6-6.11
+            n-generalid 6.6-6.6
+              n-idprefix ~ N_IdPrefix
+              identifier 6.6-6.6 A
+            coloncolon 6.8-6.9 ::
+            n-generalid 6.11-6.11
+              n-idprefix ~ N_IdPrefix
+              identifier 6.11-6.11 B
+        n-conjitem 7.3-7.6
+          and 7.3-7.4 /\\
+          n-generalid 7.6-7.6
+            n-idprefix ~ N_IdPrefix
+            identifier 7.6-7.6 A
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

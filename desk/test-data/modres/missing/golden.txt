@@ -1,0 +1,15 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file A.tla
+
+Fatal errors while parsing TLA+ spec in file A.tla
+
+In module A
+
+Cannot find source file for module Nope imported in module A.
+*** Errors: 1
+
+In module A
+
+Cannot find source file for module Nope imported in module A.

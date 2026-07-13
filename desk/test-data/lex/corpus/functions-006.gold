@@ -1,0 +1,21 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T lsb 2.7 2.7 [
+T and 3.3 3.4 /\\
+T identifier 3.6 3.6 A
+T and 4.3 4.4 /\\
+T identifier 4.6 4.6 B
+T and 5.3 5.4 /\\
+T identifier 5.6 5.6 C
+T arrow 6.5 6.6 ->
+T and 7.7 7.8 /\\
+T identifier 7.10 7.10 D
+T and 8.7 8.8 /\\
+T identifier 8.10 8.10 E
+T and 9.7 9.8 /\\
+T identifier 9.10 9.10 F
+T rsb 10.9 10.9 ]
+T end-module 11.1 11.4 ====

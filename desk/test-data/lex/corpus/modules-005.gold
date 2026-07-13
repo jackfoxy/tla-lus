@@ -1,0 +1,12 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T bm0 2.1 2.11 ---- MODULE
+T identifier 2.13 2.17 Inner
+T separator 2.19 2.22 ----
+T end-module 3.1 3.4 ====
+T theorem 4.1 4.7 THEOREM
+T identifier 4.9 4.9 T
+T def 4.11 4.12 ==
+T identifier 4.14 4.17 TRUE
+T end-module 5.1 5.4 ====

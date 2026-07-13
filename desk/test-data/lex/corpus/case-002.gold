@@ -1,0 +1,17 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T case 3.3 3.6 CASE
+T number-literal 3.8 3.8 1
+T arrow 3.10 3.11 ->
+T case 4.3 4.6 CASE
+T number-literal 4.8 4.8 2
+T arrow 4.10 4.11 ->
+T number-literal 4.13 4.13 3
+T casesep 5.3 5.4 []
+T other 5.6 5.10 OTHER
+T arrow 5.12 5.13 ->
+T number-literal 5.15 5.15 4
+T end-module 6.1 6.4 ====

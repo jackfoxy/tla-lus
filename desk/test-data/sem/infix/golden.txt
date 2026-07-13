@@ -1,0 +1,10 @@
+ACCEPT
+MODULE A 1.1-5.4
+  var x L1 3.10-3.10
+  def Next arity=0 local=n L2 4.1-4.18
+    apply = opkind=BuiltInKind L2 4.9-4.18
+      apply ' opkind=BuiltInKind L2 4.9-4.10
+        apply x opkind=VariableDeclKind L1 4.9-4.9
+      apply + opkind=UserDefinedOpKind L1 4.14-4.18
+        apply x opkind=VariableDeclKind L1 4.14-4.14
+        num 1 L0 4.18-4.18

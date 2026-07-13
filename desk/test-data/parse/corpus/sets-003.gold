@@ -1,0 +1,57 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.1
+    n-operatordefinition 2.1-7.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setenumerate 2.7-7.1
+        lbc 2.7-2.7 {
+        n-generalid 3.3-3.6
+          n-idprefix ~ N_IdPrefix
+          identifier 3.3-3.6 TRUE
+        comma 3.7-3.7 ,
+        n-generalid 4.3-4.7
+          n-idprefix ~ N_IdPrefix
+          identifier 4.3-4.7 FALSE
+        comma 4.8-4.8 ,
+        n-parenexpr 5.3-5.15
+          lbr 5.3-5.3 (
+          n-infixexpr 5.4-5.14
+            n-parenexpr 5.4-5.10
+              lbr 5.4-5.4 (
+              n-infixexpr 5.5-5.9
+                n-number 5.5-5.5
+                  number-literal 5.5-5.5 1
+                n-geninfixop 5.7-5.7
+                  n-idprefix ~ N_IdPrefix
+                  n-infixop 5.7-5.7 +
+                n-number 5.9-5.9
+                  number-literal 5.9-5.9 2
+              rbr 5.10-5.10 )
+            n-geninfixop 5.12-5.12
+              n-idprefix ~ N_IdPrefix
+              n-infixop 5.12-5.12 *
+            n-number 5.14-5.14
+              number-literal 5.14-5.14 3
+          rbr 5.15-5.15 )
+        comma 5.16-5.16 ,
+        n-setenumerate 6.3-6.9
+          lbc 6.3-6.3 {
+          n-number 6.4-6.4
+            number-literal 6.4-6.4 1
+          comma 6.5-6.5 ,
+          n-number 6.6-6.6
+            number-literal 6.6-6.6 2
+          comma 6.7-6.7 ,
+          n-number 6.8-6.8
+            number-literal 6.8-6.8 3
+          rbc 6.9-6.9 }
+        rbc 7.1-7.1 }
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

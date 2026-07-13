@@ -1,0 +1,10 @@
+ACCEPT
+MODULE A 1.1-4.4
+  const P arity=0 L0 2.10-2.10
+  const a arity=0 L0 2.13-2.13
+  const b arity=0 L0 2.16-2.16
+  def Pick arity=0 local=n L0 3.1-3.26
+    apply $IfThenElse opkind=BuiltInKind L0 3.9-3.26
+      apply P opkind=ConstantDeclKind L0 3.12-3.12
+      apply a opkind=ConstantDeclKind L0 3.19-3.19
+      apply b opkind=ConstantDeclKind L0 3.26-3.26
