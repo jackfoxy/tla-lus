@@ -1,0 +1,20 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T theorem 2.1 2.7 THEOREM
+T identifier 2.9 2.12 TRUE
+T barelevellexeme 3.1 3.3 <*>
+T and 3.5 3.6 /\\
+T number-literal 3.8 3.8 1
+T and 4.5 4.6 /\\
+T number-literal 4.8 4.8 2
+T barelevellexeme 5.7 5.9 <+>
+T qed 5.11 5.13 QED
+T by 5.15 5.16 BY
+T or 6.9 6.10 \\/
+T number-literal 6.12 6.12 1
+T or 7.9 7.10 \\/
+T number-literal 7.12 7.12 2
+T barelevellexeme 8.11 8.13 <*>
+T qed 8.15 8.17 QED
+T end-module 9.1 9.4 ====

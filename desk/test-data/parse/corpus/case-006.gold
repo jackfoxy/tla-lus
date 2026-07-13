@@ -1,0 +1,70 @@
+ACCEPT
+n-module 1.1-18.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-17.8
+    n-operatordefinition 2.1-17.8
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-case 3.3-17.8
+        case 3.3-3.6 CASE
+        n-casearm 4.5-8.12
+          n-disjlist 4.5-5.8
+            n-disjitem 4.5-4.8
+              or 4.5-4.6 \\/
+              n-number 4.8-4.8
+                number-literal 4.8-4.8 1
+            n-disjitem 5.5-5.8
+              or 5.5-5.6 \\/
+              n-number 5.8-5.8
+                number-literal 5.8-5.8 2
+          arrow 6.7-6.8 ->
+          n-disjlist 7.9-8.12
+            n-disjitem 7.9-7.12
+              or 7.9-7.10 \\/
+              n-number 7.12-7.12
+                number-literal 7.12-7.12 3
+            n-disjitem 8.9-8.12
+              or 8.9-8.10 \\/
+              n-number 8.12-8.12
+                number-literal 8.12-8.12 4
+        casesep 9.3-9.4 []
+        n-casearm 10.5-14.12
+          n-disjlist 10.5-11.8
+            n-disjitem 10.5-10.8
+              or 10.5-10.6 \\/
+              n-number 10.8-10.8
+                number-literal 10.8-10.8 5
+            n-disjitem 11.5-11.8
+              or 11.5-11.6 \\/
+              n-number 11.8-11.8
+                number-literal 11.8-11.8 6
+          arrow 12.7-12.8 ->
+          n-disjlist 13.9-14.12
+            n-disjitem 13.9-13.12
+              or 13.9-13.10 \\/
+              n-number 13.12-13.12
+                number-literal 13.12-13.12 7
+            n-disjitem 14.9-14.12
+              or 14.9-14.10 \\/
+              n-number 14.12-14.12
+                number-literal 14.12-14.12 8
+        casesep 15.3-15.4 []
+        n-otherarm 15.6-17.8
+          other 15.6-15.10 OTHER
+          arrow 15.12-15.13 ->
+          n-disjlist 16.5-17.8
+            n-disjitem 16.5-16.8
+              or 16.5-16.6 \\/
+              n-number 16.8-16.8
+                number-literal 16.8-16.8 7
+            n-disjitem 17.5-17.8
+              or 17.5-17.6 \\/
+              n-number 17.8-17.8
+                number-literal 17.8-17.8 8
+  n-endmodule 18.1-18.4
+    end-module 18.1-18.4 ====

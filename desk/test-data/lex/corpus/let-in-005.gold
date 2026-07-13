@@ -1,0 +1,15 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T or 3.3 3.4 \\/
+T let 3.6 3.8 LET
+T identifier 3.10 3.10 x
+T def 3.12 3.13 ==
+T number-literal 3.15 3.15 1
+T letin 3.17 3.18 IN
+T number-literal 3.20 3.20 2
+T or 4.3 4.4 \\/
+T number-literal 4.6 4.6 3
+T end-module 5.1 5.4 ====

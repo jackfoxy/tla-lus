@@ -1,0 +1,33 @@
+ACCEPT
+n-module 1.1-10.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-8.6
+    n-operatordefinition 3.1-8.6
+      n-identlhs 3.1-8.1
+        identifier 3.1-3.2 op
+        lbr 3.3-3.3 (
+        n-postfixdecl 4.3-4.6
+          us 4.3-4.3 _
+          n-postfixop 4.5-4.6 ^+
+        comma 4.7-4.7 ,
+        n-postfixdecl 5.3-5.6
+          us 5.3-5.3 _
+          n-postfixop 5.5-5.6 ^*
+        comma 5.7-5.7 ,
+        n-postfixdecl 6.3-6.6
+          us 6.3-6.3 _
+          n-postfixop 6.5-6.6 ^#
+        comma 6.7-6.7 ,
+        n-postfixdecl 7.3-7.5
+          us 7.3-7.3 _
+          n-postfixop 7.5-7.5 '
+        rbr 8.1-8.1 )
+      def 8.3-8.4 ==
+      n-number 8.6-8.6
+        number-literal 8.6-8.6 4
+  n-endmodule 10.1-10.4
+    end-module 10.1-10.4 ====

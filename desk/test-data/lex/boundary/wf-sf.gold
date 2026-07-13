@@ -1,0 +1,19 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.13 T
+T separator 1.15 1.18 ----
+T identifier 2.1 2.1 w
+T def 2.3 2.4 ==
+T wf 2.6 2.8 WF_
+T identifier 2.9 2.9 v
+T and 2.11 2.12 /\\
+T sf 2.14 2.16 SF_
+T identifier 2.17 2.17 v
+T and 2.19 2.20 /\\
+T identifier 2.22 2.24 WFx
+T and 2.26 2.27 /\\
+T identifier 2.29 2.30 SF
+T and 2.32 2.33 /\\
+T identifier 2.35 2.36 W_
+T and 2.38 2.39 /\\
+T identifier 2.41 2.42 S1
+T end-module 3.1 3.4 ====

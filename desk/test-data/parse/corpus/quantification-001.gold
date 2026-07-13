@@ -1,0 +1,73 @@
+ACCEPT
+n-module 1.1-4.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-3.47
+    n-operatordefinition 2.1-2.63
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-boundquant 2.7-2.63
+        forall 2.7-2.13 \\forall
+        n-quantbound 2.15-2.26
+          identifier 2.15-2.15 x
+          comma 2.16-2.16 ,
+          identifier 2.18-2.18 y
+          t-in 2.20-2.22 \\in
+          n-generalid 2.24-2.26
+            n-idprefix ~ N_IdPrefix
+            identifier 2.24-2.26 Nat
+        comma 2.27-2.27 ,
+        n-quantbound 2.29-2.37
+          identifier 2.29-2.29 z
+          t-in 2.31-2.33 \\in
+          n-generalid 2.35-2.37
+            n-idprefix ~ N_IdPrefix
+            identifier 2.35-2.37 Int
+        comma 2.38-2.38 ,
+        n-quantbound 2.40-2.55
+          identifier 2.40-2.40 a
+          comma 2.41-2.41 ,
+          identifier 2.43-2.43 b
+          comma 2.44-2.44 ,
+          identifier 2.46-2.46 c
+          t-in 2.48-2.50 \\in
+          n-generalid 2.52-2.55
+            n-idprefix ~ N_IdPrefix
+            identifier 2.52-2.55 Real
+        colon 2.57-2.57 :
+        n-generalid 2.59-2.63
+          n-idprefix ~ N_IdPrefix
+          identifier 2.59-2.63 FALSE
+    n-operatordefinition 3.1-3.47
+      n-identlhs 3.1-3.2
+        identifier 3.1-3.2 op
+      def 3.4-3.5 ==
+      n-boundquant 3.7-3.47
+        exists 3.7-3.13 \\exists
+        n-quantbound 3.15-3.26
+          identifier 3.15-3.15 x
+          comma 3.16-3.16 ,
+          identifier 3.18-3.18 y
+          t-in 3.20-3.22 \\in
+          n-generalid 3.24-3.26
+            n-idprefix ~ N_IdPrefix
+            identifier 3.24-3.26 Nat
+        comma 3.27-3.27 ,
+        n-quantbound 3.29-3.40
+          identifier 3.29-3.29 a
+          comma 3.30-3.30 ,
+          identifier 3.32-3.32 b
+          t-in 3.34-3.36 \\in
+          n-generalid 3.38-3.40
+            n-idprefix ~ N_IdPrefix
+            identifier 3.38-3.40 Int
+        colon 3.42-3.42 :
+        n-generalid 3.44-3.47
+          n-idprefix ~ N_IdPrefix
+          identifier 3.44-3.47 TRUE
+  n-endmodule 4.1-4.4
+    end-module 4.1-4.4 ====

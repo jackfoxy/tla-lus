@@ -1,0 +1,22 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 3.1 3.2 op
+T def 3.4 3.5 ==
+T lbc 3.7 3.7 {
+T identifier 3.8 3.8 x
+T in 3.10 3.12 \\in
+T identifier 3.14 3.16 Nat
+T rbc 3.17 3.17 }
+T identifier 4.1 4.2 op
+T def 4.4 4.5 ==
+T lbc 4.7 4.7 {
+T identifier 4.8 4.8 x
+T in 4.10 4.12 \\in
+T identifier 4.14 4.20 BOOLEAN
+T comma 4.21 4.21 ,
+T identifier 4.23 4.23 y
+T in 4.25 4.27 \\in
+T identifier 4.29 4.34 STRING
+T rbc 4.35 4.35 }
+T end-module 6.1 6.4 ====

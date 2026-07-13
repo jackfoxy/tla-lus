@@ -1,0 +1,28 @@
+ACCEPT
+n-module 1.1-6.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-5.6
+    n-operatordefinition 2.1-5.6
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-infixexpr 2.7-5.6
+        n-parenexpr 2.7-4.4
+          lbr 2.7-2.7 (
+          n-conjlist 3.3-3.6
+            n-conjitem 3.3-3.6
+              and 3.3-3.4 /\\
+              n-number 3.6-3.6
+                number-literal 3.6-3.6 1
+          rbr 4.4-4.4 )
+        n-geninfixop 5.3-5.4
+          n-idprefix ~ N_IdPrefix
+          n-infixop 5.3-5.4 /\\
+        n-number 5.6-5.6
+          number-literal 5.6-5.6 2
+  n-endmodule 6.1-6.4
+    end-module 6.1-6.4 ====

@@ -1,0 +1,203 @@
+ACCEPT
+n-module 1.1-15.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-14.1
+    n-operatordefinition 2.1-14.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setenumerate 2.7-14.1
+        lbc 2.7-2.7 {
+        n-opapplication 3.3-3.10
+          n-generalid 3.3-3.7
+            n-idprefix 3.3-3.6
+              n-idprefixelement 3.3-3.4
+                identifier 3.3-3.3 A
+                bang 3.4-3.4 !
+              n-idprefixelement 3.5-3.6
+                identifier 3.5-3.5 B
+                bang 3.6-3.6 !
+            n-nonexpprefixop 3.7-3.7 ~
+          n-opargs 3.8-3.10
+            lbr 3.8-3.8 (
+            n-generalid 3.9-3.9
+              n-idprefix ~ N_IdPrefix
+              identifier 3.9-3.9 x
+            rbr 3.10-3.10 )
+        comma 3.11-3.11 ,
+        n-opapplication 4.3-4.14
+          n-generalid 4.3-4.11
+            n-idprefix 4.3-4.6
+              n-idprefixelement 4.3-4.4
+                identifier 4.3-4.3 A
+                bang 4.4-4.4 !
+              n-idprefixelement 4.5-4.6
+                identifier 4.5-4.5 B
+                bang 4.6-4.6 !
+            n-nonexpprefixop 4.7-4.11 \\lnot
+          n-opargs 4.12-4.14
+            lbr 4.12-4.12 (
+            n-generalid 4.13-4.13
+              n-idprefix ~ N_IdPrefix
+              identifier 4.13-4.13 x
+            rbr 4.14-4.14 )
+        comma 4.15-4.15 ,
+        n-opapplication 5.3-5.13
+          n-generalid 5.3-5.10
+            n-idprefix 5.3-5.6
+              n-idprefixelement 5.3-5.4
+                identifier 5.3-5.3 A
+                bang 5.4-5.4 !
+              n-idprefixelement 5.5-5.6
+                identifier 5.5-5.5 B
+                bang 5.6-5.6 !
+            n-nonexpprefixop 5.7-5.10 \\neg
+          n-opargs 5.11-5.13
+            lbr 5.11-5.11 (
+            n-generalid 5.12-5.12
+              n-idprefix ~ N_IdPrefix
+              identifier 5.12-5.12 x
+            rbr 5.13-5.13 )
+        comma 5.14-5.14 ,
+        n-opapplication 6.3-6.14
+          n-generalid 6.3-6.11
+            n-idprefix 6.3-6.6
+              n-idprefixelement 6.3-6.4
+                identifier 6.3-6.3 A
+                bang 6.4-6.4 !
+              n-idprefixelement 6.5-6.6
+                identifier 6.5-6.5 B
+                bang 6.6-6.6 !
+            n-nonexpprefixop 6.7-6.11 UNION
+          n-opargs 6.12-6.14
+            lbr 6.12-6.12 (
+            n-generalid 6.13-6.13
+              n-idprefix ~ N_IdPrefix
+              identifier 6.13-6.13 x
+            rbr 6.14-6.14 )
+        comma 6.15-6.15 ,
+        n-opapplication 7.3-7.15
+          n-generalid 7.3-7.12
+            n-idprefix 7.3-7.6
+              n-idprefixelement 7.3-7.4
+                identifier 7.3-7.3 A
+                bang 7.4-7.4 !
+              n-idprefixelement 7.5-7.6
+                identifier 7.5-7.5 B
+                bang 7.6-7.6 !
+            n-nonexpprefixop 7.7-7.12 SUBSET
+          n-opargs 7.13-7.15
+            lbr 7.13-7.13 (
+            n-generalid 7.14-7.14
+              n-idprefix ~ N_IdPrefix
+              identifier 7.14-7.14 x
+            rbr 7.15-7.15 )
+        comma 7.16-7.16 ,
+        n-opapplication 8.3-8.15
+          n-generalid 8.3-8.12
+            n-idprefix 8.3-8.6
+              n-idprefixelement 8.3-8.4
+                identifier 8.3-8.3 A
+                bang 8.4-8.4 !
+              n-idprefixelement 8.5-8.6
+                identifier 8.5-8.5 B
+                bang 8.6-8.6 !
+            n-nonexpprefixop 8.7-8.12 DOMAIN
+          n-opargs 8.13-8.15
+            lbr 8.13-8.13 (
+            n-generalid 8.14-8.14
+              n-idprefix ~ N_IdPrefix
+              identifier 8.14-8.14 x
+            rbr 8.15-8.15 )
+        comma 8.16-8.16 ,
+        n-opapplication 9.3-9.11
+          n-generalid 9.3-9.8
+            n-idprefix 9.3-9.6
+              n-idprefixelement 9.3-9.4
+                identifier 9.3-9.3 A
+                bang 9.4-9.4 !
+              n-idprefixelement 9.5-9.6
+                identifier 9.5-9.5 B
+                bang 9.6-9.6 !
+            n-nonexpprefixop 9.7-9.8 -.
+          n-opargs 9.9-9.11
+            lbr 9.9-9.9 (
+            n-generalid 9.10-9.10
+              n-idprefix ~ N_IdPrefix
+              identifier 9.10-9.10 x
+            rbr 9.11-9.11 )
+        comma 9.12-9.12 ,
+        n-opapplication 10.3-10.16
+          n-generalid 10.3-10.13
+            n-idprefix 10.3-10.6
+              n-idprefixelement 10.3-10.4
+                identifier 10.3-10.3 A
+                bang 10.4-10.4 !
+              n-idprefixelement 10.5-10.6
+                identifier 10.5-10.5 B
+                bang 10.6-10.6 !
+            n-nonexpprefixop 10.7-10.13 ENABLED
+          n-opargs 10.14-10.16
+            lbr 10.14-10.14 (
+            n-generalid 10.15-10.15
+              n-idprefix ~ N_IdPrefix
+              identifier 10.15-10.15 x
+            rbr 10.16-10.16 )
+        comma 10.17-10.17 ,
+        n-opapplication 11.3-11.18
+          n-generalid 11.3-11.15
+            n-idprefix 11.3-11.6
+              n-idprefixelement 11.3-11.4
+                identifier 11.3-11.3 A
+                bang 11.4-11.4 !
+              n-idprefixelement 11.5-11.6
+                identifier 11.5-11.5 B
+                bang 11.6-11.6 !
+            n-nonexpprefixop 11.7-11.15 UNCHANGED
+          n-opargs 11.16-11.18
+            lbr 11.16-11.16 (
+            n-generalid 11.17-11.17
+              n-idprefix ~ N_IdPrefix
+              identifier 11.17-11.17 x
+            rbr 11.18-11.18 )
+        comma 11.19-11.19 ,
+        n-opapplication 12.3-12.11
+          n-generalid 12.3-12.8
+            n-idprefix 12.3-12.6
+              n-idprefixelement 12.3-12.4
+                identifier 12.3-12.3 A
+                bang 12.4-12.4 !
+              n-idprefixelement 12.5-12.6
+                identifier 12.5-12.5 B
+                bang 12.6-12.6 !
+            n-nonexpprefixop 12.7-12.8 []
+          n-opargs 12.9-12.11
+            lbr 12.9-12.9 (
+            n-generalid 12.10-12.10
+              n-idprefix ~ N_IdPrefix
+              identifier 12.10-12.10 x
+            rbr 12.11-12.11 )
+        comma 12.12-12.12 ,
+        n-opapplication 13.3-13.11
+          n-generalid 13.3-13.8
+            n-idprefix 13.3-13.6
+              n-idprefixelement 13.3-13.4
+                identifier 13.3-13.3 A
+                bang 13.4-13.4 !
+              n-idprefixelement 13.5-13.6
+                identifier 13.5-13.5 B
+                bang 13.6-13.6 !
+            n-nonexpprefixop 13.7-13.8 <>
+          n-opargs 13.9-13.11
+            lbr 13.9-13.9 (
+            n-generalid 13.10-13.10
+              n-idprefix ~ N_IdPrefix
+              identifier 13.10-13.10 x
+            rbr 13.11-13.11 )
+        rbc 14.1-14.1 }
+  n-endmodule 15.1-15.4
+    end-module 15.1-15.4 ====

@@ -1,0 +1,4 @@
+---- MODULE Test ----
+COROLLARY def == TRUE
+PROOF OBVIOUS
+====

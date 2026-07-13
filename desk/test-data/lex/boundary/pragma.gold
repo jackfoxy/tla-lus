@@ -1,0 +1,10 @@
+T begin-pragma 1.1 1.4 --->
+T number 1.6 1.7 42
+T number 1.9 1.11 007
+T bm2 2.1 2.11 ---- MODULE
+T identifier 2.13 2.13 T
+T separator 2.15 2.18 ----
+T identifier 3.1 3.1 x
+T def 3.3 3.4 ==
+T number-literal 3.6 3.6 1
+T end-module 4.1 4.4 ====

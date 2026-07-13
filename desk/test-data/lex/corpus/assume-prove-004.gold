@@ -1,0 +1,17 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T theorem 2.1 2.7 THEOREM
+T identifier 2.9 2.12 TRUE
+T proofstepdotlexeme 3.1 3.5 <1>a.
+T suffices 3.7 3.14 SUFFICES
+T assume 4.3 4.8 ASSUME
+T constant 4.10 4.17 CONSTANT
+T identifier 4.19 4.19 x
+T in 4.21 4.23 \\in
+T identifier 4.25 4.25 S
+T prove 5.3 5.7 PROVE
+T identifier 5.9 5.12 TRUE
+T proofstepdotlexeme 6.1 6.5 <1>b.
+T qed 6.7 6.9 QED
+T end-module 7.1 7.4 ====

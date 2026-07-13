@@ -1,0 +1,105 @@
+ACCEPT
+n-module 1.1-15.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-14.13
+    n-theorem 2.1-14.13
+      theorem 2.1-2.7 THEOREM
+      n-generalid 2.9-2.12
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.12 TRUE
+      n-proof 3.1-14.13
+        n-proofstep 3.1-3.17
+          proofstepdotlexeme 3.1-3.9 <1>a.....
+          n-defstep 3.11-3.17
+            n-operatordefinition 3.11-3.17
+              n-identlhs 3.11-3.12
+                identifier 3.11-3.12 op
+              def 3.14-3.15 ==
+              n-number 3.17-3.17
+                number-literal 3.17-3.17 1
+        n-proofstep 4.1-4.25
+          proofstepdotlexeme 4.1-4.9 <1>b.....
+          n-defstep 4.11-4.25
+            define 4.11-4.16 DEFINE
+            n-operatordefinition 4.18-4.25
+              n-identlhs 4.18-4.20
+                identifier 4.18-4.20 op2
+              def 4.22-4.23 ==
+              n-number 4.25-4.25
+                number-literal 4.25-4.25 2
+        n-proofstep 5.1-5.16
+          proofstepdotlexeme 5.1-5.9 <1>c.....
+          n-havestep 5.11-5.16
+            have 5.11-5.14 HAVE
+            n-number 5.16-5.16
+              number-literal 5.16-5.16 3
+        n-proofstep 6.1-6.22
+          proofstepdotlexeme 6.1-6.9 <1>d.....
+          n-witnessstep 6.11-6.22
+            witness 6.11-6.17 WITNESS
+            n-number 6.19-6.19
+              number-literal 6.19-6.19 2
+            comma 6.20-6.20 ,
+            n-number 6.22-6.22
+              number-literal 6.22-6.22 3
+        n-proofstep 7.1-7.22
+          proofstepdotlexeme 7.1-7.9 <1>e.....
+          n-takestep 7.11-7.22
+            take 7.11-7.14 TAKE
+            identifier 7.16-7.16 a
+            comma 7.17-7.17 ,
+            identifier 7.19-7.19 b
+            comma 7.20-7.20 ,
+            identifier 7.22-7.22 c
+        n-proofstep 8.1-8.14
+          proofstepdotlexeme 8.1-8.9 <1>f.....
+          n-assertstep 8.11-8.14
+            n-generalid 8.11-8.14
+              n-idprefix ~ N_IdPrefix
+              proofsteplexeme 8.11-8.14 <1>a
+        n-proofstep 9.1-9.20
+          proofstepdotlexeme 9.1-9.9 <1>g.....
+          n-assertstep 9.11-9.20
+            suffices 9.11-9.18 SUFFICES
+            n-number 9.20-9.20
+              number-literal 9.20-9.20 5
+        n-proofstep 10.1-10.16
+          proofstepdotlexeme 10.1-10.9 <1>h.....
+          n-casestep 10.11-10.16
+            case 10.11-10.14 CASE
+            n-number 10.16-10.16
+              number-literal 10.16-10.16 6
+        n-proofstep 11.1-11.26
+          proofstepdotlexeme 11.1-11.9 <1>i.....
+          n-pickstep 11.11-11.26
+            pick 11.11-11.14 PICK
+            identifier 11.16-11.16 a
+            comma 11.17-11.17 ,
+            identifier 11.19-11.19 b
+            comma 11.20-11.20 ,
+            identifier 11.22-11.22 c
+            colon 11.24-11.24 :
+            n-number 11.26-11.26
+              number-literal 11.26-11.26 7
+        n-proofstep 12.1-12.16
+          proofstepdotlexeme 12.1-12.9 <1>j.....
+          n-useorhide 12.11-12.16
+            hide 12.11-12.14 HIDE
+            n-number 12.16-12.16
+              number-literal 12.16-12.16 8
+        n-proofstep 13.1-13.15
+          proofstepdotlexeme 13.1-13.9 <1>k.....
+          n-useorhide 13.11-13.15
+            use 13.11-13.13 USE
+            n-number 13.15-13.15
+              number-literal 13.15-13.15 9
+        n-proofstep 14.1-14.13
+          proofstepdotlexeme 14.1-14.9 <1>m.....
+          n-qedstep 14.11-14.13
+            qed 14.11-14.13 QED
+  n-endmodule 15.1-15.4
+    end-module 15.1-15.4 ====

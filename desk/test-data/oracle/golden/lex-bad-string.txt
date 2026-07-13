@@ -1,0 +1,20 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/LexBadString.tla
+Lexical error at line 2, column 19.  Encountered: "\n" (10), after : "\"unterminated"
+
+Fatal errors while parsing TLA+ spec in file LexBadString.tla
+
+In module LexBadString
+
+Could not parse module LexBadString from file LexBadString.tla
+*** Errors: 1
+
+In module LexBadString
+
+Could not parse module LexBadString from file LexBadString.tla
+
+
+
+exit-code: 255

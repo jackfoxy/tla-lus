@@ -1,0 +1,19 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T lsb 2.7 2.7 [
+T identifier 3.3 3.5 foo
+T mapto 3.7 3.9 |->
+T number-literal 3.11 3.11 1
+T comma 3.12 3.12 ,
+T identifier 4.3 4.5 bar
+T mapto 4.7 4.9 |->
+T number-literal 4.11 4.11 2
+T comma 4.12 4.12 ,
+T identifier 5.3 5.5 baz
+T mapto 5.7 5.9 |->
+T number-literal 5.11 5.11 3
+T rsb 6.1 6.1 ]
+T end-module 7.1 7.4 ====

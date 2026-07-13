@@ -1,0 +1,11 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T or 3.3 3.4 \\/
+T number-literal 3.6 3.6 1
+T or 4.3 4.4 \\/
+T lbc 4.6 4.6 {
+T rbc 4.7 4.7 }
+T end-module 5.1 5.4 ====

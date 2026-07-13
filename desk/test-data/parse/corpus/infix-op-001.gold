@@ -1,0 +1,810 @@
+ACCEPT
+n-module 1.1-104.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-102.14
+    n-operatordefinition 3.1-3.10
+      n-infixlhs 3.1-3.5
+        identifier 3.1-3.1 x
+        op-95 3.3-3.3 &
+        identifier 3.5-3.5 y
+      def 3.7-3.8 ==
+      n-number 3.10-3.10
+        number-literal 3.10-3.10 0
+    n-operatordefinition 4.1-4.11
+      n-infixlhs 4.1-4.6
+        identifier 4.1-4.1 x
+        op-94 4.3-4.4 &&
+        identifier 4.6-4.6 y
+      def 4.8-4.9 ==
+      n-number 4.11-4.11
+        number-literal 4.11-4.11 1
+    n-operatordefinition 5.1-5.16
+      n-infixlhs 5.1-5.11
+        identifier 5.1-5.1 x
+        op-6 5.3-5.9 \\approx
+        identifier 5.11-5.11 y
+      def 5.13-5.14 ==
+      n-number 5.16-5.16
+        number-literal 5.16-5.16 2
+    n-operatordefinition 6.1-6.11
+      n-infixlhs 6.1-6.6
+        identifier 6.1-6.1 x
+        op-105 6.3-6.4 :=
+        identifier 6.6-6.6 y
+      def 6.8-6.9 ==
+      n-number 6.11-6.11
+        number-literal 6.11-6.11 3
+    n-operatordefinition 7.1-7.15
+      n-infixlhs 7.1-7.10
+        identifier 7.1-7.1 x
+        op-7 7.3-7.8 \\asymp
+        identifier 7.10-7.10 y
+      def 7.12-7.13 ==
+      n-number 7.15-7.15
+        number-literal 7.15-7.15 4
+    n-operatordefinition 8.1-8.17
+      n-infixlhs 8.1-8.12
+        identifier 8.1-8.1 x
+        op-8 8.3-8.10 \\bigcirc
+        identifier 8.12-8.12 y
+      def 8.14-8.15 ==
+      n-number 8.17-8.17
+        number-literal 8.17-8.17 5
+    n-operatordefinition 9.1-9.12
+      n-infixlhs 9.1-9.7
+        identifier 9.1-9.1 x
+        op-106 9.3-9.5 ::=
+        identifier 9.7-9.7 y
+      def 9.9-9.10 ==
+      n-number 9.12-9.12
+        number-literal 9.12-9.12 6
+    n-operatordefinition 10.1-10.16
+      n-infixlhs 10.1-10.11
+        identifier 10.1-10.1 x
+        op-9 10.3-10.9 \\bullet
+        identifier 10.11-10.11 y
+      def 10.13-10.14 ==
+      n-number 10.16-10.16
+        number-literal 10.16-10.16 7
+    n-operatordefinition 11.1-11.19
+      n-infixlhs 11.1-11.14
+        identifier 11.1-11.1 x
+        op-21 11.3-11.12 \\intersect
+        identifier 11.14-11.14 y
+      def 11.16-11.17 ==
+      n-number 11.19-11.19
+        number-literal 11.19-11.19 8
+    n-operatordefinition 12.1-12.13
+      n-infixlhs 12.1-12.8
+        identifier 12.1-12.1 x
+        op-10 12.3-12.6 \\cap
+        identifier 12.8-12.8 y
+      def 12.10-12.11 ==
+      n-number 12.13-12.13
+        number-literal 12.13-12.13 9
+    n-operatordefinition 13.1-13.15
+      n-infixlhs 13.1-13.9
+        identifier 13.1-13.1 x
+        op-11 13.3-13.7 \\cdot
+        identifier 13.9-13.9 y
+      def 13.11-13.12 ==
+      n-number 13.14-13.15
+        number-literal 13.14-13.15 10
+    n-operatordefinition 14.1-14.12
+      n-infixlhs 14.1-14.6
+        identifier 14.1-14.1 x
+        op-30 14.3-14.4 \\o
+        identifier 14.6-14.6 y
+      def 14.8-14.9 ==
+      n-number 14.11-14.12
+        number-literal 14.11-14.12 11
+    n-operatordefinition 15.1-15.15
+      n-infixlhs 15.1-15.9
+        identifier 15.1-15.1 x
+        op-12 15.3-15.7 \\circ
+        identifier 15.9-15.9 y
+      def 15.11-15.12 ==
+      n-number 15.14-15.15
+        number-literal 15.14-15.15 12
+    n-operatordefinition 16.1-16.12
+      n-infixlhs 16.1-16.6
+        identifier 16.1-16.1 x
+        op-102 16.3-16.4 @@
+        identifier 16.6-16.6 y
+      def 16.8-16.9 ==
+      n-number 16.11-16.12
+        number-literal 16.11-16.12 13
+    n-operatordefinition 17.1-17.15
+      n-infixlhs 17.1-17.9
+        identifier 17.1-17.1 x
+        op-13 17.3-17.7 \\cong
+        identifier 17.9-17.9 y
+      def 17.11-17.12 ==
+      n-number 17.14-17.15
+        number-literal 17.14-17.15 14
+    n-operatordefinition 18.1-18.16
+      n-infixlhs 18.1-18.10
+        identifier 18.1-18.1 x
+        op-22 18.3-18.8 \\union
+        identifier 18.10-18.10 y
+      def 18.12-18.13 ==
+      n-number 18.15-18.16
+        number-literal 18.15-18.16 15
+    n-operatordefinition 19.1-19.14
+      n-infixlhs 19.1-19.8
+        identifier 19.1-19.1 x
+        op-14 19.3-19.6 \\cup
+        identifier 19.8-19.8 y
+      def 19.10-19.11 ==
+      n-number 19.13-19.14
+        number-literal 19.13-19.14 16
+    n-operatordefinition 20.1-20.14
+      n-infixlhs 20.1-20.8
+        identifier 20.1-20.1 x
+        op-15 20.3-20.6 \\div
+        identifier 20.8-20.8 y
+      def 20.10-20.11 ==
+      n-number 20.13-20.14
+        number-literal 20.13-20.14 17
+    n-operatordefinition 21.1-21.11
+      n-infixlhs 21.1-21.5
+        identifier 21.1-21.1 x
+        op-97 21.3-21.3 $
+        identifier 21.5-21.5 y
+      def 21.7-21.8 ==
+      n-number 21.10-21.11
+        number-literal 21.10-21.11 18
+    n-operatordefinition 22.1-22.12
+      n-infixlhs 22.1-22.6
+        identifier 22.1-22.1 x
+        op-96 22.3-22.4 $$
+        identifier 22.6-22.6 y
+      def 22.8-22.9 ==
+      n-number 22.11-22.12
+        number-literal 22.11-22.12 19
+    n-operatordefinition 23.1-23.16
+      n-infixlhs 23.1-23.10
+        identifier 23.1-23.1 x
+        op-16 23.3-23.8 \\doteq
+        identifier 23.10-23.10 y
+      def 23.12-23.13 ==
+      n-number 23.15-23.16
+        number-literal 23.15-23.16 20
+    n-operatordefinition 24.1-24.12
+      n-infixlhs 24.1-24.6
+        identifier 24.1-24.1 x
+        op-89 24.3-24.4 ..
+        identifier 24.6-24.6 y
+      def 24.8-24.9 ==
+      n-number 24.11-24.12
+        number-literal 24.11-24.12 21
+    n-operatordefinition 25.1-25.13
+      n-infixlhs 25.1-25.7
+        identifier 25.1-25.1 x
+        op-88 25.3-25.5 ...
+        identifier 25.7-25.7 y
+      def 25.9-25.10 ==
+      n-number 25.12-25.13
+        number-literal 25.12-25.13 22
+    n-operatordefinition 26.1-26.11
+      n-infixlhs 26.1-26.5
+        identifier 26.1-26.1 x
+        equals 26.3-26.3 =
+        identifier 26.5-26.5 y
+      def 26.7-26.8 ==
+      n-number 26.10-26.11
+        number-literal 26.10-26.11 23
+    n-operatordefinition 27.1-27.16
+      n-infixlhs 27.1-27.10
+        identifier 27.1-27.1 x
+        op-17 27.3-27.8 \\equiv
+        identifier 27.10-27.10 y
+      def 27.12-27.13 ==
+      n-number 27.15-27.16
+        number-literal 27.15-27.16 24
+    n-operatordefinition 28.1-28.12
+      n-infixlhs 28.1-28.6
+        identifier 28.1-28.1 x
+        op-103 28.3-28.4 !!
+        identifier 28.6-28.6 y
+      def 28.8-28.9 ==
+      n-number 28.11-28.12
+        number-literal 28.11-28.12 25
+    n-operatordefinition 29.1-29.12
+      n-infixlhs 29.1-29.6
+        identifier 29.1-29.1 x
+        op-86 29.3-29.4 >=
+        identifier 29.6-29.6 y
+      def 29.8-29.9 ==
+      n-number 29.11-29.12
+        number-literal 29.11-29.12 26
+    n-operatordefinition 30.1-30.14
+      n-infixlhs 30.1-30.8
+        identifier 30.1-30.1 x
+        op-18 30.3-30.6 \\geq
+        identifier 30.8-30.8 y
+      def 30.10-30.11 ==
+      n-number 30.13-30.14
+        number-literal 30.13-30.14 27
+    n-operatordefinition 31.1-31.13
+      n-infixlhs 31.1-31.7
+        identifier 31.1-31.1 x
+        op-19 31.3-31.5 \\gg
+        identifier 31.7-31.7 y
+      def 31.9-31.10 ==
+      n-number 31.12-31.13
+        number-literal 31.12-31.13 28
+    n-operatordefinition 32.1-32.11
+      n-infixlhs 32.1-32.5
+        identifier 32.1-32.1 x
+        op-87 32.3-32.3 >
+        identifier 32.5-32.5 y
+      def 32.7-32.8 ==
+      n-number 32.10-32.11
+        number-literal 32.10-32.11 29
+    n-operatordefinition 33.1-33.12
+      n-infixlhs 33.1-33.6
+        identifier 33.1-33.1 x
+        op-66 33.3-33.4 ##
+        identifier 33.6-33.6 y
+      def 33.8-33.9 ==
+      n-number 33.11-33.12
+        number-literal 33.11-33.12 30
+    n-operatordefinition 34.1-34.13
+      n-infixlhs 34.1-34.7
+        identifier 34.1-34.1 x
+        op-82 34.3-34.5 <=>
+        identifier 34.7-34.7 y
+      def 34.9-34.10 ==
+      n-number 34.12-34.13
+        number-literal 34.12-34.13 31
+    n-operatordefinition 35.1-35.12
+      n-infixlhs 35.1-35.6
+        identifier 35.1-35.1 x
+        op-62 35.3-35.4 =>
+        identifier 35.6-35.6 y
+      def 35.8-35.9 ==
+      n-number 35.11-35.12
+        number-literal 35.11-35.12 32
+    n-operatordefinition 36.1-36.13
+      n-infixlhs 36.1-36.7
+        identifier 36.1-36.1 x
+        in 36.3-36.5 \\in
+        identifier 36.7-36.7 y
+      def 36.9-36.10 ==
+      n-number 36.12-36.13
+        number-literal 36.12-36.13 33
+    n-operatordefinition 37.1-37.12
+      n-infixlhs 37.1-37.6
+        identifier 37.1-37.1 x
+        and 37.3-37.4 /\\
+        identifier 37.6-37.6 y
+      def 37.8-37.9 ==
+      n-number 37.11-37.12
+        number-literal 37.11-37.12 34
+    n-operatordefinition 38.1-38.15
+      n-infixlhs 38.1-38.9
+        identifier 38.1-38.1 x
+        op-23 38.3-38.7 \\land
+        identifier 38.9-38.9 y
+      def 38.11-38.12 ==
+      n-number 38.14-38.15
+        number-literal 38.14-38.15 35
+    n-operatordefinition 39.1-39.12
+      n-infixlhs 39.1-39.6
+        identifier 39.1-39.1 x
+        op-64 39.3-39.4 =|
+        identifier 39.6-39.6 y
+      def 39.8-39.9 ==
+      n-number 39.11-39.12
+        number-literal 39.11-39.12 36
+    n-operatordefinition 40.1-40.12
+      n-infixlhs 40.1-40.6
+        identifier 40.1-40.1 x
+        op-59 40.3-40.4 ~>
+        identifier 40.6-40.6 y
+      def 40.8-40.9 ==
+      n-number 40.11-40.12
+        number-literal 40.11-40.12 37
+    n-operatordefinition 41.1-41.12
+      n-infixlhs 41.1-41.6
+        identifier 41.1-41.1 x
+        op-84 41.3-41.4 <=
+        identifier 41.6-41.6 y
+      def 41.8-41.9 ==
+      n-number 41.11-41.12
+        number-literal 41.11-41.12 38
+    n-operatordefinition 42.1-42.12
+      n-infixlhs 42.1-42.6
+        identifier 42.1-42.1 x
+        op-63 42.3-42.4 =<
+        identifier 42.6-42.6 y
+      def 42.8-42.9 ==
+      n-number 42.11-42.12
+        number-literal 42.11-42.12 39
+    n-operatordefinition 43.1-43.14
+      n-infixlhs 43.1-43.8
+        identifier 43.1-43.1 x
+        op-24 43.3-43.6 \\leq
+        identifier 43.8-43.8 y
+      def 43.10-43.11 ==
+      n-number 43.13-43.14
+        number-literal 43.13-43.14 40
+    n-operatordefinition 44.1-44.13
+      n-infixlhs 44.1-44.7
+        identifier 44.1-44.1 x
+        op-25 44.3-44.5 \\ll
+        identifier 44.7-44.7 y
+      def 44.9-44.10 ==
+      n-number 44.12-44.13
+        number-literal 44.12-44.13 41
+    n-operatordefinition 45.1-45.12
+      n-infixlhs 45.1-45.6
+        identifier 45.1-45.1 x
+        or 45.3-45.4 \\/
+        identifier 45.6-45.6 y
+      def 45.8-45.9 ==
+      n-number 45.11-45.12
+        number-literal 45.11-45.12 42
+    n-operatordefinition 46.1-46.14
+      n-infixlhs 46.1-46.8
+        identifier 46.1-46.1 x
+        op-27 46.3-46.6 \\lor
+        identifier 46.8-46.8 y
+      def 46.10-46.11 ==
+      n-number 46.13-46.14
+        number-literal 46.13-46.14 43
+    n-operatordefinition 47.1-47.12
+      n-infixlhs 47.1-47.6
+        identifier 47.1-47.1 x
+        op-74 47.3-47.4 -|
+        identifier 47.6-47.6 y
+      def 47.8-47.9 ==
+      n-number 47.11-47.12
+        number-literal 47.11-47.12 44
+    n-operatordefinition 48.1-48.11
+      n-infixlhs 48.1-48.5
+        identifier 48.1-48.1 x
+        op-85 48.3-48.3 <
+        identifier 48.5-48.5 y
+      def 48.7-48.8 ==
+      n-number 48.10-48.11
+        number-literal 48.10-48.11 45
+    n-operatordefinition 49.1-49.12
+      n-infixlhs 49.1-49.6
+        identifier 49.1-49.1 x
+        op-83 49.3-49.4 <:
+        identifier 49.6-49.6 y
+      def 49.8-49.9 ==
+      n-number 49.11-49.12
+        number-literal 49.11-49.12 46
+    n-operatordefinition 50.1-50.12
+      n-infixlhs 50.1-50.6
+        identifier 50.1-50.1 x
+        op-104 50.3-50.4 :>
+        identifier 50.6-50.6 y
+      def 50.8-50.9 ==
+      n-number 50.11-50.12
+        number-literal 50.11-50.12 47
+    n-operatordefinition 51.1-51.11
+      n-infixlhs 51.1-51.5
+        identifier 51.1-51.1 x
+        op-77 51.3-51.3 -
+        identifier 51.5-51.5 y
+      def 51.7-51.8 ==
+      n-number 51.10-51.11
+        number-literal 51.10-51.11 48
+    n-operatordefinition 52.1-52.12
+      n-infixlhs 52.1-52.6
+        identifier 52.1-52.1 x
+        op-73 52.3-52.4 --
+        identifier 52.6-52.6 y
+      def 52.8-52.9 ==
+      n-number 52.11-52.12
+        number-literal 52.11-52.12 49
+    n-operatordefinition 53.1-53.11
+      n-infixlhs 53.1-53.5
+        identifier 53.1-53.1 x
+        op-101 53.3-53.3 %
+        identifier 53.5-53.5 y
+      def 53.7-53.8 ==
+      n-number 53.10-53.11
+        number-literal 53.10-53.11 50
+    n-operatordefinition 54.1-54.12
+      n-infixlhs 54.1-54.6
+        identifier 54.1-54.1 x
+        op-100 54.3-54.4 %%
+        identifier 54.6-54.6 y
+      def 54.8-54.9 ==
+      n-number 54.11-54.12
+        number-literal 54.11-54.12 51
+    n-operatordefinition 55.1-55.11
+      n-infixlhs 55.1-55.5
+        identifier 55.1-55.1 x
+        op-79 55.3-55.3 *
+        identifier 55.5-55.5 y
+      def 55.7-55.8 ==
+      n-number 55.10-55.11
+        number-literal 55.10-55.11 52
+    n-operatordefinition 56.1-56.12
+      n-infixlhs 56.1-56.6
+        identifier 56.1-56.1 x
+        op-78 56.3-56.4 **
+        identifier 56.6-56.6 y
+      def 56.8-56.9 ==
+      n-number 56.11-56.12
+        number-literal 56.11-56.12 53
+    n-operatordefinition 57.1-57.12
+      n-infixlhs 57.1-57.6
+        identifier 57.1-57.1 x
+        op-3 57.3-57.4 /=
+        identifier 57.6-57.6 y
+      def 57.8-57.9 ==
+      n-number 57.11-57.12
+        number-literal 57.11-57.12 54
+    n-operatordefinition 58.1-58.11
+      n-infixlhs 58.1-58.5
+        identifier 58.1-58.1 x
+        op-67 58.3-58.3 #
+        identifier 58.5-58.5 y
+      def 58.7-58.8 ==
+      n-number 58.10-58.11
+        number-literal 58.10-58.11 55
+    n-operatordefinition 59.1-59.16
+      n-infixlhs 59.1-59.10
+        identifier 59.1-59.1 x
+        op-117 59.3-59.8 \\notin
+        identifier 59.10-59.10 y
+      def 59.12-59.13 ==
+      n-number 59.15-59.16
+        number-literal 59.15-59.16 56
+    n-operatordefinition 60.1-60.13
+      n-infixlhs 60.1-60.7
+        identifier 60.1-60.1 x
+        op-109 60.3-60.5 (.)
+        identifier 60.7-60.7 y
+      def 60.9-60.10 ==
+      n-number 60.12-60.13
+        number-literal 60.12-60.13 57
+    n-operatordefinition 61.1-61.15
+      n-infixlhs 61.1-61.9
+        identifier 61.1-61.1 x
+        op-31 61.3-61.7 \\odot
+        identifier 61.9-61.9 y
+      def 61.11-61.12 ==
+      n-number 61.14-61.15
+        number-literal 61.14-61.15 58
+    n-operatordefinition 62.1-62.13
+      n-infixlhs 62.1-62.7
+        identifier 62.1-62.1 x
+        op-108 62.3-62.5 (-)
+        identifier 62.7-62.7 y
+      def 62.9-62.10 ==
+      n-number 62.12-62.13
+        number-literal 62.12-62.13 59
+    n-operatordefinition 63.1-63.17
+      n-infixlhs 63.1-63.11
+        identifier 63.1-63.1 x
+        op-32 63.3-63.9 \\ominus
+        identifier 63.11-63.11 y
+      def 63.13-63.14 ==
+      n-number 63.16-63.17
+        number-literal 63.16-63.17 60
+    n-operatordefinition 64.1-64.13
+      n-infixlhs 64.1-64.7
+        identifier 64.1-64.1 x
+        op-107 64.3-64.5 (+)
+        identifier 64.7-64.7 y
+      def 64.9-64.10 ==
+      n-number 64.12-64.13
+        number-literal 64.12-64.13 61
+    n-operatordefinition 65.1-65.16
+      n-infixlhs 65.1-65.10
+        identifier 65.1-65.1 x
+        op-33 65.3-65.8 \\oplus
+        identifier 65.10-65.10 y
+      def 65.12-65.13 ==
+      n-number 65.15-65.16
+        number-literal 65.15-65.16 62
+    n-operatordefinition 66.1-66.13
+      n-infixlhs 66.1-66.7
+        identifier 66.1-66.1 x
+        op-110 66.3-66.5 (/)
+        identifier 66.7-66.7 y
+      def 66.9-66.10 ==
+      n-number 66.12-66.13
+        number-literal 66.12-66.13 63
+    n-operatordefinition 67.1-67.17
+      n-infixlhs 67.1-67.11
+        identifier 67.1-67.1 x
+        op-34 67.3-67.9 \\oslash
+        identifier 67.11-67.11 y
+      def 67.13-67.14 ==
+      n-number 67.16-67.17
+        number-literal 67.16-67.17 64
+    n-operatordefinition 68.1-68.14
+      n-infixlhs 68.1-68.8
+        identifier 68.1-68.1 x
+        op-111 68.3-68.6 (\\X)
+        identifier 68.8-68.8 y
+      def 68.10-68.11 ==
+      n-number 68.13-68.14
+        number-literal 68.13-68.14 65
+    n-operatordefinition 69.1-69.17
+      n-infixlhs 69.1-69.11
+        identifier 69.1-69.1 x
+        op-35 69.3-69.9 \\otimes
+        identifier 69.11-69.11 y
+      def 69.13-69.14 ==
+      n-number 69.16-69.17
+        number-literal 69.16-69.17 66
+    n-operatordefinition 70.1-70.11
+      n-infixlhs 70.1-70.5
+        identifier 70.1-70.1 x
+        op-81 70.3-70.3 +
+        identifier 70.5-70.5 y
+      def 70.7-70.8 ==
+      n-number 70.10-70.11
+        number-literal 70.10-70.11 67
+    n-operatordefinition 71.1-71.14
+      n-infixlhs 71.1-71.8
+        identifier 71.1-71.1 x
+        op-75 71.3-71.6 -+->
+        identifier 71.8-71.8 y
+      def 71.10-71.11 ==
+      n-number 71.13-71.14
+        number-literal 71.13-71.14 68
+    n-operatordefinition 72.1-72.12
+      n-infixlhs 72.1-72.6
+        identifier 72.1-72.1 x
+        op-80 72.3-72.4 ++
+        identifier 72.6-72.6 y
+      def 72.8-72.9 ==
+      n-number 72.11-72.12
+        number-literal 72.11-72.12 69
+    n-operatordefinition 73.1-73.11
+      n-infixlhs 73.1-73.5
+        identifier 73.1-73.1 x
+        op-72 73.3-73.3 ^
+        identifier 73.5-73.5 y
+      def 73.7-73.8 ==
+      n-number 73.10-73.11
+        number-literal 73.10-73.11 70
+    n-operatordefinition 74.1-74.12
+      n-infixlhs 74.1-74.6
+        identifier 74.1-74.1 x
+        op-71 74.3-74.4 ^^
+        identifier 74.6-74.6 y
+      def 74.8-74.9 ==
+      n-number 74.11-74.12
+        number-literal 74.11-74.12 71
+    n-operatordefinition 75.1-75.15
+      n-infixlhs 75.1-75.9
+        identifier 75.1-75.1 x
+        op-36 75.3-75.7 \\prec
+        identifier 75.9-75.9 y
+      def 75.11-75.12 ==
+      n-number 75.14-75.15
+        number-literal 75.14-75.15 72
+    n-operatordefinition 76.1-76.17
+      n-infixlhs 76.1-76.11
+        identifier 76.1-76.1 x
+        op-37 76.3-76.9 \\preceq
+        identifier 76.11-76.11 y
+      def 76.13-76.14 ==
+      n-number 76.16-76.17
+        number-literal 76.16-76.17 73
+    n-operatordefinition 77.1-77.17
+      n-infixlhs 77.1-77.11
+        identifier 77.1-77.1 x
+        op-38 77.3-77.9 \\propto
+        identifier 77.11-77.11 y
+      def 77.13-77.14 ==
+      n-number 77.16-77.17
+        number-literal 77.16-77.17 74
+    n-operatordefinition 78.1-78.12
+      n-infixlhs 78.1-78.6
+        identifier 78.1-78.1 x
+        op-98 78.3-78.4 ??
+        identifier 78.6-78.6 y
+      def 78.8-78.9 ==
+      n-number 78.11-78.12
+        number-literal 78.11-78.12 75
+    n-operatordefinition 79.1-79.12
+      n-infixlhs 79.1-79.6
+        identifier 79.1-79.1 x
+        op-93 79.3-79.4 |=
+        identifier 79.6-79.6 y
+      def 79.8-79.9 ==
+      n-number 79.11-79.12
+        number-literal 79.11-79.12 76
+    n-operatordefinition 80.1-80.12
+      n-infixlhs 80.1-80.6
+        identifier 80.1-80.1 x
+        op-92 80.3-80.4 |-
+        identifier 80.6-80.6 y
+      def 80.8-80.9 ==
+      n-number 80.11-80.12
+        number-literal 80.11-80.12 77
+    n-operatordefinition 81.1-81.11
+      n-infixlhs 81.1-81.5
+        identifier 81.1-81.1 x
+        op-56 81.3-81.3 \\
+        identifier 81.5-81.5 y
+      def 81.7-81.8 ==
+      n-number 81.10-81.11
+        number-literal 81.10-81.11 78
+    n-operatordefinition 82.1-82.14
+      n-infixlhs 82.1-82.8
+        identifier 82.1-82.1 x
+        op-39 82.3-82.6 \\sim
+        identifier 82.8-82.8 y
+      def 82.10-82.11 ==
+      n-number 82.13-82.14
+        number-literal 82.13-82.14 79
+    n-operatordefinition 83.1-83.16
+      n-infixlhs 83.1-83.10
+        identifier 83.1-83.1 x
+        op-40 83.3-83.8 \\simeq
+        identifier 83.10-83.10 y
+      def 83.12-83.13 ==
+      n-number 83.15-83.16
+        number-literal 83.15-83.16 80
+    n-operatordefinition 84.1-84.11
+      n-infixlhs 84.1-84.5
+        identifier 84.1-84.1 x
+        op-4 84.3-84.3 /
+        identifier 84.5-84.5 y
+      def 84.7-84.8 ==
+      n-number 84.10-84.11
+        number-literal 84.10-84.11 81
+    n-operatordefinition 85.1-85.12
+      n-infixlhs 85.1-85.6
+        identifier 85.1-85.1 x
+        op-1 85.3-85.4 //
+        identifier 85.6-85.6 y
+      def 85.8-85.9 ==
+      n-number 85.11-85.12
+        number-literal 85.11-85.12 82
+    n-operatordefinition 86.1-86.16
+      n-infixlhs 86.1-86.10
+        identifier 86.1-86.1 x
+        op-41 86.3-86.8 \\sqcap
+        identifier 86.10-86.10 y
+      def 86.12-86.13 ==
+      n-number 86.15-86.16
+        number-literal 86.15-86.16 83
+    n-operatordefinition 87.1-87.16
+      n-infixlhs 87.1-87.10
+        identifier 87.1-87.1 x
+        op-42 87.3-87.8 \\sqcup
+        identifier 87.10-87.10 y
+      def 87.12-87.13 ==
+      n-number 87.15-87.16
+        number-literal 87.15-87.16 84
+    n-operatordefinition 88.1-88.19
+      n-infixlhs 88.1-88.13
+        identifier 88.1-88.1 x
+        op-43 88.3-88.11 \\sqsubset
+        identifier 88.13-88.13 y
+      def 88.15-88.16 ==
+      n-number 88.18-88.19
+        number-literal 88.18-88.19 85
+    n-operatordefinition 89.1-89.21
+      n-infixlhs 89.1-89.15
+        identifier 89.1-89.1 x
+        op-45 89.3-89.13 \\sqsubseteq
+        identifier 89.15-89.15 y
+      def 89.17-89.18 ==
+      n-number 89.20-89.21
+        number-literal 89.20-89.21 86
+    n-operatordefinition 90.1-90.19
+      n-infixlhs 90.1-90.13
+        identifier 90.1-90.1 x
+        op-44 90.3-90.11 \\sqsupset
+        identifier 90.13-90.13 y
+      def 90.15-90.16 ==
+      n-number 90.18-90.19
+        number-literal 90.18-90.19 87
+    n-operatordefinition 91.1-91.21
+      n-infixlhs 91.1-91.15
+        identifier 91.1-91.1 x
+        op-46 91.3-91.13 \\sqsupseteq
+        identifier 91.15-91.15 y
+      def 91.17-91.18 ==
+      n-number 91.20-91.21
+        number-literal 91.20-91.21 88
+    n-operatordefinition 92.1-92.15
+      n-infixlhs 92.1-92.9
+        identifier 92.1-92.1 x
+        op-47 92.3-92.7 \\star
+        identifier 92.9-92.9 y
+      def 92.11-92.12 ==
+      n-number 92.14-92.15
+        number-literal 92.14-92.15 89
+    n-operatordefinition 93.1-93.17
+      n-infixlhs 93.1-93.11
+        identifier 93.1-93.1 x
+        op-48 93.3-93.9 \\subset
+        identifier 93.11-93.11 y
+      def 93.13-93.14 ==
+      n-number 93.16-93.17
+        number-literal 93.16-93.17 90
+    n-operatordefinition 94.1-94.19
+      n-infixlhs 94.1-94.13
+        identifier 94.1-94.1 x
+        op-49 94.3-94.11 \\subseteq
+        identifier 94.13-94.13 y
+      def 94.15-94.16 ==
+      n-number 94.18-94.19
+        number-literal 94.18-94.19 91
+    n-operatordefinition 95.1-95.15
+      n-infixlhs 95.1-95.9
+        identifier 95.1-95.1 x
+        op-50 95.3-95.7 \\succ
+        identifier 95.9-95.9 y
+      def 95.11-95.12 ==
+      n-number 95.14-95.15
+        number-literal 95.14-95.15 92
+    n-operatordefinition 96.1-96.17
+      n-infixlhs 96.1-96.11
+        identifier 96.1-96.1 x
+        op-51 96.3-96.9 \\succeq
+        identifier 96.11-96.11 y
+      def 96.13-96.14 ==
+      n-number 96.16-96.17
+        number-literal 96.16-96.17 93
+    n-operatordefinition 97.1-97.17
+      n-infixlhs 97.1-97.11
+        identifier 97.1-97.1 x
+        op-52 97.3-97.9 \\supset
+        identifier 97.11-97.11 y
+      def 97.13-97.14 ==
+      n-number 97.16-97.17
+        number-literal 97.16-97.17 94
+    n-operatordefinition 98.1-98.19
+      n-infixlhs 98.1-98.13
+        identifier 98.1-98.1 x
+        op-53 98.3-98.11 \\supseteq
+        identifier 98.13-98.13 y
+      def 98.15-98.16 ==
+      n-number 98.18-98.19
+        number-literal 98.18-98.19 95
+    n-operatordefinition 99.1-99.16
+      n-infixlhs 99.1-99.10
+        identifier 99.1-99.1 x
+        op-54 99.3-99.8 \\uplus
+        identifier 99.10-99.10 y
+      def 99.12-99.13 ==
+      n-number 99.15-99.16
+        number-literal 99.15-99.16 98
+    n-operatordefinition 100.1-100.11
+      n-infixlhs 100.1-100.5
+        identifier 100.1-100.1 x
+        op-91 100.3-100.3 |
+        identifier 100.5-100.5 y
+      def 100.7-100.8 ==
+      n-number 100.10-100.11
+        number-literal 100.10-100.11 99
+    n-operatordefinition 101.1-101.13
+      n-infixlhs 101.1-101.6
+        identifier 101.1-101.1 x
+        op-90 101.3-101.4 ||
+        identifier 101.6-101.6 y
+      def 101.8-101.9 ==
+      n-number 101.11-101.13
+        number-literal 101.11-101.13 100
+    n-operatordefinition 102.1-102.14
+      n-infixlhs 102.1-102.7
+        identifier 102.1-102.1 x
+        op-55 102.3-102.5 \\wr
+        identifier 102.7-102.7 y
+      def 102.9-102.10 ==
+      n-number 102.12-102.14
+        number-literal 102.12-102.14 101
+  n-endmodule 104.1-104.4
+    end-module 104.1-104.4 ====

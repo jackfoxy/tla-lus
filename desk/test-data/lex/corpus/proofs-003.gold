@@ -1,0 +1,10 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T proposition 2.1 2.9 COROLLARY
+T identifier 2.11 2.13 def
+T def 2.15 2.16 ==
+T identifier 2.18 2.21 TRUE
+T proof 3.1 3.5 PROOF
+T obvious 3.7 3.13 OBVIOUS
+T end-module 4.1 4.4 ====

@@ -1,0 +1,33 @@
+ACCEPT
+n-module 1.1-5.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-4.6
+    n-operatordefinition 2.1-4.6
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-conjlist 3.3-4.6
+        n-conjitem 3.3-3.20
+          and 3.3-3.4 /\\
+          n-letin 3.6-3.20
+            let 3.6-3.8 LET
+            n-letdefinitions 3.10-3.15
+              n-operatordefinition 3.10-3.15
+                n-identlhs 3.10-3.10
+                  identifier 3.10-3.10 x
+                def 3.12-3.13 ==
+                n-number 3.15-3.15
+                  number-literal 3.15-3.15 1
+            letin 3.17-3.18 IN
+            n-number 3.20-3.20
+              number-literal 3.20-3.20 2
+        n-conjitem 4.3-4.6
+          and 4.3-4.4 /\\
+          n-number 4.6-4.6
+            number-literal 4.6-4.6 3
+  n-endmodule 5.1-5.4
+    end-module 5.1-5.4 ====

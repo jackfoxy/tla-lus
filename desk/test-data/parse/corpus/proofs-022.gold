@@ -1,0 +1,123 @@
+ACCEPT
+n-module 1.1-21.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-20.7
+    n-theorem 2.1-20.7
+      theorem 2.1-2.7 THEOREM
+      n-generalid 2.9-2.12
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.12 TRUE
+      n-proof 3.1-20.7
+        n-proofstep 3.1-15.10
+          barelevellexeme 3.1-3.3 <*>
+          n-assertstep 4.3-5.9
+            n-conjlist 4.3-5.9
+              n-conjitem 4.3-4.6
+                and 4.3-4.4 /\\
+                n-number 4.6-4.6
+                  number-literal 4.6-4.6 1
+              n-conjitem 5.3-5.9
+                and 5.3-5.4 /\\
+                n-disjlist 5.6-5.9
+                  n-disjitem 5.6-5.9
+                    or 5.6-5.7 \\/
+                    n-number 5.9-5.9
+                      number-literal 5.9-5.9 2
+          n-proof 6.4-15.10
+            n-proofstep 6.4-10.9
+              barelevellexeme 6.4-6.6 <+>
+              n-witnessstep 6.8-10.9
+                witness 6.8-6.14 WITNESS
+                n-disjlist 7.6-8.12
+                  n-disjitem 7.6-7.9
+                    or 7.6-7.7 \\/
+                    n-number 7.9-7.9
+                      number-literal 7.9-7.9 3
+                  n-disjitem 8.6-8.12
+                    or 8.6-8.7 \\/
+                    n-conjlist 8.9-8.12
+                      n-conjitem 8.9-8.12
+                        and 8.9-8.10 /\\
+                        n-number 8.12-8.12
+                          number-literal 8.12-8.12 4
+                comma 8.13-8.13 ,
+                n-conjlist 9.6-10.9
+                  n-conjitem 9.6-9.12
+                    and 9.6-9.7 /\\
+                    n-disjlist 9.9-9.12
+                      n-disjitem 9.9-9.12
+                        or 9.9-9.10 \\/
+                        n-number 9.12-9.12
+                          number-literal 9.12-9.12 5
+                  n-conjitem 10.6-10.9
+                    and 10.6-10.7 /\\
+                    n-number 10.9-10.9
+                      number-literal 10.9-10.9 6
+            n-proofstep 11.4-15.10
+              barelevellexeme 11.4-11.6 <*>
+              n-qedstep 11.8-11.10
+                qed 11.8-11.10 QED
+              n-terminalproof 11.12-15.10
+                by 11.12-11.13 BY
+                n-conjlist 12.6-13.12
+                  n-conjitem 12.6-12.9
+                    and 12.6-12.7 /\\
+                    n-number 12.9-12.9
+                      number-literal 12.9-12.9 7
+                  n-conjitem 13.6-13.12
+                    and 13.6-13.7 /\\
+                    n-disjlist 13.9-13.12
+                      n-disjitem 13.9-13.12
+                        or 13.9-13.10 \\/
+                        n-number 13.12-13.12
+                          number-literal 13.12-13.12 8
+                comma 13.13-13.13 ,
+                n-disjlist 14.6-15.10
+                  n-disjitem 14.6-14.12
+                    or 14.6-14.7 \\/
+                    n-conjlist 14.9-14.12
+                      n-conjitem 14.9-14.12
+                        and 14.9-14.10 /\\
+                        n-number 14.12-14.12
+                          number-literal 14.12-14.12 9
+                  n-disjitem 15.6-15.10
+                    or 15.6-15.7 \\/
+                    n-number 15.9-15.10
+                      number-literal 15.9-15.10 10
+        n-proofstep 16.1-20.7
+          barelevellexeme 16.1-16.3 <*>
+          n-qedstep 16.5-16.7
+            qed 16.5-16.7 QED
+          n-terminalproof 16.9-20.7
+            by 16.9-16.10 BY
+            n-disjlist 17.3-18.10
+              n-disjitem 17.3-17.7
+                or 17.3-17.4 \\/
+                n-number 17.6-17.7
+                  number-literal 17.6-17.7 11
+              n-disjitem 18.3-18.10
+                or 18.3-18.4 \\/
+                n-conjlist 18.6-18.10
+                  n-conjitem 18.6-18.10
+                    and 18.6-18.7 /\\
+                    n-number 18.9-18.10
+                      number-literal 18.9-18.10 12
+            comma 18.11-18.11 ,
+            n-conjlist 19.3-20.7
+              n-conjitem 19.3-19.10
+                and 19.3-19.4 /\\
+                n-disjlist 19.6-19.10
+                  n-disjitem 19.6-19.10
+                    or 19.6-19.7 \\/
+                    n-number 19.9-19.10
+                      number-literal 19.9-19.10 13
+              n-conjitem 20.3-20.7
+                and 20.3-20.4 /\\
+                n-number 20.6-20.7
+                  number-literal 20.6-20.7 14
+  n-endmodule 21.1-21.4
+    end-module 21.1-21.4 ====

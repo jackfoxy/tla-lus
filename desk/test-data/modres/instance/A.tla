@@ -1,0 +1,4 @@
+---- MODULE A ----
+I == INSTANCE B
+INSTANCE C
+====

@@ -1,0 +1,6 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.13 T
+T separator 1.15 1.18 ----
+T identifier 2.1 2.1 x
+T def 2.3 2.4 ==
+E Lexical error at line 2, column 12.  Encountered: "q" (113), after : "\\"bad \\\\"

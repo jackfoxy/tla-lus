@@ -1,0 +1,55 @@
+ACCEPT
+n-module 1.1-6.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-4.35
+    n-operatordefinition 3.1-3.17
+      n-identlhs 3.1-3.2
+        identifier 3.1-3.2 op
+      def 3.4-3.5 ==
+      n-setenumerate 3.7-3.17
+        lbc 3.7-3.7 {
+        n-infixexpr 3.8-3.16
+          n-generalid 3.8-3.8
+            n-idprefix ~ N_IdPrefix
+            identifier 3.8-3.8 x
+          n-geninfixop 3.10-3.12
+            n-idprefix ~ N_IdPrefix
+            t-in 3.10-3.12 \\in
+          n-generalid 3.14-3.16
+            n-idprefix ~ N_IdPrefix
+            identifier 3.14-3.16 Nat
+        rbc 3.17-3.17 }
+    n-operatordefinition 4.1-4.35
+      n-identlhs 4.1-4.2
+        identifier 4.1-4.2 op
+      def 4.4-4.5 ==
+      n-setenumerate 4.7-4.35
+        lbc 4.7-4.7 {
+        n-infixexpr 4.8-4.20
+          n-generalid 4.8-4.8
+            n-idprefix ~ N_IdPrefix
+            identifier 4.8-4.8 x
+          n-geninfixop 4.10-4.12
+            n-idprefix ~ N_IdPrefix
+            t-in 4.10-4.12 \\in
+          n-generalid 4.14-4.20
+            n-idprefix ~ N_IdPrefix
+            identifier 4.14-4.20 BOOLEAN
+        comma 4.21-4.21 ,
+        n-infixexpr 4.23-4.34
+          n-generalid 4.23-4.23
+            n-idprefix ~ N_IdPrefix
+            identifier 4.23-4.23 y
+          n-geninfixop 4.25-4.27
+            n-idprefix ~ N_IdPrefix
+            n-infixop 4.25-4.27 \\in
+          n-generalid 4.29-4.34
+            n-idprefix ~ N_IdPrefix
+            identifier 4.29-4.34 STRING
+        rbc 4.35-4.35 }
+  n-endmodule 6.1-6.4
+    end-module 6.1-6.4 ====

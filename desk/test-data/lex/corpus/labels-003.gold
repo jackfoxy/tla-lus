@@ -1,0 +1,13 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T identifier 2.7 2.7 a
+T op-79 2.9 2.9 *
+T identifier 2.11 2.13 lab
+T coloncolon 2.15 2.16 ::
+T identifier 2.18 2.18 b
+T op-81 2.20 2.20 +
+T identifier 2.22 2.22 c
+T end-module 3.1 3.4 ====

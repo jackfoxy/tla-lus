@@ -1,0 +1,20 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T proposition 2.1 2.5 LEMMA
+T identifier 2.7 2.10 TRUE
+T proof 3.1 3.5 PROOF
+T by 3.7 3.8 BY
+T only 3.10 3.13 ONLY
+T module 4.3 4.8 MODULE
+T identifier 4.10 4.17 Naturals
+T comma 4.18 4.18 ,
+T module 5.3 5.8 MODULE
+T identifier 5.10 5.17 Integers
+T df 6.3 6.6 DEFS
+T module 7.5 7.10 MODULE
+T identifier 7.12 7.16 Reals
+T comma 7.17 7.17 ,
+T module 8.5 8.10 MODULE
+T identifier 8.12 8.20 Sequences
+T end-module 9.1 9.4 ====

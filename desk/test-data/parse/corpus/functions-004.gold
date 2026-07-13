@@ -1,0 +1,57 @@
+ACCEPT
+n-module 1.1-10.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-9.13
+    n-operatordefinition 2.1-9.13
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-fcnconst 2.7-9.13
+        lsb 2.7-2.7 [
+        n-quantbound 3.3-3.14
+          identifier 3.3-3.3 x
+          comma 3.4-3.4 ,
+          identifier 3.6-3.6 y
+          t-in 3.8-3.10 \\in
+          n-generalid 3.12-3.14
+            n-idprefix ~ N_IdPrefix
+            identifier 3.12-3.14 Nat
+        comma 3.15-3.15 ,
+        n-quantbound 3.17-5.8
+          n-identifiertuple 3.17-3.24
+            lab 3.17-3.18 <<
+            identifier 3.19-3.19 a
+            comma 3.20-3.20 ,
+            identifier 3.22-3.22 b
+            rab 3.23-3.24 >>
+          t-in 3.26-3.28 \\in
+          n-conjlist 4.5-5.8
+            n-conjitem 4.5-4.8
+              and 4.5-4.6 /\\
+              n-generalid 4.8-4.8
+                n-idprefix ~ N_IdPrefix
+                identifier 4.8-4.8 A
+            n-conjitem 5.5-5.8
+              and 5.5-5.6 /\\
+              n-generalid 5.8-5.8
+                n-idprefix ~ N_IdPrefix
+                identifier 5.8-5.8 B
+        mapto 6.7-6.9 |->
+        n-conjlist 7.9-8.12
+          n-conjitem 7.9-7.12
+            and 7.9-7.10 /\\
+            n-generalid 7.12-7.12
+              n-idprefix ~ N_IdPrefix
+              identifier 7.12-7.12 A
+          n-conjitem 8.9-8.12
+            and 8.9-8.10 /\\
+            n-generalid 8.12-8.12
+              n-idprefix ~ N_IdPrefix
+              identifier 8.12-8.12 B
+        rsb 9.13-9.13 ]
+  n-endmodule 10.1-10.4
+    end-module 10.1-10.4 ====
