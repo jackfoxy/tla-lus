@@ -51,3 +51,4 @@ OUT.write_text(f"""|%
 --
 """)
 print(f"{len(entries)} modules, {OUT.stat().st_size} bytes")
+print(f"TOTAL {len(entries)}")

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Release gate (unit 16): audit the %tla-lus desk for release. Runs the
-# differential reproducibility check and a set of provenance/hygiene gates,
-# then prints the compatibility-matrix tag. The Hoon test suite runs on the
-# fake ship and is checked separately (see below).
+# Scaffold gate (was "release gate", relabeled in PORT-COMPLETION-PLAN-2
+# unit 0): audit the %tla-lus desk for SCAFFOLD hygiene — not Java parity.
+# It proves the pin, golden reproducibility, provenance, kelvin, migration,
+# fixture sizes, and that the parity ledger is well-formed. It does NOT prove
+# the toolchain is at parity: the ledger still has `partial`/`absent`/
+# `oracle-only` rows (see `check-parity.py`). The real release gate (unit 12)
+# additionally requires the ledger to be closed to terminal statuses.
 #
-#   tools/release-gate.sh
+#   tools/scaffold-gate.sh
 #
-# Done when every gate below is PASS and, on the ship,
+# Passes when every gate below is PASS and, on the ship,
 #   -test /=tla-lus=/tests ~   ==>  ok=%.y
 set -uo pipefail
 
@@ -65,14 +68,27 @@ BIG=$(find "$DESK/test-data" -type f -size +100k 2>/dev/null | wc -l)
 echo "== gate 8: desk manifest =="
 [ -f "$DESK/desk.bill" ] && pass "desk.bill present" || fail "no desk.bill"
 
+echo "== gate 9: parity ledger well-formed =="
+if python3 "$REPO/tools/check-parity.py" --check >/tmp/tla-parity.log 2>&1; then
+  LEDGER=$(grep -m1 'parity ledger:' /tmp/tla-parity.log)
+  OWED=$(grep -m1 'still owed' /tmp/tla-parity.log)
+  pass "$LEDGER — no unclassified rows"
+  echo "        $OWED (scaffold gate; the real release gate requires 0)"
+else
+  fail "parity ledger malformed — see /tmp/tla-parity.log"; tail -6 /tmp/tla-parity.log
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then
-  echo "RELEASE GATE: PASS"
+  echo "SCAFFOLD GATE: PASS"
+  echo "  this proves scaffold hygiene, NOT Java parity."
   echo "  compatibility matrix tag:"
   echo "    oracle pin  : tlaplus@${PIN:0:9}"
   echo "    desk state  : $DESK_STATE"
+  echo "    evidence    : desk/doc/evidence-counts.md (generated)"
+  echo "    parity      : desk/doc/parity-manifest.md ($(grep -m1 'still owed' /tmp/tla-parity.log 2>/dev/null || echo 'see check-parity.py'))"
   echo "  remaining ship gate:  -test /=tla-lus=/tests ~   must report ok=%.y"
 else
-  echo "RELEASE GATE: FAIL"
+  echo "SCAFFOLD GATE: FAIL"
 fi
 exit "$FAIL"

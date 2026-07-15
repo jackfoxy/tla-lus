@@ -88,6 +88,7 @@ def gen_boundary() -> None:
     TESTS.mkdir(parents=True, exist_ok=True)
     (TESTS / "boundary.hoon").write_text(out)
     print(f"boundary: {len(arms)} cases")
+    return len(arms)
 
 
 MARK_EQ = re.compile(r"^=+\|\|\|$")
@@ -146,11 +147,14 @@ def gen_corpus() -> None:
         total += len(arms)
         print(f"corpus-{base}: {len(arms)} cases")
     print(f"corpus total: {total}")
+    return total
 
 
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
+    n = 0
     if which in ("all", "boundary"):
-        gen_boundary()
+        n += gen_boundary()
     if which in ("all", "corpus"):
-        gen_corpus()
+        n += gen_corpus()
+    print(f"TOTAL {n}")

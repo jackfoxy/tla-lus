@@ -52,6 +52,7 @@ def main() -> None:
             golden(case)
             n += 1
     print(f"{n} pcal cases")
+    print(f"TOTAL {n}")
 
 
 if __name__ == "__main__":

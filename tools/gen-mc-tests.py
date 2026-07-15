@@ -93,6 +93,7 @@ def main() -> None:
 """)
     OUT.write_text(HEADER + "".join(arms) + "--\n")
     print(f"{len(arms)} mc cases")
+    print(f"TOTAL {len(arms)}")
 
 
 if __name__ == "__main__":

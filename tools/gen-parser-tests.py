@@ -129,6 +129,7 @@ def main() -> None:
         total += len(arms)
         print(f"corpus-{base}: {len(arms)} cases")
     print(f"total: {total}")
+    print(f"TOTAL {total}")
 
 
 if __name__ == "__main__":

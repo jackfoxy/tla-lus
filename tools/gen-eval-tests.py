@@ -59,6 +59,7 @@ def main():
 """)
     OUT.write_text(HEADER + "".join(arms) + "--\n")
     print(f"{len(arms)} eval cases")
+    print(f"TOTAL {len(arms)}")
 
 
 if __name__ == "__main__":
