@@ -21,6 +21,36 @@
   ==
 +$  state-0  [%0 jobs=(map @ta job-0)]
 ::
+::  +|  Frozen Unit-2 Molds (%1)
+::
+::  the %1 job shape is the public $job mold in /sur/tla-lus, which is
+::  frozen; this alias records that %1 states are keyed to it
++$  state-1  [%1 jobs=(map req-id job)]
+::
+::  +|  Migration %1 -> %2
+::
+::
+++  jobs-1-to-2
+  ::  Terminal %1 jobs carry over verbatim: their results are
+  ::  historical records. Active %1 jobs ran the unit-2 stub pipeline
+  ::  and cannot be resumed honestly under the %2 continuation kernel,
+  ::  so they terminate %failed with a restart instruction rather than
+  ::  fake a resumable state.
+  |=  old=(map req-id job)
+  ^-  (map req-id job-2:job-lib)
+  %-  ~(run by old)
+  |=  j=job
+  ^-  job-2:job-lib
+  ?^  result.j
+    :*  request.j  stage.j  pending.j  progress.j
+        stats.j  diags.j  artifacts.j  result.j  *@da  ~
+    ==
+  :*  request.j  %terminal  ~  progress.j
+      stats.j  diags.j  artifacts.j
+      `[%failed 'restarted: the stub pipeline was superseded; resubmit']
+      *@da  ~
+  ==
+::
 ::  +|  Migration %0 -> %1
 ::
 ::
@@ -64,7 +94,7 @@
       ?-  op0
         %translate  [%translate [%none | &]]
         %analyze    [%analyze [& & & &]]
-        %check      [%check [& ~ [%exhaustive &]]]
+        %check      [%check [| ~ [%exhaustive &]]]
       ==
       [%inline '' ~ ~]
       default-limits:job-lib

@@ -1,22 +1,80 @@
 /-  *tla-lus
-/=  check  /lib/tla/check
+/=  ast     /lib/tla/ast
+/=  syntax  /lib/tla/syntax
+/=  check   /lib/tla/check
 |%
-  ::  Resumable Job Engine
+  ::  Resumable Job Kernel (unit P2-1)
   ::
-  ::  Pure, resumable driver for the translator/SANY/TLC pipeline. One
-  ::  +step call enters exactly one stage, so a single Gall event never
-  ::  does unbounded work, and the emitted event stream is a pure function
-  ::  of the job noun: pause/resume cannot change the output.
+  ::  Pure, resumable driver for the SANY/TLC pipeline. Every expensive
+  ::  operation runs behind a persisted continuation: one +step call
+  ::  spends at most `budget` work units and returns, so a single Gall
+  ::  event never contains a full search or compiler stage, and the
+  ::  final result is a pure function of the job noun, independent of
+  ::  where the work was sliced.
   ::
-  ::  Unit 13 wires the real model checker (lib/tla/check) into the
-  ::  %explore/%simulate stages for inline `%check` requests, bounded by
-  ::  the request's max-states; the remaining stages and the PlusCal
-  ::  translation path are still deterministic stand-ins.
+  ::  Honesty contract (plan invariant 8): no stage may return a
+  ::  plausible %ok without doing the named work. Everything the
+  ::  pipeline cannot yet do faithfully is rejected by +validate before
+  ::  a job exists, or fails with a typed reason naming the unsupported
+  ::  behavior. There are no stub stages.
   ::
-  ::  Usage:
-  ::    =/  j  (init req)
-  ::    (step j)  ::  [%more events=[[%stage %parse] [%progress 1 13]] j]
+  ::  The in-flight continuation ($kont) holds recursive syntax/value
+  ::  molds, which must never enter a vase (rendering them in a vase
+  ::  type crashes in lull, e.g. the agent's on-save). It is therefore
+  ::  persisted jammed inside the job and revived at each step.
   ::
+::  +|  Types
+::
+::  the persisted job: the public $job fields plus the submit time
+::  (for max-time) and the jammed in-flight continuation
++$  job-2
+  $:  =request
+      =stage
+      pending=(list stage)
+      =progress
+      stats=run-stats
+      diags=(list diagnostic)
+      artifacts=(map artifact-name artifact)
+      result=(unit result)
+      started=@da
+      cont=(unit [%1 k=@])
+  ==
++$  step-result-2
+  $%  [%more events=(list event) job=job-2]
+      [%stop events=(list event) job=job-2]
+  ==
+::  the source span of the Next action, for typed trace states
++$  next-act  (unit [name=@t at=(unit loc)])
+::  in-flight pipeline state; versioned via the [%1 k=@] wrapper above
++$  kont
+  $%  [%parse todo=(list module-name)]
+      ::  parsed root module, consumed by the %config stage
+      [%tree t=node:check]
+      ::  safety search
+      [%bfs nl=@t act=next-act o=bfs-opts:check cur=bfs-cursor:check]
+      ::  liveness: full-graph build (%explore), then property scan
+      $:  %live
+          phase=?(%build %scan)
+          kind=?(%diamond %boxdiamond %box)
+          inner=node:check
+          pname=@t
+          nl=@t
+          act=next-act
+          o=bfs-opts:check
+          cur=bfs-cursor:check
+          todo=(list @t)
+          best=(unit [d=@ud fp=@t])
+      ==
+      ::  seeded simulation
+      $:  %sim
+          iname=@t
+          nl=@t
+          act=next-act
+          o=sim-opts:check
+          cur=sim-cursor:check
+      ==
+  ==
+::
 ::  +|  Constants
 ::
 ++  default-limits
@@ -28,23 +86,57 @@
       max-time=~m10
       max-artifact=1.000.000
   ==
-::  deterministic per-slice stub work during exploration/simulation
-++  explore-gen   25
-++  explore-dis   20
-++  explore-dep   3
-++  simulate-gen  10
+::  work units one Gall event may spend; engine configuration,
+::  deliberately separate from the request's user-facing limits
+++  default-budget  256
+::
+::  +|  Continuation Persistence
+::
+::
+++  save-kont
+  |=  k=kont
+  ^-  (unit [%1 k=@])
+  `[%1 (jam k)]
+::
+++  load-kont
+  |=  c=[%1 k=@]
+  ^-  kont
+  ;;(kont (cue k.c))
 ::
 ::  +|  Validation
 ::
 ::
 ++  validate
-  ::  Typed-boundary request checks; ~ means acceptable
-  ::
-  ::  Clay bundles are size-checked at resolve time (unit 13), when the
-  ::  content is first read.
+  ::  Typed-boundary request checks; ~ means acceptable. Everything the
+  ::  pipeline cannot yet do faithfully is rejected here by name, never
+  ::  accepted into a stage that would fake success.
   |=  req=request
   ^-  (unit @t)
-  ?:  ?=(%clay -.src.req)  ~
+  ?:  ?=(%clay -.src.req)
+    `'unsupported: %clay sources are not loaded yet (unit 10)'
+  ?:  ?=(%translate -.op.req)
+    `'unsupported: PlusCal translation is not ported yet (unit 8)'
+  ?:  ?=(%analyze -.op.req)
+    ?:  semantic.flags.op.req
+      `'unsupported: %analyze semantic stage is not wired yet (unit 3)'
+    ?:  level.flags.op.req
+      `'unsupported: %analyze level stage is not wired yet (unit 4)'
+    ?:  lint.flags.op.req
+      `'unsupported: %analyze lint stage is not wired yet (unit 4)'
+    (validate-bundle req)
+  ?:  translate.opts.op.req
+    `'unsupported: translate-before-check is not ported yet (unit 8)'
+  ?:  ?=(^ cfg.opts.op.req)
+    `'unsupported: cfg source override; put the config in the bundle'
+  ?~  cfg.src.req
+    `'a %check request requires a config'
+  (validate-bundle req)
+::
+++  validate-bundle
+  ::  size limits are enforced here, before any work is scheduled
+  |=  req=request
+  ^-  (unit @t)
+  ?>  ?=(%inline -.src.req)
   =/  modules  modules.src.req
   =/  count  ~(wyt by modules)
   ?:  =(0 count)
@@ -66,206 +158,466 @@
 ::
 ::
 ++  plan
-  ::  Ordered stages for an operation; one bounded step each
-  |=  =op
+  ::  ordered stages for a request; every planned stage does real work
+  |=  req=request
   ^-  (list stage)
-  ?-    -.op
-      %translate
-    ~[%translate %terminal]
-  ::
-      %analyze
-    %-  zing
-    ^-  (list (list stage))
-    :~  ~[%parse]
-        ?:(semantic.flags.op ~[%modules %semantic] ~)
-        ?:(level.flags.op ~[%level] ~)
-        ?:(lint.flags.op ~[%lint] ~)
-        ~[%terminal]
-    ==
-  ::
+  ?-    -.op.req
+      %translate  ~
+      %analyze    ~[%parse %terminal]
       %check
-    %-  zing
-    ^-  (list (list stage))
-    :~  ?:(translate.opts.op ~[%translate] ~)
-        ~[%parse %modules %semantic %level %config %init]
-        ?-  -.mode.opts.op
-          %exhaustive  ~[%explore %explore %explore %explore %liveness]
-          %simulate    ~[%simulate %simulate]
-        ==
-        ~[%terminal]
+    %+  weld  `(list stage)`~[%parse %config]
+    ?-    -.mode.opts.op.req
+        %simulate  `(list stage)`~[%simulate]
+        %exhaustive
+      ?:  (has-property req)
+        `(list stage)`~[%explore %liveness]
+      `(list stage)`~[%explore]
     ==
   ==
+::
+++  has-property
+  |=  req=request
+  ^-  ?
+  ?.  ?=(%inline -.src.req)  |
+  ?~  cfg.src.req  |
+  ?=(^ (cfg-value:check u.cfg.src.req 'PROPERTY'))
 ::
 ::  +|  Engine
 ::
 ::
 ++  init
-  ::  Start a job at %starting with its full stage plan pending
-  |=  req=request
-  ^-  job
-  =/  stages  (plan op.req)
-  :*  req
-      %starting
-      stages
-      [0 (lent stages)]
-      *run-stats
-      ~
-      ~
-      ~
+  ::  start a job at %starting with its full stage plan pending
+  |=  [req=request now=@da]
+  ^-  job-2
+  =/  stages  (plan req)
+  :*  req  %starting  stages  [0 (lent stages)]
+      *run-stats  ~  ~  ~  now  ~
   ==
+::
+++  kont-stage
+  ::  the pipeline stage a continuation belongs to; ~ for inter-stage
+  ::  data consumed by the next stage entry
+  |=  k=kont
+  ^-  (unit stage)
+  ?-  -.k
+    %parse  `%parse
+    %tree   ~
+    %bfs    `%explore
+    %live   ?:(=(%build phase.k) `%explore `%liveness)
+    %sim    `%simulate
+  ==
+::
+++  time-exceeded
+  |=  [j=job-2 now=@da]
+  ^-  ?
+  ?:  (lte now started.j)  |
+  (gth `@dr`(sub now started.j) max-time.limits.request.j)
 ::
 ++  step
-  ::  Enter the next pending stage; already-terminal jobs are unchanged
-  ::
-  ::  ?^/?~ narrow the tested wings, so the advanced job is rebuilt
-  ::  wholesale rather than mutated in place.
-  |=  =job
-  ^-  step-result
-  ?^  result.job  [%stop ~ job]
-  ?~  pending.job
-    =/  res=result  [%failed 'no pending work']
-    =/  j
-      ^-  ^job
-      :*  request.job  %terminal  ~  progress.job
-          stats.job  diags.job  artifacts.job  `res
-      ==
-    [%stop [%result res]~ j]
-  =/  s  i.pending.job
-  ::  shadow the narrowed sample with a wide-typed advanced job
-  =/  job
-    ^-  ^job
-    :*  request.job  s  t.pending.job
-        [+(done.progress.job) total.progress.job]
-        stats.job  diags.job  artifacts.job  ~
-    ==
-  ?+    s
-    [%more ~[[%stage s] [%progress progress.job]] job]
-  ::
-      %semantic
-    =/  d=diagnostic
-      [[%lus 100] %info %semantic 'stub semantic analysis' ~ ~]
-    =.  diags.job  (snoc diags.job d)
-    :+  %more
-      ~[[%stage s] [%diagnostic d] [%progress progress.job]]
-    job
-  ::
-      %explore
-    ::  run the real bounded model check for inline sources, then finish;
-    ::  fall back to the deterministic stub when the source is not inline
-    =/  sc  (inline-spec-cfg job)
-    ?~  sc
-      =.  stats.job
-        :*  (add generated.stats.job explore-gen)
-            (add distinct.stats.job explore-dis)
-            0
-            (add depth.stats.job explore-dep)
-        ==
-      ?:  (gth generated.stats.job max-states.limits.request.job)
-        (finish job(pending ~) [%limited %states stats.job] ~[[%stage s]])
-      ?:  (gth depth.stats.job max-depth.limits.request.job)
-        (finish job(pending ~) [%limited %depth stats.job] ~[[%stage s]])
-      [%more ~[[%stage s] [%progress progress.job]] job]
-    =/  rr  (run-check:check spec.u.sc cfg.u.sc max-states.limits.request.job)
-    =/  res=result  -.rr
-    =.  stats.job  +.rr
-    =.  artifacts.job
-      (~(put by artifacts.job) %report [%text (real-report res +.rr)])
-    (finish job(pending ~) res ~[[%stage s] [%progress progress.job]])
-  ::
-      %simulate
-    =.  stats.job
-      :*  (add generated.stats.job simulate-gen)
-          (add distinct.stats.job simulate-gen)
-          0
-          8
-      ==
-    [%more ~[[%stage s] [%progress progress.job]] job]
-  ::
-      %terminal
-    =/  arts  (stub-artifacts job)
-    =/  too-big
-      %+  lien  arts
-      |=  [* art=artifact]
-      ?.  ?=(%text -.art)  |
-      (gth (met 3 text.art) max-artifact.limits.request.job)
-    ?:  too-big
-      (finish job [%limited %artifact stats.job] ~[[%stage s]])
-    =.  artifacts.job  (~(gas by artifacts.job) arts)
-    (finish job [%ok stats.job] ~[[%stage s] [%progress progress.job]])
+  ::  spend at most `budget` work units on the job's active stage;
+  ::  already-terminal jobs are unchanged
+  |=  [j=job-2 budget=@ud now=@da]
+  ^-  step-result-2
+  ?^  result.j  [%stop ~ j]
+  ?:  (time-exceeded j now)
+    (finish j [%limited %time stats.j] ~)
+  =/  k=(unit kont)  ?~(cont.j ~ `(load-kont u.cont.j))
+  =/  own=(unit stage)  ?~(k ~ (kont-stage u.k))
+  ::  mid-stage resume: no entry events
+  ?:  ?&(?=(^ own) =(u.own stage.j))
+    (run j k budget ~)
+  ::  stage entry
+  ?~  pending.j
+    (finish j [%failed 'no pending work'] ~)
+  =/  s  i.pending.j
+  =/  prog=progress  [+(done.progress.j) total.progress.j]
+  =/  j
+    ^-  job-2
+    j(stage s, pending t.pending.j, progress prog)
+  (run j k budget ~[[%stage s] [%progress prog]])
+::
+++  run
+  ::  execute one bounded slice of the active stage
+  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-2
+  ?+    stage.j
+      ~|([%tla-lus-unplanned-stage stage.j] !!)
+    %parse     (do-parse j k budget pre)
+    %config    (do-config j k pre)
+    %explore   (do-explore j k budget pre)
+    %liveness  (do-scan j k budget pre)
+    %simulate  (do-sim j k budget pre)
+    %terminal  (do-terminal j pre)
   ==
+::
+++  more
+  ::  a non-terminal slice; heartbeat progress when nothing else to say
+  |=  [j=job-2 evs=(list event)]
+  ^-  step-result-2
+  [%more ?~(evs ~[[%progress progress.j]] evs) j]
 ::
 ++  finish
-  ::  Seal a job with its terminal result
-  |=  [=job res=result pre=(list event)]
-  ^-  step-result
-  =.  result.job  `res
-  =.  stage.job   %terminal
-  [%stop (snoc pre [%result res]) job]
+  ::  seal the job; a sealed job is never resumed
+  |=  [j=job-2 res=result pre=(list event)]
+  ^-  step-result-2
+  =.  result.j   `res
+  =.  stage.j    %terminal
+  =.  pending.j  ~
+  =.  cont.j     ~
+  [%stop (snoc pre [%result res]) j]
 ::
-::  +|  Stub Outputs
+++  cancel
+  |=  j=job-2
+  ^-  job-2
+  j(result `[%cancelled ~], stage %terminal, pending ~, cont ~)
 ::
-::
-++  wants-translation
-  |=  =op
-  ^-  ?
-  ?-  -.op
-    %translate  &
-    %analyze    |
-    %check      translate.opts.op
+++  project
+  ::  the public job view: results and progress, never internal cursors
+  |=  j=job-2
+  ^-  job
+  :*  request.j  stage.j  pending.j  progress.j
+      stats.j  diags.j  artifacts.j  result.j
   ==
 ::
-++  stub-artifacts
-  |=  =job
-  ^-  (list [artifact-name artifact])
-  =/  =op  op.request.job
-  %-  zing
-  ^-  (list (list [artifact-name artifact]))
-  :~  [[%report [%text (report-text job)]] ~]
-    ::
-      ?.  (wants-translation op)  ~
-      [[%translation [%text stub-translation]] ~]
-    ::
-      ?.  ?&(?=(%translate -.op) gen-cfg.opts.op)  ~
-      [[%cfg [%text stub-cfg]] ~]
-  ==
+::  +|  Stage: %parse
 ::
-++  inline-spec-cfg
-  ::  the root module's source text and config for an inline %check
-  ::  request that carries a config; ~ when the source is not inline or
-  ::  has no config (those fall back to the deterministic placeholder)
-  |=  =job
-  ^-  (unit [spec=@t cfg=@t])
-  =/  src  src.request.job
-  ?.  ?=(%inline -.src)  ~
-  ?~  cfg.src  ~
-  =/  spec  (~(get by modules.src) root.src)
-  ?~  spec  ~
-  `[u.spec u.cfg.src]
 ::
-++  real-report
-  ::  a human-readable summary line for a real model-check result
-  |=  [res=result stats=run-stats]
+++  do-parse
+  ::  %check parses the root module into a %tree hand-off; %analyze
+  ::  parses every bundle module, one work unit each, collecting
+  ::  diagnostics for %terminal's verdict
+  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-2
+  ?>  ?=(%inline -.src.request.j)
+  =/  src  src.request.j
+  ?:  ?=(%check -.op.request.j)
+    =/  text  (~(get by modules.src) root.src)
+    ?~  text
+      (finish j [%failed 'root module not in bundle'] pre)
+    =/  pr  (mule |.((parse:syntax u.text)))
+    =/  err=(unit @t)
+      ?:  ?=(%| -.pr)  `'parser crashed'
+      ?:  ?=(%| -.p.pr)  `p.p.pr
+      ~
+    ?^  err
+      =/  msg  (rap 3 ~['parse error: ' u.err])
+      =/  d=diagnostic  [[%lus 400] %error %parse msg ~ ~]
+      =.  diags.j  (snoc diags.j d)
+      (finish j [%failed msg] (snoc pre [%diagnostic d]))
+    ?>  &(?=(%& -.pr) ?=(%& -.p.pr))
+    =.  cont.j  (save-kont [%tree p.p.pr])
+    (more j pre)
+  ::  %analyze
+  =/  kk=kont
+    ?^  k  u.k
+    [%parse (sort ~(tap in ~(key by modules.src)) aor)]
+  ?>  ?=(%parse -.kk)
+  =/  evs  pre
+  =/  spent  0
+  |-  ^-  step-result-2
+  ?~  todo.kk
+    =.  cont.j  ~
+    (more j evs)
+  ?:  (gte spent budget)
+    =.  cont.j  (save-kont kk)
+    (more j evs)
+  =/  nm  i.todo.kk
+  =/  err=(unit @t)
+    =/  pr  (mule |.((parse:syntax (~(got by modules.src) nm))))
+    ?:  ?=(%| -.pr)  `'parser crashed'
+    ?:  ?=(%| -.p.pr)  `p.p.pr
+    ~
+  ?~  err
+    $(todo.kk t.todo.kk, spent +(spent))
+  ::  parse:syntax reports no error position yet (unit 2); at stays ~
+  =/  d=diagnostic
+    :*  [%lus 400]  %error  %parse
+        (rap 3 ~['parse error in ' nm ': ' u.err])
+        ~  ~
+    ==
+  =.  diags.j  (snoc diags.j d)
+  $(todo.kk t.todo.kk, spent +(spent), evs (snoc evs [%diagnostic d]))
+::
+::  +|  Stage: %config
+::
+::
+++  cfg-known  ^-  (list @t)  ~['INIT' 'NEXT' 'INVARIANT' 'PROPERTY']
+::
+++  cfg-audit
+  ::  the config must be key/value pairs over the supported keys, each
+  ::  at most once; anything else is named in the typed rejection
+  |=  cfg=@t
+  ^-  (unit @t)
+  =/  toks  (cfg-tokens:check cfg)
+  =|  used=(set @t)
+  |-  ^-  (unit @t)
+  ?~  toks  ~
+  =/  key  i.toks
+  ?.  (lien cfg-known |=(w=@t =(w key)))
+    `(rap 3 ~['unsupported config key: ' key])
+  ?:  (~(has in used) key)
+    `(rap 3 ~['duplicate config key: ' key])
+  ?~  t.toks
+    `(rap 3 ~['config key without value: ' key])
+  $(toks t.t.toks, used (~(put in used) key))
+::
+++  do-config
+  ::  consume the parsed root tree and build the engine continuation.
+  ::  Every config this engine cannot process faithfully is a typed
+  ::  failure naming the key or form; nothing is silently ignored.
+  |=  [j=job-2 k=(unit kont) pre=(list event)]
+  ^-  step-result-2
+  ?.  ?&(?=(^ k) ?=(%tree -.u.k))
+    (finish j [%failed 'internal: %config without a parsed tree'] pre)
+  =/  tree  t.u.k
+  ?>  ?=(%inline -.src.request.j)
+  ?>  ?=(%check -.op.request.j)
+  =/  cfg   (need cfg.src.request.j)
+  =/  mode  mode.opts.op.request.j
+  =/  lims  limits.request.j
+  =/  bad   (cfg-audit cfg)
+  ?^  bad  (finish j [%failed u.bad] pre)
+  =/  in  (cfg-value:check cfg 'INIT')
+  =/  nx  (cfg-value:check cfg 'NEXT')
+  =/  iv  (cfg-value:check cfg 'INVARIANT')
+  =/  pp  (cfg-value:check cfg 'PROPERTY')
+  ?~  in  (finish j [%failed 'no INIT in config'] pre)
+  ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
+  ?:  &(?=(^ iv) ?=(^ pp))
+    %^  finish  j
+      [%failed 'unsupported: INVARIANT and PROPERTY in one config (unit 7)']
+    pre
+  =/  ib  (body-of-def:check tree u.in)
+  =/  nb  (body-of-def:check tree u.nx)
+  ?~  ib  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
+  ?~  nb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+  =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
+  ?:  &(?=(^ iv) ?=(~ ivb))
+    %^  finish  j
+      [%failed (rap 3 ~['no definition for INVARIANT ' u.iv])]
+    pre
+  =/  vars  (var-names:check tree)
+  =/  modn  (module-name-of:check tree)
+  =/  nl    (next-span-label:check u.nb modn)
+  =/  act=next-act
+    =/  sp  (span-of:ast u.nb)
+    `[u.nx ?~(sp ~ `[modn u.sp])]
+  ?:  ?=(%simulate -.mode)
+    ?:  ?=(^ pp)
+      %^  finish  j
+        [%failed 'unsupported: temporal property in simulation (unit 9)']
+      pre
+    =/  dep
+      ?:  =(0 max-depth.lims)  depth.mode
+      (min depth.mode max-depth.lims)
+    =/  o=sim-opts:check  [u.nb ivb vars num.mode dep]
+    =.  cont.j
+      %-  save-kont
+      [%sim ?~(iv '' u.iv) nl act o (sim-init:check u.ib vars seed.mode)]
+    (more j pre)
+  ?^  pp
+    =/  pb  (body-of-def:check tree u.pp)
+    ?~  pb
+      %^  finish  j
+        [%failed (rap 3 ~['no definition for PROPERTY ' u.pp])]
+      pre
+    =/  up  (unwrap-prop:check u.pb)
+    ?:  ?=(%none kind.up)
+      %^  finish  j
+        [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
+      pre
+    =/  o=bfs-opts:check
+      [u.nb ~ '' vars | max-states.lims max-depth.lims]
+    =.  cont.j
+      %-  save-kont
+      :*  %live  %build  kind.up  inner.up  u.pp  nl  act
+          o  (bfs-init:check u.ib vars)  ~  ~
+      ==
+    (more j pre)
+  ::  safety search
+  =/  o=bfs-opts:check
+    :*  u.nb  ivb  ?~(iv '' u.iv)  vars
+        deadlock.mode  max-states.lims  max-depth.lims
+    ==
+  =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check u.ib vars)])
+  (more j pre)
+::
+::  +|  Stage: %explore
+::
+::
+++  do-explore
+  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-2
+  ?:  ?&(?=(^ k) ?=(%bfs -.u.k))
+    =/  kk  u.k
+    =/  r  (bfs-step:check o.kk cur.kk budget)
+    ?:  ?=(%more -.r)
+      =.  cont.j  (save-kont kk(cur cur.r))
+      (more j pre)
+    (finish-bfs j out.r nl.kk act.kk pre)
+  ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
+    =/  kk  u.k
+    =/  r  (bfs-step:check o.kk cur.kk budget)
+    ?:  ?=(%more -.r)
+      =.  cont.j  (save-kont kk(cur cur.r))
+      (more j pre)
+    ?:  ?=(%limited -.out.r)
+      =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r]
+      =.  stats.j  st
+      (finish j [%limited what.out.r st] pre)
+    ?.  ?=(%ok -.out.r)
+      (finish j [%failed 'internal: unexpected graph outcome'] pre)
+    =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r]
+    =.  stats.j  st
+    =/  todo  (live-todo:check kind.kk seen.cur.r inits.cur.r)
+    =.  cont.j  (save-kont kk(phase %scan, cur cur.r, todo todo))
+    (more j pre)
+  (finish j [%failed 'internal: %explore without a search continuation'] pre)
+::
+++  finish-bfs
+  ::  seal a safety search: wire result, stats, report + trace artifacts
+  |=  [j=job-2 out=outcome:check nl=@t act=next-act pre=(list event)]
+  ^-  step-result-2
+  =/  st=run-stats
+    ?-  -.out
+      %ok        [gen.out distinct.out 0 depth.out]
+      %limited   [gen.out distinct.out 0 depth.out]
+      %inv       [gen.out distinct.out 0 depth.out]
+      %deadlock  [gen.out distinct.out 0 depth.out]
+    ==
+  =.  stats.j  st
+  =/  res=result
+    ?-  -.out
+      %ok        [%ok st]
+      %limited   [%limited what.out st]
+      %inv       [%violated [%invariant name.out] st]
+      %deadlock  [%violated [%deadlock ~] st]
+    ==
+  =/  report  (wain-text (render-outcome:check out nl))
+  =/  tr=(unit trace)
+    ?+  -.out  ~
+      %inv       `[%safety (trace-states trace.out act) ~]
+      %deadlock  `[%safety (trace-states trace.out act) ~]
+    ==
+  (finish-arts j res report tr pre)
+::
+::  +|  Stage: %liveness
+::
+::
+++  do-scan
+  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-2
+  ?.  ?&(?=(^ k) ?=(%live -.u.k) =(%scan phase.u.k))
+    (finish j [%failed 'internal: %liveness without a scan continuation'] pre)
+  =/  kk  u.k
+  =/  r
+    (live-scan:check kind.kk inner.kk seen.cur.kk todo.kk best.kk budget)
+  ?:  ?=(%more -.r)
+    =.  cont.j  (save-kont kk(todo todo.r, best best.r))
+    (more j pre)
+  ::  stats were sealed when the graph build finished
+  =/  st  stats.j
+  ?~  bad.r
+    =/  report
+      %-  wain-text
+      :-  'Model checking completed. No error has been found.'
+      (counts-lines:check generated.st distinct.st depth.st)
+    (finish-arts j [%ok st] report ~ pre)
+  =/  tr  (trace-to:check seen.cur.kk u.bad.r)
+  =/  report
+    %-  wain-text
+    ;:  weld
+      ~[(crip "Error: Temporal property {(trip pname.kk)} was violated.")]
+      ~['Error: The following behavior constitutes a counter-example:']
+      (render-live-trace:check tr nl.kk)
+      (counts-lines:check generated.st distinct.st depth.st)
+    ==
+  =/  typed=trace  [%lasso (trace-states tr act.kk) `(lent tr)]
+  (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
+::
+::  +|  Stage: %simulate
+::
+::
+++  do-sim
+  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-2
+  ?.  ?&(?=(^ k) ?=(%sim -.u.k))
+    (finish j [%failed 'internal: %simulate without a continuation'] pre)
+  =/  kk  u.k
+  =/  r  (sim-step:check o.kk cur.kk budget)
+  ?:  ?=(%more -.r)
+    =.  cont.j  (save-kont kk(cur cur.r))
+    (more j pre)
+  =/  st=run-stats  [steps.res.r 0 0 maxn.cur.r]
+  =.  stats.j  st
+  =/  head
+    %-  crip
+    ;:  weld
+      "Simulation completed: "
+      (a-tape:check traces.res.r)
+      " behaviors, "
+      (a-tape:check steps.res.r)
+      " transitions."
+    ==
+  ?~  viol.res.r
+    (finish-arts j [%ok st] head ~ pre)
+  =/  report
+    %-  wain-text
+    ;:  weld
+      ~[(crip "Error: Invariant {(trip iname.kk)} is violated.")]
+      ~['Error: The behavior up to this point is:']
+      (render-trace:check u.viol.res.r nl.kk)
+      ~[head]
+    ==
+  =/  typed=trace  [%simulate (trace-states u.viol.res.r act.kk) ~]
+  (finish-arts j [%violated [%invariant iname.kk] st] report `typed pre)
+::
+::  +|  Stage: %terminal
+::
+::
+++  do-terminal
+  ::  %analyze verdict: fail iff any parse stage errors were recorded
+  |=  [j=job-2 pre=(list event)]
+  ^-  step-result-2
+  =/  errs
+    %-  lent
+    %+  skim  diags.j
+    |=(d=diagnostic &(=(%error severity.d) =(%parse stage.d)))
+  ?:  =(0 errs)
+    (finish j [%ok stats.j] pre)
+  %^  finish  j
+    [%failed (rap 3 ~['syntax errors in ' (a-co:check errs) ' module(s)'])]
+  pre
+::
+::  +|  Artifacts
+::
+::
+++  finish-arts
+  ::  store the report (and optional typed trace) then seal; a report
+  ::  exceeding max-artifact turns the run %limited at the point of
+  ::  growth, keeping the true statistics
+  |=  [j=job-2 res=result report=@t tr=(unit trace) pre=(list event)]
+  ^-  step-result-2
+  ?:  (gth (met 3 report) max-artifact.limits.request.j)
+    (finish j [%limited %artifact stats.j] pre)
+  =.  artifacts.j  (~(put by artifacts.j) %report [%text report])
+  =.  artifacts.j
+    ?~  tr  artifacts.j
+    (~(put by artifacts.j) %trace [%trace u.tr])
+  (finish j res pre)
+::
+++  trace-states
+  ::  wire-typed trace states: 1-indexed, initial state has no action
+  |=  [sts=(list state:check) act=next-act]
+  ^-  (list trace-state)
+  =/  i  1
+  |-  ^-  (list trace-state)
+  ?~  sts  ~
+  :_  $(sts t.sts, i +(i))
+  [i ?:(=(1 i) ~ act) (state-pairs:check i.sts)]
+::
+++  wain-text
+  |=  w=wain
   ^-  @t
-  =/  counts
-    "generated {<generated.stats>} distinct {<distinct.stats>} depth {<depth.stats>}"
-  %-  crip
-  ?-  -.res
-    %ok        "check ok: {counts}"
-    %failed    "check failed: {(trip reason.res)}"
-    %limited   "check limited ({<kind.res>}): {counts}"
-    %cancelled  "check cancelled"
-    %violated  "violation {<-.violation.res>}: {counts}"
-  ==
-::
-++  stub-translation
-  '---- MODULE Stub ----\0a(* PlusCal translation stub *)\0a===='
-::
-++  stub-cfg  'INIT Init\0aNEXT Next\0a'
-::
-++  report-text
-  |=  =job
-  ^-  @t
-  %-  crip
-  "stub run: generated {<generated.stats.job>} ".
-  "distinct {<distinct.stats.job>} depth {<depth.stats.job>}"
+  (rap 3 (join '\0a' w))
 --

@@ -51,7 +51,7 @@ generated `evidence-counts.md`, never hand-written.
 | tlc-driver | tlc2.TLC (arg parsing, run modes, exit codes) | lib/tla/job | gen-mc-tests (5) | partial | 13 | exhaustive/simulate modes partial; flags map to request mold |
 | tlc-repl | tlc2.REPL, TLCRunner, TraceExplorationSpec | lib/tla/eval (repl as oracle) | gen-eval-tests (37) | excluded | 9 | REPL/TE-spec generation out of scope; used only as eval oracle |
 | tlc-safety | tool.ModelChecker, AbstractChecker, Worker, TLCState*, TLCTrace | lib/tla/check | gen-mc-tests (5) | partial | 7,10 | tiny BFS slice; FP64/symmetry/constraints/coverage/checkpoints absent |
-| tlc-resumable | tool.AbstractChecker resumable/checkpoint contract | lib/tla/job | (job tests) | partial | 1 | stub step engine exists; true per-event slicing (unit 1) absent |
+| tlc-resumable | tool.AbstractChecker resumable/checkpoint contract | lib/tla/job (kont kernel) | (job tests: every-boundary pause/resume) | partial | 1 | P2-1: budgeted per-event slicing with persisted BFS/scan/sim cursors; checkpoint-to-disk semantics and byte-format parity remain unit 9 |
 | tlc-dfid | tool.DFIDModelChecker/DFIDWorker | — | (none) | excluded | 9 | DFID not in core target |
 | tlc-eval | tool/impl.Tool, OpDefEvaluator, ContextEnumerator, ActionItemList* | lib/tla/eval, lib/tla/check | gen-eval-tests (37) | partial | 6 | CST evaluator on finite subset; semantic-node eval absent |
 | tlc-config | tool/impl.ModelConfig, Spec, SpecProcessor | lib/tla/check (cfg reader) | gen-mc-tests (5) | partial | 5 | line-oriented INIT/NEXT/INVARIANT/PROPERTY only; full grammar absent |
@@ -89,18 +89,18 @@ presence in the wire type.
 
 | id | java-owner | hoon-owner | oracle-test | status | unit | rationale |
 |---|---|---|---|---|---|---|
-| op-translate | pcal.trans | job.hoon %translate stage | (none) | absent | 8 | stage emits a stub translation artifact; no real PlusCal translation |
-| op-analyze | tla2sany.SANY -s/-l/-lint | job.hoon %analyze stages | gen-sem-tests (19) | partial | 6-7 | parse/semantic/level partial; %semantic/%lint stages still stubs |
-| op-check-exhaustive | tlc2.TLC (safety) | job.hoon %explore, check.hoon | gen-mc-tests (5) | partial | 10,13 | inline+cfg only, one capped run per event, not sliced |
-| op-check-simulate | tlc2.TLC -simulate | check.hoon +simulate | (sim property tests) | partial | 12 | engine exists as property-tested lib; %simulate stage is a stub |
-| check-opt-translate | tlc2 translate-before-check | job.hoon wants-translation | (none) | absent | 8 | translate-then-check produces a stub translation |
-| check-opt-cfg | tlc2.TLC -config | check.hoon cfg reader | gen-mc-tests (5) | partial | 5 | cfg override read; full ModelConfig grammar absent |
-| src-inline | (n/a) | job.hoon %inline | gen-mc-tests (5) | partial | 13 | inline bundles run; parse/semantic stages still stubs |
-| src-clay | util.FilenameToStream | mar/tla, job.hoon %clay | (none) | absent | 10,13 | Clay resolver exists but is not wired into the Gall job pipeline |
+| op-translate | pcal.trans | job.hoon validate | (job tests) | absent | 8 | typed rejection at submit naming unit 8; no stub artifact (P2-1) |
+| op-analyze | tla2sany.SANY -s/-l/-lint | job.hoon %parse/%terminal | gen-parser-tests (249) | partial | 2-4 | syntax-only analyze runs the real parser per module; semantic/level/lint flags are typed-rejected at submit (P2-1) |
+| op-check-exhaustive | tlc2.TLC (safety) | job.hoon kont kernel, check.hoon bfs-cursor | gen-mc-tests (5) | partial | 7,10 | inline+cfg, budget-sliced resumable BFS (P2-1); constraints/symmetry/FP64/coverage absent |
+| op-check-simulate | tlc2.TLC -simulate | job.hoon %sim kont, check.hoon sim-cursor | (sim property tests + job tests) | partial | 9,12 | real seeded engine wired and budget-sliced (P2-1); TLC RNG/enumeration-order parity absent |
+| check-opt-translate | tlc2 translate-before-check | job.hoon validate | (job tests) | absent | 8 | typed rejection at submit (P2-1); no stub translation |
+| check-opt-cfg | tlc2.TLC -config | job.hoon cfg-audit + do-config | gen-mc-tests (5) + job tests | partial | 5 | strict key/value audit rejects unknown/duplicate keys by name (P2-1); full ModelConfig grammar absent; cfg source override typed-rejected |
+| src-inline | (n/a) | job.hoon %inline | gen-mc-tests (5) | partial | 7,10 | inline bundles run the real parse->config->search pipeline; multi-module resolution not yet wired into %check |
+| src-clay | util.FilenameToStream | mar/tla, job.hoon validate | (job tests) | absent | 10 | typed rejection at submit (P2-1); Clay resolver exists but Gall issues no reads |
 | limit-max-source | (n/a) | job.hoon validate | (job tests) | parity | 2 | enforced at validate before work begins |
 | limit-max-modules | (n/a) | job.hoon validate | (job tests) | parity | 2 | enforced at validate |
-| limit-max-states | TLCGlobals | job.hoon %explore | (job tests) | partial | 13 | enforced as a whole-run cap, not resumable per-event slicing |
-| limit-max-depth | TLCGlobals | job.hoon, check.hoon | (job tests) | partial | 13 | enforced on the stub path and in simulation walks |
-| limit-max-time | TLCGlobals runtime | (default only) | (none) | absent | 1 | present in the request but never enforced |
-| limit-max-artifact | (n/a) | job.hoon %terminal | (job tests) | parity | 2 | enforced before storing artifacts |
-| allow-write | (n/a) | (unused) | (none) | absent | 13 | Clay write-back not implemented |
+| limit-max-states | TLCGlobals | check.hoon bfs-step cap | (job tests) | parity | 1 | enforced as each state registers, inside the sliced search (P2-1) |
+| limit-max-depth | TLCGlobals | check.hoon bfs-step maxd, sim depth | (job tests) | parity | 1 | enforced at registration depth and simulation walk depth (P2-1) |
+| limit-max-time | TLCGlobals runtime | job.hoon step entry | (job tests) | parity | 1 | checked on entry to every slice against the submit time (P2-1) |
+| limit-max-artifact | (n/a) | job.hoon finish-arts | (job tests) | parity | 2 | enforced before storing the report artifact |
+| allow-write | (n/a) | (unused) | (none) | absent | 13 | Clay write-back not implemented; flag ignored |

@@ -336,7 +336,7 @@
   ?~  t  ~
   ?:(=('\0a' i.t) t $(t t.t))
 ::
-::  +|  Breadth-First Exploration
+::  +|  Breadth-First Exploration (resumable cursor, unit P2-1)
 ::
 ::
 +$  visit  [depth=@ud pred=@t st=state]
@@ -344,8 +344,103 @@
   $%  [%ok gen=@ud distinct=@ud depth=@ud]
       [%inv gen=@ud distinct=@ud depth=@ud trace=(list state) name=@t]
       [%deadlock gen=@ud distinct=@ud depth=@ud trace=(list state)]
-      [%limited gen=@ud distinct=@ud depth=@ud]
+      [%limited what=?(%states %depth) gen=@ud distinct=@ud depth=@ud]
   ==
+::  fixed parameters of one search
++$  bfs-opts
+  $:  next=node
+      inv=(unit node)
+      inv-name=@t
+      vars=(set @t)
+      deadlock=?     ::  report deadlocked states as violations
+      cap=@ud        ::  distinct-state bound (0 = unbounded)
+      maxd=@ud       ::  graph-depth bound (0 = unbounded)
+  ==
+::  everything required to resume a search byte-identically
++$  bfs-cursor
+  $:  init-todo=(list state)  ::  initial states not yet registered
+      queue=(list @t)         ::  frontier fingerprints, BFS order
+      seen=(map @t visit)
+      inits=(list @t)         ::  registered initial states, in order
+      gen=@ud
+      distinct=@ud
+      depth=@ud
+  ==
++$  bfs-slice
+  $%  [%more cur=bfs-cursor]
+      [%done out=outcome cur=bfs-cursor]
+  ==
+::
+++  bfs-init
+  ::  solve the Init predicate; registration is budgeted in +bfs-step
+  |=  [init=node vars=(set @t)]
+  ^-  bfs-cursor
+  =/  is  (gen init vars %init ~ ~)
+  [is ~ ~ ~ (lent is) 0 0]
+::
+++  register
+  ::  admit one state at depth `d`: depth bound, dedup, then the
+  ::  invariant check TLC runs as each state is generated
+  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t]
+  ^-  [out=(unit outcome) cur=bfs-cursor]
+  =/  fp  (fingerprint st)
+  ?:  (~(has by seen.cur) fp)  [~ cur]
+  ?:  &(!=(0 maxd.o) (gth d maxd.o))
+    [`[%limited %depth gen.cur distinct.cur depth.cur] cur]
+  =.  seen.cur   (~(put by seen.cur) fp [d pred st])
+  =.  queue.cur  (snoc queue.cur fp)
+  =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+  =.  distinct.cur  +(distinct.cur)
+  =.  depth.cur     (max depth.cur d)
+  ?:  ?&(?=(^ inv.o) !(ev-bool %init u.inv.o st ~))
+    :_  cur
+    `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) inv-name.o]
+  [~ cur]
+::
+++  register-all
+  |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t]
+  ^-  [out=(unit outcome) cur=bfs-cursor]
+  |-  ^-  [out=(unit outcome) cur=bfs-cursor]
+  ?~  sts  [~ cur]
+  =/  rr  (register o cur i.sts d pred)
+  ?^  out.rr  rr
+  $(sts t.sts, cur cur.rr)
+::
+++  bfs-step
+  ::  spend up to `budget` work units (one per state registered or
+  ::  generated), then return the cursor. The outcome and every count
+  ::  are independent of how the search is sliced.
+  ::  narrowing note: ?^/?~ test local copies (todo, q), never wings of
+  ::  `cur`, so recursing with a fresh wide cursor never nest-fails
+  |=  [o=bfs-opts cur=bfs-cursor budget=@ud]
+  ^-  bfs-slice
+  =/  spent  0
+  |-  ^-  bfs-slice
+  ?:  (gte spent budget)  [%more cur]
+  ::  register pending initial states first (depth 1, no predecessor)
+  =/  todo  init-todo.cur
+  ?^  todo
+    =/  rr  (register o cur(init-todo t.todo) i.todo 1 '')
+    ?^  out.rr  [%done u.out.rr cur.rr]
+    $(cur cur.rr, spent +(spent))
+  ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
+    [%done [%limited %states gen.cur distinct.cur depth.cur] cur]
+  =/  q  queue.cur
+  ?~  q
+    [%done [%ok gen.cur distinct.cur depth.cur] cur]
+  =/  fp   i.q
+  =/  vis  (~(got by seen.cur) fp)
+  =/  nexts  (gen next.o vars.o %next st.vis ~)
+  ?~  nexts
+    ?.  deadlock.o  $(cur cur(queue t.q), spent +(spent))
+    :+  %done
+      [%deadlock gen.cur distinct.cur depth.cur (trace-to seen.cur fp)]
+    cur
+  =/  cost  (lent nexts)
+  =/  rr
+    (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp)
+  ?^  out.rr  [%done u.out.rr cur.rr]
+  $(cur cur.rr, spent (add spent cost))
 ::
 ++  explore
   ::  deterministic BFS from the initial states; stops at the first
@@ -361,53 +456,12 @@
           cap=@ud
       ==
   ^-  outcome
-  =/  inits  (gen init vars %init ~ ~)
-  =|  seen=(map @t visit)
-  =/  gen-count  (lent inits)
-  =|  distinct=@ud
-  =|  max-depth=@ud
-  =|  queue=(list @t)   ::  fingerprints, in BFS order
-  ::  register the initial states, checking the invariant on each
-  =/  reg
-    |=  [sts=(list state) d=@ud pred=@t s=_seen q=_queue di=@ud md=@ud]
-    ^-  [inv=(unit [trace=(list state) st=state]) s=_seen q=_queue di=@ud md=@ud]
-    |-  ^-  [inv=(unit [trace=(list state) st=state]) s=_seen q=_queue di=@ud md=@ud]
-    ?~  sts  [~ s q di md]
-    =/  fp  (fingerprint i.sts)
-    ?:  (~(has by s) fp)  $(sts t.sts)
-    =.  s   (~(put by s) fp [d pred i.sts])
-    =.  q   (snoc q fp)
-    =.  di  +(di)
-    =.  md  (max md d)
-    ?:  ?&(?=(^ inv) !(ev-bool %init u.inv i.sts ~))
-      [`[(trace-to s fp) i.sts] s q di md]
-    $(sts t.sts)
-  =/  ir  (reg inits 1 '' seen queue distinct max-depth)
-  =.  seen  s.ir
-  =.  queue  q.ir
-  =.  distinct  di.ir
-  =.  max-depth  md.ir
-  ?^  inv.ir
-    [%inv gen-count distinct max-depth trace.u.inv.ir inv-name]
-  ::  breadth-first loop
+  =/  o=bfs-opts  [next inv inv-name vars & cap 0]
+  =/  cur  (bfs-init init vars)
   |-  ^-  outcome
-  ?:  ?&(!=(0 cap) (gth distinct cap))
-    [%limited gen-count distinct max-depth]
-  ?~  queue  [%ok gen-count distinct max-depth]
-  =/  fp  i.queue
-  =/  vis  (~(got by seen) fp)
-  =/  nexts  (gen next vars %next st.vis ~)
-  ?~  nexts
-    [%deadlock gen-count distinct max-depth (trace-to seen fp)]
-  =.  gen-count  (add gen-count (lent nexts))
-  =/  rr  (reg nexts +(depth.vis) fp seen t.queue distinct max-depth)
-  =.  seen  s.rr
-  =.  distinct  di.rr
-  =.  max-depth  md.rr
-  ?^  inv.rr
-    [%inv gen-count distinct max-depth trace.u.inv.rr name=inv-name]
-  ::  q.rr is t.queue with the new frontier appended (reg snoc'd onto it)
-  $(queue q.rr)
+  =/  r  (bfs-step o cur 1.024)
+  ?:  ?=(%done -.r)  out.r
+  $(cur cur.r)
 ::
 ++  trace-to
   ::  the behavior (list of states, initial first) ending at `fp`
@@ -432,14 +486,22 @@
   =/  ids  (skim (kids-of i.bm) |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
   ?~(ids '' (leaf-text i.ids))
 ::
+++  state-pairs
+  ::  sorted [var rendered-value] pairs of a state
+  |=  st=state
+  ^-  (list [@t @t])
+  %+  turn  (sort ~(tap by st) |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b)))
+  |=  [k=@t v=value]
+  [k (crip (render:ev v))]
+::
 ++  render-state
   ::  variable bindings of a trace state, one `var = value` per line,
   ::  variables in sorted order
   |=  st=state
   ^-  wain
-  %+  turn  (sort ~(tap by st) |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b)))
-  |=  [k=@t v=value]
-  (crip "{(trip k)} = {(render:ev v)}")
+  %+  turn  (state-pairs st)
+  |=  [k=@t v=@t]
+  (crip "{(trip k)} = {(trip v)}")
 ::
 ++  render-trace
   ::  `State N: <label>` blocks; state 1 is the initial predicate, later
@@ -501,54 +563,13 @@
   ::  stop), with per-state depth and predecessor for trace reconstruction
   |=  [init=node next=node vars=(set @t)]
   ^-  graph
-  =/  is  (gen init vars %init ~ ~)
-  =/  gen-count  (lent is)
-  ::  register the initial states (depth 1, no predecessor)
-  =/  reg=[seen=(map @t visit) inits=(list @t) distinct=@ud depth=@ud queue=(list @t)]
-    =|  seen=(map @t visit)
-    =|  inits=(list @t)
-    =/  distinct=@ud  0
-    =/  depth=@ud  0
-    =|  queue=(list @t)
-    |-  ^-  [(map @t visit) (list @t) @ud @ud (list @t)]
-    ?~  is  [seen inits distinct depth queue]
-    =/  fp  (fingerprint i.is)
-    ?:  (~(has by seen) fp)  $(is t.is)
-    %=  $
-      is        t.is
-      seen      (~(put by seen) fp [1 '' i.is])
-      inits     (snoc inits fp)
-      queue     (snoc queue fp)
-      distinct  +(distinct)
-      depth     (max depth 1)
-    ==
-  =/  seen  seen.reg
-  =/  inits  inits.reg
-  =/  distinct  distinct.reg
-  =/  depth  depth.reg
-  =/  queue  queue.reg
-  ::  breadth-first over the queue
+  =/  o=bfs-opts  [next ~ '' vars | 0 0]
+  =/  cur  (bfs-init init vars)
   |-  ^-  graph
-  ?~  queue  [seen inits gen-count distinct depth]
-  =/  fp   i.queue
-  =/  vis  (~(got by seen) fp)
-  =/  nexts  (gen next vars %next st.vis ~)
-  =.  gen-count  (add gen-count (lent nexts))
-  =/  nd  +(depth.vis)
-  =^  add-fps  seen
-    =|  new=(list @t)
-    |-  ^-  [(list @t) (map @t visit)]
-    ?~  nexts  [new seen]
-    =/  nfp  (fingerprint i.nexts)
-    ?:  (~(has by seen) nfp)  $(nexts t.nexts)
-    %=  $
-      nexts     t.nexts
-      new       (snoc new nfp)
-      seen      (~(put by seen) nfp [nd fp i.nexts])
-    ==
-  =.  distinct  (add distinct (lent add-fps))
-  =.  depth  ?~(add-fps depth (max depth nd))
-  $(queue (weld t.queue add-fps))
+  =/  r  (bfs-step o cur 1.024)
+  ?:  ?=(%done -.r)
+    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+  $(cur cur.r)
 ::
 ++  unwrap-prop
   ::  classify a temporal property: <>P (%diamond), []<>P (%boxdiamond),
@@ -612,13 +633,76 @@
   =/  base  (render-trace trace next-label)
   (snoc base (crip "State {(a-tape +((lent trace)))}: Stuttering"))
 ::
-::  +|  Seeded Simulation (bounded, reproducible)
+::  +|  Resumable Liveness Scan (unit P2-1)
+::
++$  scan-slice
+  $%  [%more todo=(list @t) best=(unit [d=@ud fp=@t])]
+      [%done bad=(unit @t)]
+  ==
+::
+++  live-todo
+  ::  the ordered scan worklist for a property kind over a built graph
+  |=  [kind=?(%diamond %boxdiamond %box) seen=(map @t visit) inits=(list @t)]
+  ^-  (list @t)
+  ?:  ?=(%diamond kind)  inits
+  (turn ~(tap by seen) |=([fp=@t *] fp))
+::
+++  live-scan
+  ::  process up to `budget` fingerprints of the worklist, replicating
+  ::  +check-live's selection: the first violating initial state for
+  ::  <>P; the shallowest reachable violator (first seen wins ties, in
+  ::  worklist order) for []P and []<>P
+  |=  $:  kind=?(%diamond %boxdiamond %box)
+          inner=node
+          seen=(map @t visit)
+          todo=(list @t)
+          best=(unit [d=@ud fp=@t])
+          budget=@ud
+      ==
+  ^-  scan-slice
+  =/  spent  0
+  |-  ^-  scan-slice
+  ?~  todo
+    [%done ?~(best ~ `fp.u.best)]
+  ?:  (gte spent budget)  [%more todo best]
+  =/  v   (~(got by seen) i.todo)
+  =/  ok  (ev-bool %init inner st.v ~)
+  ?:  ?=(%diamond kind)
+    ?.  ok  [%done `i.todo]
+    $(todo t.todo, spent +(spent))
+  =?  best  ?&(!ok |(?=(~ best) (gth d.u.best depth.v)))
+    `[depth.v i.todo]
+  $(todo t.todo, spent +(spent))
+::
+::  +|  Seeded Simulation (bounded, reproducible, resumable)
 ::
 ::
 +$  sim-result
   $:  traces=@ud       ::  behaviors simulated
       steps=@ud        ::  state transitions taken
       viol=(unit (list state))  ::  an invariant-violating behavior, if hit
+  ==
+::  fixed parameters of one simulation run
++$  sim-opts
+  $:  next=node
+      inv=(unit node)
+      vars=(set @t)
+      num=@ud     ::  behaviors to simulate
+      depth=@ud   ::  transitions per behavior
+  ==
+::  everything required to resume a run byte-identically; the RNG is
+::  saved as its raw sample, so slicing cannot change the choices
++$  sim-cursor
+  $:  seed=@
+      inits=(list state)
+      t=@ud               ::  behaviors completed
+      steps=@ud
+      maxn=@ud            ::  deepest transition index reached
+      walk=(unit [cur=state path=(list state) n=@ud])
+  ==
++$  sim-slice
+  $%  [%more cur=sim-cursor]
+      [%done res=sim-result cur=sim-cursor]
   ==
 ::
 ++  nth-state
@@ -628,30 +712,52 @@
   ^-  state
   (snag i l)
 ::
-++  walk
-  ::  a single random behavior from `start`: at each step pick a uniformly
-  ::  random next state (reproducibly, from the RNG core), up to `depth`
-  ::  transitions, stopping early on a deadlock or invariant violation
-  |=  $:  start=state
-          next=node
-          inv=(unit node)
-          vars=(set @t)
-          rng=_og
-          depth=@ud
-      ==
-  ^-  [trace=(list state) viol=(unit (list state)) steps=@ud rng=_og]
-  =/  cur=state       start
-  =/  path=(list state)  ~[start]
-  =/  n     0
-  |-  ^-  [(list state) (unit (list state)) @ud _og]
-  ?:  ?&(?=(^ inv) !(ev-bool %init u.inv cur ~))
-    [(flop path) `(flop path) n rng]
-  ?:  =(n depth)  [(flop path) ~ n rng]
-  =/  nexts  (gen next vars %next cur ~)
-  ?:  =(~ nexts)  [(flop path) ~ n rng]
+++  sim-init
+  |=  [init=node vars=(set @t) seed=@]
+  ^-  sim-cursor
+  [seed (gen init vars %init ~ ~) 0 0 0 ~]
+::
+++  sim-step
+  ::  spend up to `budget` work units (one per transition or behavior
+  ::  boundary). The RNG call sequence is identical for every slicing,
+  ::  so the run is a pure function of [opts cursor].
+  ::  narrowing note: the walk option is tested via a local copy so the
+  ::  recursion can always assign a fresh wide cursor
+  |=  [o=sim-opts cur=sim-cursor budget=@ud]
+  ^-  sim-slice
+  ?:  =(~ inits.cur)  [%done [0 0 ~] cur]
+  =/  rng  ~(. og seed.cur)
+  =/  spent  0
+  |-  ^-  sim-slice
+  ?:  (gte spent budget)  [%more cur(seed +<.rng)]
+  ?:  =(num.o t.cur)  [%done [t.cur steps.cur ~] cur(seed +<.rng)]
+  =/  mw  walk.cur
+  ?~  mw
+    ::  begin a new behavior at a random initial state
+    =^  i0  rng  (rads:rng (lent inits.cur))
+    =/  start  (nth-state i0 inits.cur)
+    $(cur cur(walk `[start ~[start] 0]), spent +(spent))
+  =/  w  u.mw
+  ?:  ?&(?=(^ inv.o) !(ev-bool %init u.inv.o cur.w ~))
+    :+  %done
+      [+(t.cur) steps.cur `(flop path.w)]
+    cur(seed +<.rng)
+  ?:  =(n.w depth.o)
+    $(cur cur(walk ~, t +(t.cur)), spent +(spent))
+  =/  nexts  (gen next.o vars.o %next cur.w ~)
+  ?:  =(~ nexts)
+    $(cur cur(walk ~, t +(t.cur)), spent +(spent))
   =^  idx  rng  (rads:rng (lent nexts))
   =/  pick  (nth-state idx nexts)
-  $(cur pick, path [pick path], n +(n), rng rng)
+  %=  $
+    spent  +(spent)
+    cur
+    %=  cur
+      walk   `[pick [pick path.w] +(n.w)]
+      steps  +(steps.cur)
+      maxn   (max maxn.cur +(n.w))
+    ==
+  ==
 ::
 ++  simulate
   ::  bounded seeded simulation: up to `traces` random behaviors, each up
@@ -667,20 +773,12 @@
           depth=@ud
       ==
   ^-  sim-result
-  =/  inits  (gen init vars %init ~ ~)
-  ?:  =(~ inits)  [0 0 ~]
-  =/  rng  ~(. og seed)
-  =/  t     0
-  =/  steps=@ud  0
+  =/  o=sim-opts  [next inv vars traces depth]
+  =/  cur  (sim-init init vars seed)
   |-  ^-  sim-result
-  ?:  =(t traces)  [t steps ~]
-  =^  i0  rng  (rads:rng (lent inits))
-  =/  start  (nth-state i0 inits)
-  =/  wr  (walk start next inv vars rng depth)
-  =.  steps  (add steps steps.wr)
-  =.  rng    rng.wr
-  ?^  viol.wr  [+(t) steps viol.wr]
-  $(t +(t))
+  =/  r  (sim-step o cur 1.024)
+  ?:  ?=(%done -.r)  res.r
+  $(cur cur.r)
 ::
 ++  simulate-spec
   ::  run a bounded seeded simulation from spec + config source, returning
@@ -740,13 +838,21 @@
   ::  safety: an INVARIANT
   =/  inv-body  ?~(iv ~ (body-of-def tree u.iv))
   =/  res  (explore u.init-body u.next-body inv-body ?~(iv '' u.iv) vars 0)
+  (render-outcome res nl)
+::
+++  render-outcome
+  ::  TLC's terminal lines for a safety outcome
+  |=  [res=outcome nl=@t]
+  ^-  wain
   ?-    -.res
       %ok
     :-  'Model checking completed. No error has been found.'
     (counts-lines gen.res distinct.res depth.res)
   ::
       %limited
-    :-  'Model checking stopped: state limit reached.'
+    :-  ?:  =(%states what.res)
+          'Model checking stopped: state limit reached.'
+        'Model checking stopped: depth limit reached.'
     (counts-lines gen.res distinct.res depth.res)
   ::
       %inv
@@ -803,7 +909,7 @@
   =/  o  (explore u.ib u.nb inv-body ?~(iv '' u.iv) vars cap)
   ?-    -.o
       %ok        =/  st  [gen.o distinct.o 0 depth.o]  [[%ok st] st]
-      %limited   =/  st  [gen.o distinct.o 0 depth.o]  [[%limited %states st] st]
+      %limited   =/  st  [gen.o distinct.o 0 depth.o]  [[%limited what.o st] st]
       %inv       =/  st  [gen.o distinct.o 0 depth.o]  [[%violated [%invariant name.o] st] st]
       %deadlock  =/  st  [gen.o distinct.o 0 depth.o]  [[%violated [%deadlock ~] st] st]
   ==

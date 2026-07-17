@@ -21,15 +21,31 @@
 ::
 ++  bol  (mk-bowl 0 ~2026.7.12 ~zod)
 ::
+++  cyc-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 4
+  ====
+  '''
+::
 ++  demo-req
+  ::  a real inline %check request the %2 kernel runs end to end
   ^-  request
-  :*  [%check [& ~ [%exhaustive &]]]
-      [%inline 'Demo' (malt ~[['Demo' '---- MODULE Demo ----\0a====\0a']]) ~]
+  :*  [%check [| ~ [%exhaustive &]]]
+      :*  %inline  'spec'
+          (malt ~[['spec' cyc-spec]])
+          `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+      ==
       default-limits:job-lib
       |
   ==
-::  (plan:job-lib op.demo-req) has 13 stages
-++  total  13
+::  (plan:job-lib demo-req) is ~[%parse %config %explore]
+++  total  3
 ::
 ++  do-poke
   |=  [ag=agent:gall act=action]
@@ -150,6 +166,19 @@
     (expect-eq !>(*(unit job)) !>((scry-job ag ~.big)))
   ==
 ::
+++  test-unsupported-op-rejected
+  ::  the honesty contract: unsupported operations never become jobs
+  =/  ag  `agent:gall`agent
+  =/  req  demo-req
+  =.  op.req  [%translate [%none | &]]
+  =^  caz  ag  (do-poke ag [%submit ~.tr req])
+  ;:  weld
+    %+  expect-eq
+      !>([%rejected ~.tr 'unsupported: PlusCal translation is not ported yet (unit 8)'])
+    !>((fact-update (snag 0 caz)))
+    (expect-eq !>(*(unit job)) !>((scry-job ag ~.tr)))
+  ==
+::
 ::  +|  Bounded Execution
 ::
 ::
@@ -161,7 +190,7 @@
     ::  stage fact, progress fact, next timer
     (expect-eq !>(3) !>((lent caz)))
     %+  expect-eq
-      !>([%job ~.j1 [%stage %translate]])
+      !>([%job ~.j1 [%stage %parse]])
     !>((fact-update (snag 0 caz)))
     %+  expect-eq
       !>([%job ~.j1 [%progress 1 total]])
@@ -179,11 +208,11 @@
     ::  final wake: stage, progress, result facts and no timer
     (expect-eq !>(3) !>((lent caz)))
     %+  expect-eq
-      !>([%job ~.j1 [%result [%ok [100 80 0 12]]]])
+      !>([%job ~.j1 [%result [%ok [5 4 0 4]]]])
     !>((fact-update (snag 2 caz)))
-    (expect-eq !>(`[%ok [100 80 0 12]]) !>(result.j))
+    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
     (expect-eq !>([total total]) !>(progress.j))
-    (expect-eq !>(1) !>((lent diags.j)))
+    (expect-eq !>(~) !>(diags.j))
   ==
 ::
 ++  test-wake-unknown-job-is-noop
@@ -301,17 +330,13 @@
   =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
   =/  active  (~(on-peek ag bol) /x/job/j1/artifact/report)
   =^  caz1  ag  (wake-n ag ~.j1 total)
-  =/  report  (~(on-peek ag bol) /x/job/j1/artifact/report)
-  =/  translation  (~(on-peek ag bol) /x/job/j1/artifact/translation)
-  =/  missing  (~(on-peek ag bol) /x/job/j1/artifact/nope)
+  =/  report   (~(on-peek ag bol) /x/job/j1/artifact/report)
+  =/  missing  (~(on-peek ag bol) /x/job/j1/artifact/translation)
   ;:  weld
     (expect-eq !>([~ ~]) !>(active))
     (expect-eq !>([~ ~]) !>(missing))
     %-  expect
     !>(?=([~ ~ %noun *] report))
-    %+  expect-eq
-      !>([%text stub-translation:job-lib])
-    !>(!<(artifact q:(need (need translation))))
   ==
 ::
 ++  test-scry-unknown-path

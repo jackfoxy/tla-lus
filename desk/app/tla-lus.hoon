@@ -5,16 +5,16 @@
 |%
   ::  %tla-lus: Headless TLA+ Toolchain Agent
   ::
-  ::  Unit-2 surface: frozen request/update nouns from /sur/tla-lus over
-  ::  the deterministic stub engine in /lib/tla/job. Jobs advance in
-  ::  bounded Behn-driven steps; each step's events fan out as facts on
-  ::  /jobs and /job/<id>. Later units replace the stub stage bodies with
-  ::  the real translator/SANY/TLC pipeline.
+  ::  Frozen request/update nouns from /sur/tla-lus over the resumable
+  ::  continuation kernel in /lib/tla/job (unit P2-1). Jobs advance in
+  ::  Behn-driven steps of at most default-budget work units; each
+  ::  step's events fan out as facts on /jobs and /job/<id>. Scries
+  ::  expose the public $job projection, never internal cursors.
   ::
 ::  +|  Types
 ::
-+$  versioned-state  $%(state-0:mig state-1)
-+$  state-1  [%1 jobs=(map req-id job)]
++$  versioned-state  $%(state-0:mig state-1:mig state-2)
++$  state-2  [%2 jobs=(map req-id job-2:job-lib)]
 +$  card     card:agent:gall
 ::
 ::  +|  Card Helpers
@@ -42,7 +42,7 @@
 ::
 ++  snapshot
   ::  Current state of a job as updates, for (re)joining watchers
-  |=  [id=req-id j=job]
+  |=  [id=req-id j=job-2:job-lib]
   ^-  (list update)
   ?^  result.j
     [%job id [%result u.result.j]]~
@@ -52,12 +52,12 @@
 ::
 ++  terminal
   ::  Only terminal jobs may be deleted or expose artifacts
-  |=  j=job
+  |=  j=job-2:job-lib
   ^-  ?
   ?=(^ result.j)
 --
 %-  agent:dbug
-=|  state-1
+=|  state-2
 =*  state  -
 ^-  agent:gall
 |_  =bowl:gall
@@ -73,16 +73,17 @@
 ++  on-load
   |=  old-vase=vase
   ^-  (quip card _this)
-  =/  res=(each state-1 tang)
+  =/  res=(each state-2 tang)
     %-  mule  |.
     =/  old  !<(versioned-state old-vase)
     ?-  -.old
-      %0  [%1 (jobs-0-to-1:mig jobs.old)]
-      %1  old
+      %0  [%2 (jobs-1-to-2:mig (jobs-0-to-1:mig jobs.old))]
+      %1  [%2 (jobs-1-to-2:mig jobs.old)]
+      %2  old
     ==
   ?:  ?=(%.y -.res)  `this(state p.res)
   %-  (slog 'tla-lus: state corrupt, unable to migrate' ~)
-  `this(state *state-1)
+  `this(state *state-2)
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -101,7 +102,7 @@
       :_  this
       [(fact id.act [%rejected id.act u.bad]) ~]
     =.  jobs.state
-      (~(put by jobs.state) id.act (init:job-lib request.act))
+      (~(put by jobs.state) id.act (init:job-lib request.act now.bowl))
     :_  this
     :~  (fact id.act [%ack id.act])
         (wait id.act now.bowl)
@@ -112,8 +113,7 @@
     =/  cur  (~(get by jobs.state) id.act)
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
-    =/  j  u.cur(result `[%cancelled ~], stage %terminal, pending ~)
-    =.  jobs.state  (~(put by jobs.state) id.act j)
+    =.  jobs.state  (~(put by jobs.state) id.act (cancel:job-lib u.cur))
     :_  this
     (efacts id.act [%result [%cancelled ~]]~)
   ::
@@ -158,10 +158,11 @@
     :^  ~  ~  %noun
     !>  ^-  (list [req-id stage])
     %+  turn  ~(tap by jobs.state)
-    |=([id=req-id j=job] [id stage.j])
+    |=([id=req-id j=job-2:job-lib] [id stage.j])
   ::
       [%x %job @ ~]
-    ``noun+!>((~(get by jobs.state) `req-id`i.t.t.path))
+    =/  cur  (~(get by jobs.state) `req-id`i.t.t.path)
+    ``noun+!>(`(unit job)`(bind cur project:job-lib))
   ::
       [%x %job @ %artifact @ ~]
     =/  id    `req-id`i.t.t.path
@@ -188,7 +189,7 @@
     =/  cur  (~(get by jobs.state) id)
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
-    =/  res  (step:job-lib u.cur)
+    =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
     =.  jobs.state  (~(put by jobs.state) id job.res)
     ?-    -.res
         %more

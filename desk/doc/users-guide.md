@@ -24,15 +24,20 @@ running check resumes from its last completed stage.
 ## Concepts
 
 - **Request** — one operation (`%translate`, `%analyze`, `%check`) over a
-  **source bundle**, with **limits** and a write flag.
+  **source bundle**, with **limits** and a write flag. Operations the
+  pipeline cannot yet run faithfully are **rejected at submit by name**
+  (see `doc/compatibility.md`); today that includes `%translate`, the
+  `%analyze` semantic/level/lint flags, and `%clay` sources.
 - **Source bundle** — either `%inline` (modules and an optional `.cfg` passed
-  as nouns) or `%clay` (a root `.tla` path in a desk plus module-search roots).
-- **Job** — a submitted request identified by a `req-id` you choose. It runs as
-  a chain of bounded slices and ends in exactly one **result**.
+  as nouns) or `%clay` (a root `.tla` path in a desk plus module-search
+  roots; not yet loaded — rejected at submit until unit 10).
+- **Job** — a submitted request identified by a `req-id` you choose. It runs
+  as a chain of bounded slices — long searches persist a resumable cursor
+  between events — and ends in exactly one **result**.
 - **Result** — `%ok`, `%violated` (with a counterexample), `%limited` (a
   resource bound was hit), `%failed`, or `%cancelled`.
-- **Artifacts** — files a terminal job produced: a `%report`, and for
-  translation a `%translation` and `%cfg`.
+- **Artifacts** — files a terminal job produced: a `%report` with the
+  TLC-style output, and on a violation a typed `%trace`.
 
 ## Workflow: inline model checking
 

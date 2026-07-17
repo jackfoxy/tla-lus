@@ -103,18 +103,24 @@ is idempotent. Subscribing to an unknown id fails the watch.
 | Path | Returns |
 |---|---|
 | `/x/jobs` | `(list [req-id stage])` — all jobs and their current stage |
-| `/x/job/<id>` | `(unit job)` — the full job noun |
-| `/x/job/<id>/artifact/<name>` | `artifact` — a terminal job's artifact (`%report`, `%translation`, `%cfg`, or a `%trace`) |
+| `/x/job/<id>` | `(unit job)` — the public job projection (internal cursors are never exposed) |
+| `/x/job/<id>/artifact/<name>` | `artifact` — a terminal job's artifact (`%report` text; `%trace` on a violation) |
 
 ## Scheduling, cancellation, restart
 
 A job runs as a chain of **bounded slices**: each Behn wake
-(`/job/<id>/step`) enters exactly one pipeline stage via `step:job-lib`,
-publishes that slice's events, and — if work remains — schedules the next
-wake. No single event does unbounded work; the model checker is bounded by
-`max-states`. Jobs are stored in agent state (`state-1 = [%1 jobs=(map req-id
-job)]`), so they survive a ship restart and resume from the persisted stage;
-a job cancelled or deleted between scheduling and wake-up is a no-op.
+(`/job/<id>/step`) spends at most `default-budget:job-lib` work units via
+`step:job-lib` (states registered or generated, simulation transitions, or
+modules parsed), publishes that slice's events, and — if work remains —
+persists an in-stage continuation inside the job and schedules the next
+wake. No single event contains a full search; the per-event budget is
+engine configuration, separate from the request's `limits`, which are
+enforced where each resource grows (`max-states`/`max-depth` per state
+registered, `max-time` per slice, `max-artifact` at artifact store). Jobs
+are stored in agent state (`state-2 = [%2 jobs=(map req-id job-2)]`), so
+they survive a ship restart and resume mid-search from the persisted
+cursor with an identical result; a job cancelled or deleted between
+scheduling and wake-up is a no-op.
 
 ## Dojo example
 

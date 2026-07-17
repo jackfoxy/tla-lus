@@ -153,45 +153,66 @@ termination, violation discovery), *not* as a byte-for-byte oracle:
   enumeration loops, structured partial statistics on resource limits, DFID,
   and the benchmark suite.
 
-## Unit 13 — Gall / Clay pipeline integration
+## Unit P2-1 — Resumable job kernel (supersedes the unit-13 stub engine)
 
-The real checker is wired into the resumable job engine for **inline** `%check`
-requests that carry a config. Stubs, fallbacks, and ignored options that remain
-(each a row in `parity-manifest.md` — this section enumerates the runtime
-behavior, per unit 0):
+The job engine (`lib/tla/job`) is now a budgeted continuation kernel: one
+Gall event spends at most `default-budget` work units (states registered or
+generated, transitions, or modules parsed) and persists a versioned, jammed
+continuation (`$kont %1`) inside the `%2` job noun. Pause/resume at **every**
+slice boundary is tested to produce an identical event stream and final job.
+Consequences:
 
-- **Stubbed pipeline stages.** `%parse`, `%semantic`, `%level`, `%lint`,
-  `%translate`, and `%simulate` job stages emit deterministic placeholder
-  progress/artifacts rather than running the real analysis; only `%explore`
-  for inline-with-config runs the real model checker. A source **without** a
-  config keeps the placeholder path entirely.
-- **`%clay` sources are not loaded.** `validate` accepts a `%clay` bundle and
-  the `mar/tla` resolver exists, but the Gall job does not issue Clay reads, so
-  a submitted `%clay` request cannot produce a real result. Row `src-clay` =
-  `absent`.
-- **`max-time` is never enforced.** It is part of the public `limits` mold but
-  no stage checks it. Row `limit-max-time` = `absent`.
-- **`allow-write` is ignored.** Clay translation write-back is unimplemented;
-  the flag has no effect. Row `allow-write` = `absent`.
-- **No per-event BFS slicing.** `max-states` bounds a whole `run-check` per
-  `%explore` event (a new `%limited` outcome), rather than slicing the search
-  state-by-state across events. A large search can still block a Gall event.
-- Absent: canonicalized module-search roots, content-hash source caching,
-  stale-source protection, per-request/global quotas, artifact retention, and
-  subscriber idempotency beyond what units 1–2 provide.
+- **No stub stages exist.** The former placeholder `%parse`, `%semantic`,
+  `%level`, `%lint`, `%translate`, `%explore`, `%simulate`, and `%terminal`
+  stub bodies are gone. Every operation either runs the real pipeline or is
+  rejected by type at submit (`+validate`) naming the unsupported behavior
+  and its plan unit. A request can no longer finish `%ok` without the named
+  work having run.
+- **Per-event slicing.** The safety search, liveness graph build, liveness
+  property scan, and seeded simulation all run behind persisted cursors
+  (`bfs-cursor`, `sim-cursor` in `lib/tla/check`). The simulation cursor
+  saves the raw RNG sample, so slicing cannot change the random choices.
+  Two enumeration atoms remain un-sliceable until B5's enumeration cursors:
+  solving the Init predicate (one `+gen` call at `%config`) and generating
+  one state's successors (one `+gen` call per queue entry).
+- **Limits at the point of growth.** `max-states` and `max-depth` are
+  checked as each state registers inside the search; `max-time` is checked
+  against the submit time on entry to every slice; `max-artifact` before
+  storing the report; `max-source`/`max-modules` at validate. All six
+  request limits are now enforced (`max-time` previously was not).
+- **State `%2` migration.** Terminal `%1` jobs carry over verbatim; active
+  `%1` jobs ran the stub pipeline and cannot resume honestly, so they
+  terminate `%failed 'restarted: the stub pipeline was superseded;
+  resubmit'`.
+- **Real artifacts.** A finished check stores a TLC-style `%report` text and,
+  on violation, a typed `%trace` artifact (`%safety`, `%lasso` with
+  `loop-start`, or `%simulate`). The stub translation/cfg artifacts are gone.
+- **Simulation mode is live.** `%check` with `mode=%simulate` runs the real
+  property-tested seeded engine (unit 12) through the kernel. Its `run-stats`
+  map differently: `generated` = transitions taken, `depth` = deepest
+  transition index; `distinct`/`queued` stay 0.
 
-## Ignored / unsupported public options — summary
+Still absent after P2-1 (tracked in `parity-manifest.md`): Clay sources
+(typed-rejected at submit), PlusCal translation and translate-before-check
+(typed-rejected), `%analyze` semantic/level/lint flags (typed-rejected),
+multi-module resolution inside `%check`, canonicalized search roots,
+content-hash caching, quotas, artifact retention.
+
+## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,
-machine-checked list. In one place, the options a caller can set today that do
-**not** yet produce a faithful result:
+machine-checked list. Options a caller can set today that do **not** produce
+a run (all rejected at submit with the message shown, never silently
+ignored):
 
-| Option | Effect today |
+| Option | Rejection |
 |---|---|
-| `op` = `%translate` | stub translation artifact (no real PlusCal) |
-| `op` = `%analyze` (`semantic`/`lint`) | `%semantic`/`%lint` stages are stubs |
-| `check-opts.translate` = `&` | stub translation before check |
-| `check-mode` = `%simulate` | `%simulate` stage is a stub (engine is lib-only) |
-| `src` = `%clay …` | not loaded; no Clay reads issued |
-| `limits.max-time` | not enforced |
-| `allow-write` = `&` | ignored (no write-back) |
+| `op` = `%translate` | `unsupported: PlusCal translation is not ported yet (unit 8)` |
+| `op` = `%analyze` with `semantic`/`level`/`lint` | `unsupported: %analyze <flag> stage is not wired yet (unit 3/4)` |
+| `check-opts.translate` = `&` | `unsupported: translate-before-check is not ported yet (unit 8)` |
+| `check-opts.cfg` = `` `name `` | `unsupported: cfg source override; put the config in the bundle` |
+| `%check` without a bundle cfg | `a %check request requires a config` |
+| `src` = `%clay …` | `unsupported: %clay sources are not loaded yet (unit 10)` |
+| unknown/duplicate config key | `unsupported config key: <K>` / `duplicate config key: <K>` (at `%config`) |
+| unsupported temporal property form | `unsupported: temporal property form (only <>P, []<>P, []P; unit 8)` (at `%config`) |
+| `allow-write` = `&` | accepted but ignored (no write-back; unit 13) — the one remaining silent option |

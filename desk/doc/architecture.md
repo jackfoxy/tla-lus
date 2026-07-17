@@ -44,17 +44,25 @@ The agent is deliberately small. It:
 - **Authorizes** — every `on-poke`/`on-watch`/`on-arvo` asserts
   `=(src.bowl our.bowl)`; only the host ship drives it.
 - **Validates and starts** — `%submit` runs `validate:job` (typed-boundary
-  checks: bundle non-empty, root present, size/module limits) then
-  `init:job`, storing the job under its `req-id`.
+  checks: bundle non-empty, root present, size/module limits, and a typed
+  rejection naming every operation the pipeline cannot yet do faithfully)
+  then `init:job`, storing the job under its `req-id`.
 - **Schedules bounded slices** — a Behn timer on wire `/job/<id>/step`; each
-  `%behn %wake` runs one `step:job`, fans its events out as `%tla-lus-update`
-  facts, and reschedules while the step returns `%more`. This is how a large
-  model check yields between events instead of blocking the ship.
+  `%behn %wake` runs one `step:job` with a fixed work budget
+  (`default-budget:job`), fans its events out as `%tla-lus-update` facts,
+  and reschedules while the step returns `%more`. The search itself is
+  resumable: the BFS/liveness/simulation cursor persists inside the job as
+  a versioned jammed continuation, so a large model check yields between
+  events instead of blocking the ship (unit P2-1). The continuation is
+  jammed because its recursive syntax/value molds must not enter the
+  `on-save` vase type.
 - **Publishes** — subscribers to `/job/<id>` get a replayed snapshot then live
   ordered events; `%result` is terminal and fires once.
-- **Persists** — all jobs live in `state-1 = [%1 jobs=(map req-id job)]`.
+- **Persists** — all jobs live in `state-2 = [%2 jobs=(map req-id job-2)]`.
   `on-save`/`on-load` carry them across upgrades; `migrate.hoon` owns the
-  frozen `%0` mold and the `%0 → %1` migration.
+  frozen `%0`/`%1` molds and the `%0 → %1 → %2` chain (active `%1` stub
+  jobs terminate `%failed` rather than fake a resumable state). Scries
+  expose the public `$job` projection, never the internal continuation.
 
 ## Dependency graph (units)
 
@@ -72,12 +80,16 @@ is validated back through units 4–7.
 
 ## Persistence and recovery
 
-State is a versioned tagged union (`versioned-state = $%(state-0 state-1)`), so
-upgrades are explicit migrations, never in-place reshaping. A job's noun
-contains everything needed to resume: the request, the current stage, the
-remaining `pending` stages, accumulated stats/diags/artifacts, and (once set)
-the terminal result. Recovery is therefore "reload state, keep stepping":
-scheduled wakes for deleted or already-terminal jobs are no-ops.
+State is a versioned tagged union (`versioned-state = $%(state-0 state-1
+state-2)`), so upgrades are explicit migrations, never in-place reshaping. A
+job's noun contains everything needed to resume byte-identically: the
+request, the current stage, the remaining `pending` stages, accumulated
+stats/diags/artifacts, the submit time (for `max-time`), the jammed in-stage
+continuation (search queue, visited set, scan worklist, or RNG sample), and
+(once set) the terminal result. Recovery is therefore "reload state, keep
+stepping": interrupting after any slice — including mid-search — never
+changes the event stream or the final job, and scheduled wakes for deleted
+or already-terminal jobs are no-ops.
 
 ## Trust boundaries and data ownership
 
