@@ -1,0 +1,13 @@
+REJECT
+***Parse Error***
+
+  Precedence conflict between ops = in block line 2, col 10 to line 2, col 10 of module Test and =.
+
+Residual stack trace follows:
+ExtendableExpr starting at line 2, column 12.
+ExtendableExpr starting at line 2, column 8.
+Expression starting at line 2, column 8.
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+
+%%

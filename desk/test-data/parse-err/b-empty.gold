@@ -1,0 +1,10 @@
+REJECT
+***Parse Error***
+Was expecting "---- MODULE (beginning of module)"
+Encountered "<EOF>" at line 0, column 0 and token "" 
+
+Residual stack trace follows:
+Begin module starting at line 0, column 0.
+Module definition starting at line 0, column 0.
+
+%%

@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "]_" at line 2, column 24 and token "}" 
+
+Residual stack trace follows:
+Some [] Form starting at line 2, column 11.
+ExtendableExpr starting at line 2, column 11.
+Expression starting at line 2, column 9.
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+
+%%

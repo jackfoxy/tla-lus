@@ -294,18 +294,18 @@
     =/  text  (~(get by modules.src) root.src)
     ?~  text
       (finish j [%failed 'root module not in bundle'] pre)
-    =/  pr  (mule |.((parse:syntax u.text)))
-    =/  err=(unit @t)
-      ?:  ?=(%| -.pr)  `'parser crashed'
-      ?:  ?=(%| -.p.pr)  `p.p.pr
-      ~
-    ?^  err
-      =/  msg  (rap 3 ~['parse error: ' u.err])
-      =/  d=diagnostic  [[%lus 400] %error %parse msg ~ ~]
-      =.  diags.j  (snoc diags.j d)
-      (finish j [%failed msg] (snoc pre [%diagnostic d]))
-    ?>  &(?=(%& -.pr) ?=(%& -.p.pr))
-    =.  cont.j  (save-kont [%tree p.p.pr])
+    =/  pr  (mule |.((parse-typed:syntax u.text)))
+    ?:  ?=(%| -.pr)
+      (finish j [%failed 'parse error: parser crashed'] pre)
+    =/  pt  p.pr
+    ?:  |(fatal.pt ?=(~ tree.pt))
+      ::  SANY's exact parse-error text travels as the diagnostics
+      =.  diags.j  (weld diags.j diags.pt)
+      =/  evs  (turn diags.pt |=(d=diagnostic `event`[%diagnostic d]))
+      %^  finish  j
+        [%failed ?~(diags.pt 'parse error' message.i.diags.pt)]
+      (weld pre evs)
+    =.  cont.j  (save-kont [%tree u.tree.pt])
     (more j pre)
   ::  %analyze
   =/  kk=kont
@@ -322,21 +322,19 @@
     =.  cont.j  (save-kont kk)
     (more j evs)
   =/  nm  i.todo.kk
-  =/  err=(unit @t)
-    =/  pr  (mule |.((parse:syntax (~(got by modules.src) nm))))
-    ?:  ?=(%| -.pr)  `'parser crashed'
-    ?:  ?=(%| -.p.pr)  `p.p.pr
-    ~
-  ?~  err
+  =/  ds=(list diagnostic)
+    =/  pr  (mule |.((parse-typed:syntax (~(got by modules.src) nm))))
+    ?:  ?=(%| -.pr)
+      [[%lus 400] %error %parse (rap 3 ~['parser crashed in ' nm]) ~ ~]~
+    diags.p.pr
+  ?~  ds
     $(todo.kk t.todo.kk, spent +(spent))
-  ::  parse:syntax reports no error position yet (unit 2); at stays ~
-  =/  d=diagnostic
-    :*  [%lus 400]  %error  %parse
-        (rap 3 ~['parse error in ' nm ': ' u.err])
-        ~  ~
-    ==
-  =.  diags.j  (snoc diags.j d)
-  $(todo.kk t.todo.kk, spent +(spent), evs (snoc evs [%diagnostic d]))
+  =.  diags.j  (weld diags.j ds)
+  %=  $
+    todo.kk  t.todo.kk
+    spent    +(spent)
+    evs      (weld evs (turn ds |=(d=diagnostic `event`[%diagnostic d])))
+  ==
 ::
 ::  +|  Stage: %config
 ::

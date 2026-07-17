@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Removing label at line 2, col 11 to line 2, col 13 of module Test would change expression parsing.
+
+Residual stack trace follows:
+ExtendableExpr starting at line 2, column 11.
+ExtendableExpr starting at line 2, column 7.
+Expression starting at line 2, column 7.
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+
+%%

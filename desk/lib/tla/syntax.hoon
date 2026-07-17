@@ -1,6 +1,7 @@
 /-  *tla-lus
 /=  lex  /lib/tla/lexer
 /=  ast  /lib/tla/ast
+/=  src  /lib/tla/source
 |%
   ::  Native TLA+ Syntactic Analyzer
   ::
@@ -23,9 +24,22 @@
 +$  oper  [name=@t lo=@ud hi=@ud assoc=?(%none %left %right) fix=?(%prefix %postfix %infix %nfix)]
 ::  operator-stack element: op=~ for plain expressions
 +$  osel  [n=(unit node) op=(unit oper)]
-::  parse state: token stream + junction-list context
-+$  pst  [rest=(list token) jctx=(list [b=@tas col=@ud]) plv=(list (unit @ud))]
-::  parse result
+::  parse state: token stream + junction-list context + the SANY error
+::  bookkeeping (unit 2): the bpa production stack, the `expecting`
+::  string, the last consumed token, the current module name (for
+::  Location.toString rendering), and the EOF position
++$  pst
+  $:  rest=(list token)
+      jctx=(list [b=@tas col=@ud])
+      plv=(list (unit @ud))
+      stk=(list [name=@t at=pos])
+      exp=@t
+      last=(unit token)
+      mname=@t
+      eofp=pos
+  ==
+::  parse result; the @t error is the fully rendered SANY error text
+::  (multiple errors joined by the \01 separator, split by +dump-err)
 ++  pres  |$  [a]  (each [v=a s=pst] @t)
 ::
 ::  +|  Operator Table (Operators.java)
@@ -237,21 +251,21 @@
 ++  advance
   |=  s=pst
   ^-  pst
-  ?~(rest.s s s(rest t.rest.s))
+  ?~(rest.s s s(rest t.rest.s, last `i.rest.s))
 ::
 ++  eat
+  ::  consume one token of the given kind; failure renders the JavaCC
+  ::  jj_consume_token error (Encountered ... and token ...)
   |=  [s=pst k=@tas]
   ^-  (pres token)
   ?~  rest.s
-    [%| (crip "expected {(trip k)} but found end of input")]
+    [%| (perr-enc s 1)]
   ?.  =(k kind.i.rest.s)
-    :-  %|
-    %+  fail-at
-      (crip "expected {(trip k)} but found {(trip kind.i.rest.s)}")
-    i.rest.s
-  [%& i.rest.s s(rest t.rest.s)]
+    [%| (perr-enc s 1)]
+  [%& i.rest.s s(rest t.rest.s, last `i.rest.s)]
 ::
 ++  fail-at
+  ::  legacy helper kept for internal-only failure paths
   |=  [msg=@t tok=token]
   ^-  @t
   %-  crip
@@ -262,6 +276,235 @@
     ", column "
     (dec-tape:ast col.from.span.tok)
   ==
+::
+::  +|  SANY Error Rendering (unit 2)
+::
+::  Reproduces TLAplusParser.parse()'s error text byte-for-byte: the
+::  ***Parse Error*** block with the optional `Was expecting`, the JavaCC
+::  Encountered line, and the top of the bpa production stack.
+::
+++  bpa
+  ::  production entry: push [name next-token-pos], clear expecting
+  |=  [s=pst name=@t]
+  ^-  pst
+  s(stk [[name (peek-pos s)] stk.s], exp '')
+::
+++  epa
+  ::  production exit: pop the entry, clear expecting
+  |=  s=pst
+  ^-  pst
+  s(stk ?~(stk.s ~ t.stk.s), exp '')
+::
+++  set-exp
+  |=  [s=pst e=@t]
+  ^-  pst
+  s(exp e)
+::
+++  peek-pos
+  |=  s=pst
+  ^-  pos
+  ?~(rest.s eofp.s from.span.i.rest.s)
+::
+++  esc-image
+  ::  JavaCC ParseException.add_escapes over a token image
+  |=  img=@t
+  ^-  tape
+  %-  zing
+  %+  turn  (img-codes img)
+  |=  c=@c
+  ^-  tape
+  ?+  c
+      ?:  &((gte c 0x20) (lte c 0x7e))  [`@tD`c ~]
+      =/  hex  (render-hex c)
+      "\\u{hex}"
+    %8   "\\b"
+    %9   "\\t"
+    %10  "\\n"
+    %12  "\\f"
+    %13  "\\r"
+    %34  "\\\""
+    %39  "\\'"
+    %92  "\\\\"
+  ==
+::
+++  raw-image
+  ::  a token image as printed raw in the Encountered echo; non-ascii
+  ::  code points pass through as their UTF-8 bytes
+  |=  img=@t
+  ^-  tape
+  (trip img)
+::
+++  img-codes
+  ::  code points of a cord (zuse +tuba crashes on control chars)
+  |=  img=@t
+  ^-  (list @c)
+  (turn (annotate:src img) |=(a=ach:src c.a))
+::
+++  render-hex
+  ::  four lowercase hex digits, JavaCC add_escapes style
+  |=  c=@c
+  ^-  tape
+  =/  raw  `tape`((x-co:co 4) c)
+  %+  turn  raw
+  |=  h=@tD
+  ?:(&((gte h 'A') (lte h 'Z')) `@tD`(add h 32) h)
+::
+++  belch-index
+  ::  where belchDEF would splice its "Beginning of definition" token:
+  ::  the index (in toks) of the first token of the next definition LHS,
+  ::  found by scanning for == exactly as TLAplusParser.belchDEF does
+  |=  toks=(list token)
+  ^-  (unit @ud)
+  =/  n  (lent toks)
+  =/  j  0
+  |-  ^-  (unit @ud)
+  ::  currentT = toks[j]; nextT = toks[j+1]; stop when nextT is a stopper
+  ?:  (gte +(j) n)  ~
+  =/  nxt  kind:(snag +(j) toks)
+  ?:  ?=(?(%theorem %proposition %assumption %end-module) nxt)  ~
+  ?.  =(%def kind:(snag j toks))
+    $(j +(j))
+  ?:  =(0 j)  `0
+  `(belch-back toks (dec j))
+::
+++  belch-back
+  ::  toks[i] is the token before ==; return the LHS start index
+  |=  [toks=(list token) i=@ud]
+  ^-  @ud
+  =/  prev  (snag i toks)
+  ?:  ?=(?(%rbr %rsb) kind.prev)
+    ::  back over the balanced ( ) or [ ] group, then a leading identifier
+    =/  depth  1
+    =/  j  i
+    |-  ^-  @ud
+    ?:  =(0 j)  0
+    =/  j1  (dec j)
+    =/  k  kind:(snag j1 toks)
+    ?:  &(?=(?(%lbr %lsb) k) =(1 depth))
+      ?:  &(!=(0 j1) =(%identifier kind:(snag (dec j1) toks)))
+        (dec j1)
+      j1
+    ?:  ?=(?(%lbr %lsb) k)  $(j j1, depth (dec depth))
+    ?:  ?=(?(%rbr %rsb) k)  $(j j1, depth +(depth))
+    $(j j1)
+  ?:  =(%identifier kind.prev)
+    ::  identifier possibly preceded by an infix/prefix operator
+    ?:  =(0 i)  i
+    =/  j1  (dec i)
+    =/  pk  (snag j1 toks)
+    ?.  ?&  (is-op-kind kind.pk)
+            !?=([~ %postfix] (class-of pk))
+            ?|  !?=([~ %infix] (class-of pk))
+                &(!=(0 j1) =(%identifier kind:(snag (dec j1) toks)))
+            ==
+        ==
+      i
+    ?:  &(!=(0 j1) =(%substitute kind:(snag (dec j1) toks)))
+      i
+    ?:  ?=([~ %infix] (class-of pk))
+      ?:(=(0 j1) j1 (dec j1))
+    j1
+  ::  not an identifier: an operator backs up one more token
+  ?:  &((is-op-kind kind.prev) !=(0 i))
+    (dec i)
+  i
+::
+++  echo-toks
+  ::  the JavaCC `Encountered "<tokens>"` echo: n token images from the
+  ::  failing position; a spliced DEFBREAK renders as its synthetic image
+  |=  [s=pst n=@ud brk=?]
+  ^-  tape
+  =/  bi=(unit @ud)  ?.(brk ~ (belch-index rest.s))
+  =/  toks  rest.s
+  =/  i  0
+  =|  out=(list tape)
+  |-  ^-  tape
+  ?:  =(i n)  (zing (join " " (flop out)))
+  ?:  &(?=(^ bi) =(u.bi i))
+    ::  the synthetic token occupies one echo slot
+    $(i +(i), out ["Beginning of definition" out], bi `(unit @ud)`~)
+  ?~  toks
+    (zing (join " " (flop `(list tape)`["<EOF>" out])))
+  $(i +(i), toks t.toks, out [(raw-image text.i.toks) out])
+::
+++  encountered
+  ::  ParseExceptionExtended.getShortMessage for a consume failure
+  |=  [s=pst n=@ud brk=?]
+  ^-  tape
+  =/  at=pos  (peek-pos s)
+  ;:  welp
+    "Encountered \""
+    (echo-toks s n brk)
+    "\" at line "
+    (dec-tape:ast line.at)
+    ", column "
+    (dec-tape:ast col.at)
+    " and token \""
+    ?~(last.s "" (esc-image text.u.last.s))
+    "\" "
+  ==
+::
+++  perr
+  ::  the ***Parse Error*** block around a short message
+  |=  [s=pst short=tape]
+  ^-  @t
+  %-  crip
+  ;:  welp
+    "***Parse Error***\0a"
+    ?:  =('' exp.s)  ""
+    "Was expecting \"{(trip exp.s)}\"\0a"
+    short
+    "\0a\0aResidual stack trace follows:\0a"
+    (stack-tape stk.s)
+  ==
+::
+++  perr-enc
+  |=  [s=pst n=@ud]
+  ^-  @t
+  (perr s (encountered s n |))
+::
+++  perr-brk
+  ::  Encountered echo with belchDEF splice substitution
+  |=  [s=pst n=@ud]
+  ^-  @t
+  (perr s (encountered s n &))
+::
+++  stack-tape
+  ::  top five production entries, most recent first
+  |=  stk=(list [name=@t at=pos])
+  ^-  tape
+  %-  zing
+  %+  turn  (scag 5 stk)
+  |=  [name=@t at=pos]
+  ^-  tape
+  ;:  welp
+    (trip name)
+    " starting at line "
+    (dec-tape:ast line.at)
+    ", column "
+    (dec-tape:ast col.at)
+    ".\0a"
+  ==
+::
+++  render-locn
+  ::  tla2sany.st.Location.toString for a span in the current module
+  |=  [sp=span mname=@t]
+  ^-  tape
+  ;:  welp
+    "line "  (dec-tape:ast line.from.sp)
+    ", col "  (dec-tape:ast col.from.sp)
+    " to line "  (dec-tape:ast line.to.sp)
+    ", col "  (dec-tape:ast col.to.sp)
+    " of module "  (trip mname)
+  ==
+::
+++  node-locn
+  ::  a node's Location.toString; synthesized nodes have no span
+  |=  [n=node mname=@t]
+  ^-  tape
+  =/  sp  (span-of:ast n)
+  ?~  sp  (render-locn [[0 0] [0 0]] mname)
+  (render-locn u.sp mname)
 ::
 ++  above
   ::  junction column discipline: token must sit right of current bullet
@@ -354,9 +597,35 @@
     (mk-node:ast %n-fcnappl [operand kids.opn])
   [i.stk [`new ~] t.t.t.stk]
 ::
+++  osel-locn
+  ::  an operator-stack element's Location.toString
+  |=  [e=osel mn=@t]
+  ^-  tape
+  ?~  n.e  (render-locn [[0 0] [0 0]] mn)
+  (node-locn u.n.e mn)
+::
+++  osel-line
+  |=  e=osel
+  ^-  @ud
+  ?~  n.e  0
+  =/  sp  (span-of:ast u.n.e)
+  ?~(sp 0 line.from.u.sp)
+::
+++  follow-err
+  ::  two adjacent expressions with no operator between them
+  |=  [a=osel b=osel mn=@t]
+  ^-  @t
+  %-  crip
+  ;:  welp
+    "Expression at location "  (osel-locn a mn)
+    " and expression at location "  (osel-locn b mn)
+    " follow each other without any intervening operator."
+  ==
+::
 ++  reduce-stack
-  ::  the reduceStack() loop; %| carries a parse error
-  |=  stk=(list osel)
+  ::  the reduceStack() loop; %| carries OperatorStack's exact
+  ::  ParseException message text
+  |=  [stk=(list osel) mn=@t]
   ^-  (each (list osel) @t)
   |-
   =/  n  (lent stk)
@@ -367,26 +636,45 @@
   =/  or  (need op.tm0)
   ?-    fix.or
       %postfix
-    ?:  =(1 n)  [%| 'postfix operator on empty stack']
+    ?:  =(1 n)
+      :-  %|
+      %-  crip
+      ;:  welp
+        "\0a  Encountered postfix op "  (trip name.or)
+        " in block "  (osel-locn tm0 mn)
+        " on empty stack"
+      ==
     ?>  ?=([^ ^ *] stk)
     =/  tm1  i.t.stk
     ?:  (is-op tm1)
       =/  ol  (need op.tm1)
       ?:  ?=(?(%infix %nfix %prefix) fix.ol)
-        [%| 'postfix operator following prefix or infix operator']
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a  Encountered postfix op "  (trip name.or)
+          " in block "  (osel-locn tm0 mn)
+          " following prefix or infix op "  (trip name.ol)  "."
+        ==
       $(stk (reduce-postfix stk))
     ?:  (lth n 3)  [%& stk]
     ?>  ?=([^ ^ ^ *] stk)
     =/  tm2  i.t.t.stk
     ?.  (is-op tm2)
-      [%| 'two expressions without intervening operator']
+      [%| (follow-err tm2 tm1 mn)]
     =/  ol  (need op.tm2)
     ?:  (succ ol or)
       ?:  ?=(?(%infix %nfix) fix.ol)
         $(stk (reduce-infix stk ol))
       $(stk (reduce-prefix stk))
     ?.  (prec ol or)
-      [%| 'precedence conflict']
+      :-  %|
+      %-  crip
+      ;:  welp
+        "Precedence conflict between ops "  (trip name.ol)
+        " in block "  (osel-locn tm2 mn)
+        " and "  (trip name.or)  "."
+      ==
     [%& stk]
   ::
       %prefix
@@ -394,15 +682,34 @@
     ?>  ?=([^ ^ *] stk)
     =/  tm1  i.t.stk
     ?.  (is-op tm1)
-      [%| 'prefix operator following an expression']
+      :-  %|
+      %-  crip
+      ;:  welp
+        "\0a  Encountered prefix op "  (trip name.or)
+        " in block "  (osel-locn tm0 mn)
+        " following an expression."
+      ==
     =/  ol  (need op.tm1)
     ?:  ?=(%postfix fix.ol)
-      [%| 'prefix operator following postfix operator']
+      :-  %|
+      %-  crip
+      ;:  welp
+        "\0a  Encountered prefix op "  (trip name.or)
+        " in block "  (osel-locn tm0 mn)
+        " following postfix op "  (trip name.ol)  "."
+      ==
     [%& stk]
   ::
       ?(%infix %nfix)
     ?:  =(1 n)
-      ?~  (mixfix or)  [%| 'infix operator on empty stack']
+      ?~  (mixfix or)
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a  Encountered infix op "  (trip name.or)
+          " in block "  (osel-locn tm0 mn)
+          " on empty stack."
+        ==
       [%& stk]
     ?>  ?=([^ ^ *] stk)
     =/  tm1  i.t.stk
@@ -413,18 +720,35 @@
       =/  mixr  (mixfix or)
       ?~  mixr
         ?:  =(name:void-op name.or)
-          [%| 'missing expression following prefix or infix operator']
-        [%| 'infix operator following prefix or infix operator']
+          :-  %|
+          %-  crip
+          ;:  welp
+            "\0a  Missing expression in block "  (osel-locn tm1 mn)
+            " following prefix or infix op "  (trip name.ol)  "."
+          ==
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a  Encountered infix op "  (trip name.or)
+          " in block "  (osel-locn tm1 mn)
+          " following prefix or infix op "  (trip name.ol)  "."
+        ==
       ?:  ?|  (succ ol u.mixr)
               &((same-op ol u.mixr) ?=(%left assoc.ol))
           ==
-        [%| 'precedence conflict']
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a  Precedence conflict between ops "  (trip name.ol)
+          " in block "  (osel-locn tm1 mn)
+          " and "  (trip name.u.mixr)  "."
+        ==
       [%& stk]
     ?:  (lth n 3)  [%& stk]
     ?>  ?=([^ ^ ^ *] stk)
     =/  tm2  i.t.t.stk
     ?.  (is-op tm2)
-      [%| 'two expressions without intervening operator']
+      [%| (follow-err tm2 tm1 mn)]
     =/  ol  (need op.tm2)
     ::  unary-minus detection: mixfixable op in prefix position
     =/  olx
@@ -446,35 +770,77 @@
         $(stk (reduce-infix stk olx))
       ?:  ?=(%prefix fix.olx)
         $(stk (reduce-prefix stk))
+      ?:  ?&  (lth (osel-line tm2) (osel-line tm1))
+              =('=' name.or)
+          ==
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a  *** Hint *** You may have mistyped =="
+          "\0a  Illegal combination of operators "  (trip name.olx)
+          " in block "  (osel-locn tm2 mn)
+          " and "  (trip name.or)  "."
+        ==
       ?:  =(name:void-op name.or)
-        [%| 'missing operator or separator following expression']
-      [%| 'illegal combination of operators']
+        :-  %|
+        %-  crip
+        ;:  welp
+          "\0a Error following expression at  "
+          (osel-locn tm2 mn)
+          ", missing operator or separator."
+        ==
+      :-  %|
+      %-  crip
+      ;:  welp
+        "\0a  Illegal combination of operators "  (trip name.olx)
+        " in block "  (osel-locn tm2 mn)
+        " and "  (trip name.or)  "."
+      ==
     ?.  ?|  (prec olx or)
             &((same-op olx or) ?=(%right assoc.olx))
         ==
-      [%| 'precedence conflict']
+      :-  %|
+      %-  crip
+      ;:  welp
+        "\0a  Precedence conflict between ops "  (trip name.olx)
+        " in block "  (osel-locn tm2 mn)
+        " and "  (trip name.or)  "."
+      ==
     [%& stk]
   ==
 ::
 ++  final-reduce
-  |=  stk=(list osel)
+  ::  OperatorStack.finalReduce: a failure yields the raw (unwrapped)
+  ::  incomplete-expression text pushed straight onto PErrors
+  |=  [stk=(list osel) mn=@t]
   ^-  (each node @t)
-  =/  res  (reduce-stack [[~ `void-op] stk])
+  =/  res  (reduce-stack [[~ `void-op] stk] mn)
   ?:  ?=(%| -.res)  res
   =/  out  p.res
-  ?.  ?=([^ ^ ~] out)
-    [%| 'could not reduce expression']
-  ?~  n.i.t.out
-    [%| 'could not reduce expression']
-  [%& u.n.i.t.out]
+  ?:  ?&(?=([^ ^ ~] out) ?=(^ n.i.t.out))
+    [%& u.n.i.t.out]
+  ::  bottom-first, without the void operator pushed above
+  =/  elems  (snip (flop out))
+  :-  %|
+  %-  crip
+  %+  welp  "Couldn't properly parse expression"
+  %-  zing
+  %+  turn  elems
+  |=  e=osel
+  ^-  tape
+  ;:  welp
+    "-- incomplete expression at "
+    (osel-locn e mn)
+    ".\0a"
+  ==
 ::
 ++  push-and-reduce
   ::  push an operator element and reduce unless it is alone
-  |=  [stk=(list osel) e=osel]
+  |=  [stk=(list osel) e=osel mn=@t]
   ^-  (each (list osel) @t)
   =/  new  [e stk]
   ?:  ?=([* ~] new)  [%& new]
-  (reduce-stack new)
+  (reduce-stack new mn)
 ::
 ++  pre-in-empty-top
   |=  stk=(list osel)
@@ -488,9 +854,22 @@
 ::  combined stack+state result for the engine phases
 +$  xres  (each [stk=(list osel) s=pst] @t)
 ::
+++  open-start
+  ::  tokens beginning an OpenExpression (no ExtendableExpr entry)
+  |=  s=pst
+  ^-  ?
+  =/  pk  (peek s)
+  ?~  pk  |
+  ?=  $?  %if  %case  %let  %choose
+          %exists  %forall  %t-exists  %t-forall
+      ==
+    kind.u.pk
+::
 ++  expression
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'Expression')
   =|  stk=(list osel)
   |-  ^-  (pres node)
   ::  leading prefix operators (unary minus arrives as infix '-')
@@ -507,9 +886,11 @@
       ?:  ?=(%prefix fix.o)
         (gen-op-node %n-genprefixop %n-prefixop u.pk)
       (gen-op-node %n-geninfixop %n-infixop u.pk)
-    =/  pr  (push-and-reduce stk [`gen `o])
-    ?:  ?=(%| -.pr)  [%| p.pr]
+    =/  pr  (push-and-reduce stk [`gen `o] mname.s)
+    ?:  ?=(%| -.pr)  [%| (perr s (trip p.pr))]
     $(stk p.pr, s (advance s))
+  ::  ExtendableExpr entry, except for open expressions
+  =?  s  !(open-start s)  (bpa s 'ExtendableExpr')
   ::  operand, then its postfix/./[ chain
   =/  o1  (operand s stk)
   ?:  ?=(%| -.o1)  [%| p.o1]
@@ -526,53 +907,64 @@
       ==
     =/  o  (need (oper-of u.ik))
     =/  gen  (gen-op-node %n-geninfixop %n-infixop u.ik)
-    =/  pr  (push-and-reduce stk [`gen `o])
-    ?:  ?=(%| -.pr)  [%| p.pr]
+    =/  pr  (push-and-reduce stk [`gen `o] mname.s)
+    ?:  ?=(%| -.pr)  [%| (perr s (trip p.pr))]
     $(stk p.pr, s (advance s))
-  =/  fin  (final-reduce stk)
-  ?:  ?=(%| -.fin)  [%| p.fin]
+  ::  Expression's epa precedes finalReduce, so a reduction failure
+  ::  reports the outer context: first the raw incomplete-expression
+  ::  push, then the wrapped exception, exactly as parse() does
+  =.  s  s(stk stk0, exp '')
+  =/  fin  (final-reduce stk mname.s)
+  ?:  ?=(%| -.fin)
+    [%| (rap 3 ~[p.fin '\01' (perr s " Couldn't reduce expression stack.")])]
   [%& p.fin s]
 ::
 ++  operand
-  ::  one ExtendableExpr operand pushed onto the stack
+  ::  one ExtendableExpr operand pushed onto the stack; each alternative
+  ::  enters its SANY production for the residual error stack, restored
+  ::  at the join on success
   |=  [s=pst stk=(list osel)]
   ^-  xres
+  =/  stk0  stk.s
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in expression']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  tok  u.pk
   ?.  (above s tok)
-    [%| (fail-at 'expression continues left of junction bullet' tok)]
+    [%| (perr-enc s 1)]
   ?:  ?&  ?=(?(%and %or) kind.tok)
           (pre-in-empty-top stk)
       ==
     =/  jr  (junctions s)
     ?:  ?=(%| -.jr)  [%| p.jr]
-    [%& [[`v.p.jr ~] stk] s.p.jr]
+    [%& [[`v.p.jr ~] stk] s.p.jr(stk stk0, exp '')]
   =/  er
     ^-  (pres node)
     ?:  (is-op-kind kind.tok)
-      (op-ref-operand s)
-    ?+    kind.tok  [%| (fail-at 'unexpected token in expression' tok)]
+      (op-ref-operand (bpa s 'Primitive expression'))
+    ?+    kind.tok  [%| (perr-enc s 1)]
         %lbr             (paren-expr s)
-        %lbc             (set-expr s)
-        %lsb             (sbracket-operand s)
-        %number-literal  (number-expr s)
+        %lbc             (set-expr (bpa s 'Some { } form'))
+        %lsb             (sbracket-operand (bpa s 'Some [] Form'))
+        %number-literal  (number-expr (bpa s 'Primitive expression'))
         %string-literal
+      =/  s  (bpa (bpa s 'Primitive expression') 'String')
       [%& (tok-node:ast %n-string (cook-string tok)) (advance s)]
-        %identifier      (ident-expr s stk)
-        ?(%proofsteplexeme %proofstepdotlexeme %proofimplicitsteplexeme)  (ident-expr s stk)
-        %lab             (tuple-expr s)
-        %if              (if-then-else s)
-        %let             (let-in s)
-        %case            (case-expr s)
-        ?(%exists %forall)      (quant-expr s)
-        ?(%t-exists %t-forall)  (unbound-quant s)
-        %choose          (choose-expr s)
-        ?(%wf %sf)       (fairness-expr s)
-        %lambda          (lambda-expr s)
+        %identifier      (ident-expr (bpa s 'Primitive expression') stk)
+        ?(%proofsteplexeme %proofstepdotlexeme %proofimplicitsteplexeme)
+      (ident-expr (bpa s 'Primitive expression') stk)
+        %lab             (tuple-expr (bpa s 'Some << -- >> or >>_ Form'))
+        %if              (if-then-else (bpa s 'IF THEN ELSE'))
+        %let             (let-in (bpa s 'Case Other Arm'))
+        %case            (case-expr (bpa s 'CASE Expression'))
+        ?(%exists %forall)      (quant-expr (bpa s 'Quantified form'))
+        ?(%t-exists %t-forall)
+      (unbound-quant (bpa s 'Bound Quantified Expression'))
+        %choose          (choose-expr (bpa s '(Un)Bounded Choose'))
+        ?(%wf %sf)       (fairness-expr (bpa s 'Fairness Expression'))
+        %lambda          (lambda-expr (bpa s 'Lambda'))
     ==
   ?:  ?=(%| -.er)  [%| p.er]
-  [%& [[`v.p.er ~] stk] s.p.er]
+  [%& [[`v.p.er ~] stk] s.p.er(stk stk0, exp '')]
 ::
 ++  chain
   ::  postfix ops, record access, and function application
@@ -586,30 +978,41 @@
   ?:  ?=([~ %postfix] pcls)
     =/  o  (need (oper-of u.pk))
     =/  gen  (gen-op-node %n-genpostfixop %n-postfixop u.pk)
-    =/  pr  (push-and-reduce stk [`gen `o])
-    ?:  ?=(%| -.pr)  [%| p.pr]
+    =/  pr  (push-and-reduce stk [`gen `o] mname.s)
+    ?:  ?=(%| -.pr)  [%| (perr s (trip p.pr))]
     $(stk p.pr, s (advance s))
   ?:  =(%dot kind.u.pk)
     =/  dot  (leaf:ast u.pk)
     =.  s  (advance s)
     =/  ir  (eat s %identifier)
     ?:  ?=(%| -.ir)  [%| p.ir]
-    =/  rr  (reduce-record stk dot (leaf:ast v.p.ir))
-    ?:  ?=(%| -.rr)  [%| p.rr]
+    =/  rr  (reduce-record stk dot (leaf:ast v.p.ir) mname.s)
+    ?:  ?=(%| -.rr)  [%| (perr s (trip p.rr))]
     $(stk p.rr, s s.p.ir)
   ?:  =(%lsb kind.u.pk)
+    =/  stk0  stk.s
+    =.  s  (set-exp s 'function argument')
+    =.  s  (bpa s 'Some [] Form')
     =/  ar  (sbracket-args s)
     ?:  ?=(%| -.ar)  [%| p.ar]
-    =/  pr  (push-and-reduce stk [`v.p.ar `fcn-op])
-    ?:  ?=(%| -.pr)  [%| p.pr]
-    $(stk p.pr, s s.p.ar)
+    =.  s  s.p.ar(stk stk0, exp '')
+    =/  pr  (push-and-reduce stk [`v.p.ar `fcn-op] mname.s)
+    ?:  ?=(%| -.pr)  [%| (perr s (trip p.pr))]
+    $(stk p.pr)
   [%& stk s]
 ::
 ++  reduce-record
   ::  OperatorStack.reduceRecord: N_RecordComponent [left dot rhs]
-  |=  [stk=(list osel) dot=node rhs=node]
+  |=  [stk=(list osel) dot=node rhs=node mn=@t]
   ^-  (each (list osel) @t)
-  ?~  stk  [%| '"." has no left hand side']
+  ?~  stk
+    :-  %|
+    %-  crip
+    ;:  welp
+      "\0a    ``.'' has no left hand side at "
+      (node-locn dot mn)
+      "."
+    ==
   =/  stk2  `(list osel)`stk
   =?  stk2  ?&  (is-op i.stk)
                 ?=(^ t.stk)
@@ -621,7 +1024,13 @@
     ?~(tmp ~ t.tmp)
   ?>  ?=(^ stk2)
   ?:  (is-op i.stk2)
-    [%| '"." follows operator']
+    :-  %|
+    %-  crip
+    ;:  welp
+      "\0a    ``.'' follows operator "
+      (osel-locn i.stk2 mn)
+      "."
+    ==
   =/  left  (need n.i.stk2)
   =/  rcd  (mk-node:ast %n-recordcomponent ~[left dot rhs])
   [%& [[`rcd ~] t.stk2]]
@@ -652,6 +1061,8 @@
 ++  junctions
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'AND-OR Junction')
   =/  pk  (peek s)
   ?>  ?=(^ pk)
   ?>  ?=(?(%and %or) kind.u.pk)
@@ -661,22 +1072,24 @@
   =.  jctx.s  [[bkind col.from.span.u.pk] jctx.s]
   =|  items=(list node)
   |-  ^-  (pres node)
+  =/  jstk  stk.s
+  =.  s  (bpa s 'Junction Item')
   =/  br  (eat s bkind)
   ?:  ?=(%| -.br)  [%| p.br]
   =.  s  s.p.br
   =/  er  (expression s)
   ?:  ?=(%| -.er)  [%| p.er]
-  =.  s  s.p.er
-  =/  ind  (check-indent s v.p.er)
-  ?^  ind  [%| u.ind]
-  =.  items
-    [(mk-node:ast itemk ~[(leaf:ast v.p.br) v.p.er]) items]
+  =.  s  s.p.er(stk jstk, exp '')
+  =/  item  (mk-node:ast itemk ~[(leaf:ast v.p.br) v.p.er])
+  =/  ind  (check-indent s v.p.er item)
+  ?^  ind  [%| (perr s (trip u.ind))]
+  =.  items  [item items]
   =/  nk  (peek s)
   ?:  &(?=(^ nk) (new-bullet s u.nk))
     $
   ::  pop the junction context before returning
   =.  jctx.s  ?~(jctx.s ~ t.jctx.s)
-  [%& (mk-node:ast listk (flop items)) s]
+  [%& (mk-node:ast listk (flop items)) s(stk stk0, exp '')]
 ::
 ++  paren-expr
   |=  s=pst
@@ -705,7 +1118,7 @@
           =(%coloncolon kind.u.nk)
           (above s u.nk)
       ==
-    (label-expr s gid stk)
+    (label-expr (epa s) gid stk)
   ?.  ?&  ?=(^ nk)
           =(%lbr kind.u.nk)
           (above s u.nk)
@@ -721,7 +1134,7 @@
           =(%coloncolon kind.u.lk)
           (above s u.lk)
       ==
-    (label-expr s app stk)
+    (label-expr (epa s) app stk)
   [%& app s]
 ::
 ++  general-id-full
@@ -732,7 +1145,7 @@
   =|  elems=(list node)
   |-  ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in identifier']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  k2=(unit token)
     ?~  rest.s  ~
     ?~  t.rest.s  ~
@@ -764,7 +1177,7 @@
     =.  s  s.p.ar
     =/  bk  (peek s)
     ?.  &(?=(^ bk) =(%bang kind.u.bk))
-      [%| 'expected ! after subexpression application']
+      [%| (perr-enc s 1)]
     =/  elem
       %+  mk-node:ast  %n-idprefixelement
       ~[idl v.p.ar (leaf:ast u.bk)]
@@ -779,7 +1192,7 @@
     =.  s  s.p.ar
     =/  bk  (peek s)
     ?.  &(?=(^ bk) =(%bang kind.u.bk))
-      [%| 'expected ! after subexpression arguments']
+      [%| (perr-enc s 1)]
     =/  elem
       (mk-node:ast %n-idprefixelement ~[v.p.ar (leaf:ast u.bk)])
     $(s (advance s), elems [elem elems])
@@ -821,7 +1234,7 @@
       [%& (tok-node:ast %n-infixop u.pk)]
     ?:  ?=([~ %postfix] cls)
       [%& (tok-node:ast %n-postfixop u.pk)]
-    [%| 'expected identifier or operator']
+    [%| (perr-enc s 1)]
   ?:  ?=(%| -.fin)  [%| p.fin]
   =.  s  (advance s)
   =/  pfx
@@ -852,7 +1265,7 @@
   ?>  ?=(^ pk)
   =/  op1  (oper-of u.pk)
   ?:  &(?=(^ op1) ?=(%nfix fix.u.op1))
-    [%| (fail-at 'nfix operator cannot be used nonfix' u.pk)]
+    [%| (perr-enc s 1)]
   =/  cls  (class-of u.pk)
   =/  opn
     ?:  |(?=([~ %prefix] cls) =('-.' text.u.pk))
@@ -875,6 +1288,8 @@
   ::  ( arg (, arg)* ) -> N_OpArgs; bare operators allowed as args
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'Optional Arguments')
   =/  lr  (eat s %lbr)
   ?:  ?=(%| -.lr)  [%| p.lr]
   =.  s  s.p.lr
@@ -892,19 +1307,31 @@
   =/  rr  (eat s %rbr)
   ?:  ?=(%| -.rr)  [%| p.rr]
   =.  kids  [(leaf:ast v.p.rr) kids]
-  [%& (mk-node:ast %n-opargs (flop kids)) s.p.rr]
+  [%& (mk-node:ast %n-opargs (flop kids)) s.p.rr(stk stk0, exp '')]
 ::
 ++  op-arg
   ::  a bare operator (followed by , or )) or an expression
   |=  s=pst
   ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in arguments']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  k2=(unit token)
     ?~  rest.s  ~
     ?~  t.rest.s  ~
     `i.t.rest.s
   =/  op1  (oper-of u.pk)
+  ::  \X and \times cannot be passed as infix operator arguments
+  ?:  ?&  ?=(^ op1)
+          ?=(^ k2)
+          |(=(%comma kind.u.k2) =(%rbr kind.u.k2))
+          |(=('\\X' text.u.pk) =('\\times' text.u.pk))
+      ==
+    :-  %|
+    %+  perr  s
+    ;:  welp
+      (render-locn span.u.pk mname.s)
+      ": \\X may not be used as an infix operator."
+    ==
   ?:  ?&  ?=(^ op1)
           !?=(%nfix fix.u.op1)
           ?=(^ k2)
@@ -1024,9 +1451,9 @@
   =.  s  s.p.c1
   =|  kids=(list node)
   =.  kids  [(leaf:ast v.p.c1) kids]
-  =/  a1  (case-arm s)
+  =/  a1  (case-arm (bpa s 'Case Arm'))
   ?:  ?=(%| -.a1)  [%| p.a1]
-  =.  s  s.p.a1
+  =.  s  s.p.a1(stk stk.s, exp '')
   =.  kids  [v.p.a1 kids]
   |-  ^-  (pres node)
   =/  nk  (peek s)
@@ -1038,19 +1465,21 @@
   ?:  &(?=(^ ok) =(%other kind.u.ok))
     ::  OTHER -> expr, then done
     =/  ot  (leaf:ast u.ok)
-    =.  s  (advance s)
+    =/  ostk  stk.s
+    =.  s  (bpa (advance s) 'Case Other Arm')
     =/  ar  (eat s %arrow)
     ?:  ?=(%| -.ar)  [%| p.ar]
     =/  er  (expression s.p.ar)
     ?:  ?=(%| -.er)  [%| p.er]
+    =.  s  s.p.er(stk ostk, exp '')
     =/  arm
       (mk-node:ast %n-otherarm ~[ot (leaf:ast v.p.ar) v.p.er])
     =.  kids  [arm sep kids]
-    [%& (mk-node:ast %n-case (flop kids)) s.p.er]
-  =/  a2  (case-arm s)
+    [%& (mk-node:ast %n-case (flop kids)) s]
+  =/  a2  (case-arm (bpa s 'Case Arm'))
   ?:  ?=(%| -.a2)  [%| p.a2]
   =.  kids  [v.p.a2 sep kids]
-  $(s s.p.a2)
+  $(s s.p.a2(stk stk.s, exp ''))
 ::
 ++  case-arm
   |=  s=pst
@@ -1077,6 +1506,7 @@
     ?.  &(?=(^ pk) =(%local kind.u.pk))  ~
     `(leaf:ast u.pk)
   =?  s  ?=(^ lcl)  (advance s)
+  =.  s  (bpa s 'Definition')
   ::  prefix operator definition: op ident == e
   =/  p0  (peek s)
   =/  c0  ?~(p0 ~ (class-of u.p0))
@@ -1143,7 +1573,7 @@
     =/  er  (expression s.p.dr)
     ?:  ?=(%| -.er)  [%| p.er]
     :-  %&
-    :_  s.p.er
+    :_  (epa s.p.er)
     %+  mk-node:ast  %n-functiondefinition
     (flop [v.p.er (leaf:ast v.p.dr) kids])
   =|  lhs=(list node)
@@ -1177,7 +1607,7 @@
   =/  er  (expression s.p.dr)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  (epa s.p.er)
   %+  mk-node:ast  %n-operatordefinition
   (welp lhs ~[(leaf:ast v.p.dr) v.p.er])
 ::
@@ -1186,7 +1616,7 @@
   |=  s=pst
   ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in parameter declaration']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  cls  (class-of u.pk)
   ?:  ?=([~ %prefix] cls)
     ::  op _  -> N_PrefixDecl
@@ -1214,7 +1644,7 @@
       :-  %&
       :_  (advance s)
       (mk-node:ast %n-postfixdecl ~[u1 (tok-node:ast %n-postfixop u.ok)])
-    [%| 'expected operator after _ in declaration']
+    [%| (perr-enc s 1)]
   (op-decl s)
 ::
 ++  theorem-unit
@@ -1309,7 +1739,7 @@
   |=  s=pst
   ^-  (each [v=(list node) s=pst] @t)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in USE/HIDE']
+  ?~  pk  [%| (perr-enc s 1)]
   ?:  =(%module kind.u.pk)
     =/  mr  (eat (advance s) %identifier)
     ?:  ?=(%| -.mr)  [%| p.mr]
@@ -1366,7 +1796,13 @@
   =/  er  (expression s.p.cr)
   ?:  ?=(%| -.er)  [%| p.er]
   ?.  (label-ok stk v.p.er)
-    [%| 'label changes the parse of the enclosing expression']
+    :-  %|
+    %+  perr  s.p.er
+    ;:  welp
+      "Removing label at "
+      (node-locn target mname.s)
+      " would change expression parsing."
+    ==
   :-  %&
   :_  s.p.er
   (mk-node:ast %n-label ~[target (leaf:ast v.p.cr) v.p.er])
@@ -1422,29 +1858,41 @@
   $(raw t.t.raw, out [c out])
 ::
 ++  check-indent
-  ::  every descendant of a junction item (stopping at nested lists)
-  ::  must sit strictly right of the current bullet column
-  |=  [s=pst nd=node]
+  ::  Java checkIndentation: every descendant of the item body
+  ::  (stopping at nested junction lists) must sit strictly right of
+  ::  the current bullet; the error names the child and the whole item
+  |=  [s=pst body=node item=node]
   ^-  (unit @t)
   ?~  jctx.s  ~
   =/  bullet  col.i.jctx.s
+  =/  jl  (node-locn item mname.s)
+  =/  nd  body
   |-  ^-  (unit @t)
-  ?:  ?&  ?=(%node -.nd)
-          ?=(?(%n-conjlist %n-disjlist) kind.nd)
-      ==
-    ~
-  =/  col=(unit @ud)
-    ?-  -.nd
-      %leaf  `col.from.span.token.nd
-      %node  ?~(at.nd ~ `col.from.u.at.nd)
-    ==
-  ?:  &(?=(^ col) (lte u.col bullet))
-    `'item not properly indented inside junction list'
   ?:  ?=(%leaf -.nd)  ~
   =/  kids  kids.nd
   |-  ^-  (unit @t)
   ?~  kids  ~
-  =/  r  ^$(nd i.kids)
+  =/  child  i.kids
+  ?:  ?&  ?=(%node -.child)
+          ?=(?(%n-conjlist %n-disjlist) kind.child)
+      ==
+    $(kids t.kids)
+  =/  col=(unit @ud)
+    ?-  -.child
+      %leaf  `col.from.span.token.child
+      %node  ?~(at.child ~ `col.from.u.at.child)
+    ==
+  ?:  &(?=(^ col) (lte u.col bullet))
+    :-  ~
+    %-  crip
+    ;:  welp
+      "Item at "
+      (node-locn child mname.s)
+      " is not properly indented inside conjunction or "
+      " disjunction list item at "
+      jl
+    ==
+  =/  r  ^$(nd child)
   ?^  r  r
   $(kids t.kids)
 ::
@@ -1780,17 +2228,19 @@
   ?>  ?=(^ pk)
   =/  kw  (leaf:ast u.pk)
   =.  s  (advance s)
+  =/  stk0  stk.s
   =/  subj
     ^-  (pres node)
+    =/  s  (bpa s 'restricted form of expression')
     =/  sk  (peek s)
-    ?~  sk  [%| 'unexpected end of input in fairness expression']
+    ?~  sk  [%| (perr-enc s 1)]
     ?:  =(%lbr kind.u.sk)  (paren-expr s)
     ?:  =(%lab kind.u.sk)  (tuple-expr s)
     =/  ir  (eat s %identifier)
     ?:  ?=(%| -.ir)  [%| p.ir]
     [%& (general-id v.p.ir) s.p.ir]
   ?:  ?=(%| -.subj)  [%| p.subj]
-  =.  s  s.p.subj
+  =.  s  s.p.subj(stk stk0, exp '')
   =/  lr  (eat s %lbr)
   ?:  ?=(%| -.lr)  [%| p.lr]
   =/  er  (expression s.p.lr)
@@ -1869,19 +2319,19 @@
     :_  s.p.sub
     %+  mk-node:ast  %n-actionexpr
     ~[lsb v.p.e1 (leaf:ast u.nk) v.p.sub]
-  [%| 'unsupported [ expression form']
+  [%| (perr-enc s 1)]
 ::
 ++  subscript-expr
   ::  the _v subscript: identifier, tuple, or parenthesized expr
   |=  s=pst
   ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'expected subscript expression']
+  ?~  pk  [%| (perr-enc s 1)]
   ?:  =(%lab kind.u.pk)  (tuple-expr s)
   ?:  =(%lbr kind.u.pk)  (paren-expr s)
   ?:  =(%identifier kind.u.pk)
     (general-id-full s)
-  [%| (fail-at 'expected subscript expression' u.pk)]
+  [%| (perr-enc s 1)]
 ::
 ++  record-fields
   ::  [ name sep expr/set, .. ] for RcdConstructor and SetOfRcds
@@ -1936,6 +2386,8 @@
   ::  ! ( [expr,..] | .field )+ = expr
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'Except Spec')
   =/  br  (eat s %bang)
   ?:  ?=(%| -.br)  [%| p.br]
   =.  s  s.p.br
@@ -1963,6 +2415,9 @@
     ^$(kids [(mk-node:ast %n-exceptcomponent (flop ck)) kids], s s)
   ?:  &(?=(^ pk) =(%dot kind.u.pk))
     =.  s  (advance s)
+    =/  ak  (peek s)
+    ?:  &(?=(^ ak) =('@' text.u.ak))
+      [%| '@ used in !.@']
     =/  ir  (eat s %identifier)
     ?:  ?=(%| -.ir)  [%| p.ir]
     =.  s  s.p.ir
@@ -1976,7 +2431,7 @@
   =/  er  (expression s.p.qr)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  s.p.er(stk stk0, exp '')
   %+  mk-node:ast  %n-exceptspec
   (flop [v.p.er (leaf:ast v.p.qr(kind %t-equal)) kids])
 ::
@@ -2032,7 +2487,7 @@
   ::  validate/set the current proof level for a step token
   |=  [s=pst tok=token]
   ^-  (each pst @t)
-  ?~  plv.s  [%| 'proof step outside proof']
+  ?~  plv.s  [%| (perr-enc s 1)]
   =/  lv  (step-level text.tok)
   =/  last=@ud  ?~((parent-level s) 0 +((need (parent-level s))))
   ?-    -.lv
@@ -2045,7 +2500,7 @@
     ?~  i.plv.s
       [%& s(plv [`n.lv t.plv.s])]
     ?:  =(n.lv u.i.plv.s)  [%& s]
-    [%| 'step number has bad level']
+    [%| (perr-enc s 1)]
   ==
 ::
 ++  corrected-token
@@ -2132,9 +2587,9 @@
   |=  s=pst
   ^-  (each [n=node tok=token s=pst] @t)
   =/  pk  (peek s)
-  ?~  pk  [%| 'expected proof step number']
+  ?~  pk  [%| (perr-enc s 1)]
   ?.  (~(has in step-kinds) kind.u.pk)
-    [%| (fail-at 'expected proof step number' u.pk)]
+    [%| (perr-enc s 1)]
   =/  cl  (correct-level s u.pk)
   ?:  ?=(%| -.cl)  [%| p.cl]
   =.  s  p.cl
@@ -2207,7 +2662,7 @@
   ?:  ?=(%| -.st)  [%| p.st]
   =.  s  s.p.st
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in proof step']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  may-proof  ?=(?(%pick %case) kind.u.pk)
   ?:  ?&  !=(%define kind.u.pk)
           (def-ahead rest.s)
@@ -2295,7 +2750,7 @@
   ?.  &(?=(^ nx) (begins-proof s u.nx))
     [%& (mk-node:ast %n-proofstep ~[n.p.st v.p.body]) s]
   ?.  may2
-    [%| 'proof of step that does not take a proof']
+    [%| (perr-enc s 1)]
   =/  pr  (proof-prod s)
   ?:  ?=(%| -.pr)  [%| p.pr]
   :-  %&
@@ -2369,13 +2824,13 @@
   =|  kids=(list node)
   =/  kind=@tas  %n-useorhide
   =/  k1  (peek s)
-  ?~  k1  [%| 'unexpected end of input in proof']
+  ?~  k1  [%| (perr-enc s 1)]
   =?  kids  =(%proof kind.u.k1)  [(leaf:ast u.k1) kids]
   =?  s  =(%proof kind.u.k1)  (advance s)
   =/  kw  (peek s)
-  ?~  kw  [%| 'unexpected end of input in proof']
+  ?~  kw  [%| (perr-enc s 1)]
   ?.  ?=(?(%by %use %hide) kind.u.kw)
-    [%| (fail-at 'expected BY, USE, or HIDE' u.kw)]
+    [%| (perr-enc s 1)]
   =?  kind  =(%by kind.u.kw)  %n-terminalproof
   =.  kids  [(leaf:ast u.kw) kids]
   =.  s  (advance s)
@@ -2432,7 +2887,7 @@
   |=  s=pst
   ^-  (each [v=(list node) s=pst] @t)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in USE/HIDE/BY']
+  ?~  pk  [%| (perr-enc s 1)]
   ?:  =(%module kind.u.pk)
     =/  mr  (eat (advance s) %identifier)
     ?:  ?=(%| -.mr)  [%| p.mr]
@@ -2466,9 +2921,9 @@
     :_  s.p.ar
     (mk-node:ast %n-label ~[gid (leaf:ast u.k2) v.p.ar])
   =/  kw  (peek s)
-  ?~  kw  [%| 'expected ASSUME']
+  ?~  kw  [%| (perr-enc s 1)]
   ?.  ?=(?(%assume %boxassume) kind.u.kw)
-    [%| (fail-at 'expected ASSUME' u.kw)]
+    [%| (perr-enc s 1)]
   =.  s  (advance s)
   =|  kids=(list node)
   =.  kids  [(leaf:ast u.kw) kids]
@@ -2482,9 +2937,9 @@
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
   =/  pr  (peek s)
-  ?~  pr  [%| 'expected PROVE']
+  ?~  pr  [%| (perr-enc s 1)]
   ?.  ?=(?(%prove %boxprove) kind.u.pr)
-    [%| (fail-at 'expected PROVE' u.pr)]
+    [%| (perr-enc s 1)]
   =.  kids  [(leaf:ast u.pr) kids]
   =/  er  (expression (advance s))
   ?:  ?=(%| -.er)  [%| p.er]
@@ -2497,7 +2952,7 @@
   |=  s=pst
   ^-  (pres node)
   =/  k1  (peek s)
-  ?~  k1  [%| 'unexpected end of input in ASSUME']
+  ?~  k1  [%| (perr-enc s 1)]
   =/  k3=(unit token)
     ?~  rest.s  ~
     ?~  t.rest.s  ~
@@ -2658,7 +3113,7 @@
   |=  s=pst
   ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in substitution']
+  ?~  pk  [%| (perr-enc s 1)]
   =/  cls  (class-of u.pk)
   =/  target
     ^-  (each node @t)
@@ -2669,7 +3124,7 @@
       [%& (tok-node:ast %n-infixop u.pk)]
     ?:  ?=([~ %postfix] cls)
       [%& (tok-node:ast %n-postfixop u.pk)]
-    [%| 'expected identifier or operator in substitution']
+    [%| (perr-enc s 1)]
   ?:  ?=(%| -.target)  [%| p.target]
   =.  s  (advance s)
   =/  ar  (eat s %substitute)
@@ -2729,21 +3184,24 @@
     ?~(lhs ~ t.lhs)
   =/  dr  (eat s %def)
   ?:  ?=(%| -.dr)  [%| p.dr]
-  =.  s  s.p.dr
+  =.  s  (set-exp s.p.dr 'Expression or Instance')
   =/  pk  (peek s)
   ?:  &(?=(^ pk) =(%instance kind.u.pk))
     =/  nr  (noninst s)
     ?:  ?=(%| -.nr)  [%| p.nr]
     :-  %&
-    :_  s.p.nr
+    :_  (epa s.p.nr)
     %+  mk-node:ast  %n-moduledefinition
     %-  welp
     :_  ~[(mk-node:ast %n-identlhs lhs2) (leaf:ast v.p.dr) v.p.nr]
     ?~(lcl ~ ~[u.lcl])
+  ::  the Definition choice fails here without entering Expression
+  ?:  ?|(?=(~ pk) !(expr-start kind.u.pk))
+    [%| (perr-enc s 1)]
   =/  er  (expression s)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  (epa s.p.er)
   %+  mk-node:ast  %n-operatordefinition
   %-  welp
   :_  ~[(mk-node:ast %n-identlhs lhs2) (leaf:ast v.p.dr) v.p.er]
@@ -2779,9 +3237,10 @@
   =|  kids=(list node)
   =.  kids  [(leaf:ast v.p.kr) kids]
   |-  ^-  (pres node)
+  =.  s  (set-exp s 'Identifier')
   =/  ir  (eat s %identifier)
   ?:  ?=(%| -.ir)  [%| p.ir]
-  =.  s  s.p.ir
+  =.  s  (set-exp s.p.ir 'comma or module body')
   =.  kids
     :_  kids
     ?.  wrap  (leaf:ast v.p.ir)
@@ -2790,13 +3249,13 @@
   ?:  &(?=(^ ck) =(%comma kind.u.ck))
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
-  [%& (mk-node:ast kind (flop kids)) s]
+  [%& (mk-node:ast kind (flop kids)) s(exp '')]
 ::
 ++  body-unit
   |=  s=pst
   ^-  (pres node)
   =/  pk  (peek s)
-  ?~  pk  [%| 'unexpected end of input in module body']
+  ?~  pk  [%| (perr-enc s 1)]
   ?+    kind.u.pk
       (op-or-fun-def s)
     ::
@@ -2822,36 +3281,73 @@
     (use-hide-unit s)
     ::
       ?(%instance %local)
-    ::  LOCAL INSTANCE or LOCAL definition
+    ::  LOCAL INSTANCE or LOCAL definition; anything else after LOCAL
+    ::  fails the Unit choice exactly as SANY's LOOKAHEAD(2) does
     ?:  =(%instance kind.u.pk)  (instance-unit s)
     =/  n2=(unit token)  ?~(rest.s ~ ?~(t.rest.s ~ `i.t.rest.s))
     ?:  &(?=(^ n2) =(%instance kind.u.n2))
       (instance-unit s)
-    (op-or-fun-def s)
+    ?:  (def-ahead ?~(rest.s ~ t.rest.s))
+      (op-or-fun-def s)
+    [%| (perr-brk s 2)]
     ::
       %recursive
     (recursive-prod s)
   ==
 ::
+++  unit-starts
+  ::  Body()'s loop guard: can a module unit begin at this token?
+  |=  s=pst
+  ^-  ?
+  =/  pk  (peek s)
+  ?~  pk  |
+  ?:  ?=  $?  %separator  %variable  %constant  %recursive
+              %local  %instance  %assume  %assumption
+              %theorem  %proposition  %use  %hide
+              %bm0  %bm1  %bm2
+          ==
+        kind.u.pk
+    &
+  ::  a definition begins here iff belchDEF would splice its DEFBREAK
+  ::  at exactly this token; +def-ahead covers the common LHS shapes
+  ?|  (def-ahead rest.s)
+      =(`(unit @ud)``0 (belch-index rest.s))
+  ==
+::
+++  body-expecting
+  ^-  @t
+  'LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition'
+::
 ++  module-prod
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =/  mn0   mname.s
+  =.  s  (bpa s 'Module definition')
+  =.  s  (set-exp s '---- MODULE')
   ::  BeginModule: bm ident separator
+  =.  s  (bpa s 'Begin module')
+  =.  s  (set-exp s '---- MODULE (beginning of module)')
   =/  pk  (peek s)
-  ?~  pk  [%| 'expected module']
+  ?~  pk  [%| (perr-enc s 1)]
   ?.  ?=(?(%bm0 %bm1 %bm2) kind.u.pk)
-    [%| (fail-at 'expected module header' u.pk)]
+    [%| (perr-enc s 1)]
   =/  bm  (leaf:ast u.pk)
   =.  s  (advance s)
+  =.  s  (set-exp s 'Identifier')
   =/  nr  (eat s %identifier)
   ?:  ?=(%| -.nr)  [%| p.nr]
   =.  s  s.p.nr
+  =.  s  s(mname text.v.p.nr)
+  =.  s  (set-exp s '----')
   =/  sr  (eat s %separator)
   ?:  ?=(%| -.sr)  [%| p.sr]
-  =.  s  s.p.sr
+  =.  s  (epa s.p.sr)
   =/  begin
     (mk-node:ast %n-beginmodule ~[bm (leaf:ast v.p.nr) (leaf:ast v.p.sr)])
   ::  Extends
+  =.  s  (set-exp s 'EXTENDS clause or module body')
+  =.  s  (bpa s 'Extends')
   =/  ek  (peek s)
   =/  er
     ^-  (pres node)
@@ -2860,13 +3356,15 @@
     (decl-list s %extends %n-extends |)
   ?:  ?=(%| -.er)  [%| p.er]
   =/  extends  v.p.er
-  =.  s  s.p.er
-  ::  Body until ====
+  =.  s  (epa s.p.er)
+  ::  Body: units while one can start, then ====
+  =.  s  (set-exp s 'Module body')
+  =.  s  (bpa s 'Module body')
+  =.  s  (set-exp s body-expecting)
   =|  units=(list node)
   |-  ^-  (pres node)
   =/  bk  (peek s)
-  ?~  bk  [%| 'unexpected end of input in module body']
-  ?.  =(%end-module kind.u.bk)
+  ?:  &(?=(^ bk) !=(%end-module kind.u.bk) (unit-starts s))
     ::  pinned-bug parity (gh tlaplus/tlaplus): SANY rejects a named
     ::  theorem/assumption immediately following a nested module
     ?:  ?&  ?=(^ units)
@@ -2875,17 +3373,23 @@
             ?=(?(%theorem %proposition %assume %assumption) kind.u.bk)
             ?=(^ (named-head (advance s)))
         ==
-      [%| 'named theorem after nested module']
+      [%| (perr-brk s 2)]
     =/  ur  (body-unit s)
     ?:  ?=(%| -.ur)  [%| p.ur]
     $(units [v.p.ur units], s s.p.ur)
+  ::  EndModule; Body pops before the ==== consume
+  =.  s  (epa s)
+  =.  s  (set-exp s '==== or more Module body')
+  =/  mr  (eat s %end-module)
+  ?:  ?=(%| -.mr)  [%| p.mr]
+  =.  s  s.p.mr
   =/  body
     ?~  units  (empty-node %n-body)
     (mk-node:ast %n-body (flop units))
   =/  endm
-    (mk-node:ast %n-endmodule ~[(leaf:ast u.bk)])
+    (mk-node:ast %n-endmodule ~[(leaf:ast v.p.mr)])
   :-  %&
-  :_  (advance s)
+  :_  s(stk stk0, exp '', mname mn0)
   (mk-node:ast %n-module ~[begin extends body endm])
 ::
 ::  +|  Entry And Differential Dump
@@ -2895,17 +3399,59 @@
   |=  text=@t
   ^-  (each node @t)
   =/  items  (lex:lex text)
-  ?:  (has-err:lex items)
-    [%| 'lexical error']
+  =/  lerr  (lex-err-text items)
+  ?^  lerr  [%| u.lerr]
   =/  toks
     ^-  (list token)
     %+  murn  items
     |=  it=item:lex
     ^-  (unit token)
     ?:(?=(%tok -.it) `token.it ~)
-  =/  mr  (module-prod [toks ~ ~])
+  =/  mr  (module-prod [toks ~ ~ ~ '' ~ '' (parse-eof-pos text)])
   ?:  ?=(%| -.mr)  mr
   [%& v.p.mr]
+::
+++  lex-err-text
+  ::  the parse()-level rendering of a lexical error: the raw
+  ::  TokenMgrError text, or the EOF wrapper when the failing lexeme
+  ::  spans lines (an unterminated comment or string)
+  |=  items=(list item:lex)
+  ^-  (unit @t)
+  |-  ^-  (unit @t)
+  ?~  items  ~
+  ?.  ?=(%err -.i.items)  $(items t.items)
+  =/  e  i.items
+  ?.  &((has-eof msg.e) !=(bl.e el.e))  `msg.e
+  :-  ~
+  %-  crip
+  %+  welp
+    "Lexical \{error: EOF reached, possibly open comment starting around line "
+  (dec-tape:ast bl.e)
+::
+++  has-eof
+  |=  msg=@t
+  ^-  ?
+  =/  t  (trip msg)
+  |-  ^-  ?
+  ?~  t  |
+  ?:  ?=([%'E' %'O' %'F' *] t)  &
+  $(t +.t)
+::
+++  parse-eof-pos
+  ::  the parser's EOF-token position: the begin of the trailing
+  ::  whitespace run, one past the final character, or 0.0 when empty
+  |=  text=@t
+  ^-  pos
+  =/  all  (annotate:src text)
+  ?~  all  [0 0]
+  =/  rev  (flop `(list ach:src)`all)
+  =/  run=(unit pos)  ~
+  |-  ^-  pos
+  ?~  rev  (need run)
+  ?:  ?=(?(%9 %10 %12 %13 %32) `@`c.i.rev)
+    $(rev t.rev, run `[l.i.rev col.i.rev])
+  ?~  run  [l.i.rev +(col.i.rev)]
+  u.run
 ::
 ++  dump
   ::  AstDump.java format: ACCEPT + tree lines, or REJECT
@@ -2914,6 +3460,66 @@
   =/  res  (parse text)
   ?:  ?=(%| -.res)  ~['REJECT']
   ['ACCEPT' (dump-node:ast p.res)]
+::
+++  dump-err
+  ::  ParseErrDump.java format: ACCEPT alone, or REJECT + the verbatim
+  ::  PErrors text, each entry terminated by a %% line
+  |=  text=@t
+  ^-  wain
+  =/  res  (parse text)
+  ?:  ?=(%| -.res)
+    ::  explicit fold: the wet turn/zing composition fuse-loops on the
+    ::  narrowed fork type here
+    =/  errs=(list @t)  (split-errs `@t`p.res)
+    =/  out=wain  ~['REJECT']
+    |-  ^-  wain
+    ?~  errs  out
+    =/  seg=wain  (weld (cord-lines i.errs) `wain`~['%%'])
+    $(errs t.errs, out (weld out seg))
+  ~['ACCEPT']
+::
+++  cord-lines
+  ::  split on newlines, keeping a trailing empty line
+  |=  t=@t
+  ^-  wain
+  =/  tp  (trip t)
+  =|  cur=tape
+  =|  out=wain
+  |-  ^-  wain
+  ?~  tp  (flop [(crip (flop cur)) out])
+  ?:  =('\0a' i.tp)
+    $(tp t.tp, cur ~, out [(crip (flop cur)) out])
+  $(tp t.tp, cur [i.tp cur])
+::
+++  split-errs
+  ::  multiple accumulated errors travel joined by the \01 separator
+  |=  msg=@t
+  ^-  (list @t)
+  =/  t  (trip msg)
+  =|  cur=tape
+  =|  out=(list @t)
+  |-  ^-  (list @t)
+  ?~  t  (flop [(crip (flop cur)) out])
+  ?:  =('\01' i.t)
+    $(t t.t, cur ~, out [(crip (flop cur)) out])
+  $(t t.t, cur [i.t cur])
+::
+++  parse-typed
+  ::  typed parse result for the pipeline (unit 2): the tree when the
+  ::  parse succeeded, plus ordered diagnostics; every parse error is
+  ::  fatal (SANY recovery beyond PErrors accumulation is not ported)
+  |=  text=@t
+  ^-  [tree=(unit node) diags=(list diagnostic) fatal=?]
+  =/  res  (parse text)
+  ?:  ?=(%| -.res)
+    =/  msg  `@t`p.res
+    :+  ~
+      %+  turn  (split-errs msg)
+      |=  e=@t
+      ^-  diagnostic
+      [[%sany 0] %error %parse e ~ ~]
+    &
+  [`p.res ~ |]
 ++  grammar-manifest
   ::  one entry per production section in doc/tla-bnf.md; the generated
   ::  test tests/lib/tla/bnf.hoon fails when either side drifts

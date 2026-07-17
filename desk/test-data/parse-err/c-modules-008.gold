@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "<EOF>" at line 2, column 18 and token "(" 
+
+Residual stack trace follows:
+ExtendableExpr starting at line 2, column 18.
+Expression starting at line 2, column 18.
+ExtendableExpr starting at line 2, column 17.
+Expression starting at line 2, column 17.
+Definition starting at line 2, column 1.
+
+%%

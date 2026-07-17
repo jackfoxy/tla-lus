@@ -1,0 +1,9 @@
+REJECT
+***Parse Error***
+Was expecting "==== or more Module body"
+Encountered "<1>" at line 7, column 1 and token "QED" 
+
+Residual stack trace follows:
+Module definition starting at line 1, column 1.
+
+%%

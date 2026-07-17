@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "S" at line 2, column 9 and token "|" 
+
+Residual stack trace follows:
+Some { } form starting at line 2, column 6.
+ExtendableExpr starting at line 2, column 6.
+Expression starting at line 2, column 6.
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+
+%%

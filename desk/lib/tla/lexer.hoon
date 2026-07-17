@@ -21,7 +21,10 @@
 +$  item
   $%  [%tok =token]
       [%com text=@t =span]
-      [%err msg=@t]
+      ::  bl/el: the failing lexeme's begin line and the error line, for
+      ::  the parse()-level EOF wrapper (unit 2); msg is the byte-exact
+      ::  TokenMgrError text
+      [%err msg=@t bl=@ud el=@ud]
   ==
 ::  fixed-lexeme table entry: code points, kind
 +$  entry  [cs=(list @c) kind=@tas]
@@ -562,13 +565,17 @@
   |=  [s=achs eofp=[l=@ud c=@ud]]
   ^-  [items=(list item) rest=achs]
   =/  opening  (open-len s)
+  =/  bl  ?~(s l.eofp l.i.s)
   =/  bufr=achs  (flop (scag opening `achs`s))
   =/  rest=achs  (slag opening `achs`s)
   =/  emb=@ud  0
   =|  out=(list item)
   |-  ^-  [(list item) achs]
   ?~  rest
-    [(flop `(list item)`[[%err (render-err & l.eofp c.eofp ~ `@c`0)] out]) ~]
+    :_  ~
+    %-  flop
+    ^-  (list item)
+    [[%err (render-err & l.eofp c.eofp ~ `@c`0) bl l.eofp] out]
   =/  ol  (open-len rest)
   ?:  (gth ol 0)
     =/  piece  (weld (flop bufr) (scag ol `achs`rest))
@@ -595,11 +602,12 @@
   ::  \* to end of line; the newline is part of the comment image
   |=  [s=achs eofp=[l=@ud c=@ud]]
   ^-  [items=(list item) rest=achs]
+  =/  bl  ?~(s l.eofp l.i.s)
   =/  bufr=achs  (flop (scag 2 `achs`s))
   =/  rest=achs  (slag 2 `achs`s)
   |-  ^-  [(list item) achs]
   ?~  rest
-    [[%err (render-err & l.eofp c.eofp ~ `@c`0)]~ ~]
+    [[%err (render-err & l.eofp c.eofp ~ `@c`0) bl l.eofp]~ ~]
   =/  c  `@c`c.i.rest
   ?:  =('\0d' c)
     =/  two  ?:((starts-with t.rest (asc "\0a")) 2 1)
@@ -698,7 +706,7 @@
         %-  flop
         ^-  (list item)
         :_  out
-        [%err (render-err | l.killer col.killer after c.killer)]
+        [%err (render-err | l.killer col.killer after c.killer) l.i.s l.killer]
       ::
           %fail-eof
         =/  after
@@ -708,7 +716,7 @@
         %-  flop
         ^-  (list item)
         :_  out
-        [%err (render-err & l.eofp c.eofp after `@c`0)]
+        [%err (render-err & l.eofp c.eofp after `@c`0) l.i.s l.eofp]
       ==
     ::  general maximal munch
     =/  fixed  (match-fixed s)
@@ -749,11 +757,12 @@
       =/  killer  (slag alive `achs`s)
       ?~  killer
         =/  aft  ?:((lte alive 1) ~ after)
-        (flop `(list item)`[[%err (render-err & l.eofp c.eofp aft `@c`0)] out])
+        %-  flop
+        `(list item)`[[%err (render-err & l.eofp c.eofp aft `@c`0) l.i.s l.eofp] out]
       %-  flop
       ^-  (list item)
       :_  out
-      [%err (render-err | l.i.killer col.i.killer after c.i.killer)]
+      [%err (render-err | l.i.killer col.i.killer after c.i.killer) l.i.s l.i.killer]
     =/  tok  (mk-token kind.u.best (scag len.u.best `achs`s))
     =/  ndepth
       ?:  ?=(?(%bm0 %bm1 %bm2) kind.u.best)  +(depth)

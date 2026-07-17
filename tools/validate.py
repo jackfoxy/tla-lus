@@ -40,6 +40,7 @@ ORACLE = REPO / "tools/oracle"
 GENERATORS = [
     ("gen-lexer-tests.py",  "pass",        "Lexer (boundary + syntax corpus)",   "desk/tests/lib/tla/lexer/*.hoon"),
     ("gen-parser-tests.py", "pass",        "Parser (syntax corpus accept/reject)", "desk/tests/lib/tla/corpus-*.hoon"),
+    ("gen-parse-err-tests.py", "pass",     "Parse-error diagnostics (PErrors text)", "desk/tests/lib/tla/parse-err.hoon"),
     ("gen-bnf-manifest.py", "pass",        "BNF grammar productions",            "desk/tests/lib/tla/bnf.hoon"),
     ("gen-modres-tests.py", "pass",        "Module resolution graphs",           "desk/tests/lib/tla/modres.hoon"),
     ("gen-sem-tests.py",    "pass",        "Semantic graph + levels",            "desk/tests/lib/tla/sem.hoon"),

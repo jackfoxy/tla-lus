@@ -32,8 +32,8 @@ generated `evidence-counts.md`, never hand-written.
 |---|---|---|---|---|---|---|
 | sany-pipeline | tla2sany.SANY + drivers | app/tla-lus, job.hoon | regen.sh baseline | replaced | 1,5-7 | CLI front-end becomes the Gall API; pipeline order preserved |
 | lexer | parser.TLAplusParserTokenManager, SimpleCharStream | lib/tla/source, lib/tla/lexer | gen-lexer-tests (270) | parity | 3 | token kinds/images/spans/comment specials/TokenMgrError text match |
-| parser-cst | parser.TLAplusParser, Operators/OperatorStack, SyntaxTreeNode | lib/tla/syntax, lib/tla/ast | gen-parser-tests (249) | partial | 4 | accept/reject verdicts + tree shape match; error-message text absent |
-| parse-errors | parser.ParseError(s)/ParseException*/TokenMgrError/Errors | lib/tla/diagnostics | gen-parser-tests | absent | 2 | diagnostic codes/spans/recovery not yet ported (unit 2) |
+| parser-cst | parser.TLAplusParser, Operators/OperatorStack, SyntaxTreeNode | lib/tla/syntax, lib/tla/ast | gen-parser-tests (249) | parity | 4 | accept/reject verdicts + tree shape match; error text under parse-errors |
+| parse-errors | parser.ParseError(s)/ParseException*/TokenMgrError, msgStack/expecting | lib/tla/syntax (perr/bpa/parse-typed) | gen-parse-err-tests (34) | partial | 2 | ***Parse Error*** blocks byte-match the corpus (Encountered/Was expecting/residual stack, OperatorStack + junction/label/\X/!.@ messages, TokenMgrError wrapper); ~100 expecting sites on unexercised productions and typed `at` spans remain |
 | st-location | st.Location, TreeNode, ParseTree | lib/tla/source, lib/tla/ast | gen-lexer-tests | parity | 2-4 | span/location semantics reproduced |
 | modanalyzer | modanalyzer.SpecObj, ParseUnit, ModuleContext | lib/tla/modules | gen-modres-tests (13) | parity | 5 | EXTENDS/INSTANCE BFS, dep order, cycles, missing, shadowing |
 | semantic-graph | semantic.Generator + node classes, Context, SymbolTable, ModuleNode | lib/tla/semantic | gen-sem-tests (19) | partial | 3,6 | well-formed graph matches; recovery/EXCEPT/INSTANCE/proofs/SetOfRcds absent |

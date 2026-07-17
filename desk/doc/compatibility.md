@@ -32,10 +32,55 @@ that requires the ledger closed to terminal statuses.
 
 ## Unit 4 — Syntactic analyzer
 
-- **Error-message text for rejected parses is not reproduced.** REJECT/ACCEPT
-  verdicts match SANY exactly (all 261 corpus cases), and accepted trees match
-  node-for-node, but the human-readable text of syntax-error messages is not
-  yet byte-compatible. Diagnostic *codes* and source spans are preserved.
+- REJECT/ACCEPT verdicts match SANY exactly (all 261 corpus cases), and
+  accepted trees match node-for-node. Error-message text parity is unit P2-2
+  (below).
+
+## Unit P2-2 — Lexer/parser diagnostic parity
+
+The parser reproduces SANY's `TLAplusParser.parse()` error text byte-for-byte
+on the differential corpus (`gen-parse-err-tests`: every syntax-corpus REJECT
+case plus hand-written malformed modules; oracle
+`tools/oracle/ParseErrDump.java` captures the verbatim `PErrors` entries):
+
+- The `***Parse Error***` block: the optional `Was expecting "…"` line (the
+  grammar's `expecting` state), the JavaCC `Encountered "…" at line L, column
+  C and token "…"` line (raw upcoming-token echo incl. the synthetic
+  `Beginning of definition` token belchDEF splices, `<EOF>`, and the
+  `add_escapes`-escaped current token), and the `Residual stack trace` of the
+  top five `bpa` production entries with their entry positions.
+- OperatorStack's thrown messages (precedence conflict, illegal combination,
+  the mistyped-`==` hint, missing expression/operator, postfix/prefix/infix
+  encounter errors, `.`-reduction errors), `finalReduce`'s unwrapped
+  `Couldn't properly parse expression` push followed by the wrapped
+  ` Couldn't reduce expression stack.` exception, junction-indent errors
+  (`Item at <loc> is not properly indented …`), label
+  (`Removing label at <loc> would change expression parsing.`), `\X`-as-infix
+  rejection, `@ used in !.@`, and fairness-subscript failures.
+- Lexical errors pass through the byte-exact `TokenMgrError` text (unit 3),
+  wrapped as `Lexical {error: EOF reached, possibly open comment starting
+  around line N` when the failing lexeme spans lines, exactly as `parse()`
+  does.
+- `+parse-typed` exposes the typed result `[tree diags fatal]`; the job
+  engine's `%parse` stage emits these diagnostics as events, so a rejected
+  submission carries SANY's exact error text on the wire.
+
+Known limitations (tracked; each is a `partial` rationale in
+`parity-manifest.md`):
+
+- The `expecting` state is ported for the productions the corpus exercises
+  (module frame, body/unit dispatch, declarations, definitions); the
+  remaining ~100 assignment sites in less-traveled productions render
+  without a `Was expecting` line until fixtures cover them.
+- Multi-token `Encountered` echoes reproduce the observed JavaCC
+  lookahead-failure sites (unit dispatch, named-theorem-after-nested-module);
+  an unported site would echo one token where JavaCC echoes several.
+- Diagnostics carry the message and fatality but `at` spans are not yet
+  populated (`(unit loc)` stays `~`); the message text embeds the positions.
+- Error recovery is fail-fast: SANY accumulates multiple `PErrors` entries
+  only via non-throwing pushes (`finalReduce`, fairness, `!.@`), which is
+  reproduced; JavaCC-level resynchronization does not exist in either
+  implementation.
 
 ## Unit 5 — Module resolution
 
