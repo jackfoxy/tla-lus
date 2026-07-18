@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={bar} lc={bar<=3}
+lvl S1 L0 lp={bar} lc={bar<=3}
+lvl S2 L0

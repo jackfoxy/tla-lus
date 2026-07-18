@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,x<=1}
+lvl Init L1 lp={x} lc={x<=2}
+lvl Next L2 lp={x} lc={x<=1} nlp={x}
+lvl Spec L3 lp={x} lc={x<=1} nlp={x}

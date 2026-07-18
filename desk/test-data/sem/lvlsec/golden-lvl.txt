@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=1}
+lvl R L0 ml=[2] w=[1]
+lvl Bad L2 lc={x<=1} nlp={x}

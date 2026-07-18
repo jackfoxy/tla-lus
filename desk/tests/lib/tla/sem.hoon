@@ -5,6 +5,33 @@
 /=  semantic  /lib/tla/semantic
 |%
 ::
+++  test-sem-apsubst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  thmdef Thm local=n L0 2.1-2.22'
+        '    apsubstin subs=1 L0 2.1-2.22'
+        '      sub c <-'
+        '        num 1 L0 2.22-2.22'
+        '      in'
+        '        apply = opkind=BuiltInKind L0 3.16-3.20'
+        '          apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '          apply c opkind=ConstantDeclKind L0 3.20-3.20'
+        '  instance module=B local=n L0 2.1-2.22'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aINSTANCE B WITH c <- 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c\0aTHEOREM Thm == c = c\0a====\0a'
+  ==
+::
 ++  test-sem-bare
   %+  expect-eq
     !>  ^-  wain
@@ -494,6 +521,666 @@
       '---- MODULE A ----\0aCONSTANT z\0aFoo == LET a == z\0a           b == a\0a       IN b\0a====\0a'
   ==
 ::
+++  test-sem-lintok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  const bar arity=0 L0 2.10-2.12'
+        '  def R arity=0 local=n L0 3.1-3.18'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.6-3.18'
+        '      apply $Pair opkind=BuiltInKind L0 3.7-3.17'
+        '        str bar L0 3.7-3.9'
+        '        apply bar opkind=ConstantDeclKind L0 3.15-3.17'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT bar\0aR == [bar |-> bar]\0a====\0a'
+  ==
+::
+++  test-sem-lintrc
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def bar arity=0 local=n L0 2.1-2.9'
+        '    num 23 L0 2.8-2.9'
+        '  def R arity=0 local=n L0 3.1-3.17'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.6-3.17'
+        '      apply $Pair opkind=BuiltInKind L0 3.7-3.16'
+        '        str bar L0 3.7-3.9'
+        '        num 42 L0 3.15-3.16'
+        'DIAGS'
+        'D 4802 WARNING 3.7-3.9 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0abar == 23\0aR == [bar |-> 42]\0a====\0a'
+  ==
+::
+++  test-sem-lintsd
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  const bar arity=0 L0 2.10-2.12'
+        '  def S1 arity=0 local=n L0 3.1-3.19'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.7-3.19'
+        '      apply $Pair opkind=BuiltInKind L0 3.8-3.18'
+        '        str bar L0 3.8-3.10'
+        '        apply bar opkind=ConstantDeclKind L0 3.16-3.18'
+        '  def S2 arity=0 local=n L0 4.1-4.18'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 4.7-4.18'
+        '      apply $Pair opkind=BuiltInKind L0 4.8-4.17'
+        '        str bar L0 4.8-4.10'
+        '        num 42 L0 4.16-4.17'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT bar\0aS1 == [bar |-> bar]\0aS2 == [bar |-> 42]\0a====\0a'
+  ==
+::
+++  test-sem-lintx
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def R arity=0 local=n L0 3.1-3.17'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.6-3.17'
+        '      apply $Pair opkind=BuiltInKind L0 3.7-3.16'
+        '        str bar L0 3.7-3.9'
+        '        num 42 L0 3.15-3.16'
+        'DIAGS'
+        'D 4802 WARNING 3.7-3.9 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aR == [bar |-> 42]\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0abar == 23\0a====\0a'
+  ==
+::
+++  test-sem-lvlasm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  assume L1 3.1-3.12'
+        '    apply = opkind=BuiltInKind L1 3.8-3.12'
+        '      apply x opkind=VariableDeclKind L1 3.8-3.8'
+        '      apply x opkind=VariableDeclKind L1 3.12-3.12'
+        'DIAGS'
+        'D 4206 ERROR 3.1-3.12 Level error: assumptions must be level 0 (Constant),'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aASSUME x = x\0a====\0a'
+  ==
+::
+++  test-sem-lvlcdot
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Good arity=0 local=n L2 3.1-3.31'
+        '    apply \\cdot opkind=BuiltInKind L2 3.9-3.31'
+        '      apply = opkind=BuiltInKind L2 3.10-3.15'
+        '        apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '          apply x opkind=VariableDeclKind L1 3.10-3.10'
+        '        apply x opkind=VariableDeclKind L1 3.15-3.15'
+        '      apply = opkind=BuiltInKind L2 3.25-3.30'
+        '        apply \' opkind=BuiltInKind L2 3.25-3.26'
+        '          apply x opkind=VariableDeclKind L1 3.25-3.25'
+        '        apply x opkind=VariableDeclKind L1 3.30-3.30'
+        '  def Bad arity=0 local=n L2 4.1-4.30'
+        '    apply \\cdot opkind=BuiltInKind L2 4.8-4.30'
+        '      apply [] opkind=BuiltInKind L3 4.9-4.14'
+        '        apply TRUE opkind=BuiltInKind L0 4.11-4.14'
+        '      apply = opkind=BuiltInKind L2 4.24-4.29'
+        '        apply \' opkind=BuiltInKind L2 4.24-4.25'
+        '          apply x opkind=VariableDeclKind L1 4.24-4.24'
+        '        apply x opkind=VariableDeclKind L1 4.29-4.29'
+        'DIAGS'
+        'D 4205 ERROR 4.8-4.30 Level error in applying operator \\\\cdot:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aGood == (x\' = x) \\cdot (x\' = x)\0aBad == ([]TRUE) \\cdot (x\' = x)\0a====\0a'
+  ==
+::
+++  test-sem-lvlena
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def P arity=0 local=n L1 3.1-3.24'
+        '    apply ENABLED opkind=BuiltInKind L1 3.6-3.24'
+        '      apply [] opkind=BuiltInKind L3 3.15-3.23'
+        '        apply = opkind=BuiltInKind L1 3.18-3.22'
+        '          apply x opkind=VariableDeclKind L1 3.18-3.18'
+        '          num 0 L0 3.22-3.22'
+        'DIAGS'
+        'D 4205 ERROR 3.6-3.24 Level error in applying operator ENABLED:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aP == ENABLED ([](x = 0))\0a====\0a'
+  ==
+::
+++  test-sem-lvlho
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  var x L1 2.10-2.10'
+        '  def H arity=1 local=n L2 3.1-3.16'
+        '    param F arity=1 L0 3.3-3.6'
+        '    apply F opkind=FormalParamKind L2 3.12-3.16'
+        '      apply \' opkind=BuiltInKind L2 3.14-3.15'
+        '        apply x opkind=VariableDeclKind L1 3.14-3.14'
+        '  def Pr arity=1 local=n L2 4.1-4.13'
+        '    param a arity=0 L0 4.4-4.4'
+        '    apply \' opkind=BuiltInKind L2 4.10-4.13'
+        '      apply a opkind=FormalParamKind L0 4.11-4.11'
+        '  def Bad arity=0 local=n L2 5.1-5.12'
+        '    apply H opkind=UserDefinedOpKind L2 5.8-5.12'
+        '      oparg Pr op=Pr arity=1 L2 5.10-5.11'
+        'DIAGS'
+        'D 4272 ERROR 5.8-5.12 Level error in applying operator H:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aH(F(_)) == F(x\')\0aPr(a) == (a)\'\0aBad == H(Pr)\0a====\0a'
+  ==
+::
+++  test-sem-lvlinst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def I!D arity=0 local=n L2 3.1-3.36'
+        '    substin subs=2 L2 3.1-3.36'
+        '      sub c <-'
+        '        apply \' opkind=BuiltInKind L2 3.27-3.28'
+        '          apply x opkind=VariableDeclKind L1 3.27-3.27'
+        '      sub b <-'
+        '        apply x opkind=VariableDeclKind L1 3.36-3.36'
+        '      in'
+        '        apply = opkind=BuiltInKind L1 4.6-4.10'
+        '          apply b opkind=VariableDeclKind L1 4.6-4.6'
+        '          apply c opkind=ConstantDeclKind L0 4.10-4.10'
+        '  instance name=I module=B local=n L0 3.1-3.36'
+        'DIAGS'
+        'D 4245 ERROR 3.1-3.36 Level error in instantiating module \'B\':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aI == INSTANCE B WITH c <- x\', b <- x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c\0aVARIABLE b\0aD == b = c\0a====\0a'
+  ==
+::
+++  test-sem-lvlinstc
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def J!D arity=0 local=n L3 2.1-2.32'
+        '    substin subs=1 L3 2.1-2.32'
+        '      sub c <-'
+        '        apply [] opkind=BuiltInKind L3 2.27-2.32'
+        '          apply TRUE opkind=BuiltInKind L0 2.29-2.32'
+        '      in'
+        '        apply SUBSET opkind=BuiltInKind L0 3.6-3.13'
+        '          apply c opkind=ConstantDeclKind L0 3.13-3.13'
+        '  instance name=J module=B local=n L0 2.1-2.32'
+        'DIAGS'
+        'D 4245 ERROR 2.1-2.32 Level error in instantiating module \'B\':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aJ == INSTANCE B WITH c <- []TRUE\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c\0aD == SUBSET c\0a====\0a'
+  ==
+::
+++  test-sem-lvlinsth
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Op arity=1 local=n L2 3.1-3.15'
+        '    param a arity=0 L0 3.4-3.4'
+        '    apply = opkind=BuiltInKind L2 3.10-3.15'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply x opkind=VariableDeclKind L1 3.10-3.10'
+        '      apply a opkind=FormalParamKind L0 3.15-3.15'
+        '  def I!D arity=0 local=n L2 4.1-4.28'
+        '    substin subs=1 L2 4.1-4.28'
+        '      sub F <-'
+        '        oparg Op op=Op arity=1 L2 4.27-4.28'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L0 3.6-3.9'
+        '          num 1 L0 3.8-3.8'
+        '  instance name=I module=B local=n L0 4.1-4.28'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aOp(a) == x\' = a\0aI == INSTANCE B WITH F <- Op\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT F(_)\0aD == F(1)\0a====\0a'
+  ==
+::
+++  test-sem-lvlinstm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Op arity=1 local=n L2 3.1-3.15'
+        '    param a arity=0 L0 3.4-3.4'
+        '    apply = opkind=BuiltInKind L2 3.10-3.15'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply a opkind=FormalParamKind L0 3.10-3.10'
+        '      apply x opkind=VariableDeclKind L1 3.15-3.15'
+        '  def I!D arity=0 local=n L2 4.1-4.36'
+        '    substin subs=2 L2 4.1-4.36'
+        '      sub y <-'
+        '        apply x opkind=VariableDeclKind L1 4.27-4.27'
+        '      sub F <-'
+        '        oparg Op op=Op arity=1 L2 4.35-4.36'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L2 4.6-4.10'
+        '          apply \' opkind=BuiltInKind L2 4.8-4.9'
+        '            apply y opkind=VariableDeclKind L1 4.8-4.8'
+        '  instance name=I module=B local=n L0 4.1-4.36'
+        'DIAGS'
+        'D 4245 ERROR 4.1-4.36 Level error in instantiating module \'B\':'
+        'D 4244 ERROR 4.1-4.36 Error in instantiating module \'B\':'
+        'D 4246 ERROR 4.1-4.36 Level error in instantiating module \'B\':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aOp(a) == a\' = x\0aI == INSTANCE B WITH y <- x, F <- Op\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aVARIABLE y\0aCONSTANT F(_)\0aD == F(y\')\0a====\0a'
+  ==
+::
+++  test-sem-lvlinstp
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Op arity=1 local=n L2 3.1-3.15'
+        '    param a arity=0 L0 3.4-3.4'
+        '    apply = opkind=BuiltInKind L2 3.10-3.15'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply a opkind=FormalParamKind L0 3.10-3.10'
+        '      apply x opkind=VariableDeclKind L1 3.15-3.15'
+        '  def I!D arity=0 local=n L2 4.1-4.37'
+        '    substin subs=2 L2 4.1-4.37'
+        '      sub c <-'
+        '        apply \' opkind=BuiltInKind L2 4.27-4.28'
+        '          apply x opkind=VariableDeclKind L1 4.27-4.27'
+        '      sub F <-'
+        '        oparg Op op=Op arity=1 L2 4.36-4.37'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L0 3.6-3.9'
+        '          apply c opkind=ConstantDeclKind L0 3.8-3.8'
+        '  instance name=I module=B local=n L0 4.1-4.37'
+        'DIAGS'
+        'D 4244 ERROR 4.1-4.37 Error in instantiating module \'B\':'
+        'D 4247 ERROR 4.1-4.37 Level error when instantiating module \'B\':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aOp(a) == a\' = x\0aI == INSTANCE B WITH c <- x\', F <- Op\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANTS c, F(_)\0aD == F(c)\0a====\0a'
+  ==
+::
+++  test-sem-lvlop
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var y L1 2.10-2.10'
+        '  def Op arity=1 local=n L2 3.1-3.15'
+        '    param a arity=0 L0 3.4-3.4'
+        '    apply = opkind=BuiltInKind L2 3.10-3.15'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply a opkind=FormalParamKind L0 3.10-3.10'
+        '      apply a opkind=FormalParamKind L0 3.15-3.15'
+        '  def Bad arity=0 local=n L2 4.1-4.13'
+        '    apply Op opkind=UserDefinedOpKind L2 4.8-4.13'
+        '      apply \' opkind=BuiltInKind L2 4.11-4.12'
+        '        apply y opkind=VariableDeclKind L1 4.11-4.11'
+        'DIAGS'
+        'D 4205 ERROR 4.8-4.13 Level error in applying operator Op:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE y\0aOp(a) == a\' = a\0aBad == Op(y\')\0a====\0a'
+  ==
+::
+++  test-sem-lvlpri
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def Bad arity=0 local=n L2 3.1-3.12'
+        '    apply \' opkind=BuiltInKind L2 3.8-3.12'
+        '      apply \' opkind=BuiltInKind L2 3.9-3.10'
+        '        apply x opkind=VariableDeclKind L1 3.9-3.9'
+        'DIAGS'
+        'D 4205 ERROR 3.8-3.12 Level error in applying operator \':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aBad == (x\')\'\0a====\0a'
+  ==
+::
+++  test-sem-lvlqtb
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def Bad arity=0 local=n L3 3.1-3.51'
+        '    apply $BoundedExists opkind=BuiltInKind L3 3.8-3.51'
+        '      bound i L-1 3.11-3.11'
+        '        apply $IfThenElse opkind=BuiltInKind L3 3.17-3.44'
+        '          apply [] opkind=BuiltInKind L3 3.20-3.28'
+        '            apply = opkind=BuiltInKind L1 3.23-3.27'
+        '              apply x opkind=VariableDeclKind L1 3.23-3.23'
+        '              num 0 L0 3.27-3.27'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 3.35-3.36'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 3.43-3.44'
+        '      apply TRUE opkind=BuiltInKind L0 3.48-3.51'
+        'DIAGS'
+        'D 4315 ERROR 3.8-3.51 Level error in applying operator $BoundedExists:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aBad == \\E i \\in IF [](x = 0) THEN {} ELSE {} : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-lvlrec
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def R arity=1 local=n L2 3.1-3.13'
+        '    param a arity=0 L0 3.3-3.3'
+        '    apply R opkind=UserDefinedOpKind L2 3.9-3.13'
+        '      apply \' opkind=BuiltInKind L2 3.11-3.12'
+        '        apply a opkind=FormalParamKind L0 3.11-3.11'
+        'DIAGS'
+        'D 4290 ERROR 3.1-3.13 Argument 1 of recursive operator R is primed'
+        'D 4205 ERROR 3.9-3.13 Level error in applying operator R:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aRECURSIVE R(_)\0aR(a) == R(a\')\0a====\0a'
+  ==
+::
+++  test-sem-lvlsec
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  var x L1 2.10-2.10'
+        '  def R arity=1 local=n L0 5.1-5.12'
+        '    param a arity=0 L0 5.3-5.3'
+        '    apply R opkind=UserDefinedOpKind L0 5.9-5.12'
+        '      apply a opkind=FormalParamKind L0 5.11-5.11'
+        '  def Bad arity=0 local=n L2 4.1-4.12'
+        '    apply \' opkind=BuiltInKind L2 4.8-4.12'
+        '      apply \' opkind=BuiltInKind L2 4.9-4.10'
+        '        apply x opkind=VariableDeclKind L1 4.9-4.9'
+        'DIAGS'
+        'D 4205 ERROR 4.8-4.12 Level error in applying operator \':'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aRECURSIVE R(_)\0aBad == (x\')\'\0aR(a) == R(a)\0a====\0a'
+  ==
+::
+++  test-sem-lvltmp
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-8.4'
+        '  var x L1 2.10-2.10'
+        '  def B1 arity=0 local=n L3 3.1-3.16'
+        '    apply [] opkind=BuiltInKind L3 3.7-3.16'
+        '      apply = opkind=BuiltInKind L2 3.10-3.15'
+        '        apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '          apply x opkind=VariableDeclKind L1 3.10-3.10'
+        '        apply x opkind=VariableDeclKind L1 3.15-3.15'
+        '  def E1 arity=0 local=n L3 4.1-4.16'
+        '    apply <> opkind=BuiltInKind L3 4.7-4.16'
+        '      apply = opkind=BuiltInKind L2 4.10-4.15'
+        '        apply \' opkind=BuiltInKind L2 4.10-4.11'
+        '          apply x opkind=VariableDeclKind L1 4.10-4.10'
+        '        apply x opkind=VariableDeclKind L1 4.15-4.15'
+        '  def L1 arity=0 local=n L3 5.1-5.22'
+        '    apply ~> opkind=BuiltInKind L3 5.7-5.22'
+        '      apply = opkind=BuiltInKind L2 5.8-5.13'
+        '        apply \' opkind=BuiltInKind L2 5.8-5.9'
+        '          apply x opkind=VariableDeclKind L1 5.8-5.8'
+        '        apply x opkind=VariableDeclKind L1 5.13-5.13'
+        '      apply TRUE opkind=BuiltInKind L0 5.19-5.22'
+        '  def M1 arity=0 local=n L3 6.1-6.24'
+        '    apply \\land opkind=BuiltInKind L3 6.7-6.24'
+        '      apply = opkind=BuiltInKind L2 6.8-6.13'
+        '        apply \' opkind=BuiltInKind L2 6.8-6.9'
+        '          apply x opkind=VariableDeclKind L1 6.8-6.8'
+        '        apply x opkind=VariableDeclKind L1 6.13-6.13'
+        '      apply [] opkind=BuiltInKind L3 6.19-6.24'
+        '        apply TRUE opkind=BuiltInKind L0 6.21-6.24'
+        '  def Q1 arity=0 local=n L3 7.1-7.28'
+        '    apply $BoundedExists opkind=BuiltInKind L3 7.7-7.28'
+        '      bound i L-1 7.10-7.10'
+        '        apply $SetEnumerate opkind=BuiltInKind L2 7.16-7.19'
+        '          apply \' opkind=BuiltInKind L2 7.17-7.18'
+        '            apply x opkind=VariableDeclKind L1 7.17-7.17'
+        '      apply [] opkind=BuiltInKind L3 7.23-7.28'
+        '        apply TRUE opkind=BuiltInKind L0 7.25-7.28'
+        'DIAGS'
+        'D 4310 ERROR 3.7-3.16 [] followed by action not of form [A]_v.'
+        'D 4311 ERROR 4.7-4.16 <> followed by action not of form <<A>>_v.'
+        'D 4312 ERROR 5.7-5.22 Action used where only temporal formula or state predicate allowed.'
+        'D 4313 ERROR 6.7-6.24 \\\\land has both temporal formula and action as arguments.'
+        'D 4314 ERROR 7.16-7.19 Action-level bound of quantified temporal formula.'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aB1 == [](x\' = x)\0aE1 == <>(x\' = x)\0aL1 == (x\' = x) ~> TRUE\0aM1 == (x\' = x) /\\ []TRUE\0aQ1 == \\E i \\in {x\'} : []TRUE\0a====\0a'
+  ==
+::
+++  test-sem-lvlunc
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def U arity=0 local=n L2 3.1-3.19'
+        '    apply UNCHANGED opkind=BuiltInKind L2 3.6-3.19'
+        '      apply \' opkind=BuiltInKind L2 3.17-3.18'
+        '        apply x opkind=VariableDeclKind L1 3.17-3.17'
+        'DIAGS'
+        'D 4205 ERROR 3.6-3.19 Level error in applying operator UNCHANGED:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aU == UNCHANGED (x\')\0a====\0a'
+  ==
+::
+++  test-sem-lvlwf
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def L arity=0 local=n L3 3.1-3.19'
+        '    apply $WF opkind=BuiltInKind L3 3.6-3.19'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply x opkind=VariableDeclKind L1 3.10-3.10'
+        '      apply = opkind=BuiltInKind L1 3.14-3.18'
+        '        apply x opkind=VariableDeclKind L1 3.14-3.14'
+        '        num 0 L0 3.18-3.18'
+        'DIAGS'
+        'D 4205 ERROR 3.6-3.19 Level error in applying operator $WF:'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aL == WF_(x\')(x = 0)\0a====\0a'
+  ==
+::
+++  test-sem-lvlwfp
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def W arity=0 local=n L3 3.1-3.17'
+        '    apply $WF opkind=BuiltInKind L3 3.6-3.17'
+        '      apply x opkind=VariableDeclKind L1 3.9-3.9'
+        '      apply = opkind=BuiltInKind L2 3.11-3.16'
+        '        apply \' opkind=BuiltInKind L2 3.11-3.12'
+        '          apply x opkind=VariableDeclKind L1 3.11-3.11'
+        '        apply x opkind=VariableDeclKind L1 3.16-3.16'
+        '  def S arity=0 local=n L3 4.1-4.17'
+        '    apply $SF opkind=BuiltInKind L3 4.6-4.17'
+        '      apply x opkind=VariableDeclKind L1 4.9-4.9'
+        '      apply = opkind=BuiltInKind L2 4.11-4.16'
+        '        apply \' opkind=BuiltInKind L2 4.11-4.12'
+        '          apply x opkind=VariableDeclKind L1 4.11-4.11'
+        '        apply x opkind=VariableDeclKind L1 4.16-4.16'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aW == WF_x(x\' = x)\0aS == SF_x(x\' = x)\0a====\0a'
+  ==
+::
 ++  test-sem-nary
   %+  expect-eq
     !>  ^-  wain
@@ -555,6 +1242,64 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aNats == \\A n \\in Nat : n > 0\0a====\0a'
+  ==
+::
+++  test-sem-recfcn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def f arity=0 local=n L0 2.1-2.44'
+        '    apply $RecursiveFcnSpec opkind=BuiltInKind L0 2.1-2.44'
+        '      ubound f L0 2.1-2.44'
+        '      bound n L0 2.3-2.3'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 2.9-2.14'
+        '          num 0 L0 2.10-2.10'
+        '          num 1 L0 2.13-2.13'
+        '      apply $IfThenElse opkind=BuiltInKind L0 2.20-2.44'
+        '        apply = opkind=BuiltInKind L0 2.23-2.27'
+        '          apply n opkind=FormalParamKind L0 2.23-2.23'
+        '          num 0 L0 2.27-2.27'
+        '        num 0 L0 2.34-2.34'
+        '        apply $FcnApply opkind=BuiltInKind L0 2.41-2.44'
+        '          apply f opkind=FormalParamKind L0 2.41-2.41'
+        '          num 0 L0 2.43-2.43'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0af[n \\in {0, 1}] == IF n = 0 THEN 0 ELSE f[0]\0a====\0a'
+  ==
+::
+++  test-sem-recmut
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  var x L1 2.10-2.10'
+        '  def P arity=1 local=n L2 4.1-4.12'
+        '    param n arity=0 L0 4.3-4.3'
+        '    apply Q opkind=UserDefinedOpKind L2 4.9-4.12'
+        '      apply n opkind=FormalParamKind L0 4.11-4.11'
+        '  def Q arity=1 local=n L2 5.1-5.14'
+        '    param n arity=0 L0 5.3-5.3'
+        '    apply = opkind=BuiltInKind L2 5.9-5.14'
+        '      apply \' opkind=BuiltInKind L2 5.9-5.10'
+        '        apply x opkind=VariableDeclKind L1 5.9-5.9'
+        '      apply n opkind=FormalParamKind L0 5.14-5.14'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aRECURSIVE P(_), Q(_)\0aP(n) == Q(n)\0aQ(n) == x\' = n\0a====\0a'
   ==
 ::
 ++  test-sem-records

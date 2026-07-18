@@ -14,12 +14,16 @@
   ::  are then rendered with every operator reference resolved to a
   ::  symbol (builtin, constant, variable, formal parameter, or
   ::  user-defined operator), matching the normalized SemDump oracle.
-  ::  Unit 7 adds level computation: each builtin carries its OpLevel and
-  ::  ArgWeights, each definition's level is computed from its body in
-  ::  dependency order and threaded into the context, and every node is
-  ::  dumped with its L<level> (0 constant, 1 state, 2 action, 3 temporal).
-  ::  The full level-constraint machinery (level parameters, arg-level
-  ::  constraints for higher-order operators) and the linter are later.
+  ::  Levels: generation computes provisional levels (each builtin carries
+  ::  its OpLevel and ArgWeights); the level-check pass (+level-module,
+  ::  unit 4) then ports LevelNode/OpDefNode/OpApplNode.levelCheck: level
+  ::  parameters, level constraints (min-merged), arg-level constraints
+  ::  (max-merged), arg-level params, per-definition maxLevels/weights/
+  ::  minMaxLevel/opLevelCond, the two-iteration recursive-section
+  ::  fixpoint, node-specific temporal checks, INSTANCE substitution
+  ::  checks, and the record-constructor linter. Every node is dumped
+  ::  with its post-pass L<level> (L-1 when generation errors kept SANY
+  ::  from level checking).
   ::
 ::  +|  Types
 ::
@@ -87,6 +91,29 @@
       ['$Nop' (f 1 0 ~)]     ['$Qed' (f 0 0 ~)]    ['$Pfcase' (f 1 0 ~)]
       ['$Have' (f 1 0 ~)]    ['$Take' (f 1 0 ~)]   ['$Pick' (f 1 0 ~)]
       ['$Witness' (v 0 ~)]   ['$Suffices' (f 1 0 ~)]
+  ==
+::
+++  builtin-maxl
+  ::  per-argument maximum levels (BuiltInOperators ArgMaxLevels);
+  ::  operators absent here allow MaxLevel (3) for every argument.
+  ::  Variadic operators index every argument at position 0.
+  ^-  (map @t (list @ud))
+  %-  malt
+  ^-  (list [@t (list @ud)])
+  :~  ['=' ~[2 2]]           ['/=' ~[2 2]]         ['\'' ~[1]]
+      ['SUBSET' ~[2]]        ['UNION' ~[2]]        ['DOMAIN' ~[2]]
+      ['\\subseteq' ~[2 2]]  ['\\in' ~[2 2]]       ['\\notin' ~[2 2]]
+      ['\\' ~[2 2]]          ['\\intersect' ~[2 2]]
+      ['\\union' ~[2 2]]     ['\\times' ~[2 2]]
+      ['ENABLED' ~[2]]       ['UNCHANGED' ~[1]]    ['\\cdot' ~[2 2]]
+      ['$AngleAct' ~[2 1]]   ['$SquareAct' ~[2 1]]
+      ['$BoundedChoose' ~[2]]  ['$CartesianProd' ~[2]]
+      ['$Except' ~[2]]       ['$FcnApply' ~[2 2]]  ['$RcdSelect' ~[2 0]]
+      ['$Seq' ~[2]]          ['$SetEnumerate' ~[2]]
+      ['$SetOfAll' ~[2]]     ['$SetOfFcns' ~[2]]   ['$SetOfRcds' ~[2]]
+      ['$SF' ~[1 2]]         ['$WF' ~[1 2]]        ['$SubsetOf' ~[2]]
+      ['$Tuple' ~[2]]        ['$UnboundedChoose' ~[2]]
+      ['$Witness' ~[2]]
   ==
 ::
 ++  syn-map
@@ -780,7 +807,8 @@
   ?~  rt  ~['REJECT']
   =/  fc  (full-ctx tree.u.rt ctxs)
   :-  'ACCEPT'
-  (render-module (gen-module tree.u.rt fc ctxs mods.g))
+  %-  render-module
+  (level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g)
 ::
 ++  generate
   ::  the typed semantic graph for later units (B5 consumes this)
@@ -792,7 +820,8 @@
   =/  ctxs  (analyze order.g mods.g deps.g)
   =/  rt  (~(get by mods.g) root)
   ?~  rt  ~
-  `(gen-module tree.u.rt (full-ctx tree.u.rt ctxs) ctxs mods.g)
+  =/  fc  (full-ctx tree.u.rt ctxs)
+  `(level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g)
 ::  +|  Typed Semantic IR (unit 3: the graph later units consume)
 ::
 ::  Molds follow the zuse-408 recursive recipe: every cycle member is a
@@ -844,7 +873,23 @@
       at=sspan
       body=(unit sem)
   ==
-+$  sem-inst  [name=(unit @t) mod=@t local=? at=sspan]
+::  one INSTANCE substitution as level checking sees it: the instanced
+::  module's parameter (with its declaration kind) and the substituting
+::  expression (explicit WITH expr or the implicit same-named symbol)
++$  sem-isub
+  $+  sem-isub
+  $:  param=@t
+      pkind=symkind
+      expr=(unit sem)
+  ==
++$  sem-inst
+  $+  sem-inst
+  $:  name=(unit @t)
+      mod=@t
+      local=?
+      at=sspan
+      subs=(list sem-isub)
+  ==
 +$  sem-def
   $+  sem-def
   $:  %sdef
@@ -867,6 +912,14 @@
       theorems=(list sem-thm)
       instances=(list sem-inst)
       diags=(list sdiag)
+      ::  recursive sections (ModuleNode.opDefsInRecursiveSection): each
+      ::  section lists its member definitions in creation order (a
+      ::  RECURSIVE-declared operator is created at the RECURSIVE unit)
+      ::  with the RECURSIVE-declared subset
+      recsecs=(list [names=(list @t) recs=(list @t)])
+      ::  whether the level-check pass ran (SANY skips it when semantic
+      ::  generation reported errors; the dump then prints L-1)
+      lchecked=?
   ==
 ::  generator output: ~ when SANY's Generator returns null (the node
 ::  vanishes from the graph), plus diagnostics in report order
@@ -950,6 +1003,50 @@
     ns  t.ns
     rs  ?~(r.g rs [u.r.g rs])
     ds  (weld ds ds.g)
+  ==
+::
+++  g-arg-list
+  ::  operator-application arguments: a bare identifier naming an
+  ::  operator of nonzero arity becomes an OpArgNode, encoded as a
+  ::  reserved $OpArg %apply (ubound = the operator name, single %num
+  ::  literal arg = its arity); everything else generates normally
+  |=  [ns=(list node) c=ctx]
+  ^-  [rs=(list sem) ds=(list sdiag)]
+  =|  rs=(list sem)
+  =|  ds=(list sdiag)
+  |-  ^-  [rs=(list sem) ds=(list sdiag)]
+  ?~  ns  [(flop rs) ds]
+  =/  oa  (oparg-of i.ns c)
+  ?^  oa
+    $(ns t.ns, rs [u.oa rs])
+  =/  g  (g-x i.ns c)
+  %=  $
+    ns  t.ns
+    rs  ?~(r.g rs [u.r.g rs])
+    ds  (weld ds ds.g)
+  ==
+::
+++  oparg-of
+  ::  the $OpArg encoding when a node is a bare reference to an
+  ::  operator with arity > 0 (SANY builds an OpArgNode there)
+  |=  [n=node c=ctx]
+  ^-  (unit sem)
+  ?.  (is-kind n %n-generalid)  ~
+  =/  kids  (kids-of n)
+  =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
+  ?~  ids  ~
+  =/  nm  (leaf-text (rear-node `(list node)`ids))
+  ?:  =('@' nm)  ~
+  =/  nm
+    =/  pfx  (genid-prefix n)
+    ?~(pfx nm (rap 3 ~[u.pfx nm]))
+  =/  s  (~(get by c) nm)
+  ?~  s  ~
+  ?:  =(0 arity.u.s)  ~
+  :-  ~
+  :*  %apply  ['$OpArg' kind.u.s]  level.u.s  (span-of:ast n)
+      [[nm (span-of:ast n)] ~]  ~
+      [[%lit %num (crip (a-co arity.u.s)) (span-of:ast n)] ~]
   ==
 ::
 ++  builtin-apply
@@ -1174,7 +1271,7 @@
     :_  ~
     %^  derr  4.204  (span-of:ast args-node)
     "The operator {(trip nm)} requires {(a-co arity.u.s)} arguments."
-  =/  g  (g-list arg-exprs c)
+  =/  g  (g-arg-list arg-exprs c)
   :-  :-  ~
       :*  %apply  [nm kind.u.s]  (expr-level n c)  (span-of:ast n)
           ~  ~  rs.g
@@ -1629,7 +1726,7 @@
       ==
   ^-  [defs=(list sem-def) inst=sem-inst ds=(list sdiag)]
   =/  ip  (inst-parts nl.iu)
-  =/  irec=sem-inst  [name.iu mod.ip local.iu (span-of:ast u)]
+  =/  irec=sem-inst  [name.iu mod.ip local.iu (span-of:ast u) ~]
   =/  bt  (~(get by mods) mod.ip)
   ?~  bt  [~ irec ~]
   =/  bctx  (full-ctx tree.u.bt ctxs)
@@ -1647,11 +1744,17 @@
   =/  gsubs
     =|  nms=(list @t)
     =|  exs=(list sem)
+    =|  isubs=(list sem-isub)
     =|  ds=(list sdiag)
     =/  pl  bparams
-    |-  ^-  [nms=(list @t) exs=(list sem) ds=(list sdiag)]
-    ?~  pl  [(flop nms) (flop exs) ds]
+    |-  ^-  $:  nms=(list @t)  exs=(list sem)
+                isubs=(list sem-isub)  ds=(list sdiag)
+            ==
+    ?~  pl  [(flop nms) (flop exs) (flop isubs) ds]
     =/  pn  i.pl
+    =/  pkind=symkind
+      =/  bs  (~(get by bctx) pn)
+      ?~(bs %constant kind.u.bs)
     =/  ex=(unit node)
       =/  sl  subs.ip
       |-  ^-  (unit node)
@@ -1660,19 +1763,21 @@
     ?^  ex
       =/  g  (g-x u.ex c)
       %=  $
-        pl   t.pl
-        nms  ?~(r.g nms [pn nms])
-        exs  ?~(r.g exs [u.r.g exs])
-        ds   (weld ds ds.g)
+        pl     t.pl
+        nms    ?~(r.g nms [pn nms])
+        exs    ?~(r.g exs [u.r.g exs])
+        isubs  [[pn pkind r.g] isubs]
+        ds     (weld ds ds.g)
       ==
     ::  implicit: the instantiating module's own symbol
     =/  s  (~(get by c) pn)
     ?~  s  $(pl t.pl)
+    =/  iex=sem  [%apply [pn kind.u.s] level.u.s (span-of:ast u) ~ ~ ~]
     %=  $
-      pl   t.pl
-      nms  [pn nms]
-      exs  :_  exs
-           [%apply [pn kind.u.s] level.u.s (span-of:ast u) ~ ~ ~]
+      pl     t.pl
+      nms    [pn nms]
+      exs    [iex exs]
+      isubs  [[pn pkind `iex] isubs]
     ==
   =/  sub-lvl
     %+  roll  subs.ip
@@ -1714,7 +1819,7 @@
           `subw
       ==
     $(bus t.bus, out [wrapped out], ds (weld ds ds.gd))
-  [-.idefs irec (weld ds.gsubs +.idefs)]
+  [-.idefs irec(subs isubs.gsubs) (weld ds.gsubs +.idefs)]
 ::
 ++  gen-module
   ::  the root module's semantic graph, with duplicate-definition
@@ -1761,12 +1866,29 @@
     =|  theorems=(list sem-thm)
     =|  insts=(list sem-inst)
     =|  ds=(list sdiag)
+    ::  recursive-section state: a RECURSIVE unit creates placeholder
+    ::  definitions at its own position (SANY creates the OpDefNode at
+    ::  the declaration; the later definition fills it in place) and
+    ::  opens a section that closes when every declared operator has
+    ::  been defined
+    =|  secs=(list [names=(list @t) recs=(list @t)])
+    =/  secopen  |
+    =|  snames=(list @t)
+    =|  srecs=(list @t)
+    =|  pending=(set @t)
     =/  us  units
-    |-  ^-  $:  (list sem-def)  (list sem-thm)  (list sem-thm)
-                (list sem-thm)  (list sem-inst)  (list sdiag)
+    |-  ^-  $:  defs=(list sem-def)  thmdefs=(list sem-thm)
+                assumes=(list sem-thm)  theorems=(list sem-thm)
+                insts=(list sem-inst)  ds=(list sdiag)
+                secs=(list [names=(list @t) recs=(list @t)])
             ==
     ?~  us
-      [(flop defs) (flop thmdefs) (flop assumes) (flop theorems) (flop insts) ds]
+      :*  (flop defs)  (flop thmdefs)  (flop assumes)  (flop theorems)
+          (flop insts)  ds
+          %-  flop
+          ?.  secopen  secs
+          [[(flop snames) (flop srecs)] secs]
+      ==
     =/  u  i.us
     ::  theorem / assumption units
     ?:  ?|  (is-kind u %n-assumption)
@@ -1779,6 +1901,24 @@
         thmdefs   ?~(name.r.gt thmdefs [r.gt thmdefs])
         assumes   ?.((is-kind u %n-assumption) assumes [r.gt assumes])
         theorems  ?.((is-kind u %n-theorem) theorems [r.gt theorems])
+      ==
+    ::  RECURSIVE F(_) creates placeholder definitions here and opens
+    ::  (or extends) a recursive section
+    =/  rsyms  (recursive-syms u)
+    ?:  ?=(^ rsyms)
+      =/  ph
+        %+  turn  `(list [@t sym])`rsyms
+        |=  [nm=@t s=sym]
+        ^-  sem-def
+        [%sdef nm arity.s | 0 (span-of:ast u) ~ ~]
+      %=  $
+        us       t.us
+        secopen  &
+        defs     (weld (flop ph) defs)
+        snames   (weld (flop (turn `(list [@t sym])`rsyms |=([nm=@t *] nm))) snames)
+        srecs    (weld (flop (turn `(list [@t sym])`rsyms |=([nm=@t *] nm))) srecs)
+        pending  %+  roll  `(list [@t sym])`rsyms
+                 |=([[nm=@t *] acc=_pending] (~(put in acc) nm))
       ==
     ::  INSTANCE units import the instanced module's definitions
     =/  iu  (unit-instance u)
@@ -1796,6 +1936,27 @@
       $(us t.us)
     =/  dsg  (def-signature u)
     ?~  dsg  $(us t.us)
+    ?:  (~(has in pending) name.u.dsg)
+      ::  fill the RECURSIVE placeholder in place
+      =/  gd  (g-def u c)
+      =/  p2  (~(del in pending) name.u.dsg)
+      =/  closed  &(secopen =(~ p2))
+      %=  $
+        us       t.us
+        seen     (~(put in seen) name.u.dsg)
+        pending  p2
+        ds       (weld ds ds.gd)
+        secopen  ?:(closed | secopen)
+        snames   ?:(closed ~ snames)
+        srecs    ?:(closed ~ srecs)
+        secs     ?.(closed secs [[(flop snames) (flop srecs)] secs])
+        defs     ?~  r.gd  defs
+                 =/  dl  defs
+                 |-  ^-  (list sem-def)
+                 ?~  dl  ~
+                 ?:  =(name.i.dl name.u.dsg)  [u.r.gd t.dl]
+                 [i.dl $(dl t.dl)]
+      ==
     ?:  (~(has in seen) name.u.dsg)
       %=  $
         us  t.us
@@ -1808,27 +1969,1545 @@
       ==
     =/  gd  (g-def u c)
     %=  $
-      us    t.us
-      seen  (~(put in seen) name.u.dsg)
-      defs  ?~(r.gd defs [u.r.gd defs])
-      ds    (weld ds ds.gd)
+      us      t.us
+      seen    (~(put in seen) name.u.dsg)
+      defs    ?~(r.gd defs [u.r.gd defs])
+      ds      (weld ds ds.gd)
+      snames  ?.(&(secopen ?=(^ r.gd)) snames [name.u.dsg snames])
     ==
-  =/  [wdefs=(list sem-def) wthm=(list sem-thm) wass=(list sem-thm) wtheo=(list sem-thm) winst=(list sem-inst) wds=(list sdiag)]
-    walk
+  =/  wk  walk
   :*  (module-name tree)
       (span-of:ast tree)
       consts
       vars
-      wdefs
-      wthm
-      wass
-      wtheo
-      winst
-      wds
+      defs.wk
+      thmdefs.wk
+      assumes.wk
+      theorems.wk
+      insts.wk
+      ds.wk
+      secs.wk
+      |
   ==
 ::
-::  +|  IR Renderer (the normalized SemDump projection)
+::  +|  Level Checking (unit 4: LevelNode/OpDefNode/OpApplNode.levelCheck)
 ::
+::  A post-generation pass over the typed IR. Parameters are identified
+::  by lkey (owner + name + kind): module declarations own '', formal
+::  parameters their definition, bound identifiers 'b', NEW symbols 'n'.
+::  Level constraints min-merge (SetOfLevelConstraints), arg-level
+::  constraints max-merge (SetOfArgLevelConstraints). Diagnostics carry
+::  SANY's full message and deduplicate on [code location message]
+::  (Errors.addMessage is idempotent). Not ported (documented in
+::  compatibility.md): Leibniz tracking and 4244, the 4246/4247
+::  operator-argument instance checks, and the call-site argLevelParam
+::  remapping rules for doubly-higher-order operators.
+::
++$  lkey  [own=@t name=@t kind=symkind]
++$  lres
+  $:  lvl=@ud
+      ok=?
+      lp=(set lkey)
+      lc=(map lkey @ud)
+      ac=(map [k=lkey i=@ud] @ud)
+      ap=(set [op=lkey i=@ud par=lkey])
+  ==
++$  oplev
+  $:  lvl=@ud
+      ok=?
+      ary=@ud
+      vdc=?
+      maxl=(list @ud)
+      wgts=(list @ud)
+      mnmx=(list (list @ud))
+      cond=(list (list (list ?)))
+      pars=(list lkey)
+      lp=(set lkey)
+      lc=(map lkey @ud)
+      ac=(map [k=lkey i=@ud] @ud)
+      ap=(set [op=lkey i=@ud par=lkey])
+  ==
++$  lenv
+  $:  ops=(map @t oplev)
+      scope=(map @t lkey)
+      pfx=@t
+      c=ctx
+  ==
+::  the instanced-module data INSTANCE checking needs
++$  mlev  [const=? lc=(map lkey @ud)]
+::
+++  lres-nil  `lres`[0 & ~ ~ ~ ~]
+::
+++  lc-put
+  ::  a level constraint: parameter must have level <= v (min-merge)
+  |=  [m=(map lkey @ud) k=lkey v=@ud]
+  ^-  (map lkey @ud)
+  (~(put by m) k (min v (~(gut by m) k 3)))
+::
+++  lc-uni
+  |=  [a=(map lkey @ud) b=(map lkey @ud)]
+  ^-  (map lkey @ud)
+  =/  bl  ~(tap by b)
+  |-  ^-  (map lkey @ud)
+  ?~  bl  a
+  $(bl t.bl, a (lc-put a i.bl))
+::
+++  ac-put
+  ::  an arg-level constraint: (param, position) needs level >= v
+  |=  [m=(map [k=lkey i=@ud] @ud) k=[k=lkey i=@ud] v=@ud]
+  ^-  (map [k=lkey i=@ud] @ud)
+  (~(put by m) k (max v (~(gut by m) k 0)))
+::
+++  ac-uni
+  |=  [a=(map [k=lkey i=@ud] @ud) b=(map [k=lkey i=@ud] @ud)]
+  ^-  (map [k=lkey i=@ud] @ud)
+  =/  bl  ~(tap by b)
+  |-  ^-  (map [k=lkey i=@ud] @ud)
+  ?~  bl  a
+  $(bl t.bl, a (ac-put a i.bl))
+::
+++  at-or
+  |=  [l=(list @ud) i=@ud d=@ud]
+  ^-  @ud
+  ?:((gte i (lent l)) d (snag i l))
+::
+++  mxl-of
+  ::  the operator's maximum level for argument i (variadic index at 0)
+  |=  [ol=oplev i=@ud]
+  ^-  @ud
+  (at-or maxl.ol ?:(vdc.ol 0 i) 3)
+::
+++  wgt-of
+  |=  [ol=oplev i=@ud]
+  ^-  @ud
+  (at-or wgts.ol ?:(vdc.ol 0 i) 1)
+::
+++  mnmx-of
+  |=  [ol=oplev i=@ud j=@ud]
+  ^-  @ud
+  ?:  (gte i (lent mnmx.ol))  0
+  (at-or (snag i mnmx.ol) j 0)
+::
+++  cond-of
+  |=  [ol=oplev i=@ud j=@ud k=@ud]
+  ^-  ?
+  ?:  (gte i (lent cond.ol))  |
+  =/  ci  (snag i cond.ol)
+  ?:  (gte j (lent ci))  |
+  =/  cj  (snag j ci)
+  ?:  (gte k (lent cj))  |
+  (snag k cj)
+::
+++  oplev-nil
+  ::  least-restrictive operator data (imported operators resolved only
+  ::  through the generation context: level and weights known, no
+  ::  constraint data)
+  |=  [lvl=@ud ary=@ud vdc=? wgts=(list @ud)]
+  ^-  oplev
+  [lvl & ary vdc ~ wgts ~ ~ ~ ~ ~ ~ ~]
+::
+++  l-resolve
+  ::  operator data for an applied definition or builtin, trying the
+  ::  instance prefix first inside instanced bodies
+  |=  [nm=@t kind=symkind e=lenv]
+  ^-  oplev
+  ?:  =(%builtin kind)
+    =/  s  (~(get by builtins) nm)
+    =/  ml  (~(get by builtin-maxl) nm)
+    ?~  s  (oplev-nil 0 0 | ~)
+    =/  base  (oplev-nil level.u.s arity.u.s variadic.u.s weights.u.s)
+    base(maxl ?~(ml ~ u.ml))
+  =/  pnm  ?:(=('' pfx.e) nm (rap 3 ~[pfx.e nm]))
+  =/  o1  (~(get by ops.e) pnm)
+  ?^  o1  u.o1
+  =/  o2  (~(get by ops.e) nm)
+  ?^  o2  u.o2
+  =/  s1  (~(get by c.e) pnm)
+  ?^  s1  (oplev-nil level.u.s1 arity.u.s1 variadic.u.s1 weights.u.s1)
+  =/  s2  (~(get by c.e) nm)
+  ?^  s2  (oplev-nil level.u.s2 arity.u.s2 variadic.u.s2 weights.u.s2)
+  (oplev-nil 0 0 | ~)
+::
+++  kind-lvl
+  ::  a declared symbol's own level (OpDeclNode constructor)
+  |=  k=symkind
+  ^-  @ud
+  ?:(=(%variable k) 1 0)
+::
+++  scope-key
+  |=  [nm=@t kind=symkind e=lenv]
+  ^-  lkey
+  (~(gut by scope.e) nm ['' nm kind])
+::
+++  oparg-def
+  ::  the referenced operator of a $OpArg node, when it is a definition
+  ::  (AnyDefNode); ~ when it references a formal parameter
+  |=  [s=sem e=lenv]
+  ^-  (unit [nm=@t ol=oplev])
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('$OpArg' name.op.s)  ~
+  =/  nm  ?~(ubound.s '' name.i.ubound.s)
+  ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)  ~
+  `[nm (l-resolve nm kind.op.s e)]
+::
+++  l-x
+  ::  level-check one expression: recompute its level (rewriting lvl
+  ::  fields), gather level data, emit diagnostics in SANY report order
+  |=  [s=sem e=lenv]
+  ^-  [s=sem r=lres ds=(list sdiag)]
+  ?-    -.s
+      %lit      [s lres-nil ~]
+      %atref    [s [lvl.s & ~ ~ ~ ~] ~]
+      %nullodn  [s lres-nil ~]
+      %letin
+    =/  lets-w
+      =|  out=(list sem-def)
+      =|  ds=(list sdiag)
+      =/  eo  e
+      =/  ok  &
+      =/  ll  lets.s
+      =/  lcs=(map lkey @ud)  ~
+      |-  ^-  [(list sem-def) lenv ? (map lkey @ud) (list sdiag)]
+      ?~  ll  [(flop out) eo ok lcs ds]
+      =/  gd  (l-def i.ll eo ~)
+      %=  $
+        ll   t.ll
+        out  [df.gd out]
+        eo   eo.gd
+        ok   &(ok ok.ol.gd)
+        lcs  (lc-uni lcs lc.ol.gd)
+        ds   (weld ds ds.gd)
+      ==
+    =/  [lout=(list sem-def) le=lenv lok=? llc=(map lkey @ud) lds=(list sdiag)]
+      lets-w
+    ?~  body.s
+      [s(lets lout) [0 lok ~ llc ~ ~] lds]
+    =/  gb  (l-x u.body.s le)
+    :-  s(lets lout, body `s.gb, lvl lvl.r.gb)
+    :_  (weld lds ds.gb)
+    :*  lvl.r.gb
+        &(lok ok.r.gb)
+        lp.r.gb
+        (lc-uni llc lc.r.gb)
+        ac.r.gb
+        ap.r.gb
+    ==
+  ::
+      %apply
+    ?:  =('$OpArg' name.op.s)
+      =/  nm  ?~(ubound.s '' name.i.ubound.s)
+      ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
+        =/  key  (scope-key nm kind.op.s e)
+        =/  lvl  (kind-lvl kind.op.s)
+        [s(lvl lvl) [lvl & (silt ~[key]) ~ ~ ~] ~]
+      =/  ol  (l-resolve nm kind.op.s e)
+      [s(lvl lvl.ol) [lvl.ol ok.ol lp.ol lc.ol ac.ol ap.ol] ~]
+    ?:  =('$NewSymb' name.op.s)
+      =/  gs  (l-args args.s e)
+      =/  lvl  (max 0 lvl.rs.gs)
+      =/  ds2
+        ?.  =(3 lvl)  ds.gs
+        %+  weld  ds.gs
+        :_  ~
+        %^  derr  4.356  at.s
+        "Level error:\0aTemporal formula used as set."
+      [s(lvl lvl, args out.gs) [lvl ok.rs.gs lp.rs.gs lc.rs.gs ac.rs.gs ap.rs.gs] ds2]
+    ?:  =('$AssumeProve' name.op.s)
+      =/  walk
+        =|  out=(list sem)
+        =|  ds=(list sdiag)
+        =/  r  lres-nil
+        =/  e2  e
+        =/  as  args.s
+        |-  ^-  [(list sem) lres (list sdiag)]
+        ?~  as  [(flop out) r ds]
+        =/  g  (l-x i.as e2)
+        =?  e2  ?&(?=(%apply -.s.g) =('$NewSymb' name.op.s.g))
+          =/  nn  ?~(ubound.s.g '' name.i.ubound.s.g)
+          e2(scope (~(put by scope.e2) nn ['n' nn %new-constant]))
+        %=  $
+          as   t.as
+          out  [s.g out]
+          ds   (weld ds ds.g)
+          r    :*  (max lvl.r lvl.r.g)
+                   &(ok.r ok.r.g)
+                   (~(uni in lp.r) lp.r.g)
+                   (lc-uni lc.r lc.r.g)
+                   (ac-uni ac.r ac.r.g)
+                   (~(uni in ap.r) ap.r.g)
+               ==
+        ==
+      =/  [aout=(list sem) ar=lres ads=(list sdiag)]  walk
+      [s(lvl lvl.ar, args aout) ar ads]
+    ?:  =('$SubstIn' name.op.s)
+      (l-substin s e)
+    ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
+      ::  application of a declared symbol or formal parameter
+      =/  key  (scope-key name.op.s kind.op.s e)
+      =/  ga  (l-args args.s e)
+      =/  lvl  (max (kind-lvl kind.op.s) lvl.rs.ga)
+      =/  r=lres
+        :*  lvl
+            ok.rs.ga
+            (~(put in lp.rs.ga) key)
+            lc.rs.ga
+            =/  acc  ac.rs.ga
+            =/  i  0
+            =/  al  rl.ga
+            |-  ^-  (map [k=lkey i=@ud] @ud)
+            ?~  al  acc
+            $(al t.al, i +(i), acc (ac-put acc [key i] lvl.i.al))
+        ::
+            =/  acc  ap.rs.ga
+            =/  i  0
+            =/  al  rl.ga
+            |-  ^-  (set [op=lkey i=@ud par=lkey])
+            ?~  al  acc
+            =/  acc2
+              =/  ps  ~(tap in lp.i.al)
+              |-  ^-  (set [op=lkey i=@ud par=lkey])
+              ?~  ps  acc
+              $(ps t.ps, acc (~(put in acc) [key i i.ps]))
+            $(al t.al, i +(i), acc acc2)
+        ==
+      [s(lvl lvl, args out.ga) r ~]
+    (l-apply-def s e)
+  ==
+::
+++  l-args
+  ::  level-check an argument list in order; rs = combined lres
+  ::  (max level, unions), rl = per-argument lres in order
+  |=  [as=(list sem) e=lenv]
+  ^-  [out=(list sem) rs=lres rl=(list lres) ds=(list sdiag)]
+  =|  out=(list sem)
+  =|  rl=(list lres)
+  =|  ds=(list sdiag)
+  =/  rs  lres-nil
+  |-  ^-  [out=(list sem) rs=lres rl=(list lres) ds=(list sdiag)]
+  ?~  as  [(flop out) rs (flop rl) ds]
+  =/  g  (l-x i.as e)
+  %=  $
+    as   t.as
+    out  [s.g out]
+    rl   [r.g rl]
+    ds   (weld ds ds.g)
+    rs   :*  (max lvl.rs lvl.r.g)
+             &(ok.rs ok.r.g)
+             (~(uni in lp.rs) lp.r.g)
+             (lc-uni lc.rs lc.r.g)
+             (ac-uni ac.rs ac.r.g)
+             (~(uni in ap.rs) ap.r.g)
+         ==
+  ==
+::
+++  l-substin
+  ::  $SubstIn levelCheck: level = body's, raised by the substituting
+  ::  expression's level for each parameter appearing in the body's
+  ::  level params; sets mapped through the substitution (getSubLCSet
+  ::  with the constant-module simplification; see compatibility.md)
+  |=  [s=sem e=lenv]
+  ^-  [s=sem r=lres ds=(list sdiag)]
+  ?>  ?=(%apply -.s)
+  =/  nsubs  (lent ubound.s)
+  =/  nms  (turn ubound.s |=(b=sbind name.b))
+  =/  gsub  (l-args (scag nsubs args.s) e)
+  =/  bl  (slag nsubs args.s)
+  ?~  bl
+    [s rs.gsub ds.gsub]
+  =/  gb  (l-x i.bl e)
+  ::  which substituted parameter (by index) a body key matches
+  =/  sub-idx
+    |=  k=lkey
+    ^-  (unit @ud)
+    ?.  =('' own.k)  ~
+    =/  i  0
+    =/  nl  nms
+    |-  ^-  (unit @ud)
+    ?~  nl  ~
+    ?:(=(name.k i.nl) `i $(nl t.nl, i +(i)))
+  =/  sub-r
+    |=  i=@ud
+    ^-  lres
+    ?:((gte i (lent rl.gsub)) lres-nil (snag i rl.gsub))
+  =/  lvl
+    =/  acc  lvl.r.gb
+    =/  i  0
+    =/  nl  nms
+    |-  ^-  @ud
+    ?~  nl  acc
+    =/  hit
+      ?|  (~(has in lp.r.gb) ['' i.nl %constant])
+          (~(has in lp.r.gb) ['' i.nl %variable])
+      ==
+    $(nl t.nl, i +(i), acc ?:(hit (max acc lvl:(sub-r i)) acc))
+  =/  lp2
+    =/  acc  `(set lkey)`~
+    =/  ps  ~(tap in lp.r.gb)
+    |-  ^-  (set lkey)
+    ?~  ps  acc
+    =/  si  (sub-idx i.ps)
+    %=  $
+      ps   t.ps
+      acc  ?~(si (~(put in acc) i.ps) (~(uni in acc) lp:(sub-r u.si)))
+    ==
+  =/  lc2
+    =/  acc  `(map lkey @ud)`~
+    =/  ps  ~(tap by lc.r.gb)
+    |-  ^-  (map lkey @ud)
+    ?~  ps  acc
+    =/  si  (sub-idx -.i.ps)
+    ?~  si  $(ps t.ps, acc (lc-put acc i.ps))
+    =/  acc2
+      =/  qs  ~(tap in lp:(sub-r u.si))
+      |-  ^-  (map lkey @ud)
+      ?~  qs  acc
+      $(qs t.qs, acc (lc-put acc i.qs +.i.ps))
+    $(ps t.ps, acc acc2)
+  =/  ac2
+    =/  acc  `(map [k=lkey i=@ud] @ud)`~
+    =/  ps  ~(tap by ac.r.gb)
+    |-  ^-  (map [k=lkey i=@ud] @ud)
+    ?~  ps  acc
+    =/  kk  `[k=lkey i=@ud]`-.i.ps
+    ?^  (sub-idx k.kk)  $(ps t.ps)
+    $(ps t.ps, acc (ac-put acc i.ps))
+  =/  ap2
+    =/  acc  `(set [op=lkey i=@ud par=lkey])`~
+    =/  ps  ~(tap in ap.r.gb)
+    |-  ^-  (set [op=lkey i=@ud par=lkey])
+    ?~  ps  acc
+    ?:  ?|(?=(^ (sub-idx op.i.ps)) ?=(^ (sub-idx par.i.ps)))
+      $(ps t.ps)
+    $(ps t.ps, acc (~(put in acc) i.ps))
+  :*  s(lvl lvl, args (weld out.gsub ~[s.gb]))
+      [lvl &(ok.rs.gsub ok.r.gb) lp2 lc2 ac2 ap2]
+      (weld ds.gsub ds.gb)
+  ==
+::
+++  lp-constrain
+  ::  constrain every parameter in ps to level <= v
+  |=  [m=(map lkey @ud) ps=(set lkey) v=@ud]
+  ^-  (map lkey @ud)
+  =/  pl  ~(tap in ps)
+  |-  ^-  (map lkey @ud)
+  ?~  pl  m
+  $(pl t.pl, m (lc-put m i.pl v))
+::
+++  sem-at
+  |=  [s=sem d=sspan]
+  ^-  sspan
+  ?-  -.s
+    %apply    at.s
+    %letin    at.s
+    %lit      at.s
+    %atref    at.s
+    %nullodn  d
+  ==
+::
+++  oparg-param
+  ::  the scope key and arity when a node is a $OpArg referencing a
+  ::  formal parameter
+  |=  [s=sem e=lenv]
+  ^-  (unit [key=lkey ary=@ud])
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('$OpArg' name.op.s)  ~
+  ?.  ?=(%formal-param kind.op.s)  ~
+  =/  nm  ?~(ubound.s '' name.i.ubound.s)
+  =/  ary=@ud
+    ?~  args.s  0
+    ?.  ?=(%lit -.i.args.s)  0
+    (rash val.i.args.s dem)
+  `[(scope-key nm %formal-param e) ary]
+::
+++  l-apply-def
+  ::  OpApplNode.levelCheck for an applied definition or builtin:
+  ::  bound-variable scoping, per-argument maximum-level checks (4205),
+  ::  higher-order checks (4272/4273), range checks (4315), level and
+  ::  level-data computation, then the node-specific temporal checks
+  ::  (4310-4314). The node's levelCorrect flag is derived from whether
+  ::  any check here emitted (Java also clears it on suppressed checks;
+  ::  that distinction is unobservable in the dump)
+  |=  [s=sem e=lenv]
+  ^-  [s=sem r=lres ds=(list sdiag)]
+  ?>  ?=(%apply -.s)
+  =/  opn  name.op.s
+  =/  ol  (l-resolve opn kind.op.s e)
+  ::  bound identifiers scope over the arguments, not the ranges
+  =/  bkeys=(list [nm=@t key=lkey])
+    %+  weld
+      ^-  (list [nm=@t key=lkey])
+      (turn ubound.s |=(b=sbind [name.b `lkey`['b' name.b %formal-param]]))
+    ^-  (list [nm=@t key=lkey])
+    %-  zing
+    %+  turn  bound.s
+    |=  g=sem-bound
+    ^-  (list [nm=@t key=lkey])
+    (turn vars.g |=(b=sbind [name.b `lkey`['b' name.b %formal-param]]))
+  =/  bset
+    =/  acc  *(set lkey)
+    =/  bl  bkeys
+    |-  ^-  (set lkey)
+    ?~  bl  acc
+    $(bl t.bl, acc (~(put in acc) key.i.bl))
+  =/  e2
+    %_  e
+        scope
+      =/  acc  scope.e
+      =/  bl  bkeys
+      |-  ^-  (map @t lkey)
+      ?~  bl  acc
+      $(bl t.bl, acc (~(put by acc) nm.i.bl key.i.bl))
+    ==
+  ::  ranges first (checked outside the binding scope)
+  =/  granges
+    =|  gout=(list sem-bound)
+    =|  grl=(list (unit lres))
+    =|  gds=(list sdiag)
+    =/  gl  bound.s
+    |-  ^-  [gout=(list sem-bound) grl=(list (unit lres)) gds=(list sdiag)]
+    ?~  gl  [(flop gout) (flop grl) gds]
+    ?~  range.i.gl
+      $(gl t.gl, gout [i.gl gout], grl [~ grl])
+    =/  g  (l-x u.range.i.gl e)
+    %=  $
+      gl    t.gl
+      gout  [i.gl(range `s.g) gout]
+      grl   [`r.g grl]
+      gds   (weld gds ds.g)
+    ==
+  =/  ga  (l-args args.s e2)
+  =/  ds0  (weld gds.granges ds.ga)
+  ::  per-argument checks in order: 4205 then, for operator arguments,
+  ::  4272 and the opLevelCond co-argument 4273
+  =/  dsarg
+    =|  acc=(list sdiag)
+    =/  i  0
+    =/  al  rl.ga
+    =/  ao  out.ga
+    |-  ^-  (list sdiag)
+    ?~  al  acc
+    ?~  ao  acc
+    =/  d1=(list sdiag)
+      ?.  ?&((gth lvl.i.al (mxl-of ol i)) ok.ol ok.i.al)  ~
+      :_  ~
+      %^  derr  4.205  at.s
+      %+  weld  "Level error in applying operator {(trip opn)}:\0a"
+      "The level of argument {(a-co +(i))} exceeds the maximum level allowed by the operator."
+    =/  od  (oparg-def i.ao e)
+    =/  d2=(list sdiag)
+      ?~  od  ~
+      =/  jn  ary.ol.u.od
+      =|  dj=(list sdiag)
+      =/  j  0
+      |-  ^-  (list sdiag)
+      ?:  (gte j jn)  dj
+      ?.  ?&  (lth (mxl-of ol.u.od j) (mnmx-of ol i j))
+              ok.ol  ok.i.al
+          ==
+        $(j +(j))
+      %=  $
+        j   +(j)
+        dj  %+  weld  dj
+            :_  ~
+            %^  derr  4.272  at.s
+            ;:  weld
+              "Level error in applying operator {(trip opn)}:\0a"
+              "The permitted level of argument {(a-co +(j))}"
+              " of the operator argument {(a-co +(i))}"
+              " \0amust be at least {(a-co (mnmx-of ol i j))}."
+            ==
+      ==
+    =/  d3=(list sdiag)
+      ?~  od  ~
+      =/  kn  ary.ol.u.od
+      =|  dj=(list sdiag)
+      =/  j  0
+      =/  jl  rl.ga
+      |-  ^-  (list sdiag)
+      ?~  jl  dj
+      =/  dk=(list sdiag)
+        =|  ac2=(list sdiag)
+        =/  k  0
+        |-  ^-  (list sdiag)
+        ?:  (gte k kn)  ac2
+        ?.  ?&  (cond-of ol i j k)
+                (gth lvl.i.jl (mxl-of ol.u.od k))
+                ok.i.al  ok.i.jl
+            ==
+          $(k +(k))
+        %=  $
+          k    +(k)
+          ac2  %+  weld  ac2
+               :_  ~
+               %^  derr  4.273  at.s
+               %+  weld  "Level error in applying operator {(trip opn)}:\0a"
+               "The level of argument {(a-co +(j))} exceeds the maximum level allowed by the operator."
+        ==
+      $(jl t.jl, j +(j), dj (weld dj dk))
+    $(al t.al, ao t.ao, i +(i), acc :(weld acc d1 d2 d3))
+  ::  range checks: no range may exceed action level
+  =/  dsrng
+    =|  acc=(list sdiag)
+    =/  gl  gout.granges
+    =/  rl  grl.granges
+    |-  ^-  (list sdiag)
+    ?~  gl  acc
+    ?~  rl  acc
+    =/  d1=(list sdiag)
+      ?~  i.rl  ~
+      ?.  ?&((gth lvl.u.i.rl 2) ok.u.i.rl)  ~
+      =/  v1  ?~(vars.i.gl '' name.i.vars.i.gl)
+      :_  ~
+      %^  derr  4.315  at.s
+      ;:  weld
+        "Level error in applying operator {(trip opn)}:\0a"
+        "The level of the range for the bounded variable {(trip v1)}"
+        " \0aexceeds the maximum level allowed by the operator."
+      ==
+    $(gl t.gl, rl t.rl, acc (weld acc d1))
+  ::  level: the operator's, raised by weight-1 arguments and ranges
+  =/  lvl
+    =/  acc
+      =/  a2  lvl.ol
+      =/  i  0
+      =/  al  rl.ga
+      |-  ^-  @ud
+      ?~  al  a2
+      %=  $
+        al  t.al
+        i   +(i)
+        a2  ?:(=(1 (wgt-of ol i)) (max a2 lvl.i.al) a2)
+      ==
+    =/  gl  grl.granges
+    |-  ^-  @ud
+    ?~  gl  acc
+    $(gl t.gl, acc ?~(i.gl acc (max acc lvl.u.i.gl)))
+  ::  level params: operator's, weight-1 arguments', ranges', minus the
+  ::  bound identifiers
+  =/  lp
+    =/  acc
+      =/  a2  lp.ol
+      =/  i  0
+      =/  al  rl.ga
+      |-  ^-  (set lkey)
+      ?~  al  a2
+      %=  $
+        al  t.al
+        i   +(i)
+        a2  ?:(=(1 (wgt-of ol i)) (~(uni in a2) lp.i.al) a2)
+      ==
+    =/  acc
+      =/  gl  grl.granges
+      |-  ^-  (set lkey)
+      ?~  gl  acc
+      $(gl t.gl, acc ?~(i.gl acc (~(uni in acc) lp.u.i.gl)))
+    (~(dif in acc) bset)
+  ::  level constraints: operator's; arguments' (excluding constraints
+  ::  on our bound identifiers); ranges'; each argument's level params
+  ::  bounded by the operator's per-argument maximum; opLevelCond
+  ::  co-argument constraints from operator arguments
+  =/  lc
+    =/  acc
+      =/  a2  lc.ol
+      =/  al  rl.ga
+      |-  ^-  (map lkey @ud)
+      ?~  al  a2
+      =/  a3
+        =/  ps  ~(tap by lc.i.al)
+        =/  a4  a2
+        |-  ^-  (map lkey @ud)
+        ?~  ps  a4
+        ?:  (~(has in bset) -.i.ps)  $(ps t.ps)
+        $(ps t.ps, a4 (lc-put a4 i.ps))
+      $(al t.al, a2 a3)
+    =/  acc
+      =/  gl  grl.granges
+      |-  ^-  (map lkey @ud)
+      ?~  gl  acc
+      $(gl t.gl, acc ?~(i.gl acc (lc-uni acc lc.u.i.gl)))
+    =/  acc
+      =/  i  0
+      =/  al  rl.ga
+      |-  ^-  (map lkey @ud)
+      ?~  al  acc
+      $(al t.al, i +(i), acc (lp-constrain acc lp.i.al (mxl-of ol i)))
+    =/  i  0
+    =/  ao  out.ga
+    |-  ^-  (map lkey @ud)
+    ?~  ao  acc
+    =/  od  (oparg-def i.ao e)
+    ?~  od  $(ao t.ao, i +(i))
+    =/  acc2
+      =/  kn  ary.ol.u.od
+      =/  j  0
+      =/  jl  rl.ga
+      =/  a3  acc
+      |-  ^-  (map lkey @ud)
+      ?~  jl  a3
+      =/  a4
+        =/  k  0
+        =/  a5  a3
+        |-  ^-  (map lkey @ud)
+        ?:  (gte k kn)  a5
+        ?.  (cond-of ol i j k)  $(k +(k))
+        $(k +(k), a5 (lp-constrain a5 lp.i.jl (mxl-of ol.u.od k)))
+      $(jl t.jl, j +(j), a3 a4)
+    $(ao t.ao, i +(i), acc acc2)
+  ::  arg-level constraints: operator's, arguments', ranges'; a
+  ::  formal-parameter operator argument picks up minMaxLevel and
+  ::  opLevelCond constraints from this application
+  =/  ac
+    =/  acc
+      =/  a2  ac.ol
+      =/  al  rl.ga
+      |-  ^-  (map [k=lkey i=@ud] @ud)
+      ?~  al  a2
+      $(al t.al, a2 (ac-uni a2 ac.i.al))
+    =/  acc
+      =/  gl  grl.granges
+      |-  ^-  (map [k=lkey i=@ud] @ud)
+      ?~  gl  acc
+      $(gl t.gl, acc ?~(i.gl acc (ac-uni acc ac.u.i.gl)))
+    =/  i  0
+    =/  ao  out.ga
+    |-  ^-  (map [k=lkey i=@ud] @ud)
+    ?~  ao  acc
+    =/  pk  (oparg-param i.ao e)
+    ?~  pk  $(ao t.ao, i +(i))
+    =/  acc2
+      =/  j  0
+      =/  a3  acc
+      |-  ^-  (map [k=lkey i=@ud] @ud)
+      ?:  (gte j ary.u.pk)  a3
+      $(j +(j), a3 (ac-put a3 [key.u.pk j] (mnmx-of ol i j)))
+    =/  acc3
+      =/  j  0
+      =/  jl  rl.ga
+      =/  a3  acc2
+      |-  ^-  (map [k=lkey i=@ud] @ud)
+      ?~  jl  a3
+      =/  a4
+        =/  k  0
+        =/  a5  a3
+        |-  ^-  (map [k=lkey i=@ud] @ud)
+        ?:  (gte k ary.u.pk)  a5
+        ?.  (cond-of ol i j k)  $(k +(k))
+        $(k +(k), a5 (ac-put a5 [key.u.pk k] lvl.i.jl))
+      $(jl t.jl, j +(j), a3 a4)
+    $(ao t.ao, i +(i), acc acc3)
+  ::  arg-level params: arguments' (entries whose param is one of our
+  ::  bound identifiers dropped), ranges', level-param appearances in
+  ::  co-arguments of formal-parameter operator arguments; entries of
+  ::  the applied operator not about its own parameters pass through
+  =/  ap
+    =/  acc
+      =/  aps  ~(tap in ap.ol)
+      =/  a2  *(set [op=lkey i=@ud par=lkey])
+      |-  ^-  (set [op=lkey i=@ud par=lkey])
+      ?~  aps  a2
+      =/  own-op
+        =/  pl  pars.ol
+        |-  ^-  ?
+        ?~  pl  |
+        ?:(=(op.i.aps i.pl) & $(pl t.pl))
+      $(aps t.aps, a2 ?:(own-op a2 (~(put in a2) i.aps)))
+    =/  acc
+      =/  al  rl.ga
+      |-  ^-  (set [op=lkey i=@ud par=lkey])
+      ?~  al  acc
+      =/  a3
+        =/  ps  ~(tap in ap.i.al)
+        =/  a4  acc
+        |-  ^-  (set [op=lkey i=@ud par=lkey])
+        ?~  ps  a4
+        ?:  (~(has in bset) par.i.ps)  $(ps t.ps)
+        $(ps t.ps, a4 (~(put in a4) i.ps))
+      $(al t.al, acc a3)
+    =/  acc
+      =/  gl  grl.granges
+      |-  ^-  (set [op=lkey i=@ud par=lkey])
+      ?~  gl  acc
+      $(gl t.gl, acc ?~(i.gl acc (~(uni in acc) ap.u.i.gl)))
+    =/  i  0
+    =/  ao  out.ga
+    |-  ^-  (set [op=lkey i=@ud par=lkey])
+    ?~  ao  acc
+    =/  pk  (oparg-param i.ao e)
+    ?~  pk  $(ao t.ao, i +(i))
+    =/  acc2
+      =/  j  0
+      =/  jl  rl.ga
+      =/  a3  acc
+      |-  ^-  (set [op=lkey i=@ud par=lkey])
+      ?~  jl  a3
+      =/  a4
+        =/  k  0
+        =/  a5  a3
+        |-  ^-  (set [op=lkey i=@ud par=lkey])
+        ?:  (gte k ary.u.pk)  a5
+        ?.  (cond-of ol i j k)  $(k +(k))
+        =/  a6
+          =/  ps  ~(tap in lp.i.jl)
+          =/  a7  a5
+          |-  ^-  (set [op=lkey i=@ud par=lkey])
+          ?~  ps  a7
+          $(ps t.ps, a7 (~(put in a7) [key.u.pk k i.ps]))
+        $(k +(k), a5 a6)
+      $(jl t.jl, j +(j), a3 a4)
+    $(ao t.ao, i +(i), acc acc2)
+  ::  node-specific temporal-operator checks
+  =/  arg-lvl
+    |=  i=@ud
+    ^-  @ud
+    ?:((gte i (lent rl.ga)) 0 lvl:(snag i rl.ga))
+  =/  arg-is-not
+    ::  argument i is an apply of an operator other than nm
+    |=  [i=@ud nm=@t]
+    ^-  ?
+    ?:  (gte i (lent out.ga))  |
+    =/  a  (snag i out.ga)
+    ?.  ?=(%apply -.a)  |
+    !=(nm name.op.a)
+  =/  dstmp
+    ^-  (list sdiag)
+    ?:  ?&(=('[]' opn) =(2 (arg-lvl 0)) (arg-is-not 0 '$SquareAct'))
+      [(derr 4.310 at.s "[] followed by action not of form [A]_v.") ~]
+    ?:  ?&(=('<>' opn) =(2 (arg-lvl 0)) (arg-is-not 0 '$AngleAct'))
+      [(derr 4.311 at.s "<> followed by action not of form <<A>>_v.") ~]
+    ?:  ?&  |(=('~>' opn) =('-+->' opn))
+            |(=(2 (arg-lvl 0)) =(2 (arg-lvl 1)))
+        ==
+      :_  ~
+      %^  derr  4.312  at.s
+      "Action used where only temporal formula or state predicate allowed."
+    ?:  ?&  ?|  =('\\land' opn)  =('\\lor' opn)  =('=>' opn)
+                =('\\equiv' opn)  =('$ConjList' opn)  =('$DisjList' opn)
+            ==
+            (lien rl.ga |=(r=lres =(3 lvl.r)))
+            (lien rl.ga |=(r=lres =(2 lvl.r)))
+        ==
+      =/  pop
+        ?:  =('$ConjList' opn)  "Conjunction list"
+        ?:  =('$DisjList' opn)  "Disjunction list"
+        (trip opn)
+      :_  ~
+      %^  derr  4.313  at.s
+      "{pop} has both temporal formula and action as arguments."
+    ~
+  =/  dsquant
+    ^-  (list sdiag)
+    ?.  ?&  =(3 lvl)
+            |(=('$BoundedExists' opn) =('$BoundedForall' opn))
+        ==
+      ~
+    =|  acc=(list sdiag)
+    =/  gl  gout.granges
+    =/  rl  grl.granges
+    |-  ^-  (list sdiag)
+    ?~  gl  acc
+    ?~  rl  acc
+    =/  d1=(list sdiag)
+      ?~  i.rl  ~
+      ?.  =(2 lvl.u.i.rl)  ~
+      =/  rat=sspan
+        ?~(range.i.gl at.s (sem-at u.range.i.gl at.s))
+      [(derr 4.314 rat "Action-level bound of quantified temporal formula.") ~]
+    $(gl t.gl, rl t.rl, acc (weld acc d1))
+  =/  dsall  :(weld ds0 dsarg dsrng dstmp dsquant)
+  =/  rngok
+    =/  gl  grl.granges
+    |-  ^-  ?
+    ?~  gl  &
+    ?.  ?~(i.gl & ok.u.i.gl)  |
+    $(gl t.gl)
+  =/  nodeok
+    ?&  ok.ol  ok.rs.ga  rngok
+        =(~ dsarg)  =(~ dsrng)  =(~ dstmp)  =(~ dsquant)
+    ==
+  :*  s(lvl lvl, bound gout.granges, args out.ga)
+      [lvl nodeok lp lc ac ap]
+      dsall
+  ==
+::
+++  def-pfx
+  ::  the instance prefix of an instanced definition name (I!D -> 'I!');
+  ::  inherits the enclosing prefix when the name has none
+  |=  [nm=@t d=@t]
+  ^-  @t
+  =/  raw  (trip nm)
+  =/  idx
+    =/  fl  (flop raw)
+    =/  i  0
+    |-  ^-  (unit @ud)
+    ?~  fl  ~
+    ?:(=('!' i.fl) `i $(fl t.fl, i +(i)))
+  ?~  idx  d
+  (crip (scag (sub (lent raw) u.idx) raw))
+::
+++  oplev-fresh
+  ::  a definition's initial level data (least restrictive)
+  |=  [own=@t df=sem-def]
+  ^-  oplev
+  :*  0  &  arity.df  |
+      (reap arity.df 3)
+      (reap arity.df 0)
+      (turn params.df |=(p=spar (reap arity.p 0)))
+      %+  turn  params.df
+      |=  p=spar
+      %+  turn  params.df
+      |=(q=spar (reap arity.p |))
+      (turn params.df |=(p=spar `lkey`[own name.p %formal-param]))
+      ~  ~  ~  ~
+  ==
+::
+++  rec-seed
+  ::  a RECURSIVE operator's seeded level data (ModuleNode: maxLevels
+  ::  ActionLevel, weights 1)
+  |=  [own=@t df=sem-def]
+  ^-  oplev
+  =/  base  (oplev-fresh own df)
+  base(maxl (reap arity.df 2), wgts (reap arity.df 1))
+::
+++  l-def
+  ::  OpDefNode.levelCheck: check the body with the formal parameters
+  ::  in scope, then derive the operator's level data. Monotonic across
+  ::  recursive-section iterations: level and weights never shrink,
+  ::  maxLevels never grows
+  |=  [df=sem-def e=lenv prev=(unit oplev)]
+  ^-  [df=sem-def ol=oplev eo=lenv ds=(list sdiag)]
+  =/  own  name.df
+  =/  ol0  ?^(prev u.prev (oplev-fresh own df))
+  ?~  body.df
+    [df ol0 e(ops (~(put by ops.e) own ol0)) ~]
+  =/  pkeys  (turn params.df |=(p=spar `lkey`[own name.p %formal-param]))
+  =/  pset
+    =/  acc  *(set lkey)
+    =/  pl  pkeys
+    |-  ^-  (set lkey)
+    ?~  pl  acc
+    $(pl t.pl, acc (~(put in acc) i.pl))
+  =/  e2
+    %_  e
+        pfx  (def-pfx own pfx.e)
+        scope
+      =/  acc  scope.e
+      =/  pl  params.df
+      |-  ^-  (map @t lkey)
+      ?~  pl  acc
+      $(pl t.pl, acc (~(put by acc) name.i.pl [own name.i.pl %formal-param]))
+    ==
+  =/  gb  (l-x u.body.df e2)
+  =/  lvl  (max lvl.ol0 lvl.r.gb)
+  =/  maxl
+    =/  i  0
+    |-  ^-  (list @ud)
+    ?:  (gte i arity.df)  ~
+    :_  $(i +(i))
+    %+  min  (at-or maxl.ol0 i 3)
+    ?:  (gte i (lent pkeys))  3
+    (~(gut by lc.r.gb) (snag i pkeys) 3)
+  =/  wgts
+    =/  i  0
+    |-  ^-  (list @ud)
+    ?:  (gte i arity.df)  ~
+    :_  $(i +(i))
+    %+  max  (at-or wgts.ol0 i 0)
+    ?:  (gte i (lent pkeys))  0
+    ?:((~(has in lp.r.gb) (snag i pkeys)) 1 0)
+  =/  mnmx
+    =/  i  0
+    =/  pl  params.df
+    |-  ^-  (list (list @ud))
+    ?~  pl  ~
+    :_  $(pl t.pl, i +(i))
+    =/  ki  `lkey`[own name.i.pl %formal-param]
+    =/  j  0
+    |-  ^-  (list @ud)
+    ?:  (gte j arity.i.pl)  ~
+    [(~(gut by ac.r.gb) [ki j] 0) $(j +(j))]
+  =/  cond
+    =/  pl  params.df
+    |-  ^-  (list (list (list ?)))
+    ?~  pl  ~
+    :_  $(pl t.pl)
+    =/  ki  `lkey`[own name.i.pl %formal-param]
+    =/  kn  arity.i.pl
+    =/  ql  params.df
+    |-  ^-  (list (list ?))
+    ?~  ql  ~
+    :_  $(ql t.ql)
+    =/  kj  `lkey`[own name.i.ql %formal-param]
+    =/  k  0
+    |-  ^-  (list ?)
+    ?:  (gte k kn)  ~
+    [(~(has in ap.r.gb) [ki k kj]) $(k +(k))]
+  =/  lp2  (~(uni in lp.ol0) (~(dif in lp.r.gb) pset))
+  =/  lc2
+    =/  acc  *(map lkey @ud)
+    =/  ps  ~(tap by lc.r.gb)
+    |-  ^-  (map lkey @ud)
+    ?~  ps  acc
+    ?:  (~(has in pset) -.i.ps)  $(ps t.ps)
+    $(ps t.ps, acc (lc-put acc i.ps))
+  =/  ac2
+    =/  acc  *(map [k=lkey i=@ud] @ud)
+    =/  ps  ~(tap by ac.r.gb)
+    |-  ^-  (map [k=lkey i=@ud] @ud)
+    ?~  ps  acc
+    =/  kk  `[k=lkey i=@ud]`-.i.ps
+    ?:  (~(has in pset) k.kk)  $(ps t.ps)
+    $(ps t.ps, acc (ac-put acc i.ps))
+  =/  ap2
+    %-  ~(uni in ap.ol0)
+    =/  acc  *(set [op=lkey i=@ud par=lkey])
+    =/  ps  ~(tap in ap.r.gb)
+    |-  ^-  (set [op=lkey i=@ud par=lkey])
+    ?~  ps  acc
+    ?:  ?&((~(has in pset) op.i.ps) (~(has in pset) par.i.ps))
+      $(ps t.ps)
+    $(ps t.ps, acc (~(put in acc) i.ps))
+  =/  ol=oplev
+    [lvl ok.r.gb arity.df | maxl wgts mnmx cond pkeys lp2 lc2 ac2 ap2]
+  :*  df(lvl lvl, body `s.gb)
+      ol
+      e(ops (~(put by ops.e) own ol))
+      ds.gb
+  ==
+::
+++  l-thm
+  ::  a theorem/assumption/thmdef body (ThmOrAssumpDefNode levelCheck)
+  |=  [th=sem-thm e=lenv]
+  ^-  [th=sem-thm r=lres ds=(list sdiag)]
+  ?~  body.th  [th lres-nil ~]
+  =/  gb  (l-x u.body.th e)
+  [th(lvl lvl.r.gb, body `s.gb) r.gb ds.gb]
+::
+++  l-inst
+  ::  InstanceNode.levelCheck substitution checks: level-check the
+  ::  instanced module for its constancy and module-level constraints,
+  ::  then verify each substitution (both 4245 forms). The 4246/4247
+  ::  operator-argument checks and non-Leibniz 4244 are not ported
+  |=  [it=sem-inst e=lenv ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (list sdiag)
+  =/  bt  (~(get by mods) mod.it)
+  ?~  bt  ~
+  =/  bfc  (full-ctx tree.u.bt ctxs)
+  =/  bres  (l-module-core (gen-module tree.u.bt bfc ctxs mods) bfc ctxs mods)
+  =|  ds=(list sdiag)
+  =/  sl  subs.it
+  |-  ^-  (list sdiag)
+  ?~  sl  ds
+  ?~  expr.i.sl  $(sl t.sl)
+  =/  ge  (l-x u.expr.i.sl e)
+  =/  plvl  (kind-lvl pkind.i.sl)
+  =/  d1=(list sdiag)
+    ?.  ?&(!const.ml.bres (gth lvl.r.ge plvl))  ~
+    :_  ~
+    %^  derr  4.245  at.it
+    ;:  weld
+      "Level error in instantiating module '{(trip mod.it)}':\0a"
+      "The level of the expression or operator substituted for "
+      "'{(trip param.i.sl)}' \0amust be at most {(a-co plvl)}."
+    ==
+  =/  d2=(list sdiag)
+    =/  pl2  (~(get by lc.ml.bres) ['' param.i.sl pkind.i.sl])
+    ?~  pl2  ~
+    ?.  (gth lvl.r.ge u.pl2)  ~
+    :_  ~
+    %^  derr  4.245  at.it
+    ;:  weld
+      "Level error in instantiating module '{(trip mod.it)}':\0a"
+      "The level of the expression or operator substituted for "
+      "'{(trip param.i.sl)}' \0amust be at most {(a-co u.pl2)}."
+    ==
+  $(sl t.sl, ds :(weld ds ds.ge d1 d2))
+::
+++  dedup-diags
+  ::  Errors.addMessage is idempotent on [code location message]
+  |=  ds=(list sdiag)
+  ^-  (list sdiag)
+  =|  seen=(set [@ud sspan @t])
+  =|  out=(list sdiag)
+  |-  ^-  (list sdiag)
+  ?~  ds  (flop out)
+  =/  k  [code.i.ds at.i.ds msg.i.ds]
+  ?:  (~(has in seen) k)  $(ds t.ds)
+  $(ds t.ds, seen (~(put in seen) k), out [i.ds out])
+::
+++  span-key
+  ::  source-order sort key for top-level statements
+  |=  sp=sspan
+  ^-  [@ud @ud]
+  ?~(sp [0 0] [line.from.u.sp col.from.u.sp])
+::
+++  level-module
+  ::  the level-checking pass over a generated module (no-op, with
+  ::  L-1 masking preserved, when generation reported errors)
+  |=  [m=sem-module c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  sem-module
+  m:(l-module-core m c ctxs mods)
+::
+++  l-module-core
+  ::  ModuleNode.levelCheck: recursive sections (two-iteration
+  ::  fixpoint), remaining definitions, theorem definitions, then
+  ::  top-level assumptions/theorems/instances in source order;
+  ::  followed by the linter when nothing errored
+  |=  [m=sem-module c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  [m=sem-module ml=mlev]
+  ?:  (lien diags.m |=(d=sdiag =(%error sev.d)))
+    [m [& ~]]
+  =/  e=lenv
+    :*  ~
+        =/  acc  *(map @t lkey)
+        =/  acc
+          =/  cl  consts.m
+          |-  ^-  (map @t lkey)
+          ?~  cl  acc
+          $(cl t.cl, acc (~(put by acc) name.i.cl ['' name.i.cl %constant]))
+        =/  vl  vars.m
+        |-  ^-  (map @t lkey)
+        ?~  vl  acc
+        $(vl t.vl, acc (~(put by acc) name.i.vl ['' name.i.vl %variable]))
+        ''
+        c
+    ==
+  ::  definitions
+  =/  dwalk
+    =|  out=(list sem-def)
+    =|  ds=(list sdiag)
+    =/  eo  e
+    =/  dl  defs.m
+    =/  secs  recsecs.m
+    |-  ^-  [(list sem-def) lenv (list sdiag)]
+    ?~  dl  [(flop out) eo ds]
+    =/  insec
+      ?~  secs  |
+      ?~  names.i.secs  |
+      =(i.names.i.secs name.i.dl)
+    ?.  insec
+      =/  gd  (l-def i.dl eo ~)
+      $(dl t.dl, out [df.gd out], eo eo.gd, ds (weld ds ds.gd))
+    ?>  ?=(^ secs)
+    =/  n  (lent names.i.secs)
+    =/  members  (scag n `(list sem-def)`dl)
+    =/  rest  (slag n `(list sem-def)`dl)
+    =/  recset
+      =/  acc  *(set @t)
+      =/  rl  recs.i.secs
+      |-  ^-  (set @t)
+      ?~  rl  acc
+      $(rl t.rl, acc (~(put in acc) i.rl))
+    ::  seed the RECURSIVE members so mutual references resolve
+    =/  eo2
+      =/  acc  eo
+      =/  ml  members
+      |-  ^-  lenv
+      ?~  ml  acc
+      ?.  (~(has in recset) name.i.ml)  $(ml t.ml)
+      %=  $
+        ml   t.ml
+        acc  acc(ops (~(put by ops.acc) name.i.ml (rec-seed name.i.ml i.ml)))
+      ==
+    ::  iteration 1, with the primed-parameter check per RECURSIVE
+    ::  member right after its check
+    =/  it1
+      =|  o1=(list sem-def)
+      =|  d1=(list sdiag)
+      =/  ml  members
+      =/  ei  eo2
+      |-  ^-  [(list sem-def) lenv (list sdiag)]
+      ?~  ml  [(flop o1) ei d1]
+      =/  isrec  (~(has in recset) name.i.ml)
+      =/  prev  ?:(isrec (~(get by ops.ei) name.i.ml) ~)
+      =/  gd  (l-def i.ml ei prev)
+      =/  d2=(list sdiag)
+        ?.  isrec  ~
+        =/  j  0
+        |-  ^-  (list sdiag)
+        ?:  (gte j arity.df.gd)  ~
+        ?:  (gte (at-or maxl.ol.gd j 3) 2)  $(j +(j))
+        :_  $(j +(j))
+        %^  derr  4.290  at.df.gd
+        %+  weld  "Argument {(a-co +(j))} of recursive operator "
+        "{(trip name.df.gd)} is primed"
+      $(ml t.ml, o1 [df.gd o1], ei eo.gd, d1 :(weld d1 ds.gd d2))
+    =/  [m1=(list sem-def) e1=lenv dit1=(list sdiag)]  it1
+    ::  fixpoint raise: every member's level and level params rise to
+    ::  the section's RECURSIVE maxima
+    =/  maxrec
+      =/  acc  0
+      =/  ml  m1
+      |-  ^-  @ud
+      ?~  ml  acc
+      ?.  (~(has in recset) name.i.ml)  $(ml t.ml)
+      =/  o  (~(get by ops.e1) name.i.ml)
+      $(ml t.ml, acc ?~(o acc (max acc lvl.u.o)))
+    =/  reclp
+      =/  acc  *(set lkey)
+      =/  ml  m1
+      |-  ^-  (set lkey)
+      ?~  ml  acc
+      ?.  (~(has in recset) name.i.ml)  $(ml t.ml)
+      =/  o  (~(get by ops.e1) name.i.ml)
+      $(ml t.ml, acc ?~(o acc (~(uni in acc) lp.u.o)))
+    =/  e2
+      =/  acc  e1
+      =/  ml  m1
+      |-  ^-  lenv
+      ?~  ml  acc
+      =/  o  (~(get by ops.acc) name.i.ml)
+      ?~  o  $(ml t.ml)
+      =/  o2  u.o(lvl (max lvl.u.o maxrec), lp (~(uni in lp.u.o) reclp))
+      $(ml t.ml, acc acc(ops (~(put by ops.acc) name.i.ml o2)))
+    ::  iteration 2
+    =/  it2
+      =|  o1=(list sem-def)
+      =|  d1=(list sdiag)
+      =/  ml  m1
+      =/  ei  e2
+      |-  ^-  [(list sem-def) lenv (list sdiag)]
+      ?~  ml  [(flop o1) ei d1]
+      =/  gd  (l-def i.ml ei (~(get by ops.ei) name.i.ml))
+      $(ml t.ml, o1 [df.gd o1], ei eo.gd, d1 (weld d1 ds.gd))
+    =/  [m2=(list sem-def) e3=lenv dit2=(list sdiag)]  it2
+    %=  $
+      dl    rest
+      secs  t.secs
+      out   (weld (flop m2) out)
+      eo    e3
+      ds    :(weld ds dit1 dit2)
+    ==
+  =/  [wdefs=(list sem-def) ed=lenv dds=(list sdiag)]  dwalk
+  ::  theorem definitions (checked before the top-level statements)
+  =/  twalk
+    =|  out=(list sem-thm)
+    =|  ds=(list sdiag)
+    =/  eo  ed
+    =/  tl  thmdefs.m
+    |-  ^-  [(list sem-thm) lenv (list sdiag)]
+    ?~  tl  [(flop out) eo ds]
+    =/  gt  (l-thm i.tl eo)
+    =/  eo2
+      ?~  name.th.gt  eo
+      %_  eo
+          ops
+        %+  ~(put by ops.eo)  u.name.th.gt
+        `oplev`[lvl.r.gt ok.r.gt 0 | ~ ~ ~ ~ ~ lp.r.gt lc.r.gt ac.r.gt ap.r.gt]
+      ==
+    $(tl t.tl, out [th.gt out], eo eo2, ds (weld ds ds.gt))
+  =/  [wthm=(list sem-thm) et=lenv tds=(list sdiag)]  twalk
+  ::  top-level statements in source order
+  =/  stmts
+    ^-  (list [key=[@ud @ud] tag=?(%a %t %i) idx=@ud])
+    =/  raw
+      ;:  weld
+        =/  i  0
+        =/  al  assumes.m
+        |-  ^-  (list [key=[@ud @ud] tag=?(%a %t %i) idx=@ud])
+        ?~  al  ~
+        [[(span-key at.i.al) %a i] $(al t.al, i +(i))]
+      ::
+        =/  i  0
+        =/  al  theorems.m
+        |-  ^-  (list [key=[@ud @ud] tag=?(%a %t %i) idx=@ud])
+        ?~  al  ~
+        [[(span-key at.i.al) %t i] $(al t.al, i +(i))]
+      ::
+        =/  i  0
+        =/  al  instances.m
+        |-  ^-  (list [key=[@ud @ud] tag=?(%a %t %i) idx=@ud])
+        ?~  al  ~
+        [[(span-key at.i.al) %i i] $(al t.al, i +(i))]
+      ==
+    %+  sort  raw
+    |=  $:  a=[key=[@ud @ud] tag=?(%a %t %i) idx=@ud]
+            b=[key=[@ud @ud] tag=?(%a %t %i) idx=@ud]
+        ==
+    ?:  =(-.key.a -.key.b)  (lth +.key.a +.key.b)
+    (lth -.key.a -.key.b)
+  =/  tops
+    =/  wass  assumes.m
+    =/  wtheo  theorems.m
+    =|  ds=(list sdiag)
+    =|  arl=(list lres)
+    =|  trl=(list lres)
+    =/  sl  stmts
+    |-  ^-  $:  wass=(list sem-thm)  wtheo=(list sem-thm)
+                arl=(list lres)  trl=(list lres)  pds=(list sdiag)
+            ==
+    ?~  sl  [wass wtheo (flop arl) (flop trl) ds]
+    ?-    tag.i.sl
+        %a
+      =/  th  (snag idx.i.sl wass)
+      =/  gt  (l-thm th et)
+      =/  d1=(list sdiag)
+        ?:  =(0 lvl.r.gt)  ~
+        :_  ~
+        %^  derr  4.206  at.th.gt
+        %+  weld  "Level error: assumptions must be level 0 (Constant), "
+        "\0abut this one has level {(a-co lvl.r.gt)}."
+      %=  $
+        sl    t.sl
+        wass  (snap wass idx.i.sl th.gt)
+        arl   [r.gt arl]
+        ds    :(weld ds ds.gt d1)
+      ==
+    ::
+        %t
+      =/  th  (snag idx.i.sl wtheo)
+      =/  gt  (l-thm th et)
+      %=  $
+        sl     t.sl
+        wtheo  (snap wtheo idx.i.sl th.gt)
+        trl    [r.gt trl]
+        ds     (weld ds ds.gt)
+      ==
+    ::
+        %i
+      =/  it  (snag idx.i.sl instances.m)
+      $(sl t.sl, ds (weld ds (l-inst it et ctxs mods)))
+    ==
+  =/  tp  tops
+  =/  wass  wass.tp
+  =/  wtheo  wtheo.tp
+  =/  arl  arl.tp
+  =/  trl  trl.tp
+  =/  pds  pds.tp
+  ::  module constancy and module-level constraints (consumed by
+  ::  INSTANCE checking when this module is instanced)
+  =/  const
+    ?&  =(~ vars.m)
+        %+  levy  wdefs
+        |=(df=sem-def =(0 lvl.df))
+        %+  levy  wtheo
+        |=(th=sem-thm =(0 lvl.th))
+    ==
+  =/  mlc
+    =/  acc  *(map lkey @ud)
+    =/  acc
+      ?:  const  acc
+      =/  cl  consts.m
+      |-  ^-  (map lkey @ud)
+      ?~  cl  acc
+      $(cl t.cl, acc (lc-put acc ['' name.i.cl %constant] 0))
+    =/  acc
+      =/  dl  wdefs
+      |-  ^-  (map lkey @ud)
+      ?~  dl  acc
+      =/  o  (~(get by ops.ed) name.i.dl)
+      $(dl t.dl, acc ?~(o acc (lc-uni acc lc.u.o)))
+    ::  assumptions constrain their constants below temporal level
+    ::  (addTemporalLevelConstraintToConstants) and contribute their own
+    ::  constraint sets, as do theorems
+    =/  acc
+      =/  al  arl
+      |-  ^-  (map lkey @ud)
+      ?~  al  acc
+      =/  acc2
+        =/  ps  ~(tap in lp.i.al)
+        =/  a2  (lc-uni acc lc.i.al)
+        |-  ^-  (map lkey @ud)
+        ?~  ps  a2
+        ?.  =(%constant kind.i.ps)  $(ps t.ps)
+        $(ps t.ps, a2 (lc-put a2 i.ps 2))
+      $(al t.al, acc acc2)
+    =/  tl  trl
+    |-  ^-  (map lkey @ud)
+    ?~  tl  acc
+    $(tl t.tl, acc (lc-uni acc lc.i.tl))
+  =/  m2
+    %_  m
+      defs      wdefs
+      thmdefs   wthm
+      assumes   wass
+      theorems  wtheo
+      lchecked  &
+    ==
+  =/  allds  :(weld diags.m dds tds pds)
+  =/  lint-ds
+    ?:  (lien allds |=(d=sdiag =(%error sev.d)))  ~
+    (l-lint m2 c)
+  [m2(diags (dedup-diags (weld allds lint-ds))) [const mlc]]
+::
+++  collect-records
+  ::  every $RcdConstructor application in the module, in generation
+  ::  order (definitions, then theorem definitions, assumptions,
+  ::  theorems; LET definitions inline)
+  |=  m=sem-module
+  ^-  (list sem)
+  =/  from-sem
+    |=  s=sem
+    =/  acc  *(list sem)
+    |-  ^-  (list sem)
+    ?-    -.s
+        %lit      acc
+        %atref    acc
+        %nullodn  acc
+        %letin
+      =/  acc2
+        =/  dl  lets.s
+        |-  ^-  (list sem)
+        ?~  dl  acc
+        =/  a3  ?~(body.i.dl acc ^$(s u.body.i.dl))
+        $(dl t.dl, acc a3)
+      ?~(body.s acc2 $(s u.body.s, acc acc2))
+    ::
+        %apply
+      =/  acc2
+        ?.  =('$RcdConstructor' name.op.s)  acc
+        (weld acc `(list sem)`[s ~])
+      =/  acc3
+        =/  gl  bound.s
+        |-  ^-  (list sem)
+        ?~  gl  acc2
+        =/  a4  ?~(range.i.gl acc2 ^$(s u.range.i.gl, acc acc2))
+        $(gl t.gl, acc2 a4)
+      =/  al  args.s
+      |-  ^-  (list sem)
+      ?~  al  acc3
+      $(al t.al, acc3 ^$(s i.al, acc acc3))
+    ==
+  =/  from-body
+    |=  b=(unit sem)
+    ^-  (list sem)
+    ?~(b ~ (from-sem u.b))
+  ;:  weld
+    =/  dl  defs.m
+    |-  ^-  (list sem)
+    ?~  dl  ~
+    (weld (from-body body.i.dl) $(dl t.dl))
+  ::
+    =/  tl  thmdefs.m
+    |-  ^-  (list sem)
+    ?~  tl  ~
+    (weld (from-body body.i.tl) $(tl t.tl))
+  ::
+    =/  tl  assumes.m
+    |-  ^-  (list sem)
+    ?~  tl  ~
+    (weld (from-body body.i.tl) $(tl t.tl))
+  ::
+    =/  tl  theorems.m
+    |-  ^-  (list sem)
+    ?~  tl  ~
+    (weld (from-body body.i.tl) $(tl t.tl))
+  ==
+::
+++  rcd-pairs
+  ::  the $Pair components of a record constructor with a string field
+  ::  name: [name name-span rhs]
+  |=  r=sem
+  ^-  (list [fname=@t at=sspan rhs=sem])
+  ?.  ?=(%apply -.r)  ~
+  %+  murn  args.r
+  |=  a=sem
+  ^-  (unit [fname=@t at=sspan rhs=sem])
+  ?.  ?=(%apply -.a)  ~
+  ?.  =('$Pair' name.op.a)  ~
+  ?.  ?=([* * ~] args.a)  ~
+  =/  lhs  i.args.a
+  ?.  ?=(%lit -.lhs)  ~
+  ?.  =(%str kind.lhs)  ~
+  `[val.lhs at.lhs i.t.args.a]
+::
+++  built-from-decls
+  ::  Linter.isBuiltFromDeclarations: the expression (transitively,
+  ::  through definition bodies) applies a declared symbol, formal
+  ::  parameter, or one of the BOOLEAN/Int/Nat/Reals stubs
+  |=  [s=sem defs=(map @t sem-def) seen=(set @t)]
+  ^-  ?
+  ?-    -.s
+      %lit      |
+      %atref    |
+      %nullodn  |
+      %letin
+    ?~  body.s  |
+    $(s u.body.s)
+  ::
+      %apply
+    =/  hit
+      ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
+        &
+      ?:  &(=(%builtin kind.op.s) =('BOOLEAN' name.op.s))  &
+      ?.  =(%user-op kind.op.s)  |
+      =/  df  (~(get by defs) name.op.s)
+      ?~  df
+        ?|(=('Int' name.op.s) =('Nat' name.op.s) =('Reals' name.op.s))
+      ?:  (~(has in seen) name.op.s)  |
+      ?~  body.u.df  |
+      $(s u.body.u.df, seen (~(put in seen) name.op.s))
+    ?:  hit  &
+    =/  sub
+      =/  gl  bound.s
+      |-  ^-  ?
+      ?~  gl  |
+      ?:  ?~(range.i.gl | ^$(s u.range.i.gl))  &
+      $(gl t.gl)
+    ?:  sub  &
+    =/  al  args.s
+    |-  ^-  ?
+    ?~  al  |
+    ?:  ^$(s i.al)  &
+    $(al t.al)
+  ==
+::
+++  l-lint
+  ::  the record-constructor field-name linter (tla2sany.linter.Linter):
+  ::  warn when a field name shadows a visible definition or declaration
+  ::  unless this record (or any record with the same field domain) has
+  ::  a component built from declarations
+  |=  [m=sem-module c=ctx]
+  ^-  (list sdiag)
+  =/  records  (collect-records m)
+  =/  defsmap
+    =/  acc  *(map @t sem-def)
+    =/  dl  defs.m
+    |-  ^-  (map @t sem-def)
+    ?~  dl  acc
+    $(dl t.dl, acc (~(put by acc) name.i.dl i.dl))
+  =/  same-domain
+    |=  [a=sem b=sem]
+    ^-  ?
+    =/  pa  (rcd-pairs a)
+    =/  pb  (rcd-pairs b)
+    ?.  =((lent pa) (lent pb))  |
+    %+  levy  pa
+    |=  x=[fname=@t at=sspan rhs=sem]
+    (lien pb |=(y=[fname=@t at=sspan rhs=sem] =(fname.x fname.y)))
+  =/  any-bfd
+    |=  r=sem
+    ^-  ?
+    %+  lien  (rcd-pairs r)
+    |=  p=[fname=@t at=sspan rhs=sem]
+    (built-from-decls rhs.p defsmap ~)
+  =|  out=(list sdiag)
+  =/  rl  records
+  |-  ^-  (list sdiag)
+  ?~  rl  (flop out)
+  =/  suppress
+    %+  lien  records
+    |=  r2=sem
+    &((same-domain i.rl r2) (any-bfd r2))
+  =/  warns
+    ?:  suppress  ~
+    %+  murn  (rcd-pairs i.rl)
+    |=  p=[fname=@t at=sspan rhs=sem]
+    ^-  (unit sdiag)
+    ?~  (~(get by c) fname.p)  ~
+    :-  ~
+    %^  dwarn  4.802  at.p
+    ;:  weld
+      "The field name \"{(trip fname.p)}\" in the record constructor "
+      "is identical to the existing definition or declaration\0a"
+      "named {(trip fname.p)}.\0a"
+      "The field in the record will not take the value of the "
+      "{(trip fname.p)} definition or declaration.\0a"
+      "In TLA+, field names in records are strings, regardless of any "
+      "similarly named declarations or definitions.\0a"
+      "Therefore, DOMAIN [{(trip fname.p)} |-> ...] = "
+      "\{\"{(trip fname.p)}\"} holds true."
+    ==
+  $(rl t.rl, out (weld (flop warns) out))
 ::
 ++  strip-tail
   ::  trailing-whitespace normalization applied to golden comparisons
@@ -1874,6 +3553,14 @@
     ~[(line d "apply nullODN opkind=k0 L-1 0.0-0.0")]
   ::
       %apply
+    ?:  =('$OpArg' name.op.s)
+      =/  nm  ?~(ubound.s '' name.i.ubound.s)
+      =/  ary=@t
+        ?~  args.s  '0'
+        ?:(?=(%lit -.i.args.s) val.i.args.s '0')
+      :_  ~
+      %+  line  d
+      "oparg {(trip nm)} op={(trip nm)} arity={(trip ary)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
     ?:  =('$NewSymb' name.op.s)
       =/  nm  ?~(ubound.s '' name.i.ubound.s)
       ~[(line d "newsymb {(trip nm)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}")]
@@ -1975,10 +3662,20 @@
     (line +(d) "param {(trip name.p)} arity={(a-co arity.p)} {plv} {(sspan-tape at.p)}")
   ?~(body.df ~ (render-sem u.body.df +(d) mask))
 ::
+++  first-line
+  ::  diagnostics store SANY's full (possibly multi-line) message so
+  ::  deduplication matches Errors equality; the D line shows line one
+  |=  t=@t
+  ^-  tape
+  =/  raw  (trip t)
+  |-  ^-  tape
+  ?~  raw  ~
+  ?:(=('\0a' i.raw) ~ [i.raw $(raw t.raw)])
+::
 ++  render-module
   |=  m=sem-module
   ^-  wain
-  =/  mask  (lien diags.m |=(d=sdiag =(%error sev.d)))
+  =/  mask  !lchecked.m
   ;:  weld
     ~[(line 0 "MODULE {(trip name.m)} {(sspan-tape at.m)}")]
   ::
@@ -2040,6 +3737,6 @@
     |=  dg=sdiag
     %+  line  0
     %-  strip-tail
-    "D {(a-co code.dg)} {?:(=(%error sev.dg) "ERROR" "WARNING")} {(sspan-tape at.dg)} {(trip msg.dg)}"
+    "D {(a-co code.dg)} {?:(=(%error sev.dg) "ERROR" "WARNING")} {(sspan-tape at.dg)} {(first-line msg.dg)}"
   ==
 --

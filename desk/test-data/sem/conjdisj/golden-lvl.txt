@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={P,Q} lc={P<=3,Q<=3}
+lvl Both L0 lp={P,Q} lc={P<=3,Q<=3}
+lvl Either L0 lp={P,Q} lc={P<=3,Q<=3}

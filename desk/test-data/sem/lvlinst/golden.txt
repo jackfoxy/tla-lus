@@ -1,0 +1,17 @@
+ACCEPT
+MODULE A 1.1-4.4
+  var x L1 2.10-2.10
+  def I!D arity=0 local=n L2 3.1-3.36
+    substin subs=2 L2 3.1-3.36
+      sub c <-
+        apply ' opkind=BuiltInKind L2 3.27-3.28
+          apply x opkind=VariableDeclKind L1 3.27-3.27
+      sub b <-
+        apply x opkind=VariableDeclKind L1 3.36-3.36
+      in
+        apply = opkind=BuiltInKind L1 4.6-4.10
+          apply b opkind=VariableDeclKind L1 4.6-4.6
+          apply c opkind=ConstantDeclKind L0 4.10-4.10
+  instance name=I module=B local=n L0 3.1-3.36
+DIAGS
+D 4245 ERROR 3.1-3.36 Level error in instantiating module 'B':

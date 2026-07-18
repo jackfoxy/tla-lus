@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={a,b} lc={a<=2,b<=2}
+lvl S L0 lp={a,b} lc={a<=2,b<=2}
+lvl T L0 lp={a,b} lc={a<=2,b<=2}

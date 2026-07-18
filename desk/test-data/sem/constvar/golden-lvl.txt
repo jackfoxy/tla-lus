@@ -1,0 +1,2 @@
+LEVELS
+lvl MODULE A L-1 lp={N} lc={N<=0}

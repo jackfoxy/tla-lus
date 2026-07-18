@@ -108,19 +108,44 @@ including the cross-definition `spec` case. Two behaviors to note:
   uninitialized sentinel `-1` (e.g. `b` in `Foo(a, b) == a`). This is
   reproduced exactly rather than normalized to 0.
 
-Deferred to a later increment (tracked here):
+The plan-2 unit-4 increment (in progress) ports the constraint machinery
+and diagnostics: level/arg-level constraint sets with SANY's min/max merge
+direction, recursive fixpoint iteration, higher-order rejection (4272),
+node-specific rules (4205/4206 and temporal 4310–4315 with exact code,
+span, message, and order), instance-substitution re-leveling (4245), and
+`Linter.java` record lint (4802 with both built-from-declarations
+suppression clauses, cross-module records included). Two-phase gating is
+normative: SANY runs level checking only when semantic generation produced
+no errors (any semantic error renders every level `-1`), while a
+level-check error leaves computed levels visible and only adds `D`-line
+diagnostics.
 
-- The full **level-constraint machinery** — level parameters,
-  `SetOfLevelConstraints` / `SetOfArgLevelConstraints` for higher-order
-  operator arguments, and iterative recursive level checks — is not yet
-  ported. The direct level *value* is computed; the constraint checks that
-  reject certain higher-order or cross-substitution misuses are not.
-- **Level-error diagnostics** (prime inside prime, temporal nesting,
-  wrong-level `.cfg` targets) are not emitted. As in unit 6, SANY recovers
-  from these with partial trees rather than failing, so they need the
-  semantic diagnostic channel.
-- **`Linter.java`** (record-constructor field-name clash, with its
-  suppression/elevation settings) is not yet ported.
+Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
+(the 4.0 owner-to-fixture matrix lives in
+`tools/notes/plan2-unit4-levels-notes.md`):
+
+- **Unreferenced bound identifiers keep level `-1`** like formal
+  parameters; the Hoon side writes `0` (`lvlqtb`, `lvltmp`).
+- **DIAGS message text is backslash-escaped** by the oracle projection
+  (`\\cdot`); the Hoon renderer emits the raw message (`lvlcdot`).
+- **Recursive-function self-binding**: `$RecursiveFcnSpec` must carry the
+  function's own `ubound` binder and the recursive `$FcnApply` subtree
+  (`recfcn`).
+- **Operator substitutions in `INSTANCE … WITH F <- Op` must render as
+  `oparg`**, not `apply` (`lvlinsth`).
+- **Leibniz tracking (4244) and the instance operator-argument checks
+  (4246/4247)** are not emitted (`lvlinstm`, `lvlinstp`).
+- **`APSubstIn`**: theorems/assumptions of an instanced module are not
+  imported (`apsubst`); node generation is unit-3 residue.
+- The **LEVELS constraint projection** (`golden-lvl.txt` per sem case:
+  max-levels, weights, higher-order min-max/level conditions, level
+  params, level/arg-level constraints, arg-level params, non-Leibniz
+  params, all sorted) is captured oracle-only; no Hoon renderer compares
+  it yet (4.1).
+- **Driver-level lint controls** (`SanySettings.suppressedCodes` /
+  `messagesAsErrorCodes`, `filterVisibleMessages`) are a report-time
+  concern invisible to the `Errors` channel; the Hoon `lint-options`
+  equivalent and its unit tests are still owed (4.7).
 
 ## Unit 9 — Constant evaluation
 

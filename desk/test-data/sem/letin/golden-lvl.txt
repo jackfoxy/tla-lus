@@ -1,0 +1,3 @@
+LEVELS
+lvl MODULE A L-1 lp={z}
+lvl Foo L0 lp={z}

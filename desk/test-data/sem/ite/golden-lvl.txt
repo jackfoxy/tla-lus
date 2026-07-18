@@ -1,0 +1,3 @@
+LEVELS
+lvl MODULE A L-1 lp={P,a,b} lc={P<=3,a<=3,b<=3}
+lvl Pick L0 lp={P,a,b} lc={P<=3,a<=3,b<=3}

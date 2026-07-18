@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={a} lc={a<=2}
+lvl R L0 lp={a} lc={a<=3}
+lvl Sel L0 lp={a} lc={a<=2}
