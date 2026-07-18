@@ -1,0 +1,53 @@
+ACCEPT
+MODULE A 1.1-9.4
+  var f L1 3.10-3.10
+  var g L1 3.13-3.13
+  def E1 arity=0 local=n L1 4.1-4.25
+    apply $Except opkind=BuiltInKind L1 4.7-4.25
+      apply f opkind=VariableDeclKind L1 4.8-4.8
+      apply $Pair opkind=BuiltInKind L0 4.17-4.24
+        apply $Seq opkind=BuiltInKind L0 4.17-4.24
+          num 1 L0 4.19-4.19
+        num 2 L0 4.24-4.24
+  def E2 arity=0 local=n L1 5.1-5.36
+    apply $Except opkind=BuiltInKind L1 5.7-5.36
+      apply f opkind=VariableDeclKind L1 5.8-5.8
+      apply $Pair opkind=BuiltInKind L0 5.17-5.23
+        apply $Seq opkind=BuiltInKind L0 5.17-5.23
+          str a L0 5.19-5.19
+        num 3 L0 5.23-5.23
+      apply $Pair opkind=BuiltInKind L0 5.26-5.35
+        apply $Seq opkind=BuiltInKind L0 5.26-5.35
+          num 2 L0 5.28-5.28
+          str b L0 5.31-5.31
+        num 4 L0 5.35-5.35
+  def E3 arity=0 local=n L1 6.1-6.28
+    apply $Except opkind=BuiltInKind L1 6.7-6.28
+      apply f opkind=VariableDeclKind L1 6.8-6.8
+      apply $Pair opkind=BuiltInKind L0 6.17-6.27
+        apply $Seq opkind=BuiltInKind L0 6.17-6.27
+          apply $Tuple opkind=BuiltInKind L0 6.18-6.23
+            num 1 L0 6.19-6.19
+            num 2 L0 6.22-6.22
+        num 5 L0 6.27-6.27
+  def E4 arity=0 local=n L1 7.1-7.29
+    apply $Except opkind=BuiltInKind L1 7.7-7.29
+      apply f opkind=VariableDeclKind L1 7.8-7.8
+      apply $Pair opkind=BuiltInKind L1 7.17-7.28
+        apply $Seq opkind=BuiltInKind L0 7.17-7.28
+          num 1 L0 7.19-7.19
+        apply + opkind=UserDefinedOpKind L1 7.24-7.28
+          at L1 7.17-7.28
+          num 1 L0 7.28-7.28
+  def E5 arity=0 local=n L1 8.1-8.42
+    apply $Except opkind=BuiltInKind L1 8.7-8.42
+      apply f opkind=VariableDeclKind L1 8.8-8.8
+      apply $Pair opkind=BuiltInKind L1 8.17-8.41
+        apply $Seq opkind=BuiltInKind L0 8.17-8.41
+          num 1 L0 8.19-8.19
+        apply $Except opkind=BuiltInKind L1 8.24-8.41
+          apply g opkind=VariableDeclKind L1 8.25-8.25
+          apply $Pair opkind=BuiltInKind L1 8.34-8.40
+            apply $Seq opkind=BuiltInKind L0 8.34-8.40
+              str c L0 8.36-8.36
+            at L1 8.34-8.40

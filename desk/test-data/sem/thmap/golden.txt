@@ -1,0 +1,35 @@
+ACCEPT
+MODULE A 1.1-6.4
+  const c arity=0 L0 3.10-3.10
+  thmdef Named local=n L0 5.1-5.41
+    assumeprove L0 5.18-5.41
+      apply = opkind=BuiltInKind L0 5.25-5.29
+        apply c opkind=ConstantDeclKind L0 5.25-5.25
+        num 2 L0 5.29-5.29
+      prove
+        apply = opkind=BuiltInKind L0 5.37-5.41
+          apply c opkind=ConstantDeclKind L0 5.37-5.37
+          num 2 L0 5.41-5.41
+  theorem L0 4.1-4.56
+    assumeprove L0 4.9-4.56
+      newsymb d L0 4.16-4.29
+      apply = opkind=BuiltInKind L0 4.32-4.36
+        apply c opkind=ConstantDeclKind L0 4.32-4.32
+        num 1 L0 4.36-4.36
+      prove
+        apply = opkind=BuiltInKind L0 4.44-4.56
+          apply + opkind=UserDefinedOpKind L0 4.44-4.48
+            apply c opkind=ConstantDeclKind L0 4.44-4.44
+            apply d opkind=NewConstantKind L0 4.48-4.48
+          apply + opkind=UserDefinedOpKind L0 4.52-4.56
+            apply d opkind=NewConstantKind L0 4.52-4.52
+            apply c opkind=ConstantDeclKind L0 4.56-4.56
+  theorem name=Named L0 5.1-5.41
+    assumeprove L0 5.18-5.41
+      apply = opkind=BuiltInKind L0 5.25-5.29
+        apply c opkind=ConstantDeclKind L0 5.25-5.25
+        num 2 L0 5.29-5.29
+      prove
+        apply = opkind=BuiltInKind L0 5.37-5.41
+          apply c opkind=ConstantDeclKind L0 5.37-5.37
+          num 2 L0 5.41-5.41

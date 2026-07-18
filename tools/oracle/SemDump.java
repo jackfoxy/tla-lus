@@ -53,6 +53,25 @@ public final class SemDump {
     }
     out.append("ACCEPT\n");
     module(root, 0, out);
+    // DIAGS: the semantic Errors channel, in report order, one line per
+    // message: D <numeric-code> <severity> <loc> <first-line-of-message>
+    java.util.List<Errors.ErrorDetails> msgs = spec.semanticErrors.getMessages();
+    if (!msgs.isEmpty()) {
+      out.append("DIAGS\n");
+      for (Errors.ErrorDetails ed : msgs) {
+        Location l = ed.getLocation();
+        String locs = (l == null) ? "~"
+            : l.beginLine() + "." + l.beginColumn()
+              + "-" + l.endLine() + "." + l.endColumn();
+        String msg = ed.getMessage();
+        int nl = msg.indexOf('\n');
+        if (nl >= 0) msg = msg.substring(0, nl);
+        out.append("D ").append(ed.getCode().getStandardValue())
+           .append(' ').append(ed.getCode().getSeverityLevel())
+           .append(' ').append(locs)
+           .append(' ').append(esc(msg)).append('\n');
+      }
+    }
     System.out.print(out);
   }
 

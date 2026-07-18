@@ -1,0 +1,5 @@
+---- MODULE A ----
+VARIABLE y
+CONSTANT c
+INSTANCE B
+====

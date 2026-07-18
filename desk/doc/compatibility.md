@@ -150,10 +150,64 @@ modules only for now):
   first of a duplicated definition, and records the problem on a separate
   diagnostic channel. The current port targets well-formed modules and does not
   yet reproduce these partial trees or emit the semantic diagnostics.
-- **EXCEPT** (`$Except` / `$Seq` index nesting), **INSTANCE / substitution**
-  semantics (`$SubstIn`, `APSubstIn`), **N_SetOfRcds**, proof/theorem/assume
-  expression bodies, and subexpression `!`-navigation are not yet translated
-  into the semantic graph (they parse correctly at unit 4).
+- ~~**EXCEPT** (`$Except` / `$Seq` index nesting) and **N_SetOfRcds**~~ —
+  landed in P2-3 increment 3a (below). **INSTANCE / substitution** semantics
+  (`$SubstIn`, `APSubstIn`), proof/theorem/assume expression bodies, and
+  subexpression `!`-navigation are not yet translated into the semantic
+  graph (they parse correctly at unit 4).
+
+## Unit P2-3 — Typed semantic graph (increment 3a)
+
+The semantic dump now covers `$Except`/`$Pair`/`$Seq`/`$Tuple` with SANY's
+exact spans and levels, `@` (AtNode, at the ExceptSpec's span, correctly
+scoped under nested EXCEPTs), `$SetOfRcds`, and RECURSIVE declarations
+(mutually recursive operators resolve; levels match SANY's fixpoint result
+on the constant corpus — the iterative fixpoint itself is unit 4's
+constraint machinery). 22 differential cases.
+
+Landed since (same unit, later increments):
+
+- The **typed semantic IR**: `$sem` molds + `+gen-module` generator +
+  `+render-module` renderer replace the direct CST-to-text dump; B5
+  consumes `+generate`'s `sem-module`. 26 differential cases.
+- **Semantic error recovery + diagnostics** (increment 3b): `nullODN`
+  sentinels (4200 unknown symbol, 4204 wrong arity at the arguments
+  node), null bodies for unresolvable in/pre/postfix operators (paired
+  4004 errors), duplicate definitions keep-first (4201 ERROR + 4801
+  WARNING, raw trailing spaces held in the IR and normalized at render),
+  the `DIAGS` projection from SANY's `Errors` channel, and the level
+  mask: any semantic ERROR renders every levelCheck-derived level `-1`
+  (declaration levels survive), exactly as the pin behaves.
+
+- **INSTANCE / LOCAL INSTANCE with substitutions** (increment 3c):
+  named/unnamed instances import the instanced module's non-local
+  definitions with `SubstIn`-wrapped bodies (WITH pairs, original-module
+  spans, `I!Op` naming and compound-reference resolution) plus instance
+  records; **theorem/assume bodies** render as SANY's `thmdef` /
+  `assume` / `theorem` sections. Substitution nodes are encoded as a
+  reserved `$SubstIn` `%apply` (ubound = parameter names, args =
+  substitution expressions then body): adding them as their own `$%`
+  member hangs the zuse-408 mold compiler regardless of shape.
+
+- **ASSUME/PROVE bodies and implicit substitutions** (residue
+  increment): `assumeprove`/`newsymb` rendering with NEW-symbol scoping
+  (`NewConstantKind`), and instances substituting every parameter in
+  declaration order (implicit same-named references at the instance-unit
+  span) — both differentially matched.
+
+Remaining unit-3 increments (in plan order):
+
+- **BY/QED proof-step nodes**, **subexpression `!`-navigation** (the
+  generator needs a generated-definitions table; SANY's 4005
+  `Subexpression selection failed…` diagnostic is captured from the
+  pin), `APSubstIn` (higher-order substitution), and the widened
+  SemDump projection over every non-volatile semantic field.
+- Substituted-definition levels use `max(exported level, substitution
+  levels)` — correct on the corpus, but not SANY's full re-level of the
+  substituted body (unit 4's constraint machinery refines this).
+- The ctx `'@'` pseudo-entry (EXCEPT-spec span smuggled through the
+  unused `weights` slot) remains an interim device inside the generator;
+  an IR-native @-context replaces it.
 
 ## Unit 10 — Safety model checking
 

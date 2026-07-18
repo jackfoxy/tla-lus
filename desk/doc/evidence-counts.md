@@ -12,12 +12,12 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-parse-err-tests.py` | 34 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/tla/parse-err.hoon` |
 | `gen-bnf-manifest.py` | 35 | pass | BNF grammar productions | `desk/tests/lib/tla/bnf.hoon` |
 | `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/tla/modres.hoon` |
-| `gen-sem-tests.py` | 19 | pass | Semantic graph + levels | `desk/tests/lib/tla/sem.hoon` |
+| `gen-sem-tests.py` | 31 | pass | Semantic graph + levels | `desk/tests/lib/tla/sem.hoon` |
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/tla/eval.hoon` |
 | `gen-mc-tests.py` | 5 | pass | Safety + liveness model checking | `desk/tests/lib/tla/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/tla/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
 
-Compared cases: **682**.  Oracle-only cases: **2**.
+Compared cases: **694**.  Oracle-only cases: **2**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.
