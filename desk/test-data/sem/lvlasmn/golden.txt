@@ -1,0 +1,14 @@
+ACCEPT
+MODULE A 1.1-5.4
+  var x L1 2.10-2.10
+  assume L2 3.1-3.13
+    apply = opkind=BuiltInKind L2 3.8-3.13
+      apply ' opkind=BuiltInKind L2 3.8-3.9
+        apply x opkind=VariableDeclKind L1 3.8-3.8
+      apply x opkind=VariableDeclKind L1 3.13-3.13
+  assume L3 4.1-4.13
+    apply [] opkind=BuiltInKind L3 4.8-4.13
+      apply TRUE opkind=BuiltInKind L0 4.10-4.13
+DIAGS
+D 4206 ERROR 3.1-3.13 Level error: assumptions must be level 0 (Constant),
+D 4206 ERROR 4.1-4.13 Level error: assumptions must be level 0 (Constant),

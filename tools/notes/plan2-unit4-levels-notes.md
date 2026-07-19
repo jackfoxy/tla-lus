@@ -325,3 +325,50 @@ Parity-manifest rows changed: level-recursion (partial -> parity, evidence now 8
 Compatibility limitations removed or added: recfcn bullet removed
 Remaining dependencies: 4.5 (negative ASSUME fixtures; BY/QED blocked on unit-3 residue), 4.6 (instance operator substitutions, 4244/4246/4247, apsubst)
 ```
+
+## 4.5 Node-specific level rules (done 2026-07-19)
+
+Suite 65/69 (all four new fixtures green ON ARRIVAL — the table-driven
+engine already enforced every rule; the fixtures are the missing
+boundary evidence); red set still exactly the 4.6 owners. Manifest row
+`level-node-rules` -> parity.
+
+Rule inventory finding: SANY has NO separate node-specific level codes
+beyond what already existed — every prime/ENABLED/UNCHANGED/fairness/
+\cdot/subscript restriction is a 4205 driven by the BuiltInOperators
+ArgMaxLevels table, ASSUME is 4206, and the temporal specials are
+4310-4315 (all previously green). New fixtures per plan slice:
+
+- `lvlprin`: nested prime `(x')'` -> 4205 on the outer prime (arg
+  max 1); `x'` at the boundary stays clean.
+- `lvlencu`: ENABLED at (level-2 arg ok) and above (temporal arg ->
+  4205); UNCHANGED at (level-1 arg ok) and above (`UNCHANGED (x')` ->
+  4205 — note `UNCHANGED x'` unparenthesized is a PARSE reject, as is
+  `[]x = x` in a definition body; the fixture uses parens).
+- `lvlwfn`: WF with an action-level subscript (arg-1 max 1) and SF
+  with a temporal action operand (arg-2 max 2), both 4205 at the
+  fairness node span.
+- `lvlasmn`: ASSUME at level 2 (`x' = x`) and level 3 (`[]TRUE`),
+  emitting distinct 4206s (level number in the second message line);
+  level 1 was already covered by `lvlasm`.
+
+BY/QED proof-body rules: no proof-step nodes exist in the IR (unit-3
+residue) — recorded as the ledger rationale; their level rules ride in
+when the nodes land.
+
+Subunit handoff:
+
+```text
+Subunit: 4.5
+Java owner and entry method: OpApplNode.levelCheck ArgMaxLevels-driven 4205, AssumeNode.levelCheck 4206, the 4310-4315 specials (already green)
+Current Hoon owner: lib/tla/semantic.hoon (builtin-maxl tables, l-apply-def dsarg/dstmp/dsquant/dsrng, l-module-core assume check)
+Smallest failing parity case: none for 4.5; remaining reds are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: none (fixtures only)
+Diagnostic/result expected: boundary 4205s/4206s with exact spans and message levels
+Focused validation result: sem 65/69 (reds = the four 4.6 cases), lvl 10/10
+Full validation result: full ship suite 799 OK, same 4 reds; validate.py --check clean (69 cases; evidence-counts regenerated); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-node-rules (partial -> parity, evidence now 13 fixtures)
+Compatibility limitations removed or added: none (BY/QED already tracked as unit-3 residue)
+Remaining dependencies: 4.6 (instance/substitution: oparg rendering, 4244/4246/4247, APSubstIn), 4.7 lint options, 4.8 integration
+```

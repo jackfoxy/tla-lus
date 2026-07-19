@@ -938,6 +938,36 @@
       '---- MODULE A ----\0aVARIABLE x\0aASSUME x = x\0a====\0a'
   ==
 ::
+++  test-sem-lvlasmn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  assume L2 3.1-3.13'
+        '    apply = opkind=BuiltInKind L2 3.8-3.13'
+        '      apply \' opkind=BuiltInKind L2 3.8-3.9'
+        '        apply x opkind=VariableDeclKind L1 3.8-3.8'
+        '      apply x opkind=VariableDeclKind L1 3.13-3.13'
+        '  assume L3 4.1-4.13'
+        '    apply [] opkind=BuiltInKind L3 4.8-4.13'
+        '      apply TRUE opkind=BuiltInKind L0 4.10-4.13'
+        'DIAGS'
+        'D 4206 ERROR 3.1-3.13 Level error: assumptions must be level 0 (Constant),'
+        'D 4206 ERROR 4.1-4.13 Level error: assumptions must be level 0 (Constant),'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aASSUME x\' = x\0aASSUME []TRUE\0a====\0a'
+  ==
+::
 ++  test-sem-lvlcdot
   %+  expect-eq
     !>  ^-  wain
@@ -1005,6 +1035,50 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aVARIABLE x\0aP == ENABLED ([](x = 0))\0a====\0a'
+  ==
+::
+++  test-sem-lvlencu
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-7.4'
+        '  var x L1 2.10-2.10'
+        '  def E1 arity=0 local=n L1 3.1-3.22'
+        '    apply ENABLED opkind=BuiltInKind L1 3.7-3.22'
+        '      apply = opkind=BuiltInKind L2 3.16-3.21'
+        '        apply \' opkind=BuiltInKind L2 3.16-3.17'
+        '          apply x opkind=VariableDeclKind L1 3.16-3.16'
+        '        apply x opkind=VariableDeclKind L1 3.21-3.21'
+        '  def E2 arity=0 local=n L1 4.1-4.24'
+        '    apply ENABLED opkind=BuiltInKind L1 4.7-4.24'
+        '      apply ~> opkind=BuiltInKind L3 4.17-4.22'
+        '        apply x opkind=VariableDeclKind L1 4.17-4.17'
+        '        apply x opkind=VariableDeclKind L1 4.22-4.22'
+        '  def U1 arity=0 local=n L2 5.1-5.17'
+        '    apply UNCHANGED opkind=BuiltInKind L2 5.7-5.17'
+        '      apply x opkind=VariableDeclKind L1 5.17-5.17'
+        '  def U2 arity=0 local=n L2 6.1-6.20'
+        '    apply UNCHANGED opkind=BuiltInKind L2 6.7-6.20'
+        '      apply \' opkind=BuiltInKind L2 6.18-6.19'
+        '        apply x opkind=VariableDeclKind L1 6.18-6.18'
+        'DIAGS'
+        'D 4205 ERROR 4.7-4.24 Level error in applying operator ENABLED:'
+        'D 4205 ERROR 6.7-6.20 Level error in applying operator UNCHANGED:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl E1 L1 lc={x<=1} nlp={x}'
+        'lvl E2 L1 lc={x<=3} nlp={x}'
+        'lvl U1 L2 lc={x<=1} nlp={x}'
+        'lvl U2 L2 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aE1 == ENABLED (x\' = x)\0aE2 == ENABLED ((x ~> x))\0aU1 == UNCHANGED x\0aU2 == UNCHANGED (x\')\0a====\0a'
   ==
 ::
 ++  test-sem-lvlho
@@ -1294,6 +1368,36 @@
       '---- MODULE A ----\0aVARIABLE x\0aBad == (x\')\'\0a====\0a'
   ==
 ::
+++  test-sem-lvlprin
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Ok arity=0 local=n L2 3.1-3.8'
+        '    apply \' opkind=BuiltInKind L2 3.7-3.8'
+        '      apply x opkind=VariableDeclKind L1 3.7-3.7'
+        '  def Bad arity=0 local=n L2 4.1-4.12'
+        '    apply \' opkind=BuiltInKind L2 4.8-4.12'
+        '      apply \' opkind=BuiltInKind L2 4.9-4.10'
+        '        apply x opkind=VariableDeclKind L1 4.9-4.9'
+        'DIAGS'
+        'D 4205 ERROR 4.8-4.12 Level error in applying operator \':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Ok L2 lc={x<=1} nlp={x}'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aOk == x\'\0aBad == (x\')\'\0a====\0a'
+  ==
+::
 ++  test-sem-lvlqtb
   %+  expect-eq
     !>  ^-  wain
@@ -1503,6 +1607,43 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aVARIABLE x\0aL == WF_(x\')(x = 0)\0a====\0a'
+  ==
+::
+++  test-sem-lvlwfn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def W arity=0 local=n L3 3.1-3.20'
+        '    apply $WF opkind=BuiltInKind L3 3.6-3.20'
+        '      apply \' opkind=BuiltInKind L2 3.10-3.11'
+        '        apply x opkind=VariableDeclKind L1 3.10-3.10'
+        '      apply = opkind=BuiltInKind L2 3.14-3.19'
+        '        apply \' opkind=BuiltInKind L2 3.14-3.15'
+        '          apply x opkind=VariableDeclKind L1 3.14-3.14'
+        '        apply x opkind=VariableDeclKind L1 3.19-3.19'
+        '  def S arity=0 local=n L3 4.1-4.17'
+        '    apply $SF opkind=BuiltInKind L3 4.6-4.17'
+        '      apply x opkind=VariableDeclKind L1 4.9-4.9'
+        '      apply [] opkind=BuiltInKind L3 4.11-4.16'
+        '        apply TRUE opkind=BuiltInKind L0 4.13-4.16'
+        'DIAGS'
+        'D 4205 ERROR 3.6-3.20 Level error in applying operator $WF:'
+        'D 4205 ERROR 4.6-4.17 Level error in applying operator $SF:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl W L3 lc={x<=1} nlp={x}'
+        'lvl S L3 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aW == WF_(x\')(x\' = x)\0aS == SF_x([]TRUE)\0a====\0a'
   ==
 ::
 ++  test-sem-lvlwfp
