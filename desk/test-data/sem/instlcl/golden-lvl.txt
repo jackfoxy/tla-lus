@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={c} lc={c<=0,x<=1}
+lvl Op L1 lp={c,x} lc={c<=0,x<=1}
+lvl Use L1 lp={c,x} lc={c<=0,x<=1}

@@ -108,45 +108,38 @@ including the cross-definition `spec` case. Two behaviors to note:
   uninitialized sentinel `-1` (e.g. `b` in `Foo(a, b) == a`). This is
   reproduced exactly rather than normalized to 0.
 
-The plan-2 unit-4 increment (in progress) ports the constraint machinery
-and diagnostics: level/arg-level constraint sets with SANY's min/max merge
-direction, recursive fixpoint iteration, higher-order rejection (4272),
-node-specific rules (4205/4206 and temporal 4310–4315 with exact code,
-span, message, and order), instance-substitution re-leveling (4245), and
-`Linter.java` record lint (4802 with both built-from-declarations
-suppression clauses, cross-module records included). Two-phase gating is
-normative: SANY runs level checking only when semantic generation produced
-no errors (any semantic error renders every level `-1`), while a
-level-check error leaves computed levels visible and only adds `D`-line
-diagnostics.
+The plan-2 unit-4 increment ports the constraint machinery and
+diagnostics. Subunits 4.1–4.6 are at parity: the level/arg-level
+constraint sets with SANY's min/max merge direction and the full sorted
+LEVELS projection (levels, max-levels/weights, higher-order
+min-max/opLevelCond, level params, level/arg-level constraints,
+arg-level params, allParams, non-Leibniz params); bottom-up levels with
+the unreferenced-binder `-1` sentinel and escaped DIAGS text; the
+higher-order rules (4272/4273, the call-site argLevelParam remapping,
+alp-driven constraint bounds, the doubly-higher-order non-Leibniz rule,
+and the 4270/4271 arity mismatches); recursive fixpoint checking
+(self/mutual/higher-order recursion, recursive functions, 4290); the
+node-specific rules (4205/4206 and temporal 4310–4315, all boundary
+cases); and instance/substitution (4244/4245/4246/4247, getSubLCSet
+constraint contributions, operator substitutions as `$OpArg`, APSubstIn
+theorem import, constructSubst ordering, and a pure `validate-target`
+configuration gate). `Linter.java` record lint (4802) is also present.
+Two-phase gating is normative: SANY runs level checking only when
+semantic generation produced no errors (any semantic error renders every
+level `-1`), while a level-check error leaves computed levels visible and
+only adds `D`-line diagnostics.
 
-Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
-(the 4.0 owner-to-fixture matrix lives in
+Remaining unit-4 work (the 4.0 owner-to-fixture matrix lives in
 `tools/notes/plan2-unit4-levels-notes.md`):
 
-- **Operator substitutions in `INSTANCE … WITH F <- Op` must render as
-  `oparg`**, not `apply` (`lvlinsth`).
-- **The 4244 non-Leibniz diagnostic and the instance operator-argument
-  checks (4246/4247)** are not emitted (`lvlinstm`, `lvlinstp`).
-  Non-Leibniz *tracking* itself (allParams/nonLeibnizParams/isLeibnizArg
-  through applications, definitions, and substitutions) is ported and
-  projection-compared since 4.1; only these diagnostics remain.
-- **`APSubstIn`**: theorems/assumptions of an instanced module are not
-  imported (`apsubst`); node generation is unit-3 residue.
-- The **LEVELS constraint projection** (max-levels, weights,
-  higher-order min-max/level conditions, level params, level/arg-level
-  constraints, arg-level params, non-Leibniz params, all sorted) is
-  rendered by the Hoon level pass and byte-compared per sem case since
-  4.1; 4.3 added the call-site argLevelParam blocks (op/param-side
-  remapping, alp-driven level and arg-level constraint bounds, the
-  doubly-higher-order non-Leibniz rule) and the 4270/4271
-  operator-argument arity mismatches, so every higher-order rule is at
-  parity and the remaining reds are the recursion/substitution cases
-  above.
 - **Driver-level lint controls** (`SanySettings.suppressedCodes` /
   `messagesAsErrorCodes`, `filterVisibleMessages`) are a report-time
   concern invisible to the `Errors` channel; the Hoon `lint-options`
   equivalent and its unit tests are still owed (4.7).
+- **`%analyze` level/lint pipeline integration** (typed-rejected today)
+  is owed to 4.8.
+- **BY/QED proof-step level rules** ride in when the proof-step nodes
+  land (unit-3 residue).
 
 ## Unit 9 — Constant evaluation
 

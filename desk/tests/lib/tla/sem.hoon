@@ -713,6 +713,69 @@
       '---- MODULE B ----\0aVARIABLE y\0aCONSTANT c\0aOp == y = c\0a====\0a'
   ==
 ::
+++  test-sem-instlcl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  const c arity=0 L0 3.10-3.10'
+        '  var x L1 2.10-2.10'
+        '  def Op arity=0 local=y L1 4.1-4.28'
+        '    substin subs=2 L1 4.1-4.28'
+        '      sub c <-'
+        '        apply c opkind=ConstantDeclKind L0 4.1-4.28'
+        '      sub y <-'
+        '        apply x opkind=VariableDeclKind L1 4.28-4.28'
+        '      in'
+        '        apply = opkind=BuiltInKind L1 4.7-4.11'
+        '          apply y opkind=VariableDeclKind L1 4.7-4.7'
+        '          apply c opkind=ConstantDeclKind L0 4.11-4.11'
+        '  def Use arity=0 local=n L1 5.1-5.9'
+        '    apply Op opkind=UserDefinedOpKind L1 5.8-5.9'
+        '  instance module=B local=y L0 4.1-4.28'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=0,x<=1}'
+        'lvl Op L1 lp={c,x} lc={c<=0,x<=1}'
+        'lvl Use L1 lp={c,x} lc={c<=0,x<=1}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aCONSTANT c\0aLOCAL INSTANCE B WITH y <- x\0aUse == Op\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aVARIABLE y\0aCONSTANT c\0aOp == y = c\0a====\0a'
+  ==
+::
+++  test-sem-instrex
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        '  def Use arity=0 local=n L1 3.1-3.11'
+        '    apply I!Op opkind=UserDefinedOpKind L1 3.8-3.11'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Use L1 lp={x} lc={x<=1}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS C\0aUse == I!Op\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aVARIABLE y\0aCONSTANT c\0aOp == y = c\0a====\0a'
+      :-  'C'
+      '---- MODULE C ----\0aVARIABLE x\0aI == INSTANCE B WITH y <- x, c <- 2\0a====\0a'
+  ==
+::
 ++  test-sem-instun
   %+  expect-eq
     !>  ^-  wain

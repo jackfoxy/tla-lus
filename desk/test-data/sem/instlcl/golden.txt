@@ -1,0 +1,17 @@
+ACCEPT
+MODULE A 1.1-6.4
+  const c arity=0 L0 3.10-3.10
+  var x L1 2.10-2.10
+  def Op arity=0 local=y L1 4.1-4.28
+    substin subs=2 L1 4.1-4.28
+      sub c <-
+        apply c opkind=ConstantDeclKind L0 4.1-4.28
+      sub y <-
+        apply x opkind=VariableDeclKind L1 4.28-4.28
+      in
+        apply = opkind=BuiltInKind L1 4.7-4.11
+          apply y opkind=VariableDeclKind L1 4.7-4.7
+          apply c opkind=ConstantDeclKind L0 4.11-4.11
+  def Use arity=0 local=n L1 5.1-5.9
+    apply Op opkind=UserDefinedOpKind L1 5.8-5.9
+  instance module=B local=y L0 4.1-4.28

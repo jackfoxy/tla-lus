@@ -355,8 +355,12 @@
   ::  non-local symbols) with the same computed levels.
   |=  [tree=node deps=(map @t ctx)]
   ^-  [full=ctx exported=ctx]
+  ::  EXTENDS re-exports the whole exported context (declarations and
+  ::  definitions); INSTANCE imports only definitions, handled per unit
+  ::  by +inst-syms below, so its module is NOT folded in here (its raw
+  ::  VARIABLE/CONSTANT declarations must not leak into this module)
   =/  imports=ctx
-    %+  roll  (refs-of:modules tree)
+    %+  roll  (extends-of tree)
     |=  [r=@t acc=ctx]
     (~(uni by acc) (~(gut by deps) r ~))
   =/  full=ctx  (~(uni by builtins) imports)
@@ -802,12 +806,12 @@
   =/  r  (resolve:modules root (inline-resolver:modules src) ~)
   ?:  ?=(%| -.out.r)  ~['REJECT']
   =/  g  p.out.r
-  =/  ctxs  (analyze order.g mods.g deps.g)
+  =/  ctxs  (analyze sem-order.g mods.g deps.g)
   =/  rt  (~(get by mods.g) root)
   ?~  rt  ~['REJECT']
   =/  fc  (full-ctx tree.u.rt ctxs)
   :-  'ACCEPT'
-  =/  dv  (l-deps root order.g ctxs mods.g)
+  =/  dv  (l-deps root sem-order.g ctxs mods.g)
   =/  lr
     (l-module-core (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
   ;:  weld
@@ -823,11 +827,11 @@
   =/  r  (resolve:modules root (inline-resolver:modules src) ~)
   ?:  ?=(%| -.out.r)  ~
   =/  g  p.out.r
-  =/  ctxs  (analyze order.g mods.g deps.g)
+  =/  ctxs  (analyze sem-order.g mods.g deps.g)
   =/  rt  (~(get by mods.g) root)
   ?~  rt  ~
   =/  fc  (full-ctx tree.u.rt ctxs)
-  =/  dv  (l-deps root order.g ctxs mods.g)
+  =/  dv  (l-deps root sem-order.g ctxs mods.g)
   `(level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
 ::  +|  Typed Semantic IR (unit 3: the graph later units consume)
 ::
@@ -1817,18 +1821,25 @@
 ++  g-instance
   ::  an INSTANCE unit: one imported definition per (non-local) operator
   ::  defined in the instanced module, its body wrapped in $substin over
-  ::  the WITH substitutions; plus the instance record
+  ::  the WITH substitutions; one imported theorem definition per named
+  ::  theorem/assumption, wrapped in $apsubstin; plus the instance
+  ::  record. A substitution for an operator-valued parameter is an
+  ::  $OpArg, exactly like an operator argument at an application
   |=  $:  u=node
           iu=[name=(unit @t) local=? nl=node]
           c=ctx
           ctxs=(map @t ctx)
           mods=(map @t loaded:modules)
       ==
-  ^-  [defs=(list sem-def) inst=sem-inst ds=(list sdiag)]
+  ^-  $:  defs=(list sem-def)
+          thms=(list sem-thm)
+          inst=sem-inst
+          ds=(list sdiag)
+      ==
   =/  ip  (inst-parts nl.iu)
   =/  irec=sem-inst  [name.iu mod.ip local.iu (span-of:ast u) ~]
   =/  bt  (~(get by mods) mod.ip)
-  ?~  bt  [~ irec ~]
+  ?~  bt  [~ ~ irec ~]
   =/  bctx  (full-ctx tree.u.bt ctxs)
   ::  one substitution per parameter of the instanced module, in its
   ::  declaration order: the WITH expression when given, else the
@@ -1841,26 +1852,61 @@
     |=  bu=node
     ^-  (list @t)
     (turn (decl-syms bu) |=([nm=@t *] nm))
+  ::  substitution order per constructSubst + explicit processing: an
+  ::  implicit entry per parameter resolvable in the instantiating
+  ::  module, in declaration order; each explicit WITH entry replaces
+  ::  its implicit in place, or appends (so an explicit substitution
+  ::  for a parameter unknown to the instantiating module comes last)
+  =/  ordered
+    ^-  (list [pn=@t ex=(unit node)])
+    =/  base
+      ^-  (list [pn=@t ex=(unit node)])
+      %+  murn  bparams
+      |=  pn=@t
+      ^-  (unit [pn=@t ex=(unit node)])
+      ?~((~(get by c) pn) ~ `[pn ~])
+    =/  wl  subs.ip
+    |-  ^-  (list [pn=@t ex=(unit node)])
+    ?~  wl  base
+    =/  hit
+      =/  bl  base
+      |-  ^-  ?
+      ?~  bl  |
+      ?:(=(param.i.wl pn.i.bl) & $(bl t.bl))
+    =/  base2
+      ?.  hit
+        %+  weld  base
+        ^-  (list [pn=@t ex=(unit node)])
+        [param.i.wl `expr.i.wl]~
+      %+  turn  base
+      |=  e=[pn=@t ex=(unit node)]
+      ^-  [pn=@t ex=(unit node)]
+      ?:(=(param.i.wl pn.e) [pn.e `expr.i.wl] e)
+    $(wl t.wl, base base2)
   =/  gsubs
     =|  nms=(list @t)
     =|  exs=(list sem)
     =|  isubs=(list sem-isub)
     =|  ds=(list sdiag)
-    =/  pl  bparams
+    =/  pl  ordered
     |-  ^-  $:  nms=(list @t)  exs=(list sem)
                 isubs=(list sem-isub)  ds=(list sdiag)
             ==
     ?~  pl  [(flop nms) (flop exs) (flop isubs) ds]
-    =/  pn  i.pl
+    =/  pn  pn.i.pl
     =/  pkind=symkind
       =/  bs  (~(get by bctx) pn)
       ?~(bs %constant kind.u.bs)
-    =/  ex=(unit node)
-      =/  sl  subs.ip
-      |-  ^-  (unit node)
-      ?~  sl  ~
-      ?:(=(pn param.i.sl) `expr.i.sl $(sl t.sl))
+    =/  ex=(unit node)  ex.i.pl
     ?^  ex
+      =/  oa  (oparg-of u.ex c)
+      ?^  oa
+        %=  $
+          pl     t.pl
+          nms    [pn nms]
+          exs    [u.oa exs]
+          isubs  [[pn pkind oa] isubs]
+        ==
       =/  g  (g-x u.ex c)
       %=  $
         pl     t.pl
@@ -1869,10 +1915,17 @@
         isubs  [[pn pkind r.g] isubs]
         ds     (weld ds ds.g)
       ==
-    ::  implicit: the instantiating module's own symbol
+    ::  implicit: the instantiating module's own symbol (an $OpArg for
+    ::  an operator-valued parameter, per constructSubst)
     =/  s  (~(get by c) pn)
     ?~  s  $(pl t.pl)
-    =/  iex=sem  [%apply [pn kind.u.s] level.u.s (span-of:ast u) ~ ~ ~]
+    =/  iex=sem
+      ?:  (gth arity.u.s 0)
+        :*  %apply  ['$OpArg' kind.u.s]  level.u.s  (span-of:ast u)
+            [[pn | (span-of:ast u)] ~]  ~
+            [[%lit %num (crip (a-co arity.u.s)) (span-of:ast u)] ~]
+        ==
+      [%apply [pn kind.u.s] level.u.s (span-of:ast u) ~ ~ ~]
     %=  $
       pl     t.pl
       nms    [pn nms]
@@ -1919,7 +1972,99 @@
           `subw
       ==
     $(bus t.bus, out [wrapped out], ds (weld ds ds.gd))
-  [-.idefs irec(subs isubs.gsubs) (weld ds.gsubs +.idefs)]
+  ::  named theorems/assumptions import as theorem definitions with the
+  ::  body wrapped in $APSubstIn (APSubstInNode)
+  =/  ithms
+    =|  out=(list sem-thm)
+    =|  ds=(list sdiag)
+    =/  bus  bunits
+    |-  ^-  [(list sem-thm) (list sdiag)]
+    ?~  bus  [(flop out) ds]
+    =/  bu  i.bus
+    ?.  ?|  (is-kind bu %n-assumption)
+            (is-kind bu %n-theorem)
+        ==
+      $(bus t.bus)
+    =/  gt  (g-thm bu bctx)
+    ?~  name.r.gt  $(bus t.bus, ds (weld ds ds.gt))
+    ?~  body.r.gt  $(bus t.bus, ds (weld ds ds.gt))
+    ?:  local.r.gt  $(bus t.bus, ds (weld ds ds.gt))
+    =/  ilvl  (max lvl.r.gt sub-lvl)
+    =/  wbody=sem
+      :*  %apply  [(cat 3 '$APSubstIn:' mod.ip) %builtin]  ilvl
+          (span-of:ast u)
+          (turn nms.gsubs |=(nm=@t `sbind`[nm | ~]))
+          ~
+          (weld exs.gsubs `(list sem)`[u.body.r.gt ~])
+      ==
+    =/  wthm=sem-thm
+      :*  `(inst-op-name name.iu u.name.r.gt)
+          local.iu
+          ilvl
+          (span-of:ast u)
+          `wbody
+      ==
+    $(bus t.bus, out [wthm out], ds (weld ds ds.gt))
+  :*  -.idefs
+      -.ithms
+      irec(subs isubs.gsubs)
+      :(weld ds.gsubs +.idefs +.ithms)
+  ==
+::
+++  own-decls
+  ::  a module tree's own CONSTANT and VARIABLE declarations (name,
+  ::  arity, span), in declaration order
+  |=  tree=node
+  ^-  [consts=(list [name=@t arity=@ud at=sspan]) vars=(list [name=@t at=sspan])]
+  =/  units  (body-of-module tree)
+  :_  ^-  (list [name=@t at=sspan])
+      %-  zing
+      %+  turn  units
+      |=  u=node
+      ^-  (list [name=@t at=sspan])
+      ?.  (is-kind u %n-variabledeclaration)  ~
+      %+  turn  (decl-syms u)
+      |=([nm=@t s=sym at=node] [nm (span-of:ast at)])
+  ^-  (list [name=@t arity=@ud at=sspan])
+  %-  zing
+  %+  turn  units
+  |=  u=node
+  ^-  (list [name=@t arity=@ud at=sspan])
+  ?.  (is-kind u %n-paramdeclaration)  ~
+  %+  turn  (decl-syms u)
+  |=([nm=@t s=sym at=node] [nm arity.s (span-of:ast at)])
+::
+++  ext-decls
+  ::  a module's own declarations followed by those it inherits through
+  ::  EXTENDS (transitively; each carrying the declaring module's span),
+  ::  deduplicated by name — SANY's getConstantDecls/getVariableDecls
+  ::  return own decls first, then re-exported ones
+  |=  [tree=node mods=(map @t loaded:modules)]
+  ^-  [consts=(list [name=@t arity=@ud at=sspan]) vars=(list [name=@t at=sspan])]
+  =/  od  (own-decls tree)
+  =/  cacc  consts.od
+  =/  vacc  vars.od
+  =/  ex  (extends-of tree)
+  |-  ^-  [consts=(list [name=@t arity=@ud at=sspan]) vars=(list [name=@t at=sspan])]
+  ?~  ex  [cacc vacc]
+  =/  mt  (~(get by mods) i.ex)
+  ?~  mt  $(ex t.ex)
+  =/  sub  (ext-decls tree.u.mt mods)
+  =/  cacc2
+    =/  el  consts.sub
+    =/  a  cacc
+    |-  ^-  (list [name=@t arity=@ud at=sspan])
+    ?~  el  a
+    ?:  (lien a |=([nm=@t *] =(nm name.i.el)))  $(el t.el)
+    $(el t.el, a (snoc a i.el))
+  =/  vacc2
+    =/  el  vars.sub
+    =/  a  vacc
+    |-  ^-  (list [name=@t at=sspan])
+    ?~  el  a
+    ?:  (lien a |=([nm=@t *] =(nm name.i.el)))  $(el t.el)
+    $(el t.el, a (snoc a i.el))
+  $(ex t.ex, cacc cacc2, vacc vacc2)
 ::
 ++  gen-module
   ::  the root module's semantic graph, with duplicate-definition
@@ -1929,26 +2074,9 @@
   |=  [tree=node c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
   ^-  sem-module
   =/  units  (body-of-module tree)
-  =/  consts
-    ^-  (list [name=@t arity=@ud at=sspan])
-    %-  zing
-    %+  turn  units
-    |=  u=node
-    ^-  (list [name=@t arity=@ud at=sspan])
-    ?.  (is-kind u %n-paramdeclaration)  ~
-    %+  turn  (decl-syms u)
-    |=  [nm=@t s=sym at=node]
-    [nm arity.s (span-of:ast at)]
-  =/  vars
-    ^-  (list [name=@t at=sspan])
-    %-  zing
-    %+  turn  units
-    |=  u=node
-    ^-  (list [name=@t at=sspan])
-    ?.  (is-kind u %n-variabledeclaration)  ~
-    %+  turn  (decl-syms u)
-    |=  [nm=@t s=sym at=node]
-    [nm (span-of:ast at)]
+  =/  ed  (ext-decls tree mods)
+  =/  consts  consts.ed
+  =/  vars  vars.ed
   =/  seen
     =|  acc=(set @t)
     =/  cs  consts
@@ -2025,10 +2153,11 @@
     ?:  ?=(^ iu)
       =/  gi  (g-instance u u.iu c ctxs mods)
       %=  $
-        us     t.us
-        defs   (weld (flop defs.gi) defs)
-        insts  [inst.gi insts]
-        ds     (weld ds ds.gi)
+        us       t.us
+        defs     (weld (flop defs.gi) defs)
+        thmdefs  (weld (flop thms.gi) thmdefs)
+        insts    [inst.gi insts]
+        ds       (weld ds ds.gi)
       ==
     ?.  ?|  (is-kind u %n-operatordefinition)
             (is-kind u %n-functiondefinition)
@@ -2138,8 +2267,14 @@
       c=ctx
       mlevs=(map @t mlev)
   ==
-::  the instanced-module data INSTANCE checking needs
-+$  mlev  [const=? lc=(map lkey @ud)]
+::  the instanced-module data INSTANCE checking needs (constancy plus
+::  the module node's constraint collections)
++$  mlev
+  $:  const=?
+      lc=(map lkey @ud)
+      alc=(map [k=lkey i=@ud] @ud)
+      alp=(set [op=lkey i=@ud par=lkey])
+  ==
 ::  dependency level data seeded into a module's check: definition
 ::  oplevs by exported name (dependency-first, user shadows std) and
 ::  per-module [constancy module-constraints]
@@ -2284,6 +2419,20 @@
   ?.  =("$SubstIn:" (scag 9 t))  ~
   `(crip (slag 9 t))
 ::
+++  apsubstin-mod
+  ::  the $APSubstIn (instanced theorem/assumption) variant
+  |=  nm=@t
+  ^-  (unit @t)
+  =/  t  (trip nm)
+  ?.  =("$APSubstIn:" (scag 11 t))  ~
+  `(crip (slag 11 t))
+::
+++  anysubstin-mod
+  |=  nm=@t
+  ^-  (unit @t)
+  =/  s  (substin-mod nm)
+  ?^(s s (apsubstin-mod nm))
+::
 ++  oparg-def
   ::  the referenced operator of a $OpArg node, when it is a definition
   ::  (AnyDefNode); ~ when it references a formal parameter
@@ -2370,8 +2519,10 @@
         =/  key  (scope-key nm kind.op.s e)
         =/  lvl  (kind-lvl kind.op.s)
         [s(lvl lvl) [lvl & (silt ~[key]) ~ ~ ~ (silt ~[key]) ~] ~]
+      ::  OpArgNode.levelCheck copies the referenced operator's level
+      ::  data but never fills nonLeibnizParams
       =/  ol  (l-resolve nm kind.op.s e)
-      [s(lvl lvl.ol) [lvl.ol ok.ol lp.ol lc.ol ac.ol ap.ol all.ol nlp.ol] ~]
+      [s(lvl lvl.ol) [lvl.ol ok.ol lp.ol lc.ol ac.ol ap.ol all.ol ~] ~]
     ?:  =('$NewSymb' name.op.s)
       =/  gs  (l-args args.s e)
       =/  lvl  (max 0 lvl.rs.gs)
@@ -2413,7 +2564,7 @@
         ==
       =/  [aout=(list sem) ar=lres ads=(list sdiag)]  walk
       [s(lvl lvl.ar, args aout) ar ads]
-    ?:  ?=(^ (substin-mod name.op.s))
+    ?:  ?=(^ (anysubstin-mod name.op.s))
       (l-substin s e)
     ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
       ::  application of a declared symbol or formal parameter
@@ -2493,8 +2644,8 @@
   ::  constraint keyed by one of its CONSTANT declarations tightens to
   ::  0 and one keyed by a VARIABLE declaration to 1 before mapping
   =/  bconst
-    =/  mod  (fall (substin-mod name.op.s) '')
-    const:(~(gut by mlevs.e) mod `mlev`[& ~])
+    =/  mod  (fall (anysubstin-mod name.op.s) '')
+    const:(~(gut by mlevs.e) mod `mlev`[& ~ ~ ~])
   =/  sub-lvl-of
     |=  [k=lkey v=@ud]
     ^-  @ud
@@ -3368,42 +3519,206 @@
   [th(lvl lvl.r.gb, body `s.gb) r.gb ds.gb]
 ::
 ++  l-inst
-  ::  InstanceNode.levelCheck substitution checks: the instanced
-  ::  module's constancy and module-level constraints come precomputed
-  ::  through mlevs (+l-deps), then each substitution is verified (both
-  ::  4245 forms). The 4246/4247 operator-argument checks and
-  ::  non-Leibniz 4244 are not ported
+  ::  InstanceNode.levelCheck: the instanced module's constancy and
+  ::  module-node constraint collections come precomputed through mlevs
+  ::  (+l-deps). Three passes over the substitutions in Java's order:
+  ::  per substitution the constant-module 4245 then the non-Leibniz
+  ::  4244; then per substitution the module-constraint 4245 and the
+  ::  operator-argument 4246; then the co-parameter 4247 over the
+  ::  module's argLevelParams. Also returns the instance node's own
+  ::  level-constraint contribution (Subst.getSubLCSet applied to the
+  ::  module constraints), consumed by the module line
   |=  [it=sem-inst e=lenv]
-  ^-  (list sdiag)
-  =/  bml  (~(gut by mlevs.e) mod.it `mlev`[& ~])
-  =|  ds=(list sdiag)
-  =/  sl  subs.it
-  |-  ^-  (list sdiag)
-  ?~  sl  ds
-  ?~  expr.i.sl  $(sl t.sl)
-  =/  ge  (l-x u.expr.i.sl e)
-  =/  plvl  (kind-lvl pkind.i.sl)
-  =/  d1=(list sdiag)
-    ?.  ?&(!const.bml (gth lvl.r.ge plvl))  ~
-    :_  ~
-    %^  derr  4.245  at.it
-    ;:  weld
-      "Level error in instantiating module '{(trip mod.it)}':\0a"
-      "The level of the expression or operator substituted for "
-      "'{(trip param.i.sl)}' \0amust be at most {(a-co plvl)}."
+  ^-  [ds=(list sdiag) lc=(map lkey @ud)]
+  =/  bml  (~(gut by mlevs.e) mod.it `mlev`[& ~ ~ ~])
+  ::  level-check every substitution expression once
+  =/  ents
+    ^-  (list [param=@t pkind=symkind sx=(unit sem) rl=lres dsx=(list sdiag)])
+    %+  turn  subs.it
+    |=  is=sem-isub
+    ?~  expr.is  [param.is pkind.is ~ lres-nil ~]
+    =/  g  (l-x u.expr.is e)
+    [param.is pkind.is `s.g r.g ds.g]
+  =/  d1
+    =|  ds=(list sdiag)
+    =/  el  ents
+    |-  ^-  (list sdiag)
+    ?~  el  ds
+    ?~  sx.i.el  $(el t.el)
+    =/  plvl  (kind-lvl pkind.i.el)
+    =/  da=(list sdiag)
+      ?.  ?&(!const.bml (gth lvl.rl.i.el plvl))  ~
+      :_  ~
+      %^  derr  4.245  at.it
+      ;:  weld
+        "Level error in instantiating module '{(trip mod.it)}':\0a"
+        "The level of the expression or operator substituted for "
+        "'{(trip param.i.el)}' \0amust be at most {(a-co plvl)}."
+      ==
+    =/  db=(list sdiag)
+      =/  od  (oparg-def u.sx.i.el e)
+      ?~  od  ~
+      ?:  (levy lbz.ol.u.od |=(f=? f))  ~
+      :_  ~
+      %^  derr  4.244  at.it
+      ;:  weld
+        "Error in instantiating module '{(trip mod.it)}':\0a"
+        " A non-Leibniz operator substituted for "
+        "'{(trip param.i.el)}'."
+      ==
+    $(el t.el, ds :(weld ds dsx.i.el da db))
+  =/  d2
+    =|  ds=(list sdiag)
+    =/  el  ents
+    |-  ^-  (list sdiag)
+    ?~  el  ds
+    ?~  sx.i.el  $(el t.el)
+    =/  key  `lkey`['' param.i.el pkind.i.el]
+    =/  plevel  (~(get by lc.bml) key)
+    =/  da=(list sdiag)
+      ?~  plevel  ~
+      ?.  (gth lvl.rl.i.el u.plevel)  ~
+      :_  ~
+      %^  derr  4.245  at.it
+      ;:  weld
+        "Level error in instantiating module '{(trip mod.it)}':\0a"
+        "The level of the expression or operator substituted for "
+        "'{(trip param.i.el)}' \0amust be at most {(a-co u.plevel)}."
+      ==
+    =/  db=(list sdiag)
+      =/  od  (oparg-def u.sx.i.el e)
+      ?~  od  ~
+      ::  the module's arg-level constraints on this parameter, in
+      ::  ascending argument position (Java iterates j < arity and
+      ::  skips absent entries)
+      =/  pents
+        ^-  (list [pos=@ud alev=@ud])
+        %+  sort
+          %+  murn  ~(tap by alc.bml)
+          |=  [kk=[k=lkey i=@ud] v=@ud]
+          ^-  (unit [pos=@ud alev=@ud])
+          ?.(=(key k.kk) ~ `[i.kk v])
+        |=([a=[pos=@ud alev=@ud] b=[pos=@ud alev=@ud]] (lth pos.a pos.b))
+      =/  plstr  ?~(plevel "null" (a-co u.plevel))
+      =|  dj=(list sdiag)
+      |-  ^-  (list sdiag)
+      ?~  pents  dj
+      ?.  (lth (mxl-of ol.u.od pos.i.pents) alev.i.pents)
+        $(pents t.pents)
+      %=  $
+        pents  t.pents
+        dj  %+  weld  dj
+            :_  ~
+            %^  derr  4.246  at.it
+            ;:  weld
+              "Level error in instantiating module '{(trip mod.it)}':\0a"
+              "The level of the argument {(a-co pos.i.pents)} of the "
+              "operator {(trip nm.u.od)} \0amust be at least {plstr}."
+            ==
+      ==
+    $(el t.el, ds :(weld ds da db))
+  =/  d3
+    =|  ds=(list sdiag)
+    =/  al  ~(tap in alp.bml)
+    |-  ^-  (list sdiag)
+    ?~  al  ds
+    =/  ei
+      =/  el  ents
+      |-  ^-  (unit [param=@t pkind=symkind sx=(unit sem) rl=lres dsx=(list sdiag)])
+      ?~  el  ~
+      ?:  =(op.i.al `lkey`['' param.i.el pkind.i.el])  `i.el
+      $(el t.el)
+    =/  ej
+      =/  el  ents
+      |-  ^-  (unit [param=@t pkind=symkind sx=(unit sem) rl=lres dsx=(list sdiag)])
+      ?~  el  ~
+      ?:  =(par.i.al `lkey`['' param.i.el pkind.i.el])  `i.el
+      $(el t.el)
+    ?~  ei  $(al t.al)
+    ?~  ej  $(al t.al)
+    ?~  sx.u.ei  $(al t.al)
+    =/  od  (oparg-def u.sx.u.ei e)
+    ?~  od  $(al t.al)
+    =/  mx  (mxl-of ol.u.od i.i.al)
+    ?.  (gth lvl.rl.u.ej mx)  $(al t.al)
+    %=  $
+      al  t.al
+      ds  %+  weld  ds
+          :_  ~
+          %^  derr  4.247  at.it
+          ;:  weld
+            "Level error when instantiating module '{(trip mod.it)}':\0a"
+            "The level of the argument {(a-co i.i.al)} of the "
+            "operator {(trip param.u.ei)}' \0amust be at most {(a-co mx)}."
+          ==
     ==
-  =/  d2=(list sdiag)
-    =/  pl2  (~(get by lc.bml) ['' param.i.sl pkind.i.sl])
-    ?~  pl2  ~
-    ?.  (gth lvl.r.ge u.pl2)  ~
-    :_  ~
-    %^  derr  4.245  at.it
-    ;:  weld
-      "Level error in instantiating module '{(trip mod.it)}':\0a"
-      "The level of the expression or operator substituted for "
-      "'{(trip param.i.sl)}' \0amust be at most {(a-co u.pl2)}."
-    ==
-  $(sl t.sl, ds :(weld ds ds.ge d1 d2))
+  ::  the instance node's levelConstraints: the module's, with the
+  ::  getSubLCSet kind overrides, mapped through the substitutions
+  =/  lcc
+    =/  acc  *(map lkey @ud)
+    =/  ps  ~(tap by lc.bml)
+    |-  ^-  (map lkey @ud)
+    ?~  ps  acc
+    =/  kk  `lkey`-.i.ps
+    =/  plevel
+      ?:  const.bml  +.i.ps
+      ?:  =(%constant kind.kk)  0
+      ?:  =(%variable kind.kk)  1
+      +.i.ps
+    =/  hit
+      =/  el  ents
+      |-  ^-  (unit lres)
+      ?~  el  ~
+      ?:  =(kk `lkey`['' param.i.el pkind.i.el])  `rl.i.el
+      $(el t.el)
+    ?~  hit  $(ps t.ps, acc (lc-put acc kk plevel))
+    =/  acc2
+      =/  qs  ~(tap in lp.u.hit)
+      |-  ^-  (map lkey @ud)
+      ?~  qs  acc
+      $(qs t.qs, acc (lc-put acc i.qs plevel))
+    $(ps t.ps, acc acc2)
+  ::  getSubLCSet's arg-level-param bounds: for a module argLevelParam
+  ::  whose op is substituted by a definition, bound the mapped param
+  ::  (paramSet of alp.param) by that definition's per-argument maximum
+  =/  lcc
+    =/  al  ~(tap in alp.bml)
+    |-  ^-  (map lkey @ud)
+    ?~  al  lcc
+    =/  sxop
+      =/  el  ents
+      |-  ^-  (unit (unit sem))
+      ?~  el  ~
+      ?:  =(op.i.al `lkey`['' param.i.el pkind.i.el])  `sx.i.el
+      $(el t.el)
+    ?~  sxop  $(al t.al)
+    ?~  u.sxop  $(al t.al)
+    =/  od  (oparg-def u.u.sxop e)
+    ?~  od  $(al t.al)
+    =/  mlevel  (mxl-of ol.u.od i.i.al)
+    ::  paramSet(alp.param): the substituting expression's level params,
+    ::  or the param itself when it is not substituted
+    =/  qs
+      ^-  (list lkey)
+      =/  rj
+        =/  el  ents
+        |-  ^-  (unit lres)
+        ?~  el  ~
+        ?:  =(par.i.al `lkey`['' param.i.el pkind.i.el])  `rl.i.el
+        $(el t.el)
+      ?~(rj [par.i.al ~] ~(tap in lp.u.rj))
+    =/  lcc2
+      |-  ^-  (map lkey @ud)
+      ?~  qs  lcc
+      $(qs t.qs, lcc (lc-put lcc i.qs mlevel))
+    $(al t.al, lcc lcc2)
+  ::  plus each substitution expression's own level constraints
+  =/  lcc
+    =/  el  ents
+    |-  ^-  (map lkey @ud)
+    ?~  el  lcc
+    $(el t.el, lcc (lc-uni lcc lc.rl.i.el))
+  [:(weld d1 d2 d3) lcc]
 ::
 ++  dedup-diags
   ::  Errors.addMessage is idempotent on [code location message]
@@ -3566,6 +3881,38 @@
   %+  turn  thmdefs.m
   |=(th=sem-thm (crip "lvl {(trip (fall name.th ''))} L-1"))
 ::
+++  validate-target
+  ::  the pure validation gate for TLC-configuration targets (consumed
+  ::  by the configuration unit): resolve a definition or theorem
+  ::  definition by name in a level-checked module and accept it iff
+  ::  its level does not exceed the required maximum. Failure is a
+  ::  structured diagnostic (code 0: internal, not a SANY code)
+  |=  [m=sem-module nm=@t maxlvl=@ud]
+  ^-  (each @ud sdiag)
+  =/  hit=(unit [lvl=@ud at=sspan])
+    =/  dl  defs.m
+    |-  ^-  (unit [lvl=@ud at=sspan])
+    ?~  dl
+      =/  tl  thmdefs.m
+      |-  ^-  (unit [lvl=@ud at=sspan])
+      ?~  tl  ~
+      ?:  ?&(?=(^ name.i.tl) =(nm u.name.i.tl))  `[lvl.i.tl at.i.tl]
+      $(tl t.tl)
+    ?:  =(nm name.i.dl)  `[lvl.i.dl at.i.dl]
+    $(dl t.dl)
+  ?~  hit
+    [%| (derr 0 ~ "Unknown target: {(trip nm)}.")]
+  ?.  lchecked.m
+    [%| (derr 0 at.u.hit "Target {(trip nm)} is not level-checked.")]
+  ?:  (gth lvl.u.hit maxlvl)
+    :-  %|
+    %^  derr  0  at.u.hit
+    ;:  weld
+      "Level error: {(trip nm)} has level {(a-co lvl.u.hit)}, "
+      "the maximum allowed is {(a-co maxlvl)}."
+    ==
+  [%& lvl.u.hit]
+::
 ++  level-module
   ::  the level-checking pass over a generated module (no-op, with
   ::  L-1 masking preserved, when generation reported errors)
@@ -3615,7 +3962,7 @@
       ==
   ^-  [m=sem-module ml=mlev lvls=wain ops=(map @t oplev)]
   ?:  (lien diags.m |=(d=sdiag =(%error sev.d)))
-    [m [& ~] (render-levels-masked m) ops.dv]
+    [m [& ~ ~ ~] (render-levels-masked m) ops.dv]
   =/  e=lenv
     :*  ops.dv
         =/  acc  *(map @t lkey)
@@ -3808,11 +4155,13 @@
     =|  ds=(list sdiag)
     =|  arl=(list lres)
     =|  trl=(list lres)
+    =|  ilc=(map lkey @ud)
     =/  sl  stmts
     |-  ^-  $:  wass=(list sem-thm)  wtheo=(list sem-thm)
                 arl=(list lres)  trl=(list lres)  pds=(list sdiag)
+                ilc=(map lkey @ud)
             ==
-    ?~  sl  [wass wtheo (flop arl) (flop trl) ds]
+    ?~  sl  [wass wtheo (flop arl) (flop trl) ds ilc]
     ?-    tag.i.sl
         %a
       =/  th  (snag idx.i.sl wass)
@@ -3842,7 +4191,8 @@
     ::
         %i
       =/  it  (snag idx.i.sl instances.m)
-      $(sl t.sl, ds (weld ds (l-inst it et)))
+      =/  li  (l-inst it et)
+      $(sl t.sl, ds (weld ds ds.li), ilc (lc-uni ilc lc.li))
     ==
   =/  tp  tops
   =/  wass  wass.tp
@@ -3850,6 +4200,7 @@
   =/  arl  arl.tp
   =/  trl  trl.tp
   =/  pds  pds.tp
+  =/  ilc  ilc.tp
   ::  module constancy and module-level constraints (consumed by
   ::  INSTANCE checking when this module is instanced)
   =/  const
@@ -3920,10 +4271,12 @@
         ?.  =(%constant kind.i.ps)  $(ps t.ps)
         $(ps t.ps, a2 (lc-put a2 i.ps 2))
       $(al t.al, acc acc2)
-    =/  tl  trl
-    |-  ^-  (map lkey @ud)
-    ?~  tl  acc
-    $(tl t.tl, acc (lc-uni acc lc.i.tl))
+    =/  acc
+      =/  tl  trl
+      |-  ^-  (map lkey @ud)
+      ?~  tl  acc
+      $(tl t.tl, acc (lc-uni acc lc.i.tl))
+    (lc-uni acc ilc)
   =/  m2
     %_  m
       defs      wdefs
@@ -4026,7 +4379,7 @@
   =/  lint-ds
     ?:  (lien allds |=(d=sdiag =(%error sev.d)))  ~
     (l-lint m2 c)
-  [m2(diags (dedup-diags (weld allds lint-ds))) [const mlc] lvls ops.et]
+  [m2(diags (dedup-diags (weld allds lint-ds))) [const mlc malc malp] lvls ops.et]
 ::
 ++  collect-records
   ::  every $RcdConstructor application in the module, in generation
@@ -4280,11 +4633,12 @@
         %+  turn  (slag n-assumes args.s)
         |=(a=sem (render-sem a (add d 2) mask))
       ==
-    ?:  ?=(^ (substin-mod name.op.s))
+    ?:  ?=(^ (anysubstin-mod name.op.s))
       ::  the reserved substitution wrapper (see the mold note above)
+      =/  tag  ?:(?=(^ (substin-mod name.op.s)) "substin" "apsubstin")
       =/  nsubs  (lent ubound.s)
       :-  %+  line  d
-          "substin subs={(a-co nsubs)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
+          "{tag} subs={(a-co nsubs)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
       ;:  weld
         ^-  wain
         %-  zing

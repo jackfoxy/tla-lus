@@ -372,3 +372,82 @@ Parity-manifest rows changed: level-node-rules (partial -> parity, evidence now 
 Compatibility limitations removed or added: none (BY/QED already tracked as unit-3 residue)
 Remaining dependencies: 4.6 (instance/substitution: oparg rendering, 4244/4246/4247, APSubstIn), 4.7 lint options, 4.8 integration
 ```
+
+## 4.6 Instance and substitution constraints (done 2026-07-19)
+
+The four named failing cases (`lvlinsth lvlinstm lvlinstp apsubst`)
+closed, plus two new coverage fixtures (`instlcl` local, `instrex`
+re-exported). Suite 71/71; the FULL ship suite is `ok=%.y` for the
+first time since the 4.0 baseline (818 OK). Manifest row
+`level-substitution` -> parity.
+
+Generation (`g-instance`):
+
+- **Operator-valued substitutions render as `$OpArg`** (`lvlinsth`):
+  `INSTANCE B WITH F <- Op` where B's F is `CONSTANT F(_)`. Both
+  explicit (via `oparg-of`) and implicit (arity>0 param -> reserved
+  `$OpArg` apply) substitution expressions.
+- **APSubstIn theorem import** (`apsubst`): a named theorem/assumption
+  of an instanced module imports as a thmdef whose body is a reserved
+  `$APSubstIn:<mod>` apply (sibling of `$SubstIn:<mod>`; matched by
+  `+apsubstin-mod`/`+anysubstin-mod`, rendered `apsubstin`). This was
+  the unit-3 residue dependency — now landed.
+- **constructSubst ordering** (`instlcl`): the substitution vector is
+  the implicit subs (one per instanced-module parameter that resolves
+  in the instantiating module, in the instanced module's declaration
+  order) with explicit WITH substitutions overwriting matching slots
+  in place or appending. `+g-instance`'s `ordered` builds exactly this.
+
+Level checking (`l-inst`, now returning `[ds lc]`):
+
+- Three passes in Java's order: per-sub constant-module 4245 then
+  non-Leibniz 4244; per-sub module-constraint 4245 then arg-level
+  4246; then the co-parameter 4247 over the module's argLevelParams.
+- The instance node's own **getSubLCSet level-constraint contribution**
+  (module constraints with the constant->0/variable->1 kind overrides,
+  mapped through the substitutions' level params, plus alp-driven
+  bounds and each sub expression's own lc) flows into the module line
+  via a new `ilc` accumulator in `l-module-core`'s top-level walk.
+- `mlev` grew `alc`/`alp` (the module node's arg-level constraint and
+  arg-level-param collections) so `l-inst` reads them without
+  re-deriving; `+l-module-core` returns them.
+
+**Root-cause fix (build-ctx), load-bearing:** A's context wrongly
+contained an instanced module's VARIABLE/CONSTANT *declarations*
+because `build-ctx` folded imports over `refs-of` (EXTENDS **and**
+INSTANCE). INSTANCE imports only *definitions* (via `+inst-syms`,
+prefixed); its raw declarations must not leak. Changed the imports
+fold to `+extends-of` (EXTENDS only). This is what made `instlcl`'s
+implicit-resolution correct (`y` from B no longer resolves in A). It
+also fixed `instrex`'s constraint leak. `inst`/`instun`/`instimp`/
+`lvlinst*` still green (they imported instanced defs via `inst-syms`
+all along; the raw-decl import was only ever wrong).
+
+**EXTENDS declaration re-export** (`instrex`, `+ext-decls`): SANY's
+`getConstantDecls`/`getVariableDecls` return own decls first, then
+those inherited through EXTENDS (transitively, each with the declaring
+module's span). `gen-module` now lists them via `+ext-decls`
+(own-first, name-deduped). Standard modules declare no CONSTANT/
+VARIABLE, so extending Naturals etc. adds nothing.
+
+**Configuration gate** (`+validate-target`, plan task 6): a pure
+each-typed accept/reject by target name and required maximum level for
+the later TLC configuration unit; three `tests/lib/tla/lvl` unit tests
+(accept at/below max, level reject, unknown target).
+
+Subunit handoff:
+
+```text
+Subunit: 4.6
+Java owner and entry method: InstanceNode.levelCheck (three subst passes + getSubLCSet/getSubALCSet/getSubALPSet), SubstInNode/APSubstInNode.levelCheck, Subst.paramSet/getSubLCSet, Generator constructSubst/processSubst
+Current Hoon owner: lib/tla/semantic.hoon (g-instance ordered + OpArg + APSubstIn, l-inst three passes + ilc, l-module-core %i/ilc, mlev alc/alp, build-ctx extends-of, ext-decls, own-decls, validate-target)
+Smallest failing parity case: none — full suite ok=%.y
+New or changed nouns: mlev += alc/alp; l-inst returns [ds lc]; g-instance returns [defs thms inst ds]; validate-target
+Diagnostic/result expected: 4244/4245/4246/4247 codes+spans+text; oparg/apsubstin tree shapes; module-line getSubLCSet lc
+Focused validation result: sem 71/71, lvl 13/13
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.y (818 OK, 0 failed); validate.py --check clean (71 sem cases); check-parity.py --check clean; scaffold-gate PASS
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-substitution (partial -> parity, 11 fixtures + validate-target)
+Compatibility limitations removed or added: removed oparg/4244/4246/4247/APSubstIn gaps; build-ctx INSTANCE-decl-leak fixed; EXTENDS decl re-export added
+Remaining dependencies: 4.7 (lint-options driver controls), 4.8 (%analyze integration); BY/QED proof-step level rules await unit-3 proof nodes
+```

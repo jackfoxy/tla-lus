@@ -129,4 +129,42 @@
     (expect-eq !>("") !>((rn-ac *(map [k=lkey i=@ud] @ud))))
     (expect-eq !>("") !>((seg-set:semantic "lp" ~)))
   ==
+::
+::  the pure configuration-target validation gate (unit 4.6): accept a
+::  resolved definition at or below the required maximum level, reject
+::  with a structured diagnostic above it or when unresolved
+++  spec-module
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"
+    "VARIABLE x\0a"
+    "Init == x = 0\0a"
+    "Next == x' = x\0a"
+    "====\0a"
+  ==
+::
+++  checked
+  ^-  sem-module:semantic
+  (need (generate:semantic 'A' (malt ~[['A' spec-module]])))
+::
+++  test-validate-target-ok
+  =/  m  checked
+  ;:  weld
+    (expect-eq !>([%& 1]) !>((validate-target:semantic m 'Init' 1)))
+    (expect-eq !>([%& 2]) !>((validate-target:semantic m 'Next' 2)))
+    (expect-eq !>([%& 1]) !>((validate-target:semantic m 'Init' 3)))
+  ==
+::
+++  test-validate-target-level-reject
+  =/  r  (validate-target:semantic checked 'Next' 1)
+  ;:  weld
+    (expect-eq !>(%|) !>(-.r))
+    %+  expect-eq  !>(&)
+    !>  ?&(?=(%| -.r) =(0 code.p.r) =(%error sev.p.r))
+  ==
+::
+++  test-validate-target-unknown
+  =/  r  (validate-target:semantic checked 'Nope' 3)
+  (expect-eq !>(%|) !>(-.r))
 --
