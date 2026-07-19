@@ -140,9 +140,12 @@ Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
   higher-order min-max/level conditions, level params, level/arg-level
   constraints, arg-level params, non-Leibniz params, all sorted) is
   rendered by the Hoon level pass and byte-compared per sem case since
-  4.1 (48/56 green; the reds are the cases above). The call-site
-  argLevelParam remapping for doubly-higher-order operator arguments
-  (`OpApplNode.levelCheck` lines 758–773) is still owed to 4.3.
+  4.1; 4.3 added the call-site argLevelParam blocks (op/param-side
+  remapping, alp-driven level and arg-level constraint bounds, the
+  doubly-higher-order non-Leibniz rule) and the 4270/4271
+  operator-argument arity mismatches, so every higher-order rule is at
+  parity and the remaining reds are the recursion/substitution cases
+  above.
 - **Driver-level lint controls** (`SanySettings.suppressedCodes` /
   `messagesAsErrorCodes`, `filterVisibleMessages`) are a report-time
   concern invisible to the `Errors` channel; the Hoon `lint-options`

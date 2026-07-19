@@ -211,3 +211,68 @@ Parity-manifest rows changed: level-basic (partial -> parity), level-node-rules 
 Compatibility limitations removed or added: removed the two closed bullets (bound-identifier L-1, DIAGS escaping)
 Remaining dependencies: 4.3 (higher-order: add the doubly-higher-order argLevelParam remapping fixture), 4.4 (recfcn), 4.5 negative ASSUME fixtures, 4.6 instance ops
 ```
+
+## 4.3 Higher-order operator rules (done 2026-07-19)
+
+Six new fixtures, all green (`ho273 hodbl horemap hoparm houn hoargm`;
+suite 57/62); red set unchanged at the 4.4/4.6 owners
+`{apsubst lvlinsth lvlinstm lvlinstp recfcn}`. Manifest row
+`level-higher-order` -> parity.
+
+Key oracle finding driving the design: `OpDefNode.levelCheck` REMOVES
+argLevelParams entries whose op and param are both its own formals, so
+the call-site alp blocks in `OpApplNode.levelCheck` only ever see
+surviving entries (one side foreign). The observable cases:
+
+- `horemap` (`H(F(_)) == F(x)`; `D(G(_)) == H(G)`): H exports
+  `alp={(F,0,x)}`; at the call site the op side remaps to the actual
+  formal-parameter operator argument -> `D alp={(G,0,x)}`, and the
+  alp-driven ac bounds `(F,0)>=level(G-oparg)=0` -> `D alc={(F,0)>=0}`
+  (keyed by H's formal, surviving into D and the module line).
+- `hoparm` (`CONSTANT P(_)`; `H(a) == P(a)`; `Use == H(x)`): the param
+  side remaps through the operand's level params -> `Use alp={(P,0,x)}`.
+- `ho273` (`Bad == H(Pr, x')`, `Bad2 == H(Pr, x)` with `Pr(e) == e'`):
+  4273 (opLevelCond co-argument max-level violation, at the apply span,
+  same first line as 4205) plus the doubly-higher-order non-Leibniz
+  rule (lines 758-773): `Bad2 nlp={x}` even though x is unprimed and H
+  itself is Leibniz — cond(i,j,k) && !argDef.isLeibnizArg(k) injects
+  operands[j].allParams. Applied AFTER the bound-identifier removal,
+  per Java's ordering.
+- alp-driven lc (`put(alp.param <= argDef.getMaxLevel(alp.i))` when the
+  op side receives a definition-valued operator argument) fires only
+  for surviving entries; no separate fixture (subsumed by the above).
+- `houn`: unused operator parameter -> `w=[0]`, `param F L-1`,
+  `mml=[0] olc=[F]`, and an oparg operand under a weight-0 position
+  does not raise the level.
+- `hodbl`: singly-higher-order pass-through (`D(G(_)) == H(G, x)`) ->
+  `D mml=[1]` from the call-site `(G,0)>=level(x)` opLevelCond bound.
+
+4270/4271 arity mismatches (`hoargm`) are GENERATION-side: `sym` grew
+`parg` (per-formal-param arities, filled from `lhs-params` for
+N_IdentLHS; everywhere else `~`), and `+g-opappl` checks each position
+BEFORE generating the argument: a bare reference of the wrong arity
+gets 4271 `Expected arity E but found operator of arity T.` at the
+reference span, any other expression gets 4270 at its span, the
+argument becomes nullODN and is NEVER generated (its own resolution
+errors must not surface — `H(x + 1)` without Naturals emits no 4004s),
+and the match phase appends 4271 `Argument number i to operator 'Op'`
+(trailing space + newline in the raw message) at the apply span after
+all argument errors. All levels mask to -1 (semantic errors), and
+arity>0 defs render `ml=? w=?` / `mml=? olc=?`.
+
+Subunit handoff:
+
+```text
+Subunit: 4.3
+Java owner and entry method: OpApplNode.levelCheck call-site blocks (alp-driven lc/ac, alp remapping, non-Leibniz rule 758-773); Generator selector 4270/4271; OpDefNode.match 4271
+Current Hoon owner: lib/tla/semantic.hoon (l-apply-def par-idx/arg-lres/arg-sem + four new blocks; g-opappl expectation-aware argument walk; ref-arity; sym.parg)
+Smallest failing parity case: none for 4.3; next failing cases are recfcn (4.4) and lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: sym += parg=(list @ud) (16 construction sites, real arities only from lhs-params)
+Diagnostic/result expected: 4270/4271/4273 codes, spans, message text; alp/alc/lc/nlp projection entries
+Focused validation result: sem 57/62 (reds = apsubst lvlinsth lvlinstm lvlinstp recfcn), lvl 10/10
+Full validation result: full ship suite same 5 reds only; validate.py --check clean (62 cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-higher-order (partial -> parity, evidence now 8 fixtures)
+Compatibility limitations removed or added: doubly-higher-order remapping note removed; 4244/4246/4247 remain (4.6)
+Remaining dependencies: 4.4 (recfcn: $RecursiveFcnSpec self-binder), 4.5 negative ASSUME fixtures, 4.6 instance/substitution ops
+```

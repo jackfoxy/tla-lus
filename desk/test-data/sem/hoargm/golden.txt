@@ -1,0 +1,27 @@
+ACCEPT
+MODULE A 1.1-8.4
+  var x L1 2.10-2.10
+  def H arity=1 local=n L-1 3.1-3.15
+    param F arity=1 L-1 3.3-3.6
+    apply F opkind=FormalParamKind L-1 3.12-3.15
+      num 1 L-1 3.14-3.14
+  def Two arity=2 local=n L-1 4.1-4.14
+    param a arity=0 L-1 4.5-4.5
+    param b arity=0 L-1 4.8-4.8
+    apply a opkind=FormalParamKind L-1 4.14-4.14
+  def Bad arity=0 local=n L-1 5.1-5.13
+    apply H opkind=UserDefinedOpKind L-1 5.8-5.13
+      apply nullODN opkind=k0 L-1 0.0-0.0
+  def Bad2 arity=0 local=n L-1 6.1-6.12
+    apply H opkind=UserDefinedOpKind L-1 6.9-6.12
+      apply nullODN opkind=k0 L-1 0.0-0.0
+  def Bad3 arity=0 local=n L-1 7.1-7.16
+    apply H opkind=UserDefinedOpKind L-1 7.9-7.16
+      apply nullODN opkind=k0 L-1 0.0-0.0
+DIAGS
+D 4271 ERROR 5.10-5.12 Expected arity 1 but found operator of arity 2.
+D 4271 ERROR 5.8-5.13 Argument number 1 to operator 'H'
+D 4271 ERROR 6.11-6.11 Expected arity 1 but found operator of arity 0.
+D 4271 ERROR 6.9-6.12 Argument number 1 to operator 'H'
+D 4270 ERROR 7.11-7.15 An expression appears as argument number 1 (counting from 1) to operator 'H', in a position an operator is required.
+D 4271 ERROR 7.9-7.16 Argument number 1 to operator 'H'

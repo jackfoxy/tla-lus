@@ -381,6 +381,128 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aFac[n \\in Nat] == n\0a====\0a'
   ==
 ::
+++  test-sem-ho273
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-7.4'
+        '  var x L1 2.10-2.10'
+        '  def H arity=2 local=n L0 3.1-3.18'
+        '    param F arity=1 L0 3.3-3.6'
+        '    param a arity=0 L0 3.9-3.9'
+        '    apply F opkind=FormalParamKind L0 3.15-3.18'
+        '      apply a opkind=FormalParamKind L0 3.17-3.17'
+        '  def Pr arity=1 local=n L2 4.1-4.11'
+        '    param e arity=0 L0 4.4-4.4'
+        '    apply \' opkind=BuiltInKind L2 4.10-4.11'
+        '      apply e opkind=FormalParamKind L0 4.10-4.10'
+        '  def Bad arity=0 local=n L2 5.1-5.16'
+        '    apply H opkind=UserDefinedOpKind L2 5.8-5.16'
+        '      oparg Pr op=Pr arity=1 L2 5.10-5.11'
+        '      apply \' opkind=BuiltInKind L2 5.14-5.15'
+        '        apply x opkind=VariableDeclKind L1 5.14-5.14'
+        '  def Bad2 arity=0 local=n L2 6.1-6.16'
+        '    apply H opkind=UserDefinedOpKind L2 6.9-6.16'
+        '      oparg Pr op=Pr arity=1 L2 6.11-6.12'
+        '      apply x opkind=VariableDeclKind L1 6.15-6.15'
+        'DIAGS'
+        'D 4273 ERROR 5.8-5.16 Level error in applying operator H:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl H L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]'
+        'lvl Pr L2 ml=[1] w=[0]'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
+        'lvl Bad2 L2 lp={x} lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aH(F(_), a) == F(a)\0aPr(e) == e\'\0aBad == H(Pr, x\')\0aBad2 == H(Pr, x)\0a====\0a'
+  ==
+::
+++  test-sem-hoargm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-8.4'
+        '  var x L1 2.10-2.10'
+        '  def H arity=1 local=n L-1 3.1-3.15'
+        '    param F arity=1 L-1 3.3-3.6'
+        '    apply F opkind=FormalParamKind L-1 3.12-3.15'
+        '      num 1 L-1 3.14-3.14'
+        '  def Two arity=2 local=n L-1 4.1-4.14'
+        '    param a arity=0 L-1 4.5-4.5'
+        '    param b arity=0 L-1 4.8-4.8'
+        '    apply a opkind=FormalParamKind L-1 4.14-4.14'
+        '  def Bad arity=0 local=n L-1 5.1-5.13'
+        '    apply H opkind=UserDefinedOpKind L-1 5.8-5.13'
+        '      apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def Bad2 arity=0 local=n L-1 6.1-6.12'
+        '    apply H opkind=UserDefinedOpKind L-1 6.9-6.12'
+        '      apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def Bad3 arity=0 local=n L-1 7.1-7.16'
+        '    apply H opkind=UserDefinedOpKind L-1 7.9-7.16'
+        '      apply nullODN opkind=k0 L-1 0.0-0.0'
+        'DIAGS'
+        'D 4271 ERROR 5.10-5.12 Expected arity 1 but found operator of arity 2.'
+        'D 4271 ERROR 5.8-5.13 Argument number 1 to operator \'H\''
+        'D 4271 ERROR 6.11-6.11 Expected arity 1 but found operator of arity 0.'
+        'D 4271 ERROR 6.9-6.12 Argument number 1 to operator \'H\''
+        'D 4270 ERROR 7.11-7.15 An expression appears as argument number 1 (counting from 1) to operator \'H\', in a position an operator is required.'
+        'D 4271 ERROR 7.9-7.16 Argument number 1 to operator \'H\''
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl H L-1 ml=? w=? mml=? olc=?'
+        'lvl Two L-1 ml=? w=?'
+        'lvl Bad L-1'
+        'lvl Bad2 L-1'
+        'lvl Bad3 L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aH(F(_)) == F(1)\0aTwo(a, b) == a\0aBad == H(Two)\0aBad2 == H(x)\0aBad3 == H(x + 1)\0a====\0a'
+  ==
+::
+++  test-sem-hodbl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def H arity=2 local=n L0 3.1-3.18'
+        '    param F arity=1 L0 3.3-3.6'
+        '    param a arity=0 L0 3.9-3.9'
+        '    apply F opkind=FormalParamKind L0 3.15-3.18'
+        '      apply a opkind=FormalParamKind L0 3.17-3.17'
+        '  def D arity=1 local=n L1 4.1-4.18'
+        '    param G arity=1 L0 4.3-4.6'
+        '    apply H opkind=UserDefinedOpKind L1 4.12-4.18'
+        '      oparg G op=G arity=1 L0 4.14-4.14'
+        '      apply x opkind=VariableDeclKind L1 4.17-4.17'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=3}'
+        'lvl H L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]'
+        'lvl D L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=3} alp={(G,0,x)}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aH(F(_), a) == F(a)\0aD(G(_)) == H(G, x)\0a====\0a'
+  ==
+::
 ++  test-sem-hoparam
   %+  expect-eq
     !>  ^-  wain
@@ -403,6 +525,95 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aApply(op(_), x) == op(x)\0a====\0a'
+  ==
+::
+++  test-sem-hoparm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  const P arity=1 L0 2.10-2.13'
+        '  var x L1 3.10-3.10'
+        '  def H arity=1 local=n L0 4.1-4.12'
+        '    param a arity=0 L0 4.3-4.3'
+        '    apply P opkind=ConstantDeclKind L0 4.9-4.12'
+        '      apply a opkind=FormalParamKind L0 4.11-4.11'
+        '  def Use arity=0 local=n L1 5.1-5.11'
+        '    apply H opkind=UserDefinedOpKind L1 5.8-5.11'
+        '      apply x opkind=VariableDeclKind L1 5.10-5.10'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={P} lc={P<=0,x<=3} alc={(P,0)>=0} alp={(P,0,x)}'
+        'lvl H L0 ml=[3] w=[1] lp={P} alc={(P,0)>=0} alp={(P,0,a)}'
+        'lvl Use L1 lp={P,x} lc={x<=3} alc={(P,0)>=0} alp={(P,0,x)}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT P(_)\0aVARIABLE x\0aH(a) == P(a)\0aUse == H(x)\0a====\0a'
+  ==
+::
+++  test-sem-horemap
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def H arity=1 local=n L1 3.1-3.15'
+        '    param F arity=1 L0 3.3-3.6'
+        '    apply F opkind=FormalParamKind L1 3.12-3.15'
+        '      apply x opkind=VariableDeclKind L1 3.14-3.14'
+        '  def D arity=1 local=n L1 4.1-4.15'
+        '    param G arity=1 L0 4.3-4.6'
+        '    apply H opkind=UserDefinedOpKind L1 4.12-4.15'
+        '      oparg G op=G arity=1 L0 4.14-4.14'
+        'LEVELS'
+        'lvl MODULE A L-1 alc={(F,0)>=0}'
+        'lvl H L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} alp={(F,0,x)}'
+        'lvl D L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} alc={(F,0)>=0} alp={(G,0,x)}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aH(F(_)) == F(x)\0aD(G(_)) == H(G)\0a====\0a'
+  ==
+::
+++  test-sem-houn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Pr arity=1 local=n L2 2.1-2.11'
+        '    param e arity=0 L0 2.4-2.4'
+        '    apply \' opkind=BuiltInKind L2 2.10-2.11'
+        '      apply e opkind=FormalParamKind L0 2.10-2.10'
+        '  def U arity=1 local=n L0 3.1-3.12'
+        '    param F arity=1 L-1 3.3-3.6'
+        '    num 1 L0 3.12-3.12'
+        '  def V arity=0 local=n L0 4.1-4.10'
+        '    apply U opkind=UserDefinedOpKind L0 4.6-4.10'
+        '      oparg Pr op=Pr arity=1 L2 4.8-4.9'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Pr L2 ml=[1] w=[0]'
+        'lvl U L0 ml=[3] w=[0] mml=[0] olc=[F]'
+        'lvl V L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aPr(e) == e\'\0aU(F(_)) == 1\0aV == U(Pr)\0a====\0a'
   ==
 ::
 ++  test-sem-infix

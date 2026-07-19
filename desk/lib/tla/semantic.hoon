@@ -37,7 +37,7 @@
 ::  (unit 7): weights=~ means every argument contributes (all weight 1);
 ::  otherwise weights.i==0 marks an argument that does not raise the level
 ::  (e.g. the operand of prime, ENABLED, or a temporal operator)
-+$  sym  [kind=symkind arity=@ud variadic=? level=@ud weights=(list @ud)]
++$  sym  [kind=symkind arity=@ud variadic=? level=@ud weights=(list @ud) parg=(list @ud)]
 ::  visible symbols by (canonical) name
 +$  ctx  (map @t sym)
 ::  a definition signature extracted from a definition LHS
@@ -56,8 +56,8 @@
   ::  name -> [arity variadic opLevel argWeights], transcribed from
   ::  tla2sany BuiltInOperators.Properties (weights ~ means all-1)
   ^-  ctx
-  =/  f  |=([a=@ud lv=@ud w=(list @ud)] `sym`[%builtin a | lv w])
-  =/  v  |=([lv=@ud w=(list @ud)] `sym`[%builtin 0 & lv w])
+  =/  f  |=([a=@ud lv=@ud w=(list @ud)] `sym`[%builtin a | lv w ~])
+  =/  v  |=([lv=@ud w=(list @ud)] `sym`[%builtin 0 & lv w ~])
   %-  malt
   ^-  (list [@t sym])
   :~  ['STRING' (f 0 0 ~)]   ['FALSE' (f 0 0 ~)]   ['TRUE' (f 0 0 ~)]
@@ -245,28 +245,28 @@
         %n-identlhs
       =/  ids  (skim lk |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
       ?~  ids  ~
-      `[(leaf-text i.ids) [%user-op (count-params lk) | 0 ~] loc]
+      `[(leaf-text i.ids) [%user-op (count-params lk) | 0 ~ (turn (lhs-params lhs) |=([@t node a=@ud] a))] loc]
     ::
         %n-infixlhs
       ::  [ident infixop ident]: operator is the middle leaf
       ?.  (gte (lent leaves) 2)  ~
-      `[(resolve-syn (leaf-text (snag 1 leaves))) [%user-op 2 | 0 ~] loc]
+      `[(resolve-syn (leaf-text (snag 1 leaves))) [%user-op 2 | 0 ~ ~] loc]
     ::
         %n-prefixlhs
       ::  [prefixop ident]: operator is the first leaf
       ?~  leaves  ~
-      `[(resolve-syn (leaf-text i.leaves)) [%user-op 1 | 0 ~] loc]
+      `[(resolve-syn (leaf-text i.leaves)) [%user-op 1 | 0 ~ ~] loc]
     ::
         %n-postfixlhs
       ::  [ident postfixop]: operator is the last leaf
       ?~  leaves  ~
-      `[(resolve-syn (leaf-text (rear-node leaves))) [%user-op 1 | 0 ~] loc]
+      `[(resolve-syn (leaf-text (rear-node leaves))) [%user-op 1 | 0 ~ ~] loc]
     ==
   ?:  (is-kind nd %n-functiondefinition)
     =/  kids  (kids-of nd)
     =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
     ?~  ids  ~
-    `[(leaf-text i.ids) [%user-op 0 | 0 ~] (has-local kids)]
+    `[(leaf-text i.ids) [%user-op 0 | 0 ~ ~] (has-local kids)]
   ~
 ::
 ::  +|  Declaration Extraction
@@ -282,7 +282,7 @@
     |=  k=node
     ^-  (unit [@t sym node])
     ?.  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~
-    `[(leaf-text k) [%variable 0 | 1 ~] k]
+    `[(leaf-text k) [%variable 0 | 1 ~ ~] k]
   ?:  (is-kind nd %n-paramdeclaration)
     ::  CONSTANT decl: n-consdecl head, then n-identdecl / operator params
     ::  (an operator constant like P(_) has nonzero arity)
@@ -293,7 +293,7 @@
     =/  ik  (kids-of k)
     ?~  ik  ~
     ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
-    `[(leaf-text i.ik) [%constant (us-arity k) | 0 ~] k]
+    `[(leaf-text i.ik) [%constant (us-arity k) | 0 ~ ~] k]
   ~
 ::
 ++  recursive-syms
@@ -308,7 +308,7 @@
   =/  ik  (kids-of k)
   ?~  ik  ~
   ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
-  `[(leaf-text i.ik) [%user-op (us-arity k) | 0 ~]]
+  `[(leaf-text i.ik) [%user-op (us-arity k) | 0 ~ ~]]
 ::
 ++  put-syms
   ::  explicit fold; +roll would discard the seeded accumulator
@@ -507,7 +507,7 @@
   ?~  params  c
   =/  pn  -.i.params
   =/  par  +>.i.params
-  $(params t.params, c (~(put by c) pn [%formal-param par | 0 ~]))
+  $(params t.params, c (~(put by c) pn [%formal-param par | 0 ~ ~]))
 ::
 ::  +|  Expression Translation
 ::
@@ -663,7 +663,7 @@
   ^-  ctx
   |-  ^-  ctx
   ?~  vars  c
-  $(vars t.vars, c (~(put by c) -.i.vars [%formal-param 0 | 0 ~]))
+  $(vars t.vars, c (~(put by c) -.i.vars [%formal-param 0 | 0 ~ ~]))
 ++  range-after-in
   ::  the expression following the first \in leaf
   |=  kids=(list node)
@@ -1257,8 +1257,32 @@
     [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
   [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
 ::
+++  ref-arity
+  ::  the referenced operator's arity when a node is a bare (possibly
+  ::  instance-prefixed) symbol reference; ~ for any other expression
+  |=  [n=node c=ctx]
+  ^-  (unit @ud)
+  ?.  (is-kind n %n-generalid)  ~
+  =/  ids
+    %+  skim  (kids-of n)
+    |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
+  ?~  ids  ~
+  =/  nm  (leaf-text (rear-node `(list node)`ids))
+  ?:  =('@' nm)  ~
+  =/  nm
+    =/  pfx  (genid-prefix n)
+    ?~(pfx nm (rap 3 ~[u.pfx nm]))
+  =/  s  (~(get by c) nm)
+  ?~  s  ~
+  `arity.u.s
+::
 ++  g-opappl
-  ::  Op(args): resolve, check arity (4204 -> nullODN, args unprocessed)
+  ::  Op(args): resolve, check arity (4204 -> nullODN, args unprocessed),
+  ::  then per-position operator-argument arity checks (an operator
+  ::  parameter position must receive an operator of that arity:
+  ::  Generator's selector 4270/4271 at the argument, then
+  ::  OpDefNode.match's 4271 at the application; the argument becomes
+  ::  nullODN)
   |=  [n=node c=ctx]
   ^-  gout
   =/  kids  (kids-of n)
@@ -1279,12 +1303,61 @@
     :_  ~
     %^  derr  4.204  (span-of:ast args-node)
     "The operator {(trip nm)} requires {(a-co arity.u.s)} arguments."
-  =/  g  (g-arg-list arg-exprs c)
+  ::  arguments, checked against the expected per-position arity BEFORE
+  ::  generation: a failing operator-argument position emits its
+  ::  selector error and becomes nullODN without generating the
+  ::  expression (so its own resolution errors never surface, exactly
+  ::  like SANY); the match-phase 4271s follow all argument errors
+  =/  garg
+    =|  out=(list sem)
+    =|  ds=(list sdiag)
+    =|  d2=(list sdiag)
+    =/  i  0
+    =/  nl  arg-exprs
+    |-  ^-  [out=(list sem) ds=(list sdiag) d2=(list sdiag)]
+    ?~  nl  [(flop out) ds d2]
+    =/  expect  (at-or parg.u.s i 0)
+    ?:  =(0 expect)
+      =/  oa  (oparg-of i.nl c)
+      ?^  oa  $(nl t.nl, i +(i), out [u.oa out])
+      =/  g  (g-x i.nl c)
+      %=  $
+        nl   t.nl
+        i    +(i)
+        out  ?~(r.g out [u.r.g out])
+        ds   (weld ds ds.g)
+      ==
+    =/  ra  (ref-arity i.nl c)
+    =/  oa  ?:(?&(?=(^ ra) =(expect u.ra)) (oparg-of i.nl c) ~)
+    ?^  oa  $(nl t.nl, i +(i), out [u.oa out])
+    =/  e1
+      ?^  ra
+        %^  derr  4.271  (span-of:ast i.nl)
+        "Expected arity {(a-co expect)} but found operator of arity {(a-co u.ra)}."
+      %^  derr  4.270  (span-of:ast i.nl)
+      ;:  weld
+        "An expression appears as argument number {(a-co +(i))}"
+        " (counting from 1) to operator '{(trip nm)}',"
+        " in a position an operator is required."
+      ==
+    =/  e2
+      %^  derr  4.271  (span-of:ast n)
+      ;:  weld
+        "Argument number {(a-co +(i))} to operator '{(trip nm)}' "
+        "\0ashould be a {(a-co expect)}-parameter operator."
+      ==
+    %=  $
+      nl   t.nl
+      i    +(i)
+      out  [[%nullodn ~] out]
+      ds   (weld ds [e1 ~])
+      d2   (weld d2 [e2 ~])
+    ==
   :-  :-  ~
       :*  %apply  [nm kind.u.s]  (expr-level n c)  (span-of:ast n)
-          ~  ~  rs.g
+          ~  ~  out.garg
       ==
-  ds.g
+  (weld ds.garg d2.garg)
 ::
 ++  g-junction
   |=  [opn=@t n=node c=ctx]
@@ -1540,6 +1613,7 @@
       %+  ~(put by c)  '@'
       :*  %builtin  0  |  (max tlvl clv)
           ~[line.from.u.spx col.from.u.spx line.to.u.spx col.to.u.spx]
+          ~
       ==
     =/  gc  (g-comps comps c)
     =/  gr  (g-x rhs c2)
@@ -1607,7 +1681,7 @@
   =/  opn  ?:(recursive '$RecursiveFcnSpec' '$NonRecursiveFcnSpec')
   =/  c2=ctx
     =/  qbs  qbounds
-    =/  acc  ?:(recursive (~(put by c) fname [%user-op 0 | 0 ~]) c)
+    =/  acc  ?:(recursive (~(put by c) fname [%user-op 0 | 0 ~ ~]) c)
     |-  ^-  ctx
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
@@ -1687,7 +1761,7 @@
       %=  $
         ks   t.ks
         out  [node out]
-        c2   (~(put by c2) nm.u.nn [%new-constant 0 | 0 ~])
+        c2   (~(put by c2) nm.u.nn [%new-constant 0 | 0 ~ ~])
       ==
     =/  g  (g-x k c2)
     %=  $
@@ -2007,9 +2081,8 @@
 ::  constraints max-merge (SetOfArgLevelConstraints). Diagnostics carry
 ::  SANY's full message and deduplicate on [code location message]
 ::  (Errors.addMessage is idempotent). Not ported (documented in
-::  compatibility.md): Leibniz tracking and 4244, the 4246/4247
-::  operator-argument instance checks, and the call-site argLevelParam
-::  remapping rules for doubly-higher-order operators.
+::  compatibility.md): the 4244 non-Leibniz diagnostic and the
+::  4246/4247 operator-argument instance checks.
 ::
 +$  lkey  [own=@t name=@t kind=symkind]
 +$  lres
@@ -2740,10 +2813,31 @@
       ?~  gl  acc
       $(gl t.gl, acc ?~(i.gl acc (~(uni in acc) lp.u.i.gl)))
     (~(dif in acc) bset)
+  ::  which operand position substitutes a formal parameter of the
+  ::  applied operator (OpApplNode.getArg)
+  =/  par-idx
+    |=  k=lkey
+    ^-  (unit @ud)
+    =/  i  0
+    =/  pl  pars.ol
+    |-  ^-  (unit @ud)
+    ?~  pl  ~
+    ?:(=(k i.pl) `i $(pl t.pl, i +(i)))
+  =/  arg-lres
+    |=  i=@ud
+    ^-  lres
+    ?:((gte i (lent rl.ga)) lres-nil (snag i rl.ga))
+  =/  arg-sem
+    |=  i=@ud
+    ^-  (unit sem)
+    ?:((gte i (lent out.ga)) ~ `(snag i out.ga))
   ::  level constraints: operator's; arguments' (excluding constraints
   ::  on our bound identifiers); ranges'; each argument's level params
   ::  bounded by the operator's per-argument maximum; opLevelCond
-  ::  co-argument constraints from operator arguments
+  ::  co-argument constraints from operator arguments; the applied
+  ::  operator's argLevelParams whose op position receives a
+  ::  definition-valued operator argument bound that alp's param by the
+  ::  definition's per-argument maximum
   =/  lc
     =/  acc
       =/  a2  lc.ol
@@ -2791,9 +2885,23 @@
         $(k +(k), a5 (lp-constrain a5 lp.i.jl (mxl-of ol.u.od k)))
       $(jl t.jl, j +(j), a3 a4)
     $(ao t.ao, i +(i), acc acc2)
+  =/  lc
+    =/  aps  ~(tap in ap.ol)
+    =/  a2  lc
+    |-  ^-  (map lkey @ud)
+    ?~  aps  a2
+    =/  si  (par-idx op.i.aps)
+    ?~  si  $(aps t.aps)
+    =/  as  (arg-sem u.si)
+    ?~  as  $(aps t.aps)
+    =/  od  (oparg-def u.as e)
+    ?~  od  $(aps t.aps)
+    $(aps t.aps, a2 (lc-put a2 par.i.aps (mxl-of ol.u.od i.i.aps)))
   ::  arg-level constraints: operator's, arguments', ranges'; a
   ::  formal-parameter operator argument picks up minMaxLevel and
-  ::  opLevelCond constraints from this application
+  ::  opLevelCond constraints from this application; each alp of the
+  ::  applied operator whose op position is a formal parameter is
+  ::  constrained from below by the actual operand's level
   =/  ac
     =/  acc
       =/  a2  ac.ol
@@ -2833,22 +2941,43 @@
         $(k +(k), a5 (ac-put a5 [key.u.pk k] lvl.i.jl))
       $(jl t.jl, j +(j), a3 a4)
     $(ao t.ao, i +(i), acc acc3)
-  ::  arg-level params: arguments' (entries whose param is one of our
-  ::  bound identifiers dropped), ranges', level-param appearances in
-  ::  co-arguments of formal-parameter operator arguments; entries of
-  ::  the applied operator not about its own parameters pass through
+  =/  ac
+    =/  aps  ~(tap in ap.ol)
+    =/  a2  ac
+    |-  ^-  (map [k=lkey i=@ud] @ud)
+    ?~  aps  a2
+    =/  si  (par-idx op.i.aps)
+    ?~  si  $(aps t.aps)
+    $(aps t.aps, a2 (ac-put a2 [op.i.aps i.i.aps] lvl:(arg-lres u.si)))
+  ::  arg-level params: the applied operator's entries with both sides
+  ::  remapped through the actual operands (op position substituted by
+  ::  a formal-parameter operator argument; param position replaced by
+  ::  the operand's level params; only entries touching no formal pass
+  ::  verbatim); arguments' (entries whose param is one of our bound
+  ::  identifiers dropped); ranges'; level-param appearances in
+  ::  co-arguments of formal-parameter operator arguments
   =/  ap
     =/  acc
       =/  aps  ~(tap in ap.ol)
       =/  a2  *(set [op=lkey i=@ud par=lkey])
       |-  ^-  (set [op=lkey i=@ud par=lkey])
       ?~  aps  a2
-      =/  own-op
-        =/  pl  pars.ol
-        |-  ^-  ?
-        ?~  pl  |
-        ?:(=(op.i.aps i.pl) & $(pl t.pl))
-      $(aps t.aps, a2 ?:(own-op a2 (~(put in a2) i.aps)))
+      =/  si  (par-idx op.i.aps)
+      ?^  si
+        =/  as  (arg-sem u.si)
+        ?~  as  $(aps t.aps)
+        =/  pk  (oparg-param u.as e)
+        ?~  pk  $(aps t.aps)
+        $(aps t.aps, a2 (~(put in a2) [key.u.pk i.i.aps par.i.aps]))
+      =/  sj  (par-idx par.i.aps)
+      ?~  sj  $(aps t.aps, a2 (~(put in a2) i.aps))
+      =/  a3
+        =/  qs  ~(tap in lp:(arg-lres u.sj))
+        =/  a4  a2
+        |-  ^-  (set [op=lkey i=@ud par=lkey])
+        ?~  qs  a4
+        $(qs t.qs, a4 (~(put in a4) [op.i.aps i.i.aps i.qs]))
+      $(aps t.aps, a2 a3)
     =/  acc
       =/  al  rl.ga
       |-  ^-  (set [op=lkey i=@ud par=lkey])
@@ -2910,8 +3039,11 @@
     (~(dif in acc) bset)
   ::  non-Leibniz params: operator's and components', plus every
   ::  parameter of an argument in a non-Leibniz position, minus the
-  ::  bound identifiers. The doubly-higher-order opLevelCond rule
-  ::  (OpApplNode.levelCheck lines 758-773) is subunit 4.3
+  ::  bound identifiers; then (unfiltered, per Java's ordering) the
+  ::  doubly-higher-order rule: a non-Leibniz definition passed as an
+  ::  operator argument makes the co-argument's params non-Leibniz
+  ::  wherever the opLevelCond matrix relates them
+  ::  (OpApplNode.levelCheck lines 758-773)
   =/  nlx
     =/  acc
       =/  a2  nlp.ol
@@ -2927,7 +3059,29 @@
       |-  ^-  (set lkey)
       ?~  gl  acc
       $(gl t.gl, acc ?~(i.gl acc (~(uni in acc) nlp.u.i.gl)))
-    (~(dif in acc) bset)
+    =/  acc  (~(dif in acc) bset)
+    =/  i  0
+    =/  ao  out.ga
+    |-  ^-  (set lkey)
+    ?~  ao  acc
+    =/  od  (oparg-def i.ao e)
+    ?~  od  $(ao t.ao, i +(i))
+    =/  kn  ary.ol.u.od
+    =/  a3
+      =/  j  0
+      =/  jl  rl.ga
+      =/  a4  acc
+      |-  ^-  (set lkey)
+      ?~  jl  a4
+      =/  a5
+        =/  k  0
+        =/  a6  a4
+        |-  ^-  (set lkey)
+        ?:  (gte k kn)  a6
+        ?.  ?&((cond-of ol i j k) !(lbz-of ol.u.od k))  $(k +(k))
+        $(k +(k), a6 (~(uni in a6) all.i.jl))
+      $(jl t.jl, j +(j), a4 a5)
+    $(ao t.ao, i +(i), acc a3)
   ::  node-specific temporal-operator checks
   =/  arg-lvl
     |=  i=@ud
