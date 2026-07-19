@@ -124,10 +124,6 @@ Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
 (the 4.0 owner-to-fixture matrix lives in
 `tools/notes/plan2-unit4-levels-notes.md`):
 
-- **Unreferenced bound identifiers keep level `-1`** like formal
-  parameters; the Hoon side writes `0` (`lvlqtb`, `lvltmp`).
-- **DIAGS message text is backslash-escaped** by the oracle projection
-  (`\\cdot`); the Hoon renderer emits the raw message (`lvlcdot`).
 - **Recursive-function self-binding**: `$RecursiveFcnSpec` must carry the
   function's own `ubound` binder and the recursive `$FcnApply` subtree
   (`recfcn`).

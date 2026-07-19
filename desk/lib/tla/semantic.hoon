@@ -838,7 +838,7 @@
 ::
 +$  sspan   (unit span)
 +$  sref    $+(sref $:(name=@t kind=symkind))
-+$  sbind   $+(sbind $:(name=@t at=sspan))
++$  sbind   $+(sbind $:(name=@t used=? at=sspan))
 +$  spar    $+(spar $:(name=@t arity=@ud used=? at=sspan))
 +$  sdiag   $+(sdiag $:(code=@ud sev=?(%error %warning) at=sspan msg=@t))
 +$  sem
@@ -1053,7 +1053,7 @@
   ?:  =(0 arity.u.s)  ~
   :-  ~
   :*  %apply  ['$OpArg' kind.u.s]  level.u.s  (span-of:ast n)
-      [[nm (span-of:ast n)] ~]  ~
+      [[nm | (span-of:ast n)] ~]  ~
       [[%lit %num (crip (a-co arity.u.s)) (span-of:ast n)] ~]
   ==
 ::
@@ -1315,7 +1315,7 @@
   ?~  qbounds  [(flop bs) ds]
   =/  vars
     %+  turn  (qbound-vars i.qbounds)
-    |=([vn=@t vnode=node] `sbind`[vn (span-of:ast vnode)])
+    |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  rng  (qbound-range i.qbounds)
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   %=  $
@@ -1354,7 +1354,7 @@
   =/  c2  (add-idents c vars)
   =/  ub
     %+  turn  vars
-    |=([vn=@t vnode=node] `sbind`[vn (span-of:ast vnode)])
+    |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  gx  (g-x (rear-node kids) c2)
   [`(builtin-apply opn n c2 [ub ~ (drop-nulls ~[r.gx])]) ds.gx]
 ::
@@ -1373,7 +1373,7 @@
   =/  c2  (add-idents c vars)
   =/  sbinds
     %+  turn  vars
-    |=([vn=@t vnode=node] `sbind`[vn (span-of:ast vnode)])
+    |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   =/  gx  (g-x (rear-node kids) c2)
   :-  :-  ~
@@ -1427,7 +1427,7 @@
   =/  body  (expr-after-colon kids)
   =/  sbinds
     %+  turn  vars
-    |=([vn=@t vnode=node] `sbind`[vn (span-of:ast vnode)])
+    |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   =/  gx=gout  ?~(body [~ ~] (g-x u.body c2))
   :-  `(builtin-apply '$SubsetOf' n c [~ [[sbinds r.gr] ~] (drop-nulls ~[r.gx])])
@@ -1682,7 +1682,7 @@
       ?~  nn  $(ks t.ks)
       =/  node=sem
         :*  %apply  ['$NewSymb' %builtin]  0  (span-of:ast k)
-            [[nm.u.nn ~] ~]  ~  ~
+            [[nm.u.nn | ~] ~]  ~  ~
         ==
       %=  $
         ks   t.ks
@@ -1810,7 +1810,7 @@
     =/  ilvl  (max lvl.base sub-lvl)
     =/  subw=sem
       :*  %apply  [(cat 3 '$SubstIn:' mod.ip) %builtin]  ilvl  (span-of:ast u)
-          (turn nms.gsubs |=(nm=@t `sbind`[nm ~]))
+          (turn nms.gsubs |=(nm=@t `sbind`[nm | ~]))
           ~
           %+  weld  exs.gsubs
           ^-  (list sem)
@@ -2986,6 +2986,29 @@
         ?~(range.i.gl at.s (sem-at u.range.i.gl at.s))
       [(derr 4.314 rat "Action-level bound of quantified temporal formula.") ~]
     $(gl t.gl, rl t.rl, acc (weld acc d1))
+  ::  a bound identifier is level-checked (level 0) only when some
+  ::  argument references it; an unreferenced one keeps SANY's
+  ::  uninitialized -1 sentinel. References live in the arguments'
+  ::  allParams (ranges are outside the binding scope), with inner
+  ::  shadowing already excluded because inner nodes removed their own
+  ::  bound keys
+  =/  argall
+    =/  acc  *(set lkey)
+    =/  al  rl.ga
+    |-  ^-  (set lkey)
+    ?~  al  acc
+    $(al t.al, acc (~(uni in acc) all.i.al))
+  =/  ubound2
+    %+  turn  ubound.s
+    |=(b=sbind b(used (~(has in argall) (bound-key b))))
+  =/  bound2
+    %+  turn  gout.granges
+    |=  g=sem-bound
+    %_  g
+        vars
+      %+  turn  vars.g
+      |=(b=sbind b(used (~(has in argall) (bound-key b))))
+    ==
   =/  dsall  :(weld ds0 dsarg dsrng dstmp dsquant)
   =/  rngok
     =/  gl  grl.granges
@@ -2997,7 +3020,7 @@
     ?&  ok.ol  ok.rs.ga  rngok
         =(~ dsarg)  =(~ dsrng)  =(~ dstmp)  =(~ dsquant)
     ==
-  :*  s(lvl lvl, bound gout.granges, args out.ga)
+  :*  s(lvl lvl, ubound ubound2, bound bound2, args out.ga)
       [lvl nodeok lp lc ac ap alx nlx]
       dsall
   ==
@@ -4118,7 +4141,7 @@
       ^-  wain
       %+  turn  ubound.s
       |=  b=sbind
-      (line +(d) "ubound {(trip name.b)} {(rlvl mask 0)} {(sspan-tape at.b)}")
+      (line +(d) "ubound {(trip name.b)} {(rlvl |(mask !used.b) 0)} {(sspan-tape at.b)}")
     ::
       ^-  wain
       %-  zing
@@ -4129,7 +4152,7 @@
         ^-  wain
         %+  turn  vars.g
         |=  b=sbind
-        (line +(d) "bound {(trip name.b)} {(rlvl mask 0)} {(sspan-tape at.b)}")
+        (line +(d) "bound {(trip name.b)} {(rlvl |(mask !used.b) 0)} {(sspan-tape at.b)}")
       ?~(range.g ~ (render-sem u.range.g (add d 2) mask))
     ::
       ^-  wain
@@ -4175,6 +4198,19 @@
   |-  ^-  tape
   ?~  raw  ~
   ?:(=('\0a' i.raw) ~ [i.raw $(raw t.raw)])
+::
+++  esc-msg
+  ::  SemDump's esc() on a D-line message: backslash and control
+  ::  characters escape (the message is already cut at its first
+  ::  newline, so \n never occurs here)
+  |=  t=tape
+  ^-  tape
+  ?~  t  ~
+  ?:  =('\\' i.t)  ['\\' '\\' $(t t.t)]
+  ?:  =('\0d' i.t)  ['\\' 'r' $(t t.t)]
+  ?:  =('\09' i.t)  ['\\' 't' $(t t.t)]
+  ?:  =('\0c' i.t)  ['\\' 'f' $(t t.t)]
+  [i.t $(t t.t)]
 ::
 ++  render-module
   |=  m=sem-module
@@ -4241,6 +4277,6 @@
     |=  dg=sdiag
     %+  line  0
     %-  strip-tail
-    "D {(a-co code.dg)} {?:(=(%error sev.dg) "ERROR" "WARNING")} {(sspan-tape at.dg)} {(first-line msg.dg)}"
+    "D {(a-co code.dg)} {?:(=(%error sev.dg) "ERROR" "WARNING")} {(sspan-tape at.dg)} {(esc-msg (first-line msg.dg))}"
   ==
 --

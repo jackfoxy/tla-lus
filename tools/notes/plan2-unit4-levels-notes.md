@@ -168,3 +168,46 @@ Parity-manifest rows changed: level-constraints (oracle-only -> partial, compare
 Compatibility limitations removed or added: LEVELS projection now compared; Leibniz *tracking* ported (4244/4246/4247 diagnostics still absent); doubly-higher-order remapping noted for 4.3
 Remaining dependencies: 4.2 next (bound-identifier L-1 sentinel, \cdot DIAGS escaping)
 ```
+
+## 4.2 Bottom-up levels and basic operator constraints (done 2026-07-18)
+
+Both named failing cases closed; suite 51/56, red set now exactly
+`{apsubst lvlinsth lvlinstm lvlinstp recfcn}` (4.3–4.6 owners). The
+bulk of 4.2's scope (bottom-up levels, builtin level/weight/max-level
+tables, arity + 4205 argument-maximum checks, exact diagnostic
+code/span/message/order) was already green at the 4.0 baseline and is
+unchanged; what landed here:
+
+- **Unreferenced bound identifiers keep SANY's uninitialized `L-1`**
+  (`lvlqtb`, `lvltmp`): `sbind` gained a `used=?` flag (adding a record
+  field inside the `$+` cycle is safe — `spar` precedent; only `$%`
+  member growth hangs the zuse-408 mold compiler). `+l-apply-def` marks
+  each `ubound`/`bound` binder used iff its span-derived key appears in
+  the union of the arguments' `allParams` — exactly SANY, since a
+  reference is what invokes `FormalParamNode.levelCheck` (weight-0
+  positions still count), ranges are checked outside the binding scope,
+  and inner shadowing is already excluded because inner nodes removed
+  their own bound keys from `all`. The renderer prints binders with
+  `(rlvl |(mask !used.b) 0)`, the same form as formal params.
+- **D-line messages are escaped per SemDump `esc()`** (`lvlcdot`,
+  `lvltmp`'s 4313): `+esc-msg` doubles backslashes and escapes
+  \r/\t/\f after the first-line cut (`\cdot` → `\\cdot`, `\land` →
+  `\\land`). Tree lines (`apply \cdot …`) stay raw — SemDump only
+  escapes `str` values and DIAGS messages.
+
+Subunit handoff:
+
+```text
+Subunit: 4.2
+Java owner and entry method: LevelNode/FormalParamNode.levelCheck (uninitialized -1), first-order OpApplNode/OpDefNode.levelCheck, BuiltInOperators tables; SemDump.esc
+Current Hoon owner: lib/tla/semantic.hoon (sbind used flag, l-apply-def usage marking, render-sem binder lines, esc-msg)
+Smallest failing parity case: none for 4.2; next failing cases are hoparam's doubly-higher-order remapping fixture (4.3, to be added) and recfcn (4.4)
+New or changed nouns: sbind += used=? (all construction sites default |; l-apply-def rewrites)
+Diagnostic/result expected: bound/ubound L-1 vs L0 in the tree; backslash-escaped DIAGS text
+Focused validation result: sem 51/56 (reds = apsubst lvlinsth lvlinstm lvlinstp recfcn), lvl 10/10 unchanged
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: 785 OK, ok=%.n with exactly the 5 reds above; validate.py --check clean; check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-basic (partial -> parity), level-node-rules (note: bound sentinel closed, BY/QED residue remains)
+Compatibility limitations removed or added: removed the two closed bullets (bound-identifier L-1, DIAGS escaping)
+Remaining dependencies: 4.3 (higher-order: add the doubly-higher-order argLevelParam remapping fixture), 4.4 (recfcn), 4.5 negative ASSUME fixtures, 4.6 instance ops
+```
