@@ -276,3 +276,52 @@ Parity-manifest rows changed: level-higher-order (partial -> parity, evidence no
 Compatibility limitations removed or added: doubly-higher-order remapping note removed; 4244/4246/4247 remain (4.6)
 Remaining dependencies: 4.4 (recfcn: $RecursiveFcnSpec self-binder), 4.5 negative ASSUME fixtures, 4.6 instance/substitution ops
 ```
+
+## 4.4 Recursive fixpoint checking (done 2026-07-19)
+
+Suite 61/65; red set now exactly the 4.6 owners
+`{apsubst lvlinsth lvlinstm lvlinstp}`. Manifest row `level-recursion`
+-> parity.
+
+- `recfcn` closed with two generation fixes: (1) a recursive function
+  definition binds its own name as an unbounded formal at the
+  `$RecursiveFcnSpec` (`ubound f`, span = the whole definition), with
+  self-references resolving as FormalParamKind — `g-fcn-body` now
+  registers the name as `%formal-param` and emits the ubound; the
+  self-binder key flows through the generic machinery, giving the
+  `lc={f<=3,n<=3}` projection (lp-constrain of the body's lp by the
+  spec's max-level) and the used-flag `ubound f L0` for free. (2)
+  `%n-fcnappl` was MISSING from the `g-x` dispatch entirely — plain
+  function application `f[0]` silently generated nothing (the sem
+  corpus had never exercised it outside EXCEPT). New arm:
+  `$FcnApply(f, a)`, several selectors wrapped in `$Tuple`.
+- New fixtures, green on arrival: `recrev` (mutual recursion with the
+  declaration order reversed — order-independence of the fixed point),
+  `recun` (unused/pass-through recursive argument keeps the seeded
+  `ml=[2,2] w=[1,1]` floor — the seed is monotonic, not recomputed
+  down), `rechi` (recursion through an operator argument:
+  `R(n) == ... Ap(R, n - 1)` with `Ap(F(_), x) == F(x)`; the
+  rec-seeded R participates in the 4.3 call-site machinery).
+- Convergence bound: SANY has NO unbounded iteration to guard — the
+  recursive-section algorithm is a fixed two-pass fixpoint
+  (levelCheck(1), raise every member to the section maxima,
+  levelCheck(2)), mirrored one-for-one in `l-module-core`'s
+  it1/raise/it2. There is therefore no non-convergence failure mode to
+  type; recorded here as the rationale for plan task 4.
+
+Subunit handoff:
+
+```text
+Subunit: 4.4
+Java owner and entry method: ModuleNode.levelCheck recursive-section loop, OpDefNode seeded fields, Generator.processFunction ($RecursiveFcnSpec), OpApplNode $FcnApply
+Current Hoon owner: lib/tla/semantic.hoon (rec-seed, l-module-core it1/raise/it2, g-fcn-body, g-x %n-fcnappl)
+Smallest failing parity case: none for 4.4; next failing cases are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: none (generation-side changes only)
+Diagnostic/result expected: $RecursiveFcnSpec tree shape incl. ubound self-binder; recursion projections
+Focused validation result: sem 61/65 (reds = the four 4.6 cases), lvl 10/10
+Full validation result: full ship suite 795 OK, same 4 reds; validate.py --check clean (65 cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-recursion (partial -> parity, evidence now 8 fixtures)
+Compatibility limitations removed or added: recfcn bullet removed
+Remaining dependencies: 4.5 (negative ASSUME fixtures; BY/QED blocked on unit-3 residue), 4.6 (instance operator substitutions, 4244/4246/4247, apsubst)
+```

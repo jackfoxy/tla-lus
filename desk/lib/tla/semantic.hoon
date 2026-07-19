@@ -1089,6 +1089,19 @@
       %n-opapplication
     (g-opappl n c)
   ::
+      %n-fcnappl
+    ::  f[a] -> $FcnApply(f, a); several selectors tuple up
+    =/  kids  (kids-of n)
+    ?~  kids  [~ ~]
+    =/  gf  (g-x i.kids c)
+    =/  argl  (skim t.kids |=(k=node ?=(%node -.k)))
+    =/  ga  (g-list argl c)
+    =/  args=(list sem)
+      ?:  (lte (lent rs.ga) 1)  rs.ga
+      [(builtin-apply '$Tuple' n c [~ ~ rs.ga]) ~]
+    :-  `(builtin-apply '$FcnApply' n c [~ ~ (weld (drop-nulls ~[r.gf]) args)])
+    (weld ds.gf ds.ga)
+  ::
       %n-infixexpr
     =/  kids  (kids-of n)
     ?.  =(3 (lent kids))  [~ ~]
@@ -1679,9 +1692,12 @@
   =/  body  (rear-node kids)
   =/  recursive  (subtree-names-has body fname)
   =/  opn  ?:(recursive '$RecursiveFcnSpec' '$NonRecursiveFcnSpec')
+  ::  a recursive function binds its own name as an unbounded formal
+  ::  at the $RecursiveFcnSpec (span = the whole definition), so
+  ::  self-references resolve as FormalParamKind
   =/  c2=ctx
     =/  qbs  qbounds
-    =/  acc  ?:(recursive (~(put by c) fname [%user-op 0 | 0 ~ ~]) c)
+    =/  acc  ?:(recursive (~(put by c) fname [%formal-param 0 | 0 ~ ~]) c)
     |-  ^-  ctx
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
@@ -1689,7 +1705,9 @@
   =/  gx  (g-x body c2)
   :-  :-  ~
       :*  %apply  [opn %builtin]  (expr-level body c2)  (span-of:ast u)
-          ~  bs.gb  (drop-nulls ~[r.gx])
+          ?:(recursive [[fname | (span-of:ast u)] ~] ~)
+          bs.gb
+          (drop-nulls ~[r.gx])
       ==
   (weld ds.gb ds.gx)
 ::

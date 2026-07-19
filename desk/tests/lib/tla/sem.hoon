@@ -1647,6 +1647,43 @@
       '---- MODULE A ----\0af[n \\in {0, 1}] == IF n = 0 THEN 0 ELSE f[0]\0a====\0a'
   ==
 ::
+++  test-sem-rechi
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Ap arity=2 local=n L0 3.1-3.19'
+        '    param F arity=1 L0 3.4-3.7'
+        '    param x arity=0 L0 3.10-3.10'
+        '    apply F opkind=FormalParamKind L0 3.16-3.19'
+        '      apply x opkind=FormalParamKind L0 3.18-3.18'
+        '  def R arity=1 local=n L0 5.1-5.41'
+        '    param n arity=0 L0 5.3-5.3'
+        '    apply $IfThenElse opkind=BuiltInKind L0 5.9-5.41'
+        '      apply = opkind=BuiltInKind L0 5.12-5.16'
+        '        apply n opkind=FormalParamKind L0 5.12-5.12'
+        '        num 0 L0 5.16-5.16'
+        '      num 0 L0 5.23-5.23'
+        '      apply Ap opkind=UserDefinedOpKind L0 5.30-5.41'
+        '        oparg R op=R arity=1 L0 5.33-5.33'
+        '        apply - opkind=UserDefinedOpKind L0 5.36-5.40'
+        '          apply n opkind=FormalParamKind L0 5.36-5.36'
+        '          num 1 L0 5.40-5.40'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl Ap L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]'
+        'lvl R L0 ml=[2] w=[1] lc={n<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aAp(F(_), x) == F(x)\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN 0 ELSE Ap(R, n - 1)\0a====\0a'
+  ==
+::
 ++  test-sem-recmut
   %+  expect-eq
     !>  ^-  wain
@@ -1709,6 +1746,80 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aCONSTANT a\0aR == [f |-> a, g |-> a]\0aSel == R.f\0a====\0a'
+  ==
+::
+++  test-sem-recrev
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Even arity=1 local=n L0 4.1-4.45'
+        '    param n arity=0 L0 4.6-4.6'
+        '    apply $IfThenElse opkind=BuiltInKind L0 4.12-4.45'
+        '      apply = opkind=BuiltInKind L0 4.15-4.19'
+        '        apply n opkind=FormalParamKind L0 4.15-4.15'
+        '        num 0 L0 4.19-4.19'
+        '      apply TRUE opkind=BuiltInKind L0 4.26-4.29'
+        '      apply Odd opkind=UserDefinedOpKind L0 4.36-4.45'
+        '        apply - opkind=UserDefinedOpKind L0 4.40-4.44'
+        '          apply n opkind=FormalParamKind L0 4.40-4.40'
+        '          num 1 L0 4.44-4.44'
+        '  def Odd arity=1 local=n L0 5.1-5.46'
+        '    param n arity=0 L0 5.5-5.5'
+        '    apply $IfThenElse opkind=BuiltInKind L0 5.11-5.46'
+        '      apply = opkind=BuiltInKind L0 5.14-5.18'
+        '        apply n opkind=FormalParamKind L0 5.14-5.14'
+        '        num 0 L0 5.18-5.18'
+        '      apply FALSE opkind=BuiltInKind L0 5.25-5.29'
+        '      apply Even opkind=UserDefinedOpKind L0 5.36-5.46'
+        '        apply - opkind=UserDefinedOpKind L0 5.41-5.45'
+        '          apply n opkind=FormalParamKind L0 5.41-5.41'
+        '          num 1 L0 5.45-5.45'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl Even L0 ml=[2] w=[1] lc={n<=2}'
+        'lvl Odd L0 ml=[2] w=[1] lc={n<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aRECURSIVE Even(_), Odd(_)\0aEven(n) == IF n = 0 THEN TRUE ELSE Odd(n - 1)\0aOdd(n) == IF n = 0 THEN FALSE ELSE Even(n - 1)\0a====\0a'
+  ==
+::
+++  test-sem-recun
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def F arity=2 local=n L0 4.1-4.43'
+        '    param a arity=0 L0 4.3-4.3'
+        '    param b arity=0 L0 4.6-4.6'
+        '    apply $IfThenElse opkind=BuiltInKind L0 4.12-4.43'
+        '      apply = opkind=BuiltInKind L0 4.15-4.19'
+        '        apply b opkind=FormalParamKind L0 4.15-4.15'
+        '        num 0 L0 4.19-4.19'
+        '      num 0 L0 4.26-4.26'
+        '      apply F opkind=UserDefinedOpKind L0 4.33-4.43'
+        '        apply a opkind=FormalParamKind L0 4.35-4.35'
+        '        apply - opkind=UserDefinedOpKind L0 4.38-4.42'
+        '          apply b opkind=FormalParamKind L0 4.38-4.38'
+        '          num 1 L0 4.42-4.42'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl F L0 ml=[2,2] w=[1,1] lc={n<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aRECURSIVE F(_, _)\0aF(a, b) == IF b = 0 THEN 0 ELSE F(a, b - 1)\0a====\0a'
   ==
 ::
 ++  test-sem-recur

@@ -124,9 +124,6 @@ Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
 (the 4.0 owner-to-fixture matrix lives in
 `tools/notes/plan2-unit4-levels-notes.md`):
 
-- **Recursive-function self-binding**: `$RecursiveFcnSpec` must carry the
-  function's own `ubound` binder and the recursive `$FcnApply` subtree
-  (`recfcn`).
 - **Operator substitutions in `INSTANCE … WITH F <- Op` must render as
   `oparg`**, not `apply` (`lvlinsth`).
 - **The 4244 non-Leibniz diagnostic and the instance operator-argument
