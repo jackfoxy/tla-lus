@@ -133,15 +133,20 @@ Open unit-4 gaps, each carried by a red fixture in `desk/test-data/sem`
   (`recfcn`).
 - **Operator substitutions in `INSTANCE … WITH F <- Op` must render as
   `oparg`**, not `apply` (`lvlinsth`).
-- **Leibniz tracking (4244) and the instance operator-argument checks
-  (4246/4247)** are not emitted (`lvlinstm`, `lvlinstp`).
+- **The 4244 non-Leibniz diagnostic and the instance operator-argument
+  checks (4246/4247)** are not emitted (`lvlinstm`, `lvlinstp`).
+  Non-Leibniz *tracking* itself (allParams/nonLeibnizParams/isLeibnizArg
+  through applications, definitions, and substitutions) is ported and
+  projection-compared since 4.1; only these diagnostics remain.
 - **`APSubstIn`**: theorems/assumptions of an instanced module are not
   imported (`apsubst`); node generation is unit-3 residue.
-- The **LEVELS constraint projection** (`golden-lvl.txt` per sem case:
-  max-levels, weights, higher-order min-max/level conditions, level
-  params, level/arg-level constraints, arg-level params, non-Leibniz
-  params, all sorted) is captured oracle-only; no Hoon renderer compares
-  it yet (4.1).
+- The **LEVELS constraint projection** (max-levels, weights,
+  higher-order min-max/level conditions, level params, level/arg-level
+  constraints, arg-level params, non-Leibniz params, all sorted) is
+  rendered by the Hoon level pass and byte-compared per sem case since
+  4.1 (48/56 green; the reds are the cases above). The call-site
+  argLevelParam remapping for doubly-higher-order operator arguments
+  (`OpApplNode.levelCheck` lines 758–773) is still owed to 4.3.
 - **Driver-level lint controls** (`SanySettings.suppressedCodes` /
   `messagesAsErrorCodes`, `filterVisibleMessages`) are a report-time
   concern invisible to the `Errors` channel; the Hoon `lint-options`

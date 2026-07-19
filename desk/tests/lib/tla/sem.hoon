@@ -20,6 +20,9 @@
         '          apply c opkind=ConstantDeclKind L0 3.16-3.16'
         '          apply c opkind=ConstantDeclKind L0 3.20-3.20'
         '  instance module=B local=n L0 2.1-2.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Thm L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -38,6 +41,8 @@
     :~
         'ACCEPT'
         'MODULE A 1.1-2.4'
+        'LEVELS'
+        'lvl MODULE A L-1'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -66,6 +71,9 @@
         '      apply $Pair opkind=BuiltInKind L0 3.21-3.26'
         '        apply Q opkind=ConstantDeclKind L0 3.21-3.21'
         '        apply b opkind=ConstantDeclKind L0 3.26-3.26'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={P,Q,a,b} lc={P<=3,Q<=3,a<=3,b<=3}'
+        'lvl C L0 lp={P,Q,a,b} lc={P<=3,Q<=3,a<=3,b<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -90,6 +98,9 @@
         '      apply = opkind=BuiltInKind L0 3.26-3.30'
         '        apply x opkind=FormalParamKind L0 3.26-3.26'
         '        apply x opkind=FormalParamKind L0 3.30-3.30'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={S} lc={x<=2}'
+        'lvl Pick L0 lp={S} lc={x<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -116,6 +127,10 @@
         '    apply $DisjList opkind=BuiltInKind L0 5.11-6.14'
         '      apply P opkind=ConstantDeclKind L0 5.14-5.14'
         '      apply Q opkind=ConstantDeclKind L0 6.14-6.14'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={P,Q} lc={P<=3,Q<=3}'
+        'lvl Both L0 lp={P,Q} lc={P<=3,Q<=3}'
+        'lvl Either L0 lp={P,Q} lc={P<=3,Q<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -134,6 +149,8 @@
         'MODULE A 1.1-4.4'
         '  const N arity=0 L0 2.10-2.10'
         '  var x L1 3.10-3.10'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={N} lc={N<=0}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -171,6 +188,12 @@
         'D 4204 ERROR 3.10-3.12 The operator Op requires 2 arguments.'
         'D 4204 ERROR 4.30-4.32 The operator Op requires 2 arguments.'
         'D 4204 ERROR 5.17-5.19 The operator Op requires 2 arguments.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Op L-1 ml=? w=?'
+        'lvl Bad L-1'
+        'lvl Quant L-1'
+        'lvl Unb L-1'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -194,6 +217,10 @@
         'DIAGS'
         'D 4201 ERROR 3.1-3.8 Operator Foo already defined or declared.'
         'D 4801 WARNING 3.1-3.8 Multiple declarations or definitions for symbol Foo.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L-1'
+        'lvl Baz L-1'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -216,6 +243,10 @@
         '    num 1 L-1 3.7-3.7'
         'DIAGS'
         'D 4200 ERROR 2.8-2.10 Unknown operator: `Bar\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L-1'
+        'lvl Ok L-1'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -238,6 +269,10 @@
         'DIAGS'
         'D 4004 ERROR 2.12-2.12 Could not find declaration or definition of symbol \'+\'.'
         'D 4004 ERROR 2.8-2.14 Couldn\'t resolve infix operator symbol `+\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L-1'
+        'lvl Baz L-1'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -305,6 +340,13 @@
         '            apply $Seq opkind=BuiltInKind L0 8.34-8.40'
         '              str c L0 8.36-8.36'
         '            at L1 8.34-8.40'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={f<=2,g<=2,n<=2}'
+        'lvl E1 L1 lp={f} lc={f<=2}'
+        'lvl E2 L1 lp={f} lc={f<=2}'
+        'lvl E3 L1 lp={f} lc={f<=2}'
+        'lvl E4 L1 lp={f} lc={f<=2}'
+        'lvl E5 L1 lp={f,g} lc={f<=2,g<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -326,6 +368,9 @@
         '      bound n L0 3.5-3.5'
         '        apply Nat opkind=UserDefinedOpKind L0 3.11-3.13'
         '      apply n opkind=FormalParamKind L0 3.19-3.19'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,n<=3}'
+        'lvl Fac L0 lc={n<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -347,6 +392,9 @@
         '    param x arity=0 L0 2.14-2.14'
         '    apply op opkind=FormalParamKind L0 2.20-2.24'
         '      apply x opkind=FormalParamKind L0 2.23-2.23'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Apply L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -371,6 +419,9 @@
         '      apply + opkind=UserDefinedOpKind L1 4.14-4.18'
         '        apply x opkind=VariableDeclKind L1 4.14-4.14'
         '        num 1 L0 4.18-4.18'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,x<=1}'
+        'lvl Next L2 lp={x} lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -401,6 +452,10 @@
         '  def Use arity=0 local=n L1 4.1-4.11'
         '    apply I!Op opkind=UserDefinedOpKind L1 4.8-4.11'
         '  instance name=I module=B local=n L0 3.1-3.35'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl I!Op L1 lp={x} lc={x<=1}'
+        'lvl Use L1 lp={x} lc={x<=1}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -432,6 +487,9 @@
         '          apply y opkind=VariableDeclKind L1 4.7-4.7'
         '          apply c opkind=ConstantDeclKind L0 4.11-4.11'
         '  instance module=B local=n L0 4.1-4.10'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=0,y<=1}'
+        'lvl Op L1 lp={c,y} lc={c<=0,y<=1}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -460,6 +518,10 @@
         '  def Use arity=0 local=n L1 4.1-4.9'
         '    apply Op opkind=UserDefinedOpKind L1 4.8-4.9'
         '  instance module=B local=n L0 3.1-3.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Op L1 lp={x}'
+        'lvl Use L1 lp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -486,6 +548,9 @@
         '      apply P opkind=ConstantDeclKind L0 3.12-3.12'
         '      apply a opkind=ConstantDeclKind L0 3.19-3.19'
         '      apply b opkind=ConstantDeclKind L0 3.26-3.26'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={P,a,b} lc={P<=3,a<=3,b<=3}'
+        'lvl Pick L0 lp={P,a,b} lc={P<=3,a<=3,b<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -511,6 +576,9 @@
         '        apply a opkind=UserDefinedOpKind L0 4.17-4.17'
         '      in'
         '        apply b opkind=UserDefinedOpKind L0 5.11-5.11'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={z}'
+        'lvl Foo L0 lp={z}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -533,6 +601,9 @@
         '      apply $Pair opkind=BuiltInKind L0 3.7-3.17'
         '        str bar L0 3.7-3.9'
         '        apply bar opkind=ConstantDeclKind L0 3.15-3.17'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={bar} lc={bar<=3}'
+        'lvl R L0 lp={bar} lc={bar<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -558,6 +629,10 @@
         '        num 42 L0 3.15-3.16'
         'DIAGS'
         'D 4802 WARNING 3.7-3.9 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl bar L0'
+        'lvl R L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -585,6 +660,10 @@
         '      apply $Pair opkind=BuiltInKind L0 4.8-4.17'
         '        str bar L0 4.8-4.10'
         '        num 42 L0 4.16-4.17'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={bar} lc={bar<=3}'
+        'lvl S1 L0 lp={bar} lc={bar<=3}'
+        'lvl S2 L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -608,6 +687,9 @@
         '        num 42 L0 3.15-3.16'
         'DIAGS'
         'D 4802 WARNING 3.7-3.9 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl R L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -633,6 +715,8 @@
         '      apply x opkind=VariableDeclKind L1 3.12-3.12'
         'DIAGS'
         'D 4206 ERROR 3.1-3.12 Level error: assumptions must be level 0 (Constant),'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -670,6 +754,10 @@
         '        apply x opkind=VariableDeclKind L1 4.29-4.29'
         'DIAGS'
         'D 4205 ERROR 4.8-4.30 Level error in applying operator \\\\cdot:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Good L2 lc={x<=1} nlp={x}'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -695,6 +783,9 @@
         '          num 0 L0 3.22-3.22'
         'DIAGS'
         'D 4205 ERROR 3.6-3.24 Level error in applying operator ENABLED:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=2}'
+        'lvl P L1 lc={x<=2} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -726,6 +817,11 @@
         '      oparg Pr op=Pr arity=1 L2 5.10-5.11'
         'DIAGS'
         'D 4272 ERROR 5.8-5.12 Level error in applying operator H:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl H L2 ml=[3] w=[1] mml=[2] olc=[F] lc={x<=1} nlp={x}'
+        'lvl Pr L2 ml=[1] w=[0]'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -757,6 +853,9 @@
         '  instance name=I module=B local=n L0 3.1-3.36'
         'DIAGS'
         'D 4245 ERROR 3.1-3.36 Level error in instantiating module \'B\':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl I!D L2 lp={x} lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -786,6 +885,9 @@
         '  instance name=J module=B local=n L0 2.1-2.32'
         'DIAGS'
         'D 4245 ERROR 2.1-2.32 Level error in instantiating module \'B\':'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl J!D L3'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -819,6 +921,10 @@
         '        apply F opkind=ConstantDeclKind L0 3.6-3.9'
         '          num 1 L0 3.8-3.8'
         '  instance name=I module=B local=n L0 4.1-4.28'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Op L2 ml=[2] w=[1] lc={x<=1} nlp={x}'
+        'lvl I!D L2'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -859,6 +965,10 @@
         'D 4245 ERROR 4.1-4.36 Level error in instantiating module \'B\':'
         'D 4244 ERROR 4.1-4.36 Error in instantiating module \'B\':'
         'D 4246 ERROR 4.1-4.36 Level error in instantiating module \'B\':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=0}'
+        'lvl Op L2 ml=[1] w=[0] lp={x} lc={x<=2}'
+        'lvl I!D L2 lp={x} lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -898,6 +1008,10 @@
         'DIAGS'
         'D 4244 ERROR 4.1-4.37 Error in instantiating module \'B\':'
         'D 4247 ERROR 4.1-4.37 Level error when instantiating module \'B\':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Op L2 ml=[1] w=[0] lp={x} lc={x<=2}'
+        'lvl I!D L2 lp={x} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -929,6 +1043,10 @@
         '        apply y opkind=VariableDeclKind L1 4.11-4.11'
         'DIAGS'
         'D 4205 ERROR 4.8-4.13 Level error in applying operator Op:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={y<=1}'
+        'lvl Op L2 ml=[1] w=[1]'
+        'lvl Bad L2 lc={y<=1} nlp={y}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -952,6 +1070,9 @@
         '        apply x opkind=VariableDeclKind L1 3.9-3.9'
         'DIAGS'
         'D 4205 ERROR 3.8-3.12 Level error in applying operator \':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -982,6 +1103,9 @@
         '      apply TRUE opkind=BuiltInKind L0 3.48-3.51'
         'DIAGS'
         'D 4315 ERROR 3.8-3.51 Level error in applying operator $BoundedExists:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=2}'
+        'lvl Bad L3 lc={x<=2} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1006,6 +1130,9 @@
         'DIAGS'
         'D 4290 ERROR 3.1-3.13 Argument 1 of recursive operator R is primed'
         'D 4205 ERROR 3.9-3.13 Level error in applying operator R:'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl R L2 ml=[1] w=[1]'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1033,6 +1160,10 @@
         '        apply x opkind=VariableDeclKind L1 4.9-4.9'
         'DIAGS'
         'D 4205 ERROR 4.8-4.12 Level error in applying operator \':'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl R L0 ml=[2] w=[1]'
+        'lvl Bad L2 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1091,6 +1222,13 @@
         'D 4312 ERROR 5.7-5.22 Action used where only temporal formula or state predicate allowed.'
         'D 4313 ERROR 6.7-6.24 \\\\land has both temporal formula and action as arguments.'
         'D 4314 ERROR 7.16-7.19 Action-level bound of quantified temporal formula.'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl B1 L3 lc={x<=1} nlp={x}'
+        'lvl E1 L3 lc={x<=1} nlp={x}'
+        'lvl L1 L3 lc={x<=1} nlp={x}'
+        'lvl M1 L3 lp={x} lc={x<=1} nlp={x}'
+        'lvl Q1 L3 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1114,6 +1252,9 @@
         '        apply x opkind=VariableDeclKind L1 3.17-3.17'
         'DIAGS'
         'D 4205 ERROR 3.6-3.19 Level error in applying operator UNCHANGED:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl U L2 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1140,6 +1281,9 @@
         '        num 0 L0 3.18-3.18'
         'DIAGS'
         'D 4205 ERROR 3.6-3.19 Level error in applying operator $WF:'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl L L3 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1171,6 +1315,10 @@
         '        apply \' opkind=BuiltInKind L2 4.11-4.12'
         '          apply x opkind=VariableDeclKind L1 4.11-4.11'
         '        apply x opkind=VariableDeclKind L1 4.16-4.16'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl W L3 lc={x<=1} nlp={x}'
+        'lvl S L3 lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1191,6 +1339,9 @@
         '    param a arity=0 L0 2.5-2.5'
         '    param b arity=0 L-1 2.8-2.8'
         '    apply a opkind=FormalParamKind L0 2.14-2.14'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L0 ml=[3,3] w=[1,0]'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1211,6 +1362,10 @@
         '    num 42 L0 2.8-2.9'
         '  def Bar arity=0 local=n L0 3.1-3.14'
         '    str hello L0 3.8-3.14'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L0'
+        'lvl Bar L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1234,6 +1389,9 @@
         '      apply > opkind=UserDefinedOpKind L0 3.24-3.28'
         '        apply n opkind=FormalParamKind L0 3.24-3.24'
         '        num 0 L0 3.28-3.28'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,n<=3}'
+        'lvl Nats L0 lc={n<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1265,6 +1423,9 @@
         '        apply $FcnApply opkind=BuiltInKind L0 2.41-2.44'
         '          apply f opkind=FormalParamKind L0 2.41-2.41'
         '          num 0 L0 2.43-2.43'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={f<=3,n<=3}'
+        'lvl f L0 lc={f<=3,n<=3}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1292,6 +1453,10 @@
         '      apply \' opkind=BuiltInKind L2 5.9-5.10'
         '        apply x opkind=VariableDeclKind L1 5.9-5.9'
         '      apply n opkind=FormalParamKind L0 5.14-5.14'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl P L2 ml=[2] w=[1] lc={x<=1} nlp={x}'
+        'lvl Q L2 ml=[2] w=[1] lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1321,6 +1486,10 @@
         '    apply $RcdSelect opkind=BuiltInKind L0 4.8-4.10'
         '      apply R opkind=UserDefinedOpKind L0 4.8-4.8'
         '      str f L0 4.10-4.10'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={a} lc={a<=2}'
+        'lvl R L0 lp={a} lc={a<=3}'
+        'lvl Sel L0 lp={a} lc={a<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1370,6 +1539,11 @@
         '        apply - opkind=UserDefinedOpKind L0 7.40-7.44'
         '          apply n opkind=FormalParamKind L0 7.40-7.40'
         '          num 1 L0 7.44-7.44'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl Fact L0 ml=[2] w=[1] lc={n<=2}'
+        'lvl Odd L0 ml=[2] w=[1] lc={n<=2}'
+        'lvl Even L0 ml=[2] w=[1] lc={n<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1404,6 +1578,11 @@
         '    apply $SetOfFcns opkind=BuiltInKind L0 5.7-5.14'
         '      apply S opkind=ConstantDeclKind L0 5.8-5.8'
         '      apply T opkind=ConstantDeclKind L0 5.13-5.13'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={S,T} lc={S<=2,T<=2,x<=2,x<=2}'
+        'lvl A1 L0 lp={S} lc={x<=2}'
+        'lvl A2 L0 lp={S} lc={x<=2}'
+        'lvl A3 L0 lp={S,T} lc={S<=2,T<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1439,6 +1618,10 @@
         '      apply $Pair opkind=BuiltInKind L0 3.16-3.22'
         '        str b L0 3.16-3.16'
         '        num 2 L0 3.22-3.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl S L0'
+        'lvl R L0'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1465,6 +1648,10 @@
         '    apply $Tuple opkind=BuiltInKind L0 4.6-4.13'
         '      apply a opkind=ConstantDeclKind L0 4.8-4.8'
         '      apply b opkind=ConstantDeclKind L0 4.11-4.11'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={a,b} lc={a<=2,b<=2}'
+        'lvl S L0 lp={a,b} lc={a<=2,b<=2}'
+        'lvl T L0 lp={a,b} lc={a<=2,b<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1500,6 +1687,11 @@
         '        apply $SquareAct opkind=BuiltInKind L2 6.19-6.26'
         '          apply Next opkind=UserDefinedOpKind L2 6.20-6.23'
         '          apply x opkind=VariableDeclKind L1 6.26-6.26'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,x<=1}'
+        'lvl Init L1 lp={x} lc={x<=2}'
+        'lvl Next L2 lp={x} lc={x<=1} nlp={x}'
+        'lvl Spec L3 lp={x} lc={x<=1} nlp={x}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1549,6 +1741,9 @@
         '        apply = opkind=BuiltInKind L0 5.37-5.41'
         '          apply c opkind=ConstantDeclKind L0 5.37-5.37'
         '          num 2 L0 5.41-5.41'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=2,d<=2,n<=2}'
+        'lvl Named L0 lp={c} lc={c<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1590,6 +1785,10 @@
         '    apply = opkind=BuiltInKind L0 6.19-6.23'
         '      apply c opkind=ConstantDeclKind L0 6.19-6.19'
         '      num 3 L0 6.23-6.23'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=2}'
+        'lvl NamedA L0 lp={c} lc={c<=2}'
+        'lvl NamedT L0 lp={c} lc={c<=2}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1612,6 +1811,9 @@
         '      ubound x L0 3.11-3.11'
         '      apply P opkind=ConstantDeclKind L0 3.15-3.18'
         '        apply x opkind=FormalParamKind L0 3.17-3.17'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={P} lc={P<=3,x<=3} alc={(P,0)>=0}'
+        'lvl All L0 lp={P} lc={P<=3,x<=3} alc={(P,0)>=0}'
     ==
   !>
   %+  dump-sem:semantic  'A'
@@ -1630,6 +1832,9 @@
         'MODULE A 1.1-4.4'
         '  def Foo arity=0 local=n L0 3.1-3.10'
         '    apply Bar opkind=UserDefinedOpKind L0 3.8-3.10'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L0'
     ==
   !>
   %+  dump-sem:semantic  'A'

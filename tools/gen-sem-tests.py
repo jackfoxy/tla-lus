@@ -9,9 +9,10 @@ against each golden.
 
 SemDump's trailing LEVELS section (per-def level-constraint projection:
 max-levels, weights, higher-order min-max/level conditions, level params,
-level/arg-level constraints, arg-level params, non-Leibniz params) is split
-into golden-lvl.txt per case. It is ORACLE-ONLY until the unit-4.1 Hoon
-constraint renderer exists; no test arm compares it yet. Never edit
+level/arg-level constraints, arg-level params, non-Leibniz params) is
+still split into golden-lvl.txt per case for inspection, and since unit
+4.1 the Hoon renderer emits the same projection: each test arm compares
+the full output (tree + DIAGS + LEVELS) as one wain. Never edit
 generated files.
 """
 import subprocess
@@ -41,8 +42,8 @@ def hcord(s: str) -> str:
 
 
 def golden(case: Path) -> tuple[str, str]:
-    """Returns (tree+diags golden, LEVELS golden); either may be captured
-    but only the first is compared by the generated suite for now."""
+    """Returns (tree+diags golden, LEVELS golden); the generated suite
+    compares their concatenation."""
     r = subprocess.run(["java", "-cp", DUMP_CP, "SemDump", "A.tla"],
                        cwd=case, capture_output=True, text=True)
     out = r.stdout
@@ -79,7 +80,7 @@ def main() -> None:
             lvlf.write_text(lvl)
         elif lvlf.exists():
             lvlf.unlink()
-        glines = gold.split("\n")
+        glines = (gold + lvl).split("\n")
         if glines and glines[-1] == "":
             glines.pop()
         gitems = "\n".join(f"        '{hcord(l)}'" for l in glines)

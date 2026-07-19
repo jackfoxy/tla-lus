@@ -99,3 +99,72 @@ apsubst`. Everything else (48) green as of this baseline.
   suppression/elevation is driver-level.
 - Do not grow the `$sem` or `$kont` `$%` unions for 4.x nodes (zuse-408
   mold-compiler hang); use the reserved-apply encoding.
+
+## 4.1 Canonical constraint types and set algebra (done 2026-07-18)
+
+The projection went from oracle-only to byte-compared: `dump-sem` now
+appends the LEVELS section and `gen-sem-tests.py` compares tree + DIAGS
++ LEVELS as one wain per case. Focused suite 48/56; the red set is
+exactly the 8 named 4.2–4.6 cases from the 4.0 matrix (no new reds).
+Algebra unit suite `tests/lib/tla/lvl.hoon` 10/10.
+
+What landed beyond the frozen 4.0 machinery:
+
+- `lres`/`oplev` grew `all` (allParams), `nlp` (nonLeibnizParams), and
+  `lbz` (isLeibnizArg; builtins = ArgWeights>0 with variadic index 0,
+  user defs = param absent from body nlp, monotonic across recursive
+  iterations). Non-Leibniz argument positions inject the operand's
+  allParams (`OpApplNode.levelCheck` line 638); bound identifiers are
+  removed from lp/all/nlp but NOT from the constraint sets.
+- LetIn: SANY never fills a LetInNode's nonLeibnizParams (keep empty);
+  lets contribute lc, alc, and occur-filtered alp (previously dropped).
+- Bound identifiers key constraints by a span-derived owner
+  (`+bound-key`, e.g. `b3.4`) standing in for SymbolNode identity —
+  same-named binders keep distinct entries and the renderer keeps
+  duplicates (`lc={x<=2,x<=2}` in setforms).
+- `+l-deps`/`denv`: dependency-first level check of every loaded module,
+  seeding definition oplevs (imported ops carry real constraint sets —
+  the `n<=2` on everything EXTENDS-ing Naturals comes from a Naturals
+  definition's own lc) and per-module `mlev` (constancy + module lc).
+  `+l-inst` consumes it instead of re-checking the instanced module.
+- `Subst.getSubLCSet` kind overrides in `+l-substin`: when the
+  instanced module is non-constant, CONSTANT-keyed entries tighten to 0
+  and VARIABLE-keyed to 1 before mapping through the substitution. The
+  `$SubstIn` reserved apply's op name now carries the module
+  (`'$SubstIn:B'`, `+substin-mod`; all matches are prefix-based).
+- Module line: lp = the constant declarations; lc/alc/alp union own
+  defs + EXTENDS-imported defs (`+extends-of`; INSTANCE-loaded modules'
+  raw defs must NOT contribute — that distinction is invisible in the
+  generation ctx, hence the tree walk) + assumes/theorems; alp filtered
+  per def by `ArgLevelParam.occur(params)`; `ModuleNode.getLevel()`
+  throws in SemDump, so the module always prints `L-1`.
+- Masked (semantic-error) form: `lvl <name> L-1` with `ml=? w=?` /
+  `mml=? olc=?` for arity>0 / higher-order defs — the oracle's getters
+  throw when levelCheck never ran.
+- Renderer order/format: entries render name-only, sorted
+  byte-lexicographically (Java Collections.sort), `alc` as
+  `(p,i)>=n`, `alp` as `(op,i,param)`, empty segments omitted; segment
+  order lp lc alc alp nlp.
+
+Deferred out of 4.1 (owned rows unchanged): the doubly-higher-order
+call-site argLevelParam remapping and its opLevelCond non-Leibniz rule
+(4.3), instance-node lc/alc/alp contributions to the module line and
+4244/4246/4247 (4.6 — today only lvlinstm/lvlinstp would notice),
+driver-level lint controls (4.7).
+
+Subunit handoff:
+
+```text
+Subunit: 4.1
+Java owner and entry method: SetOfLevelConstraints/SetOfArgLevelConstraints put+putAll, ArgLevelParam/ParamAndPosition, LevelNode collection fields; SemDump.lvlLine projection
+Current Hoon owner: lib/tla/semantic.hoon (lc-*/ac-* algebra, lres/oplev/denv, l-deps, LEVELS renderer in l-module-core)
+Smallest failing parity case: none for 4.1; next failing cases are lvlqtb/lvltmp (4.2)
+New or changed nouns: lres/oplev += all/nlp/lbz; lenv += mlevs; denv; $SubstIn op name carries module
+Diagnostic/result expected: no diagnostic changes; LEVELS section byte-equality
+Focused validation result: sem 48/56 (reds = the 8 named 4.2-4.6 cases), lvl 10/10
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.n with exactly {apsubst lvlcdot lvlinsth lvlinstm lvlinstp lvlqtb lvltmp recfcn}; validate.py --check clean; check-parity.py --check clean (70 rows)
+Pause/resume evidence, if applicable: n/a (no Gall wiring in 4.1)
+Parity-manifest rows changed: level-constraints (oracle-only -> partial, compared evidence), level-substitution (note update)
+Compatibility limitations removed or added: LEVELS projection now compared; Leibniz *tracking* ported (4244/4246/4247 diagnostics still absent); doubly-higher-order remapping noted for 4.3
+Remaining dependencies: 4.2 next (bound-identifier L-1 sentinel, \cdot DIAGS escaping)
+```
