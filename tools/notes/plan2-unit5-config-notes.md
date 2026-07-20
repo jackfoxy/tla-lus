@@ -116,14 +116,31 @@ unvalidated key may return `%ok`.
   Comments lex as `%com` items (skip); a lexical `%err` item = the
   `TokenMgrError→EOF` swallow (truncate the token stream there).
 
-## Remaining subunits
+## 5.1 + 5.2 landed (2026-07-20)
 
-- 5.1 (remaining) line grammar + parseValue over `lex-cfg` → `dump-cfg` Hoon
-  entrypoint producing the ConfigDump projection; flip gen-cfg-tests to `pass`.
-  Compare tokens by IMAGE (as Java `tt.image.equals`); only NUMBER/STRING kinds
-  matter for parseValue. Values recurse only through sets → use eval.hoon's
-  proven `$+` value-mold recipe for `cfg-value`. Only recursive cycle is
-  `cfg-value`; the rest of `cfg-ast` is flat lists.
+`lib/tla/config.hoon` ports ModelConfig.parse/parseValue + the CONSTANT
+machinery; `dump-cfg` renders the ConfigDump projection. gen-cfg-tests emits
+`desk/tests/lib/tla/cfg.hoon` (34/34 green), flipped to `pass`; full suite
+`ok=%.y`. `cfg-lex-parse`+`cfg-constants` → parity.
+
+- Tokens compared by IMAGE (as Java `tt.image.equals`); only NUMBER/STRING
+  kinds are distinguished (for parseValue). Punctuation `<- ! [ ] ( ) , = { }`
+  all lex as single tokens with those exact images in %spec state.
+- **cfg-value reuses `value:eval`.** A freshly-defined `$+`-recursive `$%`
+  `cfg-value` (5 members, isomorphic to eval's proven `value`) OVERFLOWED the
+  zuse-408 mold compiler (thousands of `[24 42]`/`[29 15]` frames on the cycle,
+  the "recover: dig: over" signature) — even the exact eval recipe. Aliasing
+  the already-compiled `value:eval` (via `/= eval /lib/tla/eval`) avoids
+  defining a second recursive mold. cfg produces `%int`(≥0)/`%str`/`%bool`/
+  `%model`/`%set`; render-value is a `?+` over those five.
+- HOON GOTCHAS hit: 4+-digit decimals need dot grouping (`5.003`); `:(cat 3 …)`
+  is invalid (cat is ternary → `(rap 3 ~[…])`); double-quoted `"{"`/`"}"`
+  interpolate (use `(trip '{')`); `\n` isn't an escape (`\0a`); `$?(a b c)`
+  bunts to the LAST member (deadlock default `%undef` placed last); `roll`
+  seeds acc at the bunt so it drops a threaded prefix (fold each render section
+  from empty, then weld onto `o`).
+
+## Remaining subunits
 - 5.2 CONSTANT/override/rawConstants machinery (byte-exact RAW).
 - 5.3 extend ConfigDump with SpecProcessor validation (paired `A.tla`) →
   TLC_CONFIG_* diagnostics; port config-vs-graph validation reusing WU4
