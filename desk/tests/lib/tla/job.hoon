@@ -36,6 +36,13 @@
   =/  root  ?~(mods 'spec' -.i.mods)
   [[%analyze [& | | |]] [%inline root (malt mods) ~] lim |]
 ::
+++  analyze-req-f
+  ::  an %analyze request with explicit flags [syntax semantic level lint]
+  |=  [mods=(list [module-name @t]) flags=analyze-flags]
+  ^-  request
+  =/  root  ?~(mods 'spec' -.i.mods)
+  [[%analyze flags] [%inline root (malt mods) ~] lim |]
+::
 ++  cyc-spec
   ^~
   '''
@@ -90,6 +97,46 @@
 ::
 ++  mc-cfg    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ++  bare-cfg  'INIT Init\0aNEXT Next\0a'
+::
+++  undef-spec
+  ::  Bar is undefined -> semantic error 4200 (generation phase)
+  ^~
+  '''
+  ---- MODULE spec ----
+  Foo == Bar
+  ====
+  '''
+::
+++  asm-spec
+  ::  a non-constant ASSUME -> level error 4206 (level phase)
+  ^~
+  '''
+  ---- MODULE spec ----
+  VARIABLE x
+  ASSUME x = x
+  ====
+  '''
+::
+++  lint-spec
+  ::  a record field shadowing a definition -> lint warning 4802
+  ^~
+  '''
+  ---- MODULE spec ----
+  bar == 23
+  R == [bar |-> 42]
+  ====
+  '''
+::
+++  analyze-run
+  ::  drive an analyze request to termination, returning whether the
+  ::  verdict failed and the error/warning diagnostics it emitted
+  |=  req=request
+  ^-  [failed=? errs=(list diagnostic) warns=(list diagnostic)]
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  =/  ds  diags.j
+  :+  ?=([~ %failed *] result.j)
+    (skim ds |=(d=diagnostic =(%error severity.d)))
+  (skim ds |=(d=diagnostic =(%warning severity.d)))
 ::
 ++  run-all
   ::  step to termination, collecting the full event stream
@@ -173,12 +220,12 @@
     !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
-++  test-validate-analyze-flags-rejected
+++  test-validate-analyze-accepted
+  ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
+  ::  bundle validates
   =/  req=request
-    [[%analyze [& & | |]] (bundle cyc-spec ~) lim |]
-  %+  expect-eq
-    !>(`'unsupported: %analyze semantic stage is not wired yet (unit 3)')
-  !>((validate:job-lib req))
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim |]
+  (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
@@ -242,6 +289,81 @@
     %+  expect-eq
       !>(`(list stage)`~[%parse %terminal])
     !>((plan:job-lib (analyze-req ~[['spec' cyc-spec]])))
+  ::
+    ::  any deeper flag adds the %semantic stage
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %semantic %terminal])
+    !>((plan:job-lib (analyze-req-f ~[['spec' cyc-spec]] [& & & &])))
+  ==
+::
+::  +|  Analyze Pipeline (unit 4.8)
+::
+::
+++  test-analyze-clean-ok
+  ::  a well-formed module analyzed at every flag: %ok, no diagnostics
+  =/  r  (analyze-run (analyze-req-f ~[['spec' cyc-spec]] [& & & &]))
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+    (expect-eq !>(~) !>(warns.r))
+  ==
+::
+++  test-analyze-semantic-error
+  ::  an undefined operator fails the run with a 4200 at the %semantic
+  ::  stage; level and lint do not run (SANY gating, via analyze-graph)
+  =/  r  (analyze-run (analyze-req-f ~[['spec' undef-spec]] [& & & &]))
+  =/  es  errs.r
+  ?>  ?=(^ es)
+  ;:  weld
+    (expect !>(failed.r))
+    (expect-eq !>([%sany 4.200]) !>(code.i.es))
+    (expect-eq !>(%semantic) !>(stage.i.es))
+  ==
+::
+++  test-analyze-level-error
+  ::  a non-constant ASSUME fails the run with a 4206 at the %level stage
+  =/  r  (analyze-run (analyze-req-f ~[['spec' asm-spec]] [& & & &]))
+  =/  es  errs.r
+  ?>  ?=(^ es)
+  ;:  weld
+    (expect !>(failed.r))
+    (expect-eq !>([%sany 4.206]) !>(code.i.es))
+    (expect-eq !>(%level) !>(stage.i.es))
+  ==
+::
+++  test-analyze-level-flag-off
+  ::  with the level flag off, the 4206 level error is not emitted and
+  ::  the run is %ok
+  =/  r  (analyze-run (analyze-req-f ~[['spec' asm-spec]] [& & | |]))
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+  ==
+::
+++  test-analyze-lint-warning
+  ::  a record-field collision is a %lint warning: emitted but does not
+  ::  fail the run
+  =/  r  (analyze-run (analyze-req-f ~[['spec' lint-spec]] [& & & &]))
+  =/  ws  warns.r
+  ?>  ?=(^ ws)
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+    (expect-eq !>([%sany 4.802]) !>(code.i.ws))
+    (expect-eq !>(%lint) !>(stage.i.ws))
+  ==
+::
+++  test-analyze-lint-flag-off
+  ::  with the lint flag off, no 4802 warning is emitted
+  =/  r  (analyze-run (analyze-req-f ~[['spec' lint-spec]] [& & & |]))
+  (expect-eq !>(~) !>(warns.r))
+::
+++  test-analyze-budget-independent
+  ::  the analyze pipeline is pause/resume identical at every slice
+  ;:  weld
+    (every-boundary (analyze-req-f ~[['spec' cyc-spec]] [& & & &]) 1)
+    (every-boundary (analyze-req-f ~[['spec' lint-spec]] [& & & &]) 1)
+    (every-boundary (analyze-req-f ~[['spec' undef-spec]] [& & & &]) 1)
   ==
 ::
 ::  +|  Safety Checking Through The Kernel
@@ -465,7 +587,7 @@
     (analyze-req ~[['spec' cyc-spec] ['bad' 'not a module']])
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   ;:  weld
-    (expect-eq !>(`[%failed 'syntax errors in 1 module(s)']) !>(result.j))
+    (expect-eq !>(`[%failed 'analysis found 1 error(s)']) !>(result.j))
     (expect-eq !>(1) !>((lent diags.j)))
   ==
 ::

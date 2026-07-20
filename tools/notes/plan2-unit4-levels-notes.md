@@ -496,3 +496,61 @@ Parity-manifest rows changed: linter (partial -> parity, 6 fixtures + lint-optio
 Compatibility limitations removed or added: removed the driver-level lint-controls gap
 Remaining dependencies: 4.8 wires apply-lint-options + validate-target into the real %analyze stages and closes the unit
 ```
+
+## 4.8 Integrate, bound, document, close (done 2026-07-20)
+
+Unit 4 complete. Full ship suite ok=%.y (828 OK), validate + check-parity
+clean, all nine scaffold gates PASS.
+
+- **Phase-split diagnostics**: `l-module-core` now returns a fifth field
+  `phase=[sem lvl lint]` — the generation diags (`diags.m`), the level
+  diags (`dds`+`tds`+`pds`), and the lint diags (`lint-ds`). The
+  semantic-error early return puts everything in `sem`. `+analyze-graph`
+  exposes this (resolve -> gen-module -> l-module-core), ~ on resolution
+  failure.
+- **job.hoon**: new `%semantic` stage (`+do-semantic`) runs
+  `analyze-graph` in one bounded slice and emits diagnostics per the
+  request flags, converting `sdiag` -> wire `diagnostic` via
+  `+sdiag-to-diag` (code -> [%sany num], phase -> stage, sspan -> loc in
+  the root module). Lint diags pass through `apply-lint-options` (empty
+  options; a request-carried set is a future sur extension). `+plan`:
+  `%analyze` with any of semantic/level/lint -> [%parse %semantic
+  %terminal], else [%parse %terminal]. `+validate` no longer typed-
+  rejects the flags. `+do-terminal` fails on any error-severity diag
+  from parse/semantic/level/lint (an elevated lint warning flips to
+  %error and thus fails). Resolution failure proceeds to terminal (parse
+  errors drive the verdict) or surfaces a `[%lus 401]` %modules diag.
+- **Gating** is enforced inside `analyze-graph`/`l-module-core`, not the
+  pipeline: a semantic error suppresses level+lint (phase = [sem ~ ~]);
+  a level error suppresses lint. So even with all flags set, the emitted
+  diags respect SANY's phase gating.
+- **Bounded, no cursor**: a module bundle's analysis is one bounded slice
+  (like a capped run-check), so no `$kont` member was added. Pause/resume
+  is identical at every boundary — `every-boundary` tests over clean,
+  lint, and semantic-error analyze requests all pass.
+- **Tests** (`tests/lib/tla/job`): clean -> %ok no diags; undefined op ->
+  %failed + 4200 at %semantic; non-constant ASSUME -> %failed + 4206 at
+  %level; level-flag-off suppresses the 4206; record collision -> %ok +
+  4802 warning at %lint; lint-flag-off suppresses it;
+  `test-analyze-budget-independent` = every-boundary at budget 1.
+
+HOON LESSONS (4.8): (1) referencing the `result` MOLD (sur `$%`) in a
+type annotation while a `job` with a `result` FIELD is in the subject
+mis-resolves the mold to the field's value type — return the job noun and
+access `result.j` (field access is fine), or compute the verdict inside
+the helper and return a `?`. (2) A `?>  ?=(^ errs.r)` on a nested tuple
+wing does NOT narrow it for later `i.errs.r` access — bind a local copy
+`=/ es errs.r` first, then `?=(^ es)`, then `i.es` (same class as the
+`=.`-into-narrowed-wing gotcha).
+
+## Unit 4 closeout
+
+All eight subunits (4.0–4.8) done. `desk/test-data/sem` is 73 cases,
+`tests/lib/tla/lvl` is 19 (algebra + validate-target + lint-options),
+`tests/lib/tla/job` covers the analyze pipeline. Manifest rows now
+parity: level-constraints, level-basic, level-higher-order,
+level-recursion, level-node-rules, level-substitution, linter,
+op-analyze. Remaining owed rows are other units (PlusCal, Clay, TLC
+core, liveness fairness). Unit-4 residue: BY/QED proof-step level rules
+(await unit-3 proof nodes); cross-module diagnostic origin-module spans;
+request-carried lint-options (sur extension).

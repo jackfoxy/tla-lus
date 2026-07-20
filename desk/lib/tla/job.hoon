@@ -1,7 +1,8 @@
 /-  *tla-lus
-/=  ast     /lib/tla/ast
-/=  syntax  /lib/tla/syntax
-/=  check   /lib/tla/check
+/=  ast       /lib/tla/ast
+/=  syntax    /lib/tla/syntax
+/=  check     /lib/tla/check
+/=  semantic  /lib/tla/semantic
 |%
   ::  Resumable Job Kernel (unit P2-1)
   ::
@@ -117,12 +118,6 @@
   ?:  ?=(%translate -.op.req)
     `'unsupported: PlusCal translation is not ported yet (unit 8)'
   ?:  ?=(%analyze -.op.req)
-    ?:  semantic.flags.op.req
-      `'unsupported: %analyze semantic stage is not wired yet (unit 3)'
-    ?:  level.flags.op.req
-      `'unsupported: %analyze level stage is not wired yet (unit 4)'
-    ?:  lint.flags.op.req
-      `'unsupported: %analyze lint stage is not wired yet (unit 4)'
     (validate-bundle req)
   ?:  translate.opts.op.req
     `'unsupported: translate-before-check is not ported yet (unit 8)'
@@ -163,7 +158,13 @@
   ^-  (list stage)
   ?-    -.op.req
       %translate  ~
-      %analyze    ~[%parse %terminal]
+      %analyze
+    ?:  ?|  semantic.flags.op.req
+            level.flags.op.req
+            lint.flags.op.req
+        ==
+      `(list stage)`~[%parse %semantic %terminal]
+    `(list stage)`~[%parse %terminal]
       %check
     %+  weld  `(list stage)`~[%parse %config]
     ?-    -.mode.opts.op.req
@@ -243,6 +244,7 @@
   ?+    stage.j
       ~|([%tla-lus-unplanned-stage stage.j] !!)
     %parse     (do-parse j k budget pre)
+    %semantic  (do-semantic j pre)
     %config    (do-config j k pre)
     %explore   (do-explore j k budget pre)
     %liveness  (do-scan j k budget pre)
@@ -335,6 +337,74 @@
     spent    +(spent)
     evs      (weld evs (turn ds |=(d=diagnostic `event`[%diagnostic d])))
   ==
+::
+::  +|  Stage: %semantic (level and lint)
+::
+::
+++  sdiag-to-diag
+  ::  a semantic-library diagnostic on the wire: the code is a SANY
+  ::  ErrorCode, the phase supplies the stage, and the (unit span)
+  ::  becomes a loc in the root module. Cross-module instance
+  ::  diagnostics carry the root name here (their true origin module is
+  ::  a deferred refinement, like the parser's typed-at spans)
+  |=  [d=sdiag:semantic root=module-name stg=stage]
+  ^-  diagnostic
+  :*  [%sany code.d]
+      sev.d
+      stg
+      msg.d
+      ?~(at.d ~ `[root u.at.d])
+      ~
+  ==
+::
+++  do-semantic
+  ::  the %analyze semantic/level/lint stage: one bounded pass over the
+  ::  Work Unit 3 graph (generation, level checking, linting) with the
+  ::  diagnostics split by phase, emitting only the requested stages.
+  ::  Level and lint diagnostics are gated exactly as SANY gates them
+  ::  (a semantic error suppresses both; a level error suppresses lint),
+  ::  which +analyze-graph already enforces. Runs in a single slice: a
+  ::  module bundle's analysis is bounded like a capped exploration, so
+  ::  no mid-stage cursor is needed (see doc/compatibility.md)
+  |=  [j=job-2 pre=(list event)]
+  ^-  step-result-2
+  ?>  ?=(%inline -.src.request.j)
+  ?>  ?=(%analyze -.op.request.j)
+  =/  src    src.request.j
+  =/  flags  flags.op.request.j
+  =/  ag  (analyze-graph:semantic root.src modules.src)
+  ?~  ag
+    ::  resolution failed. If the parse stage already reported errors,
+    ::  they drive the terminal verdict; otherwise surface a resolution
+    ::  diagnostic (a missing EXTENDS/INSTANCE target parses per module
+    ::  but fails the dependency graph)
+    ?:  %+  lien  diags.j
+        |=(d=diagnostic &(=(%error severity.d) ?=(?(%parse %modules) stage.d)))
+      (more j pre)
+    =/  d=diagnostic
+      [[%lus 401] %error %modules 'module resolution failed' ~ ~]
+    =.  diags.j  (snoc diags.j d)
+    (more j (snoc pre [%diagnostic d]))
+  =/  as-diags
+    |=  [ds=(list sdiag:semantic) stg=stage]
+    ^-  (list diagnostic)
+    (turn ds |=(d=sdiag:semantic (sdiag-to-diag d root.src stg)))
+  =/  lint-ds
+    ?.  lint.flags  ~
+    ::  driver-level warning controls, with default (empty) options; a
+    ::  request-carried lint-options set is a future sur extension
+    =/  applied  (apply-lint-options:semantic [~ ~] lint.u.ag)
+    ?:  ?=(%| -.applied)  ~
+    (as-diags p.applied %lint)
+  =/  ds=(list diagnostic)
+    ;:  weld
+      ?:(semantic.flags (as-diags sem.u.ag %semantic) ~)
+      ?:(level.flags (as-diags lvl.u.ag %level) ~)
+      lint-ds
+    ==
+  =.  diags.j  (weld diags.j ds)
+  =/  evs  (weld pre (turn ds |=(d=diagnostic `event`[%diagnostic d])))
+  (more j evs)
 ::
 ::  +|  Stage: %config
 ::
@@ -574,17 +644,23 @@
 ::
 ::
 ++  do-terminal
-  ::  %analyze verdict: fail iff any parse stage errors were recorded
+  ::  %analyze verdict: fail iff any error-severity diagnostic was
+  ::  recorded by a parse, semantic, or level stage (lint warnings do
+  ::  not fail the run unless a lint-option elevated one to %error,
+  ::  which flips its severity here)
   |=  [j=job-2 pre=(list event)]
   ^-  step-result-2
   =/  errs
     %-  lent
     %+  skim  diags.j
-    |=(d=diagnostic &(=(%error severity.d) =(%parse stage.d)))
+    |=  d=diagnostic
+    ?&  =(%error severity.d)
+        ?=(?(%parse %semantic %level %lint) stage.d)
+    ==
   ?:  =(0 errs)
     (finish j [%ok stats.j] pre)
   %^  finish  j
-    [%failed (rap 3 ~['syntax errors in ' (a-co:check errs) ' module(s)'])]
+    [%failed (rap 3 ~['analysis found ' (a-co:check errs) ' error(s)'])]
   pre
 ::
 ::  +|  Artifacts

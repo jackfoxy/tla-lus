@@ -138,12 +138,22 @@ overlap rejection) matching SANY's `filterVisibleMessages`/
 to the `Errors` channel, their evidence is Hoon unit tests
 (`tests/lib/tla/lvl`) rather than SemDump goldens.
 
-Remaining unit-4 work (the 4.0 owner-to-fixture matrix lives in
-`tools/notes/plan2-unit4-levels-notes.md`):
+Unit 4 is complete. The `%analyze` request runs the real Work Unit 3+4
+pipeline (4.8): a `%semantic` stage calls `analyze-graph`, splitting the
+diagnostics by phase and gating them exactly as SANY does (a semantic
+error suppresses level and lint; a level error suppresses lint). The
+`semantic`/`level`/`lint` flags select which phases' diagnostics are
+emitted; `apply-lint-options` threads the driver warning controls. The
+stage runs in a single bounded slice — a module bundle's analysis is
+bounded like a capped exploration — so no mid-stage cursor is needed;
+pause/resume is identical at every boundary. Cross-module instance
+diagnostics carry the root module name as their loc source (the true
+origin module is a deferred refinement, like the parser's typed-at
+spans), and a request-carried `lint-options` set is a future sur
+extension (the pipeline applies empty options today).
 
-- **`%analyze` level/lint pipeline integration** (typed-rejected today)
-  is owed to 4.8, which wires `apply-lint-options`/`validate-target`
-  into the real analyze stages.
+Remaining unit-4 residue:
+
 - **BY/QED proof-step level rules** ride in when the proof-step nodes
   land (unit-3 residue).
 
@@ -318,9 +328,9 @@ Consequences:
 
 Still absent after P2-1 (tracked in `parity-manifest.md`): Clay sources
 (typed-rejected at submit), PlusCal translation and translate-before-check
-(typed-rejected), `%analyze` semantic/level/lint flags (typed-rejected),
-multi-module resolution inside `%check`, canonicalized search roots,
-content-hash caching, quotas, artifact retention.
+(typed-rejected), multi-module resolution inside `%check`, canonicalized
+search roots, content-hash caching, quotas, artifact retention. (The
+`%analyze` semantic/level/lint flags now run the real pipeline — unit 4.8.)
 
 ## Typed-rejected / unsupported public options — summary
 
@@ -332,7 +342,6 @@ ignored):
 | Option | Rejection |
 |---|---|
 | `op` = `%translate` | `unsupported: PlusCal translation is not ported yet (unit 8)` |
-| `op` = `%analyze` with `semantic`/`level`/`lint` | `unsupported: %analyze <flag> stage is not wired yet (unit 3/4)` |
 | `check-opts.translate` = `&` | `unsupported: translate-before-check is not ported yet (unit 8)` |
 | `check-opts.cfg` = `` `name `` | `unsupported: cfg source override; put the config in the bundle` |
 | `%check` without a bundle cfg | `a %check request requires a config` |

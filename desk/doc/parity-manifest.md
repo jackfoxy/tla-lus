@@ -95,7 +95,7 @@ presence in the wire type.
 | id | java-owner | hoon-owner | oracle-test | status | unit | rationale |
 |---|---|---|---|---|---|---|
 | op-translate | pcal.trans | job.hoon validate | (job tests) | absent | 8 | typed rejection at submit naming unit 8; no stub artifact (P2-1) |
-| op-analyze | tla2sany.SANY -s/-l/-lint | job.hoon %parse/%terminal | gen-parser-tests (249) | partial | 2-4 | syntax-only analyze runs the real parser per module; semantic/level/lint flags are typed-rejected at submit (P2-1) |
+| op-analyze | tla2sany.SANY -s/-l/-lint driver phases + filterVisibleMessages | job.hoon %parse/%semantic/%terminal, semantic.analyze-graph | gen-parser-tests (249) + tests/lib/tla/job (analyze pipeline) | parity | 2-4 | 4.8: syntax runs the real parser per module; the semantic/level/lint flags run the real Work Unit 3+4 pipeline via analyze-graph, with diagnostics split by phase and gated as SANY gates them (a semantic error suppresses level and lint; a level error suppresses lint); apply-lint-options threads the driver warning controls (default empty); the verdict fails on any parse/semantic/level error, single bounded slice, pause/resume identical |
 | op-check-exhaustive | tlc2.TLC (safety) | job.hoon kont kernel, check.hoon bfs-cursor | gen-mc-tests (5) | partial | 7,10 | inline+cfg, budget-sliced resumable BFS (P2-1); constraints/symmetry/FP64/coverage absent |
 | op-check-simulate | tlc2.TLC -simulate | job.hoon %sim kont, check.hoon sim-cursor | (sim property tests + job tests) | partial | 9,12 | real seeded engine wired and budget-sliced (P2-1); TLC RNG/enumeration-order parity absent |
 | check-opt-translate | tlc2 translate-before-check | job.hoon validate | (job tests) | absent | 8 | typed rejection at submit (P2-1); no stub translation |

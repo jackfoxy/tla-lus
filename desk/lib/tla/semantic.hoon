@@ -833,6 +833,26 @@
   =/  fc  (full-ctx tree.u.rt ctxs)
   =/  dv  (l-deps root sem-order.g ctxs mods.g)
   `(level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
+::
+++  analyze-graph
+  ::  the analyze pipeline's entry (unit 4.8): resolve, generate, level
+  ::  check, and lint the root module, returning the diagnostics split
+  ::  by pipeline phase so %analyze can emit only the requested stages.
+  ::  ~ when module resolution fails (the caller reports the modres
+  ::  diagnostics from its own %parse/%modules stages)
+  |=  [root=@t src=(map @t @t)]
+  ^-  (unit [sem=(list sdiag) lvl=(list sdiag) lint=(list sdiag)])
+  =/  r  (resolve:modules root (inline-resolver:modules src) ~)
+  ?:  ?=(%| -.out.r)  ~
+  =/  g  p.out.r
+  =/  ctxs  (analyze sem-order.g mods.g deps.g)
+  =/  rt  (~(get by mods.g) root)
+  ?~  rt  ~
+  =/  fc  (full-ctx tree.u.rt ctxs)
+  =/  dv  (l-deps root sem-order.g ctxs mods.g)
+  =/  lr
+    (l-module-core (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
+  `phase.lr
 ::  +|  Typed Semantic IR (unit 3: the graph later units consume)
 ::
 ::  Molds follow the zuse-408 recursive recipe: every cycle member is a
@@ -3960,9 +3980,16 @@
           mods=(map @t loaded:modules)
           dv=denv
       ==
-  ^-  [m=sem-module ml=mlev lvls=wain ops=(map @t oplev)]
+  ^-  $:  m=sem-module
+          ml=mlev
+          lvls=wain
+          ops=(map @t oplev)
+          phase=[sem=(list sdiag) lvl=(list sdiag) lint=(list sdiag)]
+      ==
+  ::  a semantic (generation) error suppresses level checking and
+  ::  linting entirely, so the generation diags are the whole story
   ?:  (lien diags.m |=(d=sdiag =(%error sev.d)))
-    [m [& ~ ~ ~] (render-levels-masked m) ops.dv]
+    [m [& ~ ~ ~] (render-levels-masked m) ops.dv [diags.m ~ ~]]
   =/  e=lenv
     :*  ops.dv
         =/  acc  *(map @t lkey)
@@ -4375,11 +4402,17 @@
     %-  crip
     %+  weld  "lvl {(trip nm)} L{(a-co lvl.th)}"
     ?~(o "" (lvl-segs lp.u.o lc.u.o ac.u.o ap.u.o nlp.u.o))
-  =/  allds  :(weld diags.m dds tds pds)
+  =/  level-ds  :(weld dds tds pds)
+  =/  allds  (weld diags.m level-ds)
   =/  lint-ds
     ?:  (lien allds |=(d=sdiag =(%error sev.d)))  ~
     (l-lint m2 c)
-  [m2(diags (dedup-diags (weld allds lint-ds))) [const mlc malc malp] lvls ops.et]
+  :*  m2(diags (dedup-diags (weld allds lint-ds)))
+      [const mlc malc malp]
+      lvls
+      ops.et
+      [diags.m level-ds lint-ds]
+  ==
 ::
 ++  collect-records
   ::  every $RcdConstructor application in the module, in generation
