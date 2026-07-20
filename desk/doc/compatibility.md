@@ -129,15 +129,21 @@ semantic generation produced no errors (any semantic error renders every
 level `-1`), while a level-check error leaves computed levels visible and
 only adds `D`-line diagnostics.
 
+Record-constructor linting (4.7) is at parity: the 4802 field-name
+collision rule with its built-from-declarations suppression, nested and
+multi-field constructors, and the driver-level `lint-options` (per-code
+suppression, warning-to-error elevation, and the suppressed/as-errors
+overlap rejection) matching SANY's `filterVisibleMessages`/
+`reportMessages`. Because those controls are report-time and invisible
+to the `Errors` channel, their evidence is Hoon unit tests
+(`tests/lib/tla/lvl`) rather than SemDump goldens.
+
 Remaining unit-4 work (the 4.0 owner-to-fixture matrix lives in
 `tools/notes/plan2-unit4-levels-notes.md`):
 
-- **Driver-level lint controls** (`SanySettings.suppressedCodes` /
-  `messagesAsErrorCodes`, `filterVisibleMessages`) are a report-time
-  concern invisible to the `Errors` channel; the Hoon `lint-options`
-  equivalent and its unit tests are still owed (4.7).
 - **`%analyze` level/lint pipeline integration** (typed-rejected today)
-  is owed to 4.8.
+  is owed to 4.8, which wires `apply-lint-options`/`validate-target`
+  into the real analyze stages.
 - **BY/QED proof-step level rules** ride in when the proof-step nodes
   land (unit-3 residue).
 

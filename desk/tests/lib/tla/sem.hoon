@@ -863,6 +863,68 @@
       '---- MODULE A ----\0aCONSTANT z\0aFoo == LET a == z\0a           b == a\0a       IN b\0a====\0a'
   ==
 ::
+++  test-sem-lintmf
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def bar arity=0 local=n L0 2.1-2.8'
+        '    num 1 L0 2.8-2.8'
+        '  def R arity=0 local=n L0 3.1-3.30'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.6-3.30'
+        '      apply $Pair opkind=BuiltInKind L0 3.7-3.16'
+        '        str bar L0 3.7-3.9'
+        '        num 42 L0 3.15-3.16'
+        '      apply $Pair opkind=BuiltInKind L0 3.19-3.29'
+        '        str baz L0 3.19-3.21'
+        '        apply bar opkind=UserDefinedOpKind L0 3.27-3.29'
+        'DIAGS'
+        'D 4802 WARNING 3.7-3.9 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl bar L0'
+        'lvl R L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0abar == 1\0aR == [bar |-> 42, baz |-> bar]\0a====\0a'
+  ==
+::
+++  test-sem-lintnest
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  const bar arity=0 L0 2.10-2.12'
+        '  def R arity=0 local=n L0 3.1-3.27'
+        '    apply $RcdConstructor opkind=BuiltInKind L0 3.6-3.27'
+        '      apply $Pair opkind=BuiltInKind L0 3.7-3.26'
+        '        str foo L0 3.7-3.9'
+        '        apply $RcdConstructor opkind=BuiltInKind L0 3.15-3.26'
+        '          apply $Pair opkind=BuiltInKind L0 3.16-3.25'
+        '            str bar L0 3.16-3.18'
+        '            num 42 L0 3.24-3.25'
+        'DIAGS'
+        'D 4802 WARNING 3.16-3.18 The field name "bar" in the record constructor is identical to the existing definition or declaration'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={bar}'
+        'lvl R L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT bar\0aR == [foo |-> [bar |-> 42]]\0a====\0a'
+  ==
+::
 ++  test-sem-lintok
   %+  expect-eq
     !>  ^-  wain

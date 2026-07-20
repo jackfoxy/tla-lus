@@ -167,4 +167,48 @@
 ++  test-validate-target-unknown
   =/  r  (validate-target:semantic checked 'Nope' 3)
   (expect-eq !>(%|) !>(-.r))
+::
+::  driver-level lint controls (SanySettings suppressedCodes /
+::  messagesAsErrorCodes): report-time filtering and elevation of
+::  linting warnings, invisible to the semantic Errors channel
+++  lint-warns
+  ^-  (list sdiag:semantic)
+  :~  [4.802 %warning ~ 'field bar']
+      [4.802 %warning ~ 'field baz']
+  ==
+::
+++  no-opts  `lint-options:semantic`[~ ~]
+::
+++  test-lint-passthrough
+  =/  r  (apply-lint-options:semantic no-opts lint-warns)
+  (expect-eq !>([%& lint-warns]) !>(r))
+::
+++  test-lint-suppress
+  =/  o  `lint-options:semantic`[(silt ~[4.802]) ~]
+  =/  r  (apply-lint-options:semantic o lint-warns)
+  (expect-eq !>([%& `(list sdiag:semantic)`~]) !>(r))
+::
+++  test-lint-elevate
+  =/  o  `lint-options:semantic`[~ (silt ~[4.802])]
+  =/  r  (apply-lint-options:semantic o lint-warns)
+  =/  want=(list sdiag:semantic)
+    :~  [4.802 %error ~ 'field bar']
+        [4.802 %error ~ 'field baz']
+    ==
+  (expect-eq !>([%& want]) !>(r))
+::
+++  test-lint-partial-suppress
+  ::  suppression keys on code; a different code passes through untouched
+  =/  mixed=(list sdiag:semantic)
+    :~  [4.802 %warning ~ 'lint']
+        [4.801 %warning ~ 'dup']
+    ==
+  =/  o  `lint-options:semantic`[(silt ~[4.802]) ~]
+  =/  r  (apply-lint-options:semantic o mixed)
+  (expect-eq !>([%& `(list sdiag:semantic)`[[4.801 %warning ~ 'dup'] ~]]) !>(r))
+::
+++  test-lint-overlap-rejected
+  =/  o  `lint-options:semantic`[(silt ~[4.802]) (silt ~[4.802])]
+  =/  r  (apply-lint-options:semantic o lint-warns)
+  (expect-eq !>(%|) !>(-.r))
 --

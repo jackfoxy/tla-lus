@@ -451,3 +451,48 @@ Parity-manifest rows changed: level-substitution (partial -> parity, 11 fixtures
 Compatibility limitations removed or added: removed oparg/4244/4246/4247/APSubstIn gaps; build-ctx INSTANCE-decl-leak fixed; EXTENDS decl re-export added
 Remaining dependencies: 4.7 (lint-options driver controls), 4.8 (%analyze integration); BY/QED proof-step level rules await unit-3 proof nodes
 ```
+
+## 4.7 Record-constructor linting (done 2026-07-20)
+
+The 4802 field-name collision rule and its built-from-declarations
+suppression were already green (lintok/lintrc/lintx/lintsd). 4.7 adds
+the coverage cases and the driver-level controls. Suite 73/73, full
+ship suite ok=%.y (825 OK). Manifest row `linter` -> parity.
+
+- **Coverage fixtures**: `lintnest` (`[foo |-> [bar |-> 42]]` with bar
+  visible — the linter recurses into nested record constructors and
+  warns on the INNER field, span at the inner bar; `collect-records`
+  already walked args so this was green on arrival) and `lintmf`
+  (`[bar |-> 42, baz |-> bar]` — per-field checking, warns on bar
+  only). Both are Errors-channel observable, so they are ordinary
+  differential fixtures.
+- **Driver-level lint-options** (`+apply-lint-options`, tested in
+  `tests/lib/tla/lvl`): a `lint-options` mold with two code sets
+  (`suppressed`, `as-errors`). Mirrors SANY's driver exactly:
+  `filterVisibleMessages` drops suppressed codes; `reportMessages`
+  elevates as-errors codes from `%warning` to `%error` preserving
+  order; and suppressed ∩ as-errors is a configuration error (SANY
+  rejects before running), returned as a typed `%|` failure listing
+  the overlapping codes. This is REPORT-TIME and invisible to the
+  Errors channel (SANY applies it in the driver after level checking),
+  so it can never reach a SemDump golden — hence the six unit tests
+  (passthrough, suppress, elevate, partial-suppress-by-code, overlap
+  reject) rather than differential fixtures. `+lint-warnings` exposes a
+  module's linting warnings alone for the 4.8 pipeline to filter.
+
+Subunit handoff:
+
+```text
+Subunit: 4.7
+Java owner and entry method: linter.Linter.lintRecords; SANY.filterVisibleMessages/reportMessages/isMessageElevated + the suppressed/as-errors overlap guard
+Current Hoon owner: lib/tla/semantic.hoon (l-lint, collect-records, built-from-decls, lint-options, apply-lint-options, lint-warnings)
+Smallest failing parity case: none — full suite ok=%.y
+New or changed nouns: lint-options [suppressed=(set @ud) as-errors=(set @ud)]; apply-lint-options -> (each (list sdiag) @t); lint-warnings
+Diagnostic/result expected: 4802 nested/multi-field warnings; suppression/elevation/overlap-reject via unit tests
+Focused validation result: sem 73/73, lvl 19/19
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.y (825 OK, 0 failed); validate.py --check clean (73 sem cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: linter (partial -> parity, 6 fixtures + lint-options unit tests)
+Compatibility limitations removed or added: removed the driver-level lint-controls gap
+Remaining dependencies: 4.8 wires apply-lint-options + validate-target into the real %analyze stages and closes the unit
+```

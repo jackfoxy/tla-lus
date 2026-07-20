@@ -4561,6 +4561,45 @@
     ==
   $(rl t.rl, out (weld (flop warns) out))
 ::
+::  driver-level warning controls (SanySettings.suppressedCodes /
+::  messagesAsErrorCodes), applied at report time to linting warnings.
+::  These live outside the Errors channel — SANY filters them in the
+::  driver after level checking, so they never reach a SemDump golden;
+::  the analyze pipeline (unit 4.8) applies them and their evidence is
+::  the Hoon unit tests in tests/lib/tla/lvl
++$  lint-options
+  $:  suppressed=(set @ud)   ::  message codes to silence
+      as-errors=(set @ud)    ::  message codes to elevate to errors
+  ==
+::
+++  apply-lint-options
+  ::  SANY.filterVisibleMessages then reportMessages: drop suppressed
+  ::  codes, elevate as-errors codes from %warning to %error (order
+  ::  preserved). A code in both sets is a configuration error (SANY
+  ::  rejects before running), reported as a typed failure
+  |=  [opts=lint-options ds=(list sdiag)]
+  ^-  (each (list sdiag) @t)
+  ?.  =(~ (~(int in suppressed.opts) as-errors.opts))
+    :-  %|
+    %-  crip
+    %+  weld  "Options suppressed and as-errors overlap for codes: "
+    (join-sep "," (turn (sort ~(tap in (~(int in suppressed.opts) as-errors.opts)) lth) a-co))
+  :-  %&
+  %+  murn  ds
+  |=  d=sdiag
+  ^-  (unit sdiag)
+  ?:  (~(has in suppressed.opts) code.d)  ~
+  ?:  (~(has in as-errors.opts) code.d)  `d(sev %error)
+  `d
+::
+++  lint-warnings
+  ::  a module's linting warnings only (the linter's own diagnostics),
+  ::  for the analyze pipeline to filter/elevate independently of the
+  ::  semantic and level diagnostics already merged into the module
+  |=  [m=sem-module c=ctx]
+  ^-  (list sdiag)
+  (l-lint m c)
+::
 ++  strip-tail
   ::  trailing-whitespace normalization applied to golden comparisons
   |=  t=tape
