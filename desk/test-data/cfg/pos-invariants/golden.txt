@@ -1,0 +1,6 @@
+CONFIG
+deadlock true
+invariant A
+invariant B
+invariant C
+RAW

@@ -1,0 +1,4 @@
+CONFIG
+deadlock true
+postcondition Post
+RAW

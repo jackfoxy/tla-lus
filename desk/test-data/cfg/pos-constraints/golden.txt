@@ -1,0 +1,5 @@
+CONFIG
+deadlock true
+constraint C
+action-constraint AC
+RAW

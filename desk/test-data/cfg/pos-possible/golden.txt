@@ -1,0 +1,5 @@
+CONFIG
+deadlock true
+possible X
+possible Y
+RAW

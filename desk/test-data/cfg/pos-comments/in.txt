@@ -1,0 +1,4 @@
+\* line comment
+INIT I
+(* block *)
+NEXT N

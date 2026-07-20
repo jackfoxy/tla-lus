@@ -1,0 +1,1 @@
+CONSTANT Op(x, y) = 5

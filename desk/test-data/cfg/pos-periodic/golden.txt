@@ -1,0 +1,4 @@
+CONFIG
+periodic 5
+deadlock true
+RAW

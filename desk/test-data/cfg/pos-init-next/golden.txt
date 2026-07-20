@@ -1,0 +1,5 @@
+CONFIG
+init Init
+next Next
+deadlock true
+RAW

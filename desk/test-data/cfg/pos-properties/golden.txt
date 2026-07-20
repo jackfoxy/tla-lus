@@ -1,0 +1,6 @@
+CONFIG
+deadlock true
+property P
+property Q
+property R
+RAW

@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const B = TRUE
+RAW
+CONSTANT
+B = TRUE 
+---

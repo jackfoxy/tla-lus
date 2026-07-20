@@ -48,6 +48,7 @@ GENERATORS = [
     ("gen-mc-tests.py",     "pass",        "Safety + liveness model checking",   "desk/tests/lib/tla/mc.hoon"),
     ("gen-stdmods.py",      "pass",        "Vendored StandardModules",           "desk/lib/tla/stdmods.hoon"),
     ("gen-pcal-tests.py",   "oracle-only", "PlusCal translation goldens",        "(no Hoon translator yet — unit 8)"),
+    ("gen-cfg-tests.py",    "oracle-only", "TLC .cfg parse goldens (ModelConfig)", "(no Hoon config parser yet — unit 5.1)"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically

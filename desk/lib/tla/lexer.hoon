@@ -626,15 +626,20 @@
   ^-  ?
   (lien is |=(i=item ?=(%err -.i)))
 ::
-++  lex
-  |=  text=@t
+++  lex  |=(text=@t (lex-in text %default))
+::  lex a .cfg file: TLC's ModelConfig drives the token manager directly in
+::  lexstate SPEC (=2), bypassing module-frame detection, so we seed %spec
+::  with depth=1/saw=& (no ---- BEGIN_MODULE precedes the tokens).
+++  lex-cfg  |=(text=@t (lex-in text %spec))
+++  lex-in
+  |=  [text=@t start=?(%default %pragma %spec)]
   ^-  (list item)
   =/  all  (annotate:src text)
   =/  eofp  (eof-pos:src all)
   =/  s  all
-  =/  state=?(%default %pragma %spec)  %default
-  =/  depth=@ud  0
-  =/  saw=?  |
+  =/  state=?(%default %pragma %spec)  start
+  =/  depth=@ud  ?:(=(%spec start) 1 0)
+  =/  saw=?  =(%spec start)
   =|  out=(list item)
   |-  ^-  (list item)
   ?~  s  (flop out)

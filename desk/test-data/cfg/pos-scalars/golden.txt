@@ -1,0 +1,6 @@
+CONFIG
+view V
+symmetry Sym
+alias Al
+deadlock true
+RAW

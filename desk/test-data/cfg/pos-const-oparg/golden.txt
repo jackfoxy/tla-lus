@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const Op ( x , y ) = 5
+RAW
+CONSTANT
+Op ( x , y ) = 5 
+---

@@ -1,0 +1,3 @@
+VIEW V
+SYMMETRY Sym
+ALIAS Al

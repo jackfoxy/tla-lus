@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const S = {a, b}
+RAW
+CONSTANT
+S = { a , b } 
+---
