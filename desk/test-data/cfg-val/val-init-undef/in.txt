@@ -1,0 +1,2 @@
+INIT NoSuchInit
+NEXT Next

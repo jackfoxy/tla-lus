@@ -140,6 +140,67 @@ machinery; `dump-cfg` renders the ConfigDump projection. gen-cfg-tests emits
   seeds acc at the bunt so it drops a threaded prefix (fold each render section
   from empty, then weld onto `o`).
 
+## 5.3a landed — config-vs-graph validation oracle (2026-07-20)
+
+- `tools/oracle/ConfigValidate.java`: drives `tlc2.tool.impl.FastTool`
+  (concrete; `Tool` is abstract) = SANY parse → `SpecProcessor.processConfig`
+  on a paired `<base>.tla`+`<base>.cfg`, catching `Assert.TLCRuntimeException`
+  (`.errorCode`, `.getMessage()`) / `TLCDetailedRuntimeException` (adds a
+  `SemanticNode` span). Prints `VALIDATE` then `ok`, or `<code> <span>` +
+  message. Spec arg omits `.tla` (else "Module-Table lookup failure");
+  config arg omits `.cfg` (getConfig appends it).
+- `tools/gen-cfg-val-tests.py` + `desk/test-data/cfg-val/*` (13 cases,
+  A.tla + in.txt): stages in.txt→A.cfg in a tempdir (no `%cfg` Clay mark),
+  runs ConfigValidate, captures `golden-val.txt`. `oracle-only` in validate.py,
+  byte-stable. `cfg-validate` row → oracle-only.
+
+### Frozen oracle facts (validation)
+
+- **processConfig is fail-fast**: the first `Assert.fail` throws → at most one
+  TLC_CONFIG diagnostic per file (like ModelConfig). Java check order:
+  processConstants (2222 unassigned constant) → processConfig →
+  processConfigInvariants → spec-xor-init/next → properties. Single-issue
+  fixtures pass regardless of order.
+- **Spans**: the resolution codes (2222/2227/2228/2229/2231/2233) pass no
+  `expr` → span `~`. The action-level 2272 **bakes the location into the
+  message text** ("...at line L, col C to line L, col C of module M...") and
+  also has span `~`.
+- Captured messages (byte-exact): 2222 `The constant parameter %1% is not
+  assigned a value by the configuration file.`; 2227 `The configuration file
+  cannot specify both INIT/NEXT and SPECIFICATION fields.`; 2228 `TLC requires
+  %1% not to take any argument, but one was given: %2%` (%1% = "initial
+  predicate"/"next state action"/"invariant"); 2229 `The %1% %2% specified in
+  the configuration file\nis not defined in the specification.`; 2231 `The
+  configuration file did not specify the initial state predicate.`; 2233 `The
+  %1% %2% cannot be a constant.`; 2272 the long action-level paragraph.
+- Observations: INIT with no NEXT/SPEC is **ok** (2232 not easily triggered);
+  an extra `CONSTANT D = 5` not declared in the spec is **ok** (2226 not
+  triggered by a stray assignment); `INVARIANT x` where x is a VARIABLE →
+  2229 "not defined" (a variable is not an OpDef).
+
+### 5.3b Hoon port path (mapped, not yet written)
+
+The WU3 `sem-module` (from `generate`/`analyze-graph`) exposes everything:
+`consts=(list [name arity at])`, `vars=(list [name at])`,
+`defs=(list sem-def)` (each `sem-def` has `name`/`arity`/`lvl`/`at`), and
+`lchecked`. WU4 `validate-target [m nm maxlvl]` resolves a def/thmdef by name
+and gates on level. Port `validate-config [sem-module cfg-ast]`:
+- 2222: every `consts` name must be assigned by `constants.cfg-ast` (or a
+  mod-const); else fail.
+- 2227: `spec` set AND (`init` or `next`) set.
+- 2231: no `spec` and no `init`.
+- INIT/NEXT: name in `consts` → 2233; in `defs` arity>0 → 2228; not in
+  `defs`/`consts`/`vars` → 2229 (msg role "initial predicate"/"next state
+  action").
+- INVARIANT: in `defs` arity 0 → ok; arity>0 → 2228; else → 2229 ("invariant").
+- PROPERTY action-level (2272): resolve in `defs`, if `lvl`==2 emit the baked
+  message using the def's `at` span rendered "line L, col C to line L, col C
+  of module M". (validate-target with maxlvl for temporal handles the level
+  gate; the 2272 message wording is config-specific.)
+Then flip gen-cfg-val-tests to `pass` + emit `desk/tests/lib/tla/cfg-val.hoon`.
+Deeper SPECIFICATION-form processConfigSpec unfolding, substitution codes
+(2223/2224/2225/2281), and 2242 arity-inconsistent are 5.3c residue.
+
 ## Remaining subunits
 - 5.2 CONSTANT/override/rawConstants machinery (byte-exact RAW).
 - 5.3 extend ConfigDump with SpecProcessor validation (paired `A.tla`) →

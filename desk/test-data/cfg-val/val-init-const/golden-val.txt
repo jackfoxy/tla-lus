@@ -1,0 +1,3 @@
+VALIDATE
+2233 ~
+The initial predicate C cannot be a constant.

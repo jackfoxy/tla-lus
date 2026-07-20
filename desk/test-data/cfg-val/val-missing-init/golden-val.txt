@@ -1,0 +1,3 @@
+VALIDATE
+2231 ~
+The configuration file did not specify the initial state predicate.

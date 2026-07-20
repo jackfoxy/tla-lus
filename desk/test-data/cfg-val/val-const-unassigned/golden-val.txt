@@ -1,0 +1,3 @@
+VALIDATE
+2222 ~
+The constant parameter C is not assigned a value by the configuration file.
