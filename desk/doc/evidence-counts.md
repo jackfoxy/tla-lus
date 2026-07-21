@@ -18,8 +18,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/tla/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/tla/cfg.hoon` |
-| `gen-cfg-val-tests.py` | 13 | oracle-only | Config-vs-graph validation (SpecProcessor) | `(no Hoon config validator yet — unit 5.3b)` |
+| `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/tla/cfg-val.hoon` |
 
-Compared cases: **770**.  Oracle-only cases: **15**.
+Compared cases: **783**.  Oracle-only cases: **2**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

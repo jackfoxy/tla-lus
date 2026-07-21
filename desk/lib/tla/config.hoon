@@ -1,6 +1,7 @@
 /-  *tla-lus
 /=  lex  /lib/tla/lexer
 /=  eval  /lib/tla/eval
+/=  sem-lib  /lib/tla/semantic
 |%
 ::  TLC .cfg processing (PORT-COMPLETION-PLAN-2 unit 5).
 ::
@@ -507,6 +508,209 @@
   ^-  tape
   ?~  l  o
   $(o :(weld o (trip key) " " (trip i.l) "\0a"), l t.l)
+::
+::  +|  Config-vs-Graph Validation (SpecProcessor.processConfig)
+::
+::  Port of tlc2.tool.impl.SpecProcessor's config-processing methods over
+::  the WU3 semantic graph (sem-module). Fail-fast, like the Java: the
+::  first violation is the only diagnostic. Handles the resolution codes
+::  (2222/2227/2228/2229/2230/2231/2232/2233) and the property action-
+::  level code (2272). Deep SPECIFICATION-form unfolding (processConfigSpec)
+::  and substitution/arity-inconsistent codes are 5.3c residue: a valid
+::  arity-0 SPECIFICATION is treated as establishing init and next.
+::
++$  cfg-vdiag  [code=@ud msg=@t]
+::
+++  find-def
+  |=  [m=sem-module:sem-lib nm=@t]
+  ^-  (unit sem-def:sem-lib)
+  =/  dl  defs.m
+  |-  ^-  (unit sem-def:sem-lib)
+  ?~  dl  ~
+  ?:  =(nm name.i.dl)  `i.dl
+  $(dl t.dl)
+::
+++  is-const
+  |=  [m=sem-module:sem-lib nm=@t]
+  ^-  ?
+  (lien consts.m |=([name=@t arity=@ud at=(unit span)] =(name nm)))
+::
+++  sem-span
+  ::  the source span of an IR expression node (nullodn has none)
+  |=  s=sem:sem-lib
+  ^-  (unit span)
+  ?-  -.s
+    %apply    at.s
+    %letin    at.s
+    %lit      at.s
+    %atref    at.s
+    %nullodn  ~
+  ==
+::
+++  loc-str
+  ::  render a span as Location.toString: "line L, col C to line L, col C
+  ::  of module M" (or "Unknown location")
+  |=  [modname=@t sp=(unit span)]
+  ^-  @t
+  ?~  sp  'Unknown location'
+  =/  s  u.sp
+  %+  rap  3
+  :~  'line '  (num-cord line.from.s)  ', col '  (num-cord col.from.s)
+      ' to line '  (num-cord line.to.s)  ', col '  (num-cord col.to.s)
+      ' of module '  modname
+  ==
+::
+++  v-noarg
+  |=  [role=@t nm=@t]
+  ^-  @t
+  (rap 3 ~['TLC requires ' role ' not to take any argument, but one was given: ' nm])
+::
+++  v-notdef
+  |=  [role=@t nm=@t]
+  ^-  @t
+  (rap 3 ~['The ' role ' ' nm ' specified in the configuration file\0ais not defined in the specification.'])
+::
+++  msg-2272
+  |=  [nm=@t modname=@t bsp=(unit span)]
+  ^-  @t
+  =/  l  (loc-str modname bsp)
+  %+  rap  3
+  :~  'The formula '  nm  ' at '  l  ' is an action-level formula (i.e., it contains no temporal operators). '
+      'Only temporal-level (or state-level) formulas are allowed under PROPERTY or PROPERTIES. '
+      'To check that action '  nm  ' holds in *every* step of the behavior, define a temporal property: '
+      'Let A be the formula at '  l  '; rewrite A as [][A]_v, where v is a state function (typically '
+      'the tuple of variables) (compare page 90 of Specifying Systems at '
+      'https://lamport.azurewebsites.net/tla/book.html).'
+  ==
+::
+++  ck-action
+  ::  INIT/NEXT: absent-def -> 2229; a constant -> 2233; def arity>0 -> 2228
+  |=  [m=sem-module:sem-lib role=@t nm=@t]
+  ^-  (unit cfg-vdiag)
+  =/  d  (find-def m nm)
+  ?^  d
+    ?:  (gth arity.u.d 0)  `[2.228 (v-noarg role nm)]
+    ~
+  ?:  (is-const m nm)
+    `[2.233 (rap 3 ~['The ' role ' ' nm ' cannot be a constant.'])]
+  `[2.229 (v-notdef role nm)]
+::
+++  ck-formula
+  ::  INVARIANT/PROPERTY resolution: def arity>0 -> 2228; absent -> 2229;
+  ::  a constant/value -> 2230. Returns the resolved def when it is a
+  ::  clean arity-0 operator (for the caller's level dispatch).
+  |=  [m=sem-module:sem-lib role=@t nm=@t]
+  ^-  (each (unit sem-def:sem-lib) cfg-vdiag)
+  =/  d  (find-def m nm)
+  ?^  d
+    ?:  (gth arity.u.d 0)  [%| 2.228 (v-noarg role nm)]
+    [%& `u.d]
+  ?:  (is-const m nm)
+    [%| 2.230 (rap 3 ~['The ' role ' of ' nm ' is equal to <value>'])]
+  [%| 2.229 (v-notdef role nm)]
+::
+++  validate-config
+  |=  [m=sem-module:sem-lib a=cfg-ast]
+  ^-  (each ~ cfg-vdiag)
+  =/  modname  name.m
+  |^  result
+  ++  result
+    ^-  (each ~ cfg-vdiag)
+    =/  e
+      ;:  first
+        chk-const  chk-invariants  chk-spec-init-next
+        chk-properties  chk-missing-init  chk-missing-next
+      ==
+    ?~  e  [%& ~]
+    [%| u.e]
+  ::  first non-~ of a chain of checks
+  ++  first
+    |=  [a=(unit cfg-vdiag) b=(unit cfg-vdiag)]
+    ^-  (unit cfg-vdiag)
+    ?^(a a b)
+  ::  2222: every declared constant must be assigned by the config
+  ++  chk-const
+    ^-  (unit cfg-vdiag)
+    =/  assigned=(set @t)
+      %-  sy
+      %+  weld
+        (turn constants.a |=(c=cfg-const lhs.c))
+      (turn ~(tap by overrides.a) |=([k=@t v=@t] k))
+    =/  cl  consts.m
+    |-  ^-  (unit cfg-vdiag)
+    ?~  cl  ~
+    ?:  (~(has in assigned) name.i.cl)  $(cl t.cl)
+    `[2.222 (rap 3 ~['The constant parameter ' name.i.cl ' is not assigned a value by the configuration file.'])]
+  ::  invariants (resolution only; state-level check is 5.3c residue)
+  ++  chk-invariants
+    ^-  (unit cfg-vdiag)
+    =/  il  invariants.a
+    |-  ^-  (unit cfg-vdiag)
+    ?~  il  ~
+    =/  r  (ck-formula m 'invariant' i.il)
+    ?:  ?=(%| -.r)  `p.r
+    $(il t.il)
+  ::  SPECIFICATION xor INIT/NEXT, and their resolution
+  ++  chk-spec-init-next
+    ^-  (unit cfg-vdiag)
+    ?^  spec.a
+      ?:  |(?=(^ init.a) ?=(^ next.a))
+        `[2.227 'The configuration file cannot specify both INIT/NEXT and SPECIFICATION fields.']
+      =/  d  (find-def m u.spec.a)
+      ?^  d
+        ?:  (gth arity.u.d 0)
+          `[2.228 (v-noarg 'name' u.spec.a)]
+        ~
+      ?:  (is-const m u.spec.a)
+        `[2.230 (rap 3 ~['The value of ' u.spec.a ' is equal to <value>'])]
+      `[2.229 (v-notdef 'name' u.spec.a)]
+    ::  no SPECIFICATION: resolve INIT then NEXT
+    =/  ei  ?~(init.a ~ (ck-action m 'initial predicate' u.init.a))
+    ?^  ei  ei
+    ?~(next.a ~ (ck-action m 'next state action' u.next.a))
+  ::  properties: resolution + action-level (2272)
+  ++  chk-properties
+    ^-  (unit cfg-vdiag)
+    =/  pl  properties.a
+    |-  ^-  (unit cfg-vdiag)
+    ?~  pl  ~
+    =/  r  (ck-formula m 'property' i.pl)
+    ?:  ?=(%| -.r)  `p.r
+    =/  d  p.r
+    ?~  d  $(pl t.pl)
+    ?.  =(2 lvl.u.d)  $(pl t.pl)
+    =/  bsp  ?~(body.u.d ~ (sem-span u.body.u.d))
+    `[2.272 (msg-2272 i.pl modname bsp)]
+  ::  2231: no init established while the model needs one
+  ++  chk-missing-init
+    ^-  (unit cfg-vdiag)
+    =/  established  |(?=(^ init.a) ?=(^ spec.a))
+    ?:  established  ~
+    ?.  |(?=(^ vars.m) ?=(^ invariants.a) ?=(^ properties.a))  ~
+    `[2.231 'The configuration file did not specify the initial state predicate.']
+  ::  2232: no next established while invariants/actions need one
+  ++  chk-missing-next
+    ^-  (unit cfg-vdiag)
+    =/  established  |(?=(^ next.a) ?=(^ spec.a))
+    ?:  established  ~
+    ?.  ?=(^ invariants.a)  ~
+    `[2.232 'The configuration file did not specify the next state predicate.']
+  --
+::
+++  dump-validate
+  ::  render the ConfigValidate projection for a spec + .cfg text
+  |=  [root=@t src=(map @t @t) cfg=@t]
+  ^-  @t
+  =/  mo  (generate:sem-lib root src)
+  ?~  mo  'VALIDATE\0aTHROW NoModule\0a'
+  =/  pr  (parse-cfg cfg)
+  ?:  ?=(%| -.pr)
+    (rap 3 ~['VALIDATE\0aCFGPARSE\0a' msg.p.pr '\0a'])
+  =/  r  (validate-config u.mo p.pr)
+  ?-  -.r
+    %&  'VALIDATE\0aok\0a'
+    %|  (rap 3 ~['VALIDATE\0a' (num-cord code.p.r) ' ~\0a' msg.p.r '\0a'])
+  ==
 ::
 ::  +|  Entrypoint
 ::

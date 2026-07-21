@@ -178,7 +178,32 @@ machinery; `dump-cfg` renders the ConfigDump projection. gen-cfg-tests emits
   triggered by a stray assignment); `INVARIANT x` where x is a VARIABLE →
   2229 "not defined" (a variable is not an OpDef).
 
-### 5.3b Hoon port path (mapped, not yet written)
+## 5.3b landed — Hoon validate-config (2026-07-20)
+
+`config.hoon` gained `validate-config [sem-module cfg-ast]` (fail-fast like
+SpecProcessor.processConfig) + `dump-validate [root src cfg]` (generates the
+graph via `generate:semantic`, parses the cfg, validates, renders the
+ConfigValidate projection). gen-cfg-val-tests emits `cfg-val.hoon` (13/13
+green), flipped to `pass`; full ship suite `ok=%.y`. `cfg-validate` → partial.
+
+- Java lookup semantics (confirmed): `defns.get(name)` returns an OpDefNode
+  for a definition, an OpDeclNode for a **constant** (so INIT-of-a-constant →
+  2233, not 2229), and **null for a variable** (variables aren't in defns, so
+  INVARIANT-of-a-variable → 2229 "not defined"). Port: `find-def` over
+  `defs.m`, `is-const` over `consts.m`; a name in neither (variable or absent)
+  is treated as null.
+- Order (fail-fast): processConstants (2222) → invariants → spec-xor-init/next
+  → properties → missing-init (2231) → missing-next (2232). `validate-config`
+  chains the six checks with a left-biased `first` over `(unit cfg-vdiag)`.
+- 2272: after a property resolves to an arity-0 def, dispatch on `sem-def.lvl`
+  — `lvl==2` (action) → 2272 with the def's **body** span (`sem-span` of
+  `sem-def.body`) rendered as Location.toString (`line L, col C to line L,
+  col C of module M`); lvl 0/1/3 are fine.
+- Approximation: a valid arity-0 SPECIFICATION establishes init+next (the deep
+  `processConfigSpec` unfold — which also owns 2234/2235/2237 and substitution
+  codes — is 5.3c residue).
+
+### 5.3b Hoon port path (as implemented; kept for reference)
 
 The WU3 `sem-module` (from `generate`/`analyze-graph`) exposes everything:
 `consts=(list [name arity at])`, `vars=(list [name at])`,
