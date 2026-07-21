@@ -89,6 +89,58 @@ subclasses; `tlc2.tool.impl.Tool` (`eval`, `getInitStates`/`getNextStates`,
   evaluator (the CST evaluator takes bare expression text), incomplete action
   semantics (`check.hoon`'s ad-hoc CST solver).
 
+## 6.1 landed — canonical value layer (2026-07-20)
+
+`desk/lib/tla/tlc/value.hoon`: the canonical value interface the evaluator/
+enumerator/fingerprint encoder build on. Molds **alias** eval.hoon's proven
+mold (`+$ value value:ev`, tuples = the `%seq` member, a vpair's image field
+is `r`) — a freshly-defined `$+`-recursive `$%` overflows the zuse-408 mold
+compiler even in an isomorphic shape (`recover: dig: over`), the same fix
+config.hoon uses. Implemented:
+- `equal`: total, cross-representation (interval↔set, tuple↔function,
+  record field-order independent, unnormalized↔normalized), recursive, never
+  by rendered string. `set-elems`/`fcn-pairs` coerce; `rec-equal`/`fcn-equal`/
+  `elems-equal` compare by mutual membership.
+- `normalize`: idempotent, representation-preserving (sets sorted+deduped by
+  equality, record fields sorted by key, function pairs sorted by domain;
+  intervals/tuples keep their view).
+- `vlth`: total private storage order (distinct from TLC comparison), with
+  real record/function ordering (eval.hoon's had records/functions collapse
+  to a single bucket).
+- `compare`: the **partial** TLC `<` operator — integers only, a typed
+  failure (`each @sd @t`) on incomparable values, never a convenient total order.
+- `render`: matches `Value.toString` — plain-decimal ints (Hoon `scow %ud`
+  would dot-group), `1..n` functions as tuples, all-string-domain functions as
+  records, else the `(d :> v @@ …)` form, sorted record/set output, escaped
+  strings. Verified in dojo against the EvalDump renderings.
+- `type-name`, `vkind`, and value constructors (`vin`/`vni`/`vb`/`vs`/`vm`/
+  `vintv-c`/`vset-c`/`vseq-c`/`vrec-c`/`vfcn-c`).
+
+Verified correct by direct dojo evaluation (`equal` same-kind + cross-rep
+interval=set, `render` int/set, `compare`) — all match.
+
+### CRITICAL zuse-408 finding (blocks the usual test path; affects 6.2-6.9)
+
+A `value` mold **cannot cross a core import boundary without a nest-fail**:
+`(render:v (vin:v 42))` evaluates fine in dojo (after `=v -build-file`) but a
+test file (`/= v /lib/tla/tlc/value` then the same call) fails to build with
+`nest-fail` — the mull re-derives the recursive `$+` fixpoint and the two
+structurally-identical instances do not nest. Every automated-test shape
+tried failed (direct arms, grouped `;:(weld …)` arms, constructors moved into
+value.hoon, an internal `+selftest` returning scalars — the last even broke
+value.hoon's own compilation). This is why the 37 existing eval tests only
+ever pass `@t` and compare rendered **cords** — a value never crosses a
+boundary there. Implications:
+- Automated coverage of value.hoon is via the **differential** path (EvalDump
+  renders values to text = tape, which crosses cleanly) once 6.5 wires the
+  semantic evaluator; unit-level assertions must compare rendered cords, not
+  value molds.
+- 6.2-6.9 architecture: value operations likely must stay **within one core**
+  (a monolith like today's eval.hoon), or be exposed only through
+  scalar-returning entrypoints (text in / rendered text or boolean out).
+  Verify cross-core value passing before committing to the plan's separate
+  value/enumerate/eval/action file split.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →
