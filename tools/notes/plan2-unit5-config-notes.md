@@ -236,10 +236,26 @@ Mode = spec-form xor init/next-form; sections keep multiplicity+order;
 it is unit-tested, not differential. 2257/2259/2237 (property/fairness gates,
 trivial spec) are 5.3c/WU11 residue (need deep processConfigSpec).
 
-## Remaining subunits
-- 5.2 CONSTANT/override/rawConstants machinery (byte-exact RAW).
-- 5.3 extend ConfigDump with SpecProcessor validation (paired `A.tla`) →
-  TLC_CONFIG_* diagnostics; port config-vs-graph validation reusing WU4
-  `validate-target`.
-- 5.4 mode selection + property/fairness gates + typed run-spec.
-- 5.5 integrate into `do-config`, rewire `check.hoon` consumers, document, close.
+## 5.5 landed — integration + close (2026-07-20)
+
+`%config` now runs the real pipeline: `do-config` → `run-spec-of:config root
+modules cfg` (generate the WU3 graph → parse-cfg → validate-config →
+assemble-run-spec) in one bounded slice, driving the `%bfs`/`%live`/`%sim`
+konts off the run-spec's names. Config diagnostics are typed TLC failures via
+`config-fail` ( `[%tlc code]` diagnostic + `%failed` with the EC message).
+The honest reader is deleted: `job.hoon` lost `cfg-audit`/`cfg-known`;
+`check.hoon` lost `cfg-value`/`cfg-tokens`/`sto`/`fell`/`sub-comments`/
+`skip-line`, and `check`/`simulate-spec`/`run-check`/`has-property` read names
+via the new `cfg-names` / `parse-cfg`. Both libs import `lib/tla/config`
+(no cycle). The `%inline` source carries the full `modules` map, so `%config`
+generates the graph with no prior `%semantic` stage. Four config-honesty job
+tests rewritten to faithful behavior (5006 / repeated-invariant-ok / 2231 /
+2229). Full suite `ok=%.y`, validate --check clean, all 9 scaffold gates PASS.
+The wire contract is untouched (run-spec stays internal).
+
+## Unit-5 residue (5.3c, future)
+- Deep `processConfigSpec` SPECIFICATION-form unfold (2234/2235/2237, subst).
+- Substitution codes 2223/2224/2225/2281; 2242 arity-inconsistent.
+- 2230 has-value message body; TLC_INVARIANT_VIOLATED_LEVEL.
+- Property/fairness gates 2257/2259 (need fairness extraction, WU11).
+- Multi-invariant / multi-property checking (engine takes the first today).

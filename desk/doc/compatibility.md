@@ -346,6 +346,7 @@ ignored):
 | `check-opts.cfg` = `` `name `` | `unsupported: cfg source override; put the config in the bundle` |
 | `%check` without a bundle cfg | `a %check request requires a config` |
 | `src` = `%clay …` | `unsupported: %clay sources are not loaded yet (unit 10)` |
-| unknown/duplicate config key | `unsupported config key: <K>` / `duplicate config key: <K>` (at `%config`) |
+| malformed / invalid config | the real TLC `CFG_*` (5001-5006) or `TLC_CONFIG_*` (2222-2281) diagnostic at `%config`, byte-matching ModelConfig/SpecProcessor (unit 5) |
+| `SPECIFICATION`-form config | `unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)` (at `%config`) |
 | unsupported temporal property form | `unsupported: temporal property form (only <>P, []<>P, []P; unit 8)` (at `%config`) |
 | `allow-write` = `&` | accepted but ignored (no write-back; unit 13) — the one remaining silent option |

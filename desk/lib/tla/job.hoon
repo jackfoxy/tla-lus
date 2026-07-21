@@ -3,6 +3,7 @@
 /=  syntax    /lib/tla/syntax
 /=  check     /lib/tla/check
 /=  semantic  /lib/tla/semantic
+/=  config    /lib/tla/config
 |%
   ::  Resumable Job Kernel (unit P2-1)
   ::
@@ -177,11 +178,14 @@
   ==
 ::
 ++  has-property
+  ::  does the config name a temporal PROPERTY? (structural cfg parse,
+  ::  no graph — the %config stage does full validation later)
   |=  req=request
   ^-  ?
   ?.  ?=(%inline -.src.req)  |
   ?~  cfg.src.req  |
-  ?=(^ (cfg-value:check u.cfg.src.req 'PROPERTY'))
+  =/  pr  (parse-cfg:config u.cfg.src.req)
+  ?&(?=(%& -.pr) ?=(^ properties.p.pr))
 ::
 ::  +|  Engine
 ::
@@ -409,25 +413,15 @@
 ::  +|  Stage: %config
 ::
 ::
-++  cfg-known  ^-  (list @t)  ~['INIT' 'NEXT' 'INVARIANT' 'PROPERTY']
-::
-++  cfg-audit
-  ::  the config must be key/value pairs over the supported keys, each
-  ::  at most once; anything else is named in the typed rejection
-  |=  cfg=@t
-  ^-  (unit @t)
-  =/  toks  (cfg-tokens:check cfg)
-  =|  used=(set @t)
-  |-  ^-  (unit @t)
-  ?~  toks  ~
-  =/  key  i.toks
-  ?.  (lien cfg-known |=(w=@t =(w key)))
-    `(rap 3 ~['unsupported config key: ' key])
-  ?:  (~(has in used) key)
-    `(rap 3 ~['duplicate config key: ' key])
-  ?~  t.toks
-    `(rap 3 ~['config key without value: ' key])
-  $(toks t.t.toks, used (~(put in used) key))
+++  config-fail
+  ::  a config diagnostic (CFG_* 5001-5006 or TLC_CONFIG_* 2222-2281) is
+  ::  a typed TLC failure: record the structured diagnostic and seal the
+  ::  job %failed with its message (never a silent %ok)
+  |=  [j=job-2 d=cfg-vdiag:config pre=(list event)]
+  ^-  step-result-2
+  =/  dg=diagnostic  [[%tlc code.d] %error %config msg.d ~ ~]
+  =.  diags.j  (snoc diags.j dg)
+  (finish j [%failed msg.d] (snoc pre [%diagnostic dg]))
 ::
 ++  do-config
   ::  consume the parsed root tree and build the engine continuation.
@@ -443,12 +437,21 @@
   =/  cfg   (need cfg.src.request.j)
   =/  mode  mode.opts.op.request.j
   =/  lims  limits.request.j
-  =/  bad   (cfg-audit cfg)
-  ?^  bad  (finish j [%failed u.bad] pre)
-  =/  in  (cfg-value:check cfg 'INIT')
-  =/  nx  (cfg-value:check cfg 'NEXT')
-  =/  iv  (cfg-value:check cfg 'INVARIANT')
-  =/  pp  (cfg-value:check cfg 'PROPERTY')
+  ::  real config pipeline (unit 5): parse -> validate against the WU3
+  ::  graph -> assemble the typed run-spec. One bounded slice (graph
+  ::  generation, like a capped run-check); a config diagnostic is a
+  ::  typed TLC failure, not a silent %ok.
+  =/  rso  (run-spec-of:config root.src.request.j modules.src.request.j cfg)
+  ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
+  =/  rs  p.rso
+  ?.  ?=(%init-next -.mode.rs)
+    (finish j [%failed 'unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)'] pre)
+  =/  in  init.mode.rs
+  =/  nx  next.mode.rs
+  ::  the engine takes a single invariant/property (the first); multiple
+  ::  invariants are validated but only one is checked (unit 10 residue)
+  =/  iv=(unit @t)  ?~(invariants.rs ~ `i.invariants.rs)
+  =/  pp=(unit @t)  ?~(properties.rs ~ `i.properties.rs)
   ?~  in  (finish j [%failed 'no INIT in config'] pre)
   ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
   ?:  &(?=(^ iv) ?=(^ pp))

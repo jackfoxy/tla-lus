@@ -2,6 +2,7 @@
 /=  ast     /lib/tla/ast
 /=  syntax  /lib/tla/syntax
 /=  ev      /lib/tla/eval
+/=  config  /lib/tla/config
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
   ::
@@ -283,58 +284,22 @@
   ?.  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~
   `(leaf-text k)
 ::
-++  cfg-value
-  ::  the identifier following a config keyword (INIT/NEXT/INVARIANT)
-  |=  [cfg=@t key=@t]
-  ^-  (unit @t)
-  =/  toks  (cfg-tokens cfg)
-  |-  ^-  (unit @t)
-  ?~  toks  ~
-  ?:  =(key i.toks)  ?~(t.toks ~ `i.t.toks)
-  $(toks t.toks)
-::
-++  cfg-tokens
-  ::  whitespace-separated words of a .cfg, comments stripped
+++  cfg-names
+  ::  the INIT/NEXT/first-INVARIANT/first-PROPERTY names from a .cfg via
+  ::  the real config parser (unit 5); ~ when the cfg is malformed. Full
+  ::  config-vs-graph validation is the job kernel's %config stage — these
+  ::  engine helpers only need the target names off a well-formed cfg.
   |=  cfg=@t
-  ^-  (list @t)
-  %+  murn  `(list @t)`(sto (crip (sub-comments (trip cfg))))
-  |=(w=@t ?:(=('' w) ~ `w))
-::
-++  sto
-  ::  split on whitespace
-  |=  t=@t
-  ^-  (list @t)
-  =/  words  (fell (trip t))
-  (turn words crip)
-::
-++  fell
-  |=  t=tape
-  ^-  (list tape)
-  =/  ws  |=(c=@tD |(=(' ' c) =('\0a' c) =('\09' c) =('\0d' c)))
-  =|  cur=tape
-  =|  out=(list tape)
-  |-  ^-  (list tape)
-  ?~  t
-    ?~(cur (flop out) (flop [(flop cur) out]))
-  ?:  (ws i.t)
-    ?~(cur $(t t.t) $(t t.t, cur ~, out [(flop cur) out]))
-  $(t t.t, cur [i.t cur])
-::
-++  sub-comments
-  ::  drop `\*` line comments (cfg uses TLA-style comments)
-  |=  t=tape
-  ^-  tape
-  |-  ^-  tape
-  ?~  t  ~
-  ?:  ?&(=('\\' i.t) ?=(^ t.t) =('*' i.t.t))
-    $(t (skip-line t.t))
-  [i.t $(t t.t)]
-::
-++  skip-line
-  |=  t=tape
-  ^-  tape
-  ?~  t  ~
-  ?:(=('\0a' i.t) t $(t t.t))
+  ^-  (unit [in=(unit @t) nx=(unit @t) iv=(unit @t) pp=(unit @t)])
+  =/  pr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.pr)  ~
+  =/  a  p.pr
+  :-  ~
+  :*  init.a
+      next.a
+      ?~(invariants.a ~ `i.invariants.a)
+      ?~(properties.a ~ `i.properties.a)
+  ==
 ::
 ::  +|  Breadth-First Exploration (resumable cursor, unit P2-1)
 ::
@@ -789,9 +754,11 @@
   ?:  ?=(%| -.pr)  [0 0 ~]
   =/  tree  p.pr
   =/  vars  (var-names tree)
-  =/  in  (cfg-value cfg 'INIT')
-  =/  nx  (cfg-value cfg 'NEXT')
-  =/  iv  (cfg-value cfg 'INVARIANT')
+  =/  nm  (cfg-names cfg)
+  ?~  nm  [0 0 ~]
+  =/  in  in.u.nm
+  =/  nx  nx.u.nm
+  =/  iv  iv.u.nm
   ?~  in  [0 0 ~]
   ?~  nx  [0 0 ~]
   =/  ib  (body-of-def tree u.in)
@@ -809,10 +776,12 @@
   ?:  ?=(%| -.pr)  ~['Parse error']
   =/  tree  p.pr
   =/  vars  (var-names tree)
-  =/  in  (cfg-value cfg 'INIT')
-  =/  nx  (cfg-value cfg 'NEXT')
-  =/  iv  (cfg-value cfg 'INVARIANT')
-  =/  pp  (cfg-value cfg 'PROPERTY')
+  =/  nm  (cfg-names cfg)
+  ?~  nm  ~['Config error']
+  =/  in  in.u.nm
+  =/  nx  nx.u.nm
+  =/  iv  iv.u.nm
+  =/  pp  pp.u.nm
   ?~  in  ~['No INIT']
   ?~  nx  ~['No NEXT']
   =/  init-body  (body-of-def tree u.in)
@@ -885,10 +854,12 @@
   ?:  ?=(%| -.pr)  [[%failed 'parse error'] *run-stats]
   =/  tree  p.pr
   =/  vars  (var-names tree)
-  =/  in  (cfg-value cfg 'INIT')
-  =/  nx  (cfg-value cfg 'NEXT')
-  =/  iv  (cfg-value cfg 'INVARIANT')
-  =/  pp  (cfg-value cfg 'PROPERTY')
+  =/  nm  (cfg-names cfg)
+  ?~  nm  [[%failed 'config error'] *run-stats]
+  =/  in  in.u.nm
+  =/  nx  nx.u.nm
+  =/  iv  iv.u.nm
+  =/  pp  pp.u.nm
   ?~  in  [[%failed 'no INIT in config'] *run-stats]
   ?~  nx  [[%failed 'no NEXT in config'] *run-stats]
   =/  ib  (body-of-def tree u.in)

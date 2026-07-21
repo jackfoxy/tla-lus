@@ -475,31 +475,42 @@
 ::  +|  Config Honesty
 ::
 ::
-++  test-config-unknown-key
+::  a malformed CONSTANT line (bare `CONSTANT N`, no `=`/`<-`) is the
+::  real ModelConfig CFG_EXPECTED_SYMBOL (5006), not a made-up rejection
+++  test-config-constant-no-value
   =/  cfg  'INIT Init\0aNEXT Next\0aCONSTANT N\0a'
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
-  (expect-eq !>(`[%failed 'unsupported config key: CONSTANT']) !>(result.j))
+  %+  expect-eq
+    !>  `[%failed 'TLC found an error in the configuration file at line 3\0aIt was expecting = or <-, but did not find it.']
+  !>  result.j
 ::
-++  test-config-duplicate-key
+::  a repeated INVARIANT is valid in TLC (a list key accumulates), so the
+::  run proceeds; the engine checks the first invariant -> %ok on cyc
+++  test-config-repeated-invariant
   =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aINVARIANT Inv\0a'
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
-  (expect-eq !>(`[%failed 'duplicate config key: INVARIANT']) !>(result.j))
+  (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
 ::
+::  no INIT and no SPECIFICATION with state variables -> TLC_CONFIG 2231
 ++  test-config-missing-init
   =/  cfg  'NEXT Next\0a'
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
-  (expect-eq !>(`[%failed 'no INIT in config']) !>(result.j))
+  %+  expect-eq
+    !>  `[%failed 'The configuration file did not specify the initial state predicate.']
+  !>  result.j
 ::
+::  an invariant not defined in the spec -> TLC_CONFIG 2229 (validation
+::  against the WU3 graph, replacing the old CST body-lookup message)
 ++  test-config-unknown-invariant
   =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Nope\0a'
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
   %+  expect-eq
-    !>(`[%failed 'no definition for INVARIANT Nope'])
-  !>(result.j)
+    !>  `[%failed 'The invariant Nope specified in the configuration file\0ais not defined in the specification.']
+  !>  result.j
 ::
 ++  test-parse-error-fails
   =/  [evs=(list event) j=jb]
