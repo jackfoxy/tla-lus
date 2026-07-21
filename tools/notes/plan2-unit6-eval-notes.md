@@ -204,6 +204,55 @@ Message text is approximate (single-line, no embedded `\n`); exact
 EC-coded/byte-faithful diagnostics are 6.8's job (like `apply`/`domain`).
 Remaining 6.2 is closed; next is 6.3 enumeration or 6.5 evaluator wiring.
 
+## 6.3 landed 2026-07-21 — resumable finite enumeration + lazy sets
+
+USER DECISION (locked): lazy sets are a **separate `sexp` descriptor + `enum`
+cursor, forced to eager `%set` only at value boundaries** — NOT extra members
+of the `value` union (that growth is the zuse-408 recursive-mold hazard). A
+key consequence: `sexp` operands are `value`s (a lazy operand is forced
+first), so `sexp` is a **flat, non-recursive** `$%` and the cursor never
+nests — zero mold risk. Molds compiled in isolation first (plan discipline)
+before any logic. Full ship suite `ok=%.y`, all dojo-verified.
+
+Added to value.hoon:
+- **`sexp`** (flat union): `%set`/`%cup`/`%cap`/`%diff`/`%union`/`%prod`
+  (=set-of-tuples, S1\X…\Xn)/`%fcns` ([D->R])/`%rcds` ([a:S,…])/`%subset`.
+- **`ecur`** (flat, jam-safe WU1 continuation) — three shapes, non-recursive
+  because every sub-enumeration is a finite value's element list:
+  `%elems es i` (linear: set/interval/cup/cap/diff/union, element list
+  precomputed in `enum`), `%odo dims ix mk dom ks done` (exponential:
+  product/fcns/rcds — odometer, **rightmost dim fastest** = tlc2
+  SetOfTuples/Fcns/Rcds), `%subset es k comb done` (tlc2 cardinality order).
+- **`enum`** sexp→`(each ecur eval-err)`; **`enum-next`** cur→`[estep ecur]`
+  (`estep`=`%item`/`%done`), one bounded element per step, cursor is the
+  continuation; **`force`** sexp→`(each value eval-err)` drains + normalizes
+  to a deduped `%set`, rejecting `>max-card`(1e6) / SUBSET arg `>20` as typed
+  overflow (`cur-bound`: exact product/2^n, upper bound otherwise);
+  **`enum-tapes`** = ordered render list (test witness, returns tapes so no
+  value crosses a low-budget test core).
+- **Lazy `set-member`/`set-empty`** — decided structurally on the descriptor,
+  never materializing: verified `{7} \in SUBSET (1..25)`→T and
+  `SUBSET (1..25)` non-empty with NO overflow (while `force` correctly
+  rejects it). `set-empty` = one `enum-next` step.
+- Helpers: `elemsof-e` (non-enumerable→typed err), `elemsof-all`, `memb`
+  (structural), `odo-current`/`odo-advance`, `next-comb`/`subset-advance`,
+  `zip-vp`/`zip-vf`/`odo-build`, `cap-mul`.
+
+Dojo-verified ORDER vs TLC: `{1,2}\X{3,4}`→`<<1,3>>,<<1,4>>,<<2,3>>,<<2,4>>`;
+`[1..2->{5,6}]`→`<<5,5>>,<<5,6>>,<<6,5>>,<<6,6>>`; `SUBSET{1,2,3}`→
+`{},{1},{2},{3},{1,2},{1,3},{2,3},{1,2,3}`; `cup` keeps dups in order
+`1,2,2,3` (force→`{1,2,3}`); `cap`/`diff`/`union`/`rcds` all match; empty
+range→no fcns, empty domain→one `<<>>` fcn. Pause/resume: a mid-enumeration
+cursor `=(c ;;(ecur (cue (jam c))))`→`%.y`, and `enum-next` is a pure gate of
+it ⇒ save/load equivalence by construction.
+
+DEFERRED to 6.4 (need the evaluator to test a predicate / map an expr): set
+predicate `{x∈S:P}` and set-of-all `{e:x∈S}` cursors — thin filter/map layers
+over an existing `ecur`, wired when the evaluator exists. Per-`next` WU1
+budget accounting is wired at 6.9 integration (each `enum-next` = one bounded
+step; the caller loops against the budget). Comprehensive coverage rides the
+differential EvalDump path once 6.5 wires enumeration into expression eval.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →

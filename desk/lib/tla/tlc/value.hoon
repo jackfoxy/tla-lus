@@ -663,6 +663,381 @@
   ?~  dup  [%& (normalize [%fcn ps])]
   [%| 0 (rap 3 ~['The value ' (crip (render u.dup)) ' occurs multiple times in the function domain.'])]
 ::
+::  +|  Finite Enumeration And Lazy Sets (unit 6.3)
+::
+::  A `sexp` is a lazy finite-set descriptor. Its operands are ordinary
+::  `value`s (already-evaluated sets/intervals): a lazy set used as an
+::  operand of another is forced to an eager `%set` first, so `sexp` is a
+::  FLAT (non-recursive) union and the cursor never nests — sidestepping the
+::  zuse-408 recursive-mold hazard entirely. TLC keeps these lazy (Subset/
+::  Union/SetOfFcns/…Value); we mirror the observable enumeration ORDER and
+::  keep membership/emptiness lazy, forcing to a normalized `%set` only when
+::  a lazy set must become a value element, be rendered, or be fingerprinted.
+::
++$  sexp
+  $%  [%set s=value]                     ::  explicit set / interval
+      [%cup a=value b=value]             ::  S \cup T
+      [%cap a=value b=value]             ::  S \cap T
+      [%diff a=value b=value]            ::  S \ T
+      [%union s=value]                   ::  UNION S  (S a set of sets)
+      [%prod ss=(list value)]            ::  S1 \X ... \X Sn  (set of tuples)
+      [%fcns dom=value rng=value]        ::  [D -> R]
+      [%rcds fs=(list [k=@t s=value])]   ::  [a: S, b: T, ...]
+      [%subset s=value]                  ::  SUBSET S
+  ==
+::  one enumeration step: an element, or exhaustion
++$  estep  $%  [%item v=value]  [%done ~]  ==
+::  a resumable, jam-safe enumeration cursor (WU1 continuation state). Every
+::  sub-enumeration is a finite value's element list, so the cursor is flat.
++$  ecur
+  $%  ::  a precomputed ordered element list at index `i` (linear
+      ::  constructors: explicit set, interval, cup, cap, diff, union)
+      [%elems es=(list value) i=@ud]
+      ::  an odometer over per-dimension element lists (exponential
+      ::  constructors: product, set-of-functions, set-of-records);
+      ::  rightmost dimension varies fastest, matching TLC
+      $:  %odo
+          dims=(list (list value))
+          ix=(list @ud)
+          mk=?(%tuple %fcn %rec)
+          dom=(list value)                ::  %fcn: domain points, in order
+          ks=(list @t)                    ::  %rec: field names, in order
+          done=?
+      ==
+      ::  SUBSET S in TLC cardinality order: {}, singletons, pairs, …, S
+      [%subset es=(list value) k=@ud comb=(list @ud) done=?]
+  ==
+::  the largest domain we materialize; larger is a typed non-enumerable
+::  overflow rather than a hang or silent truncation
+++  max-card  1.000.000
+::
+::  +|  Enumeration Helpers
+::
+++  elemsof-e
+  ::  the normalized element list of a set-like value, else a typed
+  ::  non-enumerable failure
+  |=  v=value
+  ^-  (each (list value) eval-err)
+  ?.  (set-like v)
+    [%| 0 (rap 3 ~['Attempted to enumerate the non-enumerable value ' (crip (render v)) '.'])]
+  [%& (set-elems (normalize v))]
+::
+++  elemsof-all
+  ::  elemsof-e over each operand, short-circuiting on the first failure
+  |=  vs=(list value)
+  ^-  (each (list (list value)) eval-err)
+  =|  acc=(list (list value))
+  |-  ^-  (each (list (list value)) eval-err)
+  ?~  vs  [%& (flop acc)]
+  =/  r  (elemsof-e i.vs)
+  ?:  ?=(%| -.r)  r
+  $(vs t.vs, acc [p.r acc])
+::
+++  memb
+  ::  structural membership of x in a set-like value (equality-based)
+  |=  [x=value s=value]
+  ^-  ?
+  (lien (set-elems s) |=(e=value (equal x e)))
+::
+::  +|  Cursor Construction (sexp -> ecur)
+::
+++  enum
+  |=  x=sexp
+  ^-  (each ecur eval-err)
+  ?-  -.x
+      %set
+    =/  r  (elemsof-e s.x)
+    ?:  ?=(%| -.r)  r
+    [%& %elems p.r 0]
+  ::
+      %cup
+    =/  ra  (elemsof-e a.x)
+    ?:  ?=(%| -.ra)  ra
+    =/  rb  (elemsof-e b.x)
+    ?:  ?=(%| -.rb)  rb
+    [%& %elems (weld p.ra p.rb) 0]
+  ::
+      %cap
+    =/  ra  (elemsof-e a.x)
+    ?:  ?=(%| -.ra)  ra
+    ?.  (set-like b.x)
+      [%| 0 (rap 3 ~['Attempted to enumerate the non-enumerable value ' (crip (render b.x)) '.'])]
+    [%& %elems (skim p.ra |=(e=value (memb e b.x))) 0]
+  ::
+      %diff
+    =/  ra  (elemsof-e a.x)
+    ?:  ?=(%| -.ra)  ra
+    [%& %elems (skim p.ra |=(e=value !(memb e b.x))) 0]
+  ::
+      %union
+    =/  rs  (elemsof-e s.x)
+    ?:  ?=(%| -.rs)  rs
+    =/  rd  (elemsof-all p.rs)
+    ?:  ?=(%| -.rd)  rd
+    [%& %elems (zing p.rd) 0]
+  ::
+      %prod
+    =/  rd  (elemsof-all ss.x)
+    ?:  ?=(%| -.rd)  rd
+    =/  done  (lien p.rd |=(d=(list value) ?=(~ d)))
+    [%& %odo p.rd (reap (lent p.rd) 0) %tuple ~ ~ done]
+  ::
+      %fcns
+    =/  rr  (elemsof-e rng.x)
+    ?:  ?=(%| -.rr)  rr
+    =/  rd  (elemsof-e dom.x)
+    ?:  ?=(%| -.rd)  rd
+    =/  dims  (reap (lent p.rd) p.rr)
+    =/  done  &(!=(0 (lent p.rd)) =(0 (lent p.rr)))
+    [%& %odo dims (reap (lent p.rd) 0) %fcn p.rd ~ done]
+  ::
+      %rcds
+    =/  ks  (turn fs.x |=(f=[k=@t s=value] k.f))
+    =/  rd  (elemsof-all (turn fs.x |=(f=[k=@t s=value] s.f)))
+    ?:  ?=(%| -.rd)  rd
+    =/  done  (lien p.rd |=(d=(list value) ?=(~ d)))
+    [%& %odo p.rd (reap (lent p.rd) 0) %rec ~ ks done]
+  ::
+      %subset
+    =/  r  (elemsof-e s.x)
+    ?:  ?=(%| -.r)  r
+    [%& %subset p.r 0 ~ |]
+  ==
+::
+::  +|  Stepping The Cursor
+::
+++  odo-current
+  ::  the value picked in each dimension at the current index vector
+  |=  [dims=(list (list value)) ix=(list @ud)]
+  ^-  (list value)
+  ?~  dims  ~
+  ?~  ix  ~
+  [(snag i.ix i.dims) $(dims t.dims, ix t.ix)]
+::
+++  odo-advance
+  ::  advance ix as an odometer over dims; the rightmost digit is fastest
+  ::  (matching tlc2's SetOfTuples/Fcns/Rcds enumerators)
+  |=  [dims=(list (list value)) ix=(list @ud)]
+  ^-  [ix=(list @ud) done=?]
+  ?~  ix  [~ &]
+  ?~  dims  [~ &]
+  =/  sub  $(ix t.ix, dims t.dims)
+  ?.  done.sub  [[i.ix ix.sub] |]
+  =/  ni  +(i.ix)
+  ?:  (lth ni (lent i.dims))
+    [[ni (reap (lent t.ix) 0)] |]
+  [[0 (reap (lent t.ix) 0)] &]
+::
+++  zip-vp
+  |=  [ds=(list value) vs=(list value)]
+  ^-  (list vpair)
+  ?~  ds  ~
+  ?~  vs  ~
+  [[i.ds i.vs] $(ds t.ds, vs t.vs)]
+::
+++  zip-vf
+  |=  [ks=(list @t) vs=(list value)]
+  ^-  (list vfield)
+  ?~  ks  ~
+  ?~  vs  ~
+  [[i.ks i.vs] $(ks t.ks, vs t.vs)]
+::
+++  odo-build
+  |=  [mk=?(%tuple %fcn %rec) dom=(list value) ks=(list @t) cells=(list value)]
+  ^-  value
+  ?-  mk
+    %tuple  [%seq cells]
+    %fcn    (normalize [%fcn (zip-vp dom cells)])
+    %rec    (normalize [%rec (zip-vf ks cells)])
+  ==
+::
+++  next-comb
+  ::  the lexicographically next k-combination of 0..n-1 after `comb`, or ~
+  ::  when `comb` is the last (largest) k-combination
+  |=  [n=@ud k=@ud comb=(list @ud)]
+  ^-  (unit (list @ud))
+  ?:  =(k 0)  ~
+  =/  maxv  (sub n k)
+  =/  found=(unit @ud)  ~
+  =.  found
+    =/  i  0
+    |-  ^-  (unit @ud)
+    ?:  =(i k)  found
+    =?  found  (lth (snag i comb) (add i maxv))  `i
+    $(i +(i))
+  ?~  found  ~
+  =/  fv  +((snag u.found comb))
+  :-  ~
+  %+  turn  (gulf 0 (dec k))
+  |=  j=@ud
+  ?:  (lth j u.found)  (snag j comb)
+  (add fv (sub j u.found))
+::
+++  subset-advance
+  ::  step SUBSET enumeration: cardinality k ascending, each k in lex order
+  |=  [n=@ud k=@ud comb=(list @ud)]
+  ^-  [k=@ud comb=(list @ud) done=?]
+  ?:  =(k 0)
+    ?:  =(n 0)  [1 ~ &]
+    [1 ~[0] |]
+  =/  nxt  (next-comb n k comb)
+  ?^  nxt  [k u.nxt |]
+  ?:  (gth +(k) n)  [+(k) ~ &]
+  [+(k) (gulf 0 k) |]
+::
+++  enum-next
+  ::  one bounded step; returns the element (or exhaustion) and the resumed
+  ::  cursor. Cursor state is a flat jam-safe noun (WU1 save/load).
+  |=  cur=ecur
+  ^-  [estep ecur]
+  ?-  -.cur
+      %elems
+    ?:  (gte i.cur (lent es.cur))  [[%done ~] cur]
+    [[%item (snag i.cur es.cur)] cur(i +(i.cur))]
+  ::
+      %odo
+    ?:  done.cur  [[%done ~] cur]
+    =/  cells  (odo-current dims.cur ix.cur)
+    =/  item   (odo-build mk.cur dom.cur ks.cur cells)
+    =/  adv    (odo-advance dims.cur ix.cur)
+    [[%item item] cur(ix ix.adv, done done.adv)]
+  ::
+      %subset
+    ?:  done.cur  [[%done ~] cur]
+    =/  item  (normalize [%set (turn comb.cur |=(j=@ud (snag j es.cur)))])
+    =/  adv   (subset-advance (lent es.cur) k.cur comb.cur)
+    [[%item item] cur(k k.adv, comb comb.adv, done done.adv)]
+  ==
+::
+::  +|  Cardinality Bound, Force, And Test Projection
+::
+++  cap-mul
+  ::  a*b, saturating just past max-card so overflow is detectable
+  |=  [a=@ud b=@ud]
+  ^-  @ud
+  =/  p  (mul a b)
+  ?:((gth p max-card) +(max-card) p)
+::
+++  cur-bound
+  ::  an upper bound on the cursor's element count (exact for odo/subset),
+  ::  or a typed overflow for an unmanageably large domain
+  |=  c=ecur
+  ^-  (each @ud eval-err)
+  ?-  -.c
+      %elems   [%& (lent es.c)]
+      %odo
+    =/  lens  (turn dims.c |=(d=(list value) (lent d)))
+    =|  acc=@ud  =.  acc  1
+    |-  ^-  (each @ud eval-err)
+    ?~  lens  [%& acc]
+    $(lens t.lens, acc (cap-mul acc i.lens))
+  ::
+      %subset
+    ?:  (gth (lent es.c) 20)
+      [%| 0 'SUBSET argument too large to enumerate.']
+    [%& (bex (lent es.c))]
+  ==
+::
+++  force
+  ::  materialize a lazy set into a normalized eager %set (the boundary at
+  ::  which a lazy set must become a value); typed overflow if too large
+  |=  x=sexp
+  ^-  (each value eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =/  bnd  (cur-bound p.rc)
+  ?:  ?=(%| -.bnd)  bnd
+  ?:  (gth p.bnd max-card)
+    [%| 0 'Set too large to enumerate.']
+  =|  acc=(list value)
+  =/  cur  p.rc
+  |-  ^-  (each value eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (normalize [%set acc])]
+    %item  $(acc [v.es acc], cur +.st)
+  ==
+::
+++  enum-tapes
+  ::  render every element in ENUMERATION order (a test/inspection witness;
+  ::  returns tapes so no value crosses a low-budget test core)
+  |=  x=sexp
+  ^-  (each (list tape) eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list tape)
+  =/  cur  p.rc
+  |-  ^-  (each (list tape) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (flop acc)]
+    %item  $(acc [(render v.es) acc], cur +.st)
+  ==
+::
+::  +|  Lazy Membership And Emptiness (no materialization)
+::
+++  all-memb
+  ::  each es.i is a structural member of the corresponding ss.i
+  |=  [es=(list value) ss=(list value)]
+  ^-  ?
+  ?~  es  ?=(~ ss)
+  ?~  ss  |
+  ?:  (memb i.es i.ss)  $(es t.es, ss t.ss)
+  |
+::
+++  set-empty
+  ::  emptiness by one bounded step — never materializes the domain
+  |=  x=sexp
+  ^-  (each ? eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =/  st  (enum-next p.rc)
+  [%& ?=(%done -.-.st)]
+::
+++  set-member
+  ::  lazy membership: decided structurally on the descriptor, never by
+  ::  enumerating an exponential domain (mirrors tlc2's lazy member)
+  |=  [e=value x=sexp]
+  ^-  (each ? eval-err)
+  ?-  -.x
+    %set    [%& (memb e s.x)]
+    %cup    [%& |((memb e a.x) (memb e b.x))]
+    %cap    [%& &((memb e a.x) (memb e b.x))]
+    %diff   [%& &((memb e a.x) !(memb e b.x))]
+  ::
+      %union
+    =/  rs  (elemsof-e s.x)
+    ?:  ?=(%| -.rs)  rs
+    [%& (lien p.rs |=(m=value ?:((set-like m) (memb e m) |)))]
+  ::
+      %prod
+    ?.  ?=(%seq -.e)  [%& |]
+    [%& (all-memb p.e ss.x)]
+  ::
+      %fcns
+    ?.  (fcn-like e)  [%& |]
+    =/  ps  (fcn-pairs e)
+    =/  dom-e  (normalize [%set (turn ps |=(pr=vpair d.pr))])
+    ?.  (equal dom-e dom.x)  [%& |]
+    [%& (levy ps |=(pr=vpair (memb r.pr rng.x)))]
+  ::
+      %rcds
+    ?.  ?=(%rec -.e)  [%& |]
+    ?.  =((lent p.e) (lent fs.x))  [%& |]
+    :-  %&
+    %+  levy  fs.x
+    |=  f=[k=@t s=value]
+    =/  hit  (skim p.e |=(fd=vfield =(k.fd k.f)))
+    ?~  hit  |
+    (memb v.i.hit s.f)
+  ::
+      %subset
+    ?.  (set-like e)  [%& |]
+    [%& (levy (set-elems e) |=(el=value (memb el s.x)))]
+  ==
+::
 ::  +|  Canonical Key (single-value-arg equality witness for tests)
 ::
 ::  +equal takes two values, and nesting the recursive value mold into a
