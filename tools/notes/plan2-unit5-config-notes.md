@@ -226,6 +226,16 @@ Then flip gen-cfg-val-tests to `pass` + emit `desk/tests/lib/tla/cfg-val.hoon`.
 Deeper SPECIFICATION-form processConfigSpec unfolding, substitution codes
 (2223/2224/2225/2281), and 2242 arity-inconsistent are 5.3c residue.
 
+## 5.4 landed — typed run-spec + mode selection (2026-07-20)
+
+`config.hoon` gained the `run-spec`/`run-mode` molds + `assemble-run-spec
+[sem-module cfg-ast]` (validate then project) + `run-spec-of [root src cfg]`.
+Mode = spec-form xor init/next-form; sections keep multiplicity+order;
+`deadlock=!=(%false deadlock.cfg-ast)`. Hand-written unit tests
+`tests/lib/tla/cfg-runspec.hoon` (6/6). The run-spec is an internal noun, so
+it is unit-tested, not differential. 2257/2259/2237 (property/fairness gates,
+trivial spec) are 5.3c/WU11 residue (need deep processConfigSpec).
+
 ## Remaining subunits
 - 5.2 CONSTANT/override/rawConstants machinery (byte-exact RAW).
 - 5.3 extend ConfigDump with SpecProcessor validation (paired `A.tla`) →

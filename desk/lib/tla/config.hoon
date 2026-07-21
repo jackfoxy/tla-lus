@@ -520,6 +520,28 @@
 ::  arity-0 SPECIFICATION is treated as establishing init and next.
 ::
 +$  cfg-vdiag  [code=@ud msg=@t]
+::  the typed run specification (unit 5.4): the single hand-off every
+::  checking mode consumes, superseding the old cfg-word lookups. Mode is
+::  spec-form (SPECIFICATION) xor init/next-form.
++$  run-mode
+  $%  [%spec name=@t]
+      [%init-next init=(unit @t) next=(unit @t)]
+  ==
++$  run-spec
+  $:  mode=run-mode
+      invariants=(list @t)
+      properties=(list @t)
+      constraints=(list @t)
+      action-constraints=(list @t)
+      constants=(list cfg-const)
+      overrides=(map @t @t)
+      mod-overrides=(map @t (map @t @t))
+      mod-constants=(map @t (list cfg-const))
+      symmetry=(unit @t)
+      view=(unit @t)
+      alias=(unit @t)
+      deadlock=?                         ::  getCheckDeadlock: true unless FALSE
+  ==
 ::
 ++  find-def
   |=  [m=sem-module:sem-lib nm=@t]
@@ -711,6 +733,46 @@
     %&  'VALIDATE\0aok\0a'
     %|  (rap 3 ~['VALIDATE\0a' (num-cord code.p.r) ' ~\0a' msg.p.r '\0a'])
   ==
+::
+::  +|  Run-Spec Assembly (unit 5.4)
+::
+++  assemble-run-spec
+  ::  validate the config against the graph, then assemble the typed
+  ::  run-spec (mode selection + validated sections). Rejections are the
+  ::  same TLC_CONFIG diagnostics as validate-config. The property/
+  ::  fairness gates (2257/2259) and trivial-spec (2237) ride in with the
+  ::  deep processConfigSpec unfold (5.3c residue).
+  |=  [m=sem-module:sem-lib a=cfg-ast]
+  ^-  (each run-spec cfg-vdiag)
+  =/  v  (validate-config m a)
+  ?:  ?=(%| -.v)  v
+  :-  %&
+  ^-  run-spec
+  :*  mode=?^(spec.a [%spec u.spec.a] [%init-next init.a next.a])
+      invariants=invariants.a
+      properties=properties.a
+      constraints=constraints.a
+      action-constraints=action-constraints.a
+      constants=constants.a
+      overrides=overrides.a
+      mod-overrides=mod-overrides.a
+      mod-constants=mod-constants.a
+      symmetry=symmetry.a
+      view=view.a
+      alias=alias.a
+      deadlock=!=(%false deadlock.a)
+  ==
+::
+++  run-spec-of
+  ::  convenience: from a root name + module sources + cfg text to the
+  ::  typed run-spec (or the first config diagnostic)
+  |=  [root=@t src=(map @t @t) cfg=@t]
+  ^-  (each run-spec cfg-vdiag)
+  =/  mo  (generate:sem-lib root src)
+  ?~  mo  [%| 0 'internal: module generation failed']
+  =/  pr  (parse-cfg cfg)
+  ?:  ?=(%| -.pr)  [%| code.p.pr msg.p.pr]
+  (assemble-run-spec u.mo p.pr)
 ::
 ::  +|  Entrypoint
 ::
