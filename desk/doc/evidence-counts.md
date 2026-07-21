@@ -19,7 +19,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/tla/cfg.hoon` |
 | `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/tla/cfg-val.hoon` |
+| `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
 
-Compared cases: **783**.  Oracle-only cases: **2**.
+Compared cases: **783**.  Oracle-only cases: **11**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

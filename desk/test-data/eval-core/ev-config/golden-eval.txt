@@ -1,0 +1,4 @@
+EVAL
+Prod IntValue 15
+Range IntervalValue 1..5
+Sum IntValue 8

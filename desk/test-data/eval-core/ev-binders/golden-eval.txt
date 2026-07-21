@@ -1,0 +1,8 @@
+EVAL
+All BoolValue TRUE
+AllF BoolValue FALSE
+Cas StringValue "b"
+Ch IntValue 5
+Cond StringValue "y"
+Ex BoolValue TRUE
+ExF BoolValue FALSE

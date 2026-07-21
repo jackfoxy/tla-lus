@@ -1,0 +1,2 @@
+CONSTANT MV = m0
+MS = {a, b, c}

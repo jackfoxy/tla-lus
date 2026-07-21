@@ -1,0 +1,10 @@
+EVAL
+App IntValue 12
+Dom IntervalValue 1..3
+F FcnRcdValue <<11, 12, 13>>
+Field IntValue 2
+R RecordValue [a |-> 1, b |-> 2]
+RDom SetEnumValue {"a", "b"}
+T TupleValue <<9, 8, 7>>
+TApp IntValue 9
+TLen IntValue 3

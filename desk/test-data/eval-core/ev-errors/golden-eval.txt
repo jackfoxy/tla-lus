@@ -1,0 +1,3 @@
+EVAL
+BadDom ! TLCRuntimeException: In applying the function <<1, 2, 3>>, the first argument is: 9 which is not in its domain.
+DivZero ! EvalException: The second argument of \div is 0.

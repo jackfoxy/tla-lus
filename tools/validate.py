@@ -50,6 +50,7 @@ GENERATORS = [
     ("gen-pcal-tests.py",   "oracle-only", "PlusCal translation goldens",        "(no Hoon translator yet — unit 8)"),
     ("gen-cfg-tests.py",    "pass",        "TLC .cfg parse (ModelConfig)",       "desk/tests/lib/tla/cfg.hoon"),
     ("gen-cfg-val-tests.py", "pass",        "Config-vs-graph validation (SpecProcessor)", "desk/tests/lib/tla/cfg-val.hoon"),
+    ("gen-core-eval-tests.py", "oracle-only", "Core value/evaluation (Tool.eval)", "(no semantic-node evaluator yet — unit 6.5)"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically
