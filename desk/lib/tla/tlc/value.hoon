@@ -410,4 +410,103 @@
 ++  vseq-c   |=(l=(list value) `value`[%seq l])
 ++  vrec-c   |=(l=(list vfield) `value`[%rec l])
 ++  vfcn-c   |=(l=(list vpair) `value`[%fcn l])
+::
+::  +|  Composite Access: application and DOMAIN (unit 6.2)
+::
+::  a typed evaluation failure (unit 6.8 refines the EC-coded shape); vres
+::  is a value or such a failure
++$  eval-err  [code=@ud msg=@t]
++$  vres      (each value eval-err)
+::
+++  idx-of
+  ::  a 1-based positive-integer index as @ud (0 = not a positive int)
+  |=  x=value
+  ^-  @ud
+  ?.  ?=(%int -.x)  0
+  =/  o  (old:si p.x)
+  ?.(-.o 0 +.o)
+::
+++  find-image
+  ::  the image of x under function pairs (domain compared with +equal)
+  |=  [ps=(list vpair) x=value]
+  ^-  (unit value)
+  ?~  ps  ~
+  ?:  (equal d.i.ps x)  `r.i.ps
+  $(ps t.ps)
+::
+++  apply
+  ::  f[x]: function, tuple (integer index), or record (string field)
+  |=  [f=value x=value]
+  ^-  vres
+  ?-  -.f
+      %fcn
+    =/  hit  (find-image p.f x)
+    ?~  hit  [%| 0 (rap 3 ~['applying a function outside its domain: ' (crip (render x))])]
+    [%& u.hit]
+      %seq
+    =/  i  (idx-of x)
+    ?:  |(=(0 i) (gth i (lent p.f)))
+      [%| 0 (rap 3 ~['applying a tuple outside its domain: ' (crip (render x))])]
+    [%& (snag (dec i) p.f)]
+      %rec
+    ?.  ?=(%str -.x)  [%| 0 'applying a record to a non-string selector']
+    =/  hit  (skim p.f |=(fd=vfield =(k.fd p.x)))
+    ?~  hit  [%| 0 (rap 3 ~['record has no field ' p.x])]
+    [%& v.i.hit]
+      %intv
+    ::  an interval is a set, not a function
+    [%| 0 'applying a set as a function']
+    %bool   [%| 0 'applying a boolean as a function']
+    %int    [%| 0 'applying an integer as a function']
+    %str    [%| 0 'applying a string as a function']
+    %model  [%| 0 'applying a model value as a function']
+    %set    [%| 0 'applying a set as a function']
+  ==
+::
+++  domain
+  ::  DOMAIN f: function domain (set), tuple domain (1..n), record fields
+  |=  f=value
+  ^-  vres
+  ?-  -.f
+    %fcn   [%& (normalize [%set (turn p.f |=(pr=vpair d.pr))])]
+    %seq   [%& [%intv --1 (sun:si (lent p.f))]]
+    %rec   [%& (normalize [%set (turn p.f |=(fd=vfield `value`[%str k.fd]))])]
+    %bool  [%| 0 'DOMAIN of a boolean']
+    %int   [%| 0 'DOMAIN of an integer']
+    %str   [%| 0 'DOMAIN of a string']
+    %model  [%| 0 'DOMAIN of a model value']
+    %intv  [%| 0 'DOMAIN of a set']
+    %set   [%| 0 'DOMAIN of a set']
+  ==
+::
+::  +|  Canonical Key (single-value-arg equality witness for tests)
+::
+::  +equal takes two values, and nesting the recursive value mold into a
+::  two-cell gate sample nest-fails the zuse-408 mull when called from an
+::  external test core (a single value arg, as +render takes, is fine).
+::  +canon renders a fully-canonicalized value (intervals expanded to sets,
+::  so cross-representation equals coincide) as a tape: for the finite
+::  values in scope, (canon a) == (canon b) iff (equal a b). Tests compare
+::  canon strings; production equality still uses +equal.
+++  canon  |=(v=value (render (canonicalize v)))
+::
+++  canonicalize
+  ::  fold representation views into one canonical form: an interval
+  ::  becomes its explicit set; a tuple stays a tuple (render already
+  ::  unifies it with a contiguous function). Recurse into components.
+  |=  v=value
+  ^-  value
+  ?-  -.v
+    %bool   v
+    %int    v
+    %str    v
+    %model  v
+    %intv   (canonicalize [%set (set-elems v)])
+    %seq    [%seq (turn p.v canonicalize)]
+    %set    [%set (norm-set (turn p.v canonicalize))]
+      %rec
+    [%rec (turn p.v |=(f=vfield [k.f (canonicalize v.f)]))]
+      %fcn
+    [%fcn (turn p.v |=(pr=vpair [(canonicalize d.pr) (canonicalize r.pr)]))]
+  ==
 --

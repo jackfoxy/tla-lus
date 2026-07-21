@@ -119,27 +119,49 @@ config.hoon uses. Implemented:
 Verified correct by direct dojo evaluation (`equal` same-kind + cross-rep
 interval=set, `render` int/set, `compare`) — all match.
 
-### CRITICAL zuse-408 finding (blocks the usual test path; affects 6.2-6.9)
+### zuse-408 mull-budget constraint (confirms the single-core architecture)
 
-A `value` mold **cannot cross a core import boundary without a nest-fail**:
-`(render:v (vin:v 42))` evaluates fine in dojo (after `=v -build-file`) but a
-test file (`/= v /lib/tla/tlc/value` then the same call) fails to build with
-`nest-fail` — the mull re-derives the recursive `$+` fixpoint and the two
-structurally-identical instances do not nest. Every automated-test shape
-tried failed (direct arms, grouped `;:(weld …)` arms, constructors moved into
-value.hoon, an internal `+selftest` returning scalars — the last even broke
-value.hoon's own compilation). This is why the 37 existing eval tests only
-ever pass `@t` and compare rendered **cords** — a value never crosses a
-boundary there. Implications:
-- Automated coverage of value.hoon is via the **differential** path (EvalDump
-  renders values to text = tape, which crosses cleanly) once 6.5 wires the
-  semantic evaluator; unit-level assertions must compare rendered cords, not
-  value molds.
-- 6.2-6.9 architecture: value operations likely must stay **within one core**
-  (a monolith like today's eval.hoon), or be exposed only through
-  scalar-returning entrypoints (text in / rendered text or boolean out).
-  Verify cross-core value passing before committing to the plan's separate
-  value/enumerate/eval/action file split.
+An external test core has a **very low mull budget for the recursive `value`
+mold**: `(render:v (vin:v 42))` — one value construction — builds and passes
+in a test file, but more than ~1-2 value-typed expressions in one core (e.g.
+five render assertions, or a single two-value `equal:v` call) overflows with a
+`nest-fail`/`recover: dig: over` flood. (An earlier note here claimed values
+"cannot cross a core boundary at all"; that was wrong — it was stale-revision
+noise plus tmux eating the leading `-` of `-test`, which must be sent with
+`-l --`. A single value op crosses fine.) This is why the 37 eval tests only
+pass `@t` and compare rendered **cords** — a value is never held in the test
+core. Consequences (now settled):
+- **Architecture: consolidate.** Production value/eval/action operations live
+  in a **single core** (a monolith like today's eval.hoon), so values never
+  cross a boundary and the mull budget is spent once at lib-compile time, not
+  per test. The plan's separate value/enumerate/eval/action file split is not
+  viable as independent cores; `value.hoon` is the seed of the one core, and
+  6.2-6.9 grow it (or a `tlc/core.hoon`) rather than adding sibling cores.
+- **Testing.** Drive the core through **scalar entrypoints** (text in /
+  rendered cord or boolean out), exactly as `eval-text` does; keep at most a
+  1-op value smoke test per file. Comprehensive value coverage rides the
+  **differential EvalDump path** (values → text) once 6.5 wires the evaluator.
+- value.hoon itself is verified correct by **direct dojo evaluation** (equal
+  same-kind + cross-representation, render, compare) and a 1-op render smoke
+  test (`tests/lib/tla/value`).
+
+## 6.2 in progress — composite access (2026-07-21)
+
+Growing value.hoon as the single core (the settled architecture). Landed
+`apply` and `domain` + the `eval-err`/`vres` typed-failure shape:
+- `apply [f x]`: `f[x]` for a function (domain point matched by `equal`), a
+  tuple (1-based integer index), or a record (string field); out-of-domain /
+  wrong-selector are typed `vres` failures.
+- `domain f`: function domain as a normalized set, tuple domain as `1..n`,
+  record fields as a string set.
+Verified in dojo: `<<1,4,9>>[2]` → `4`; `[a|->1,b|->2].b` → `2`;
+`DOMAIN (1:>10 @@ 5:>20)` → `{1, 5}`; `<<9>>[5]` → typed "applying a tuple
+outside its domain: 5". Automated coverage is dojo + differential-at-6.5
+(constructing an apply input exceeds the ~1-2-op test-core mull budget).
+Remaining 6.2: `ValueExcept` application (function/tuple/record, nested
+selector paths, multi-clause in source order, the `@` old-value binding),
+model values from config (typed/untyped), and canonical record/function
+constructors with duplicate-domain/field handling.
 
 ## Remaining subunits (dependency order)
 
