@@ -1038,6 +1038,240 @@
     [%& (levy (set-elems e) |=(el=value (memb el s.x)))]
   ==
 ::
+::  +|  Binders, Quantifiers, CHOOSE, Constructors, Control (unit 6.4)
+::
+::  These evaluate expression BODIES (a quantifier/filter predicate, a
+::  set-of-all/function image, a CASE guard, an IF/CASE branch), which is the
+::  6.5 semantic-node evaluator's job. So they are parameterized by Hoon
+::  gates: the 6.5 evaluator supplies each gate as `|=(v (eval node ctx(x v)))`
+::  over a jam-safe (node, context) pair, and the resumable state is the 6.3
+::  cursor. Branch/guard gates are deferred (thunks) so only the SELECTED
+::  branch is evaluated — unselected branches' errors are suppressed, as in
+::  tlc2. Multiple/dependent binders (`\A x\in S, y\in T(x) : P`) are the
+::  `(list cdom)` context enumerator; single-variable forms use the `sexp`
+::  primitives directly.
+::
++$  vpred   $-(value (each ? eval-err))        ::  single-binder predicate
++$  vmap    $-(value (each value eval-err))     ::  single-binder image
++$  vthunk  $-(~ (each value eval-err))         ::  a deferred value (branch)
++$  bthunk  $-(~ (each ? eval-err))             ::  a deferred boolean (guard)
++$  cpred   $-((list value) (each ? eval-err))  ::  multi-binder predicate
++$  cdom    $-((list value) (each sexp eval-err))  ::  prefix-dependent domain
+::
+::  +|  Streaming Primitives Over A Cursor
+::
+++  stream-find
+  ::  the first element satisfying `p`, streamed (short-circuit); ~ if none
+  |=  [x=sexp p=vpred]
+  ^-  (each (unit value) eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =/  cur  p.rc
+  |-  ^-  (each (unit value) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& ~]
+      %item
+    =/  r  (p v.es)
+    ?:  ?=(%| -.r)  r
+    ?:  p.r  [%& `v.es]
+    $(cur +.st)
+  ==
+::
+++  stream-collect
+  ::  fold every element: `f` returns ~ to drop or `x to keep x (in order)
+  |=  [x=sexp f=$-(value (each (unit value) eval-err))]
+  ^-  (each (list value) eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list value)
+  =/  cur  p.rc
+  |-  ^-  (each (list value) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (flop acc)]
+      %item
+    =/  r  (f v.es)
+    ?:  ?=(%| -.r)  r
+    ?~  p.r  $(cur +.st)
+    $(acc [u.p.r acc], cur +.st)
+  ==
+::
+::  +|  Bounded Quantifiers And CHOOSE
+::
+++  ex-over
+  ::  \E x \in S : P  — short-circuit on the first witness
+  |=  [x=sexp p=vpred]
+  ^-  (each ? eval-err)
+  =/  r  (stream-find x p)
+  ?:  ?=(%| -.r)  r
+  [%& ?=(^ p.r)]
+::
+++  all-over
+  ::  \A x \in S : P  — short-circuit on the first counterexample
+  |=  [x=sexp p=vpred]
+  ^-  (each ? eval-err)
+  =/  r
+    %+  stream-find  x
+    |=(v=value =/(b (p v) ?:(?=(%| -.b) b [%& !p.b])))
+  ?:  ?=(%| -.r)  r
+  [%& ?=(~ p.r)]
+::
+++  choose-over
+  ::  CHOOSE x \in S : P  — deterministic first satisfying element in TLC
+  ::  enumeration order (stable across pause/resume: a pure fn of the
+  ::  cursor); typed failure when no element satisfies P
+  |=  [x=sexp p=vpred]
+  ^-  (each value eval-err)
+  =/  r  (stream-find x p)
+  ?:  ?=(%| -.r)  r
+  ?~  p.r
+    [%| 0 'CHOOSE: no element of the domain satisfies the predicate.']
+  [%& u.p.r]
+::
+::  +|  Enumerable Constructors ({x∈S:P}, {e:x∈S}, [x∈S|->e])
+::
+++  filter-over
+  ::  {x \in S : P}  — streamed filter, normalized result set
+  |=  [x=sexp p=vpred]
+  ^-  (each value eval-err)
+  =/  r
+    %+  stream-collect  x
+    |=  v=value
+    ^-  (each (unit value) eval-err)
+    =/  b  (p v)
+    ?:  ?=(%| -.b)  b
+    ?:(p.b [%& `v] [%& ~])
+  ?:  ?=(%| -.r)  r
+  [%& (normalize [%set p.r])]
+::
+++  map-over
+  ::  {e(x) : x \in S}  — streamed image, normalized (deduped) result set
+  |=  [x=sexp f=vmap]
+  ^-  (each value eval-err)
+  =/  r
+    %+  stream-collect  x
+    |=  v=value
+    ^-  (each (unit value) eval-err)
+    =/  w  (f v)
+    ?:(?=(%| -.w) w [%& `p.w])
+  ?:  ?=(%| -.r)  r
+  [%& (normalize [%set p.r])]
+::
+++  fcn-over
+  ::  [x \in S |-> e(x)]  — a function pairing each domain element with e
+  |=  [x=sexp f=vmap]
+  ^-  (each value eval-err)
+  =/  rc  (enum x)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list vpair)
+  =/  cur  p.rc
+  |-  ^-  (each value eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (normalize [%fcn (flop acc)])]
+      %item
+    =/  r  (f v.es)
+    ?:  ?=(%| -.r)  r
+    $(acc [[v.es p.r] acc], cur +.st)
+  ==
+::
+::  +|  Multi-Binder Context Enumeration (dependent bounds)
+::
+++  ctx-go
+  ::  visit bindings over ordered domains, streaming nested cursors; each
+  ::  domain gate sees the prefix bound so far (dependent bounds). Returns
+  ::  the first prefix whose completed binding satisfies `p`, else ~.
+  |=  [ds=(list cdom) pre=(list value) p=cpred]
+  ^-  (each (unit (list value)) eval-err)
+  ?~  ds
+    =/  r  (p pre)
+    ?:  ?=(%| -.r)  r
+    ?:  p.r  [%& `pre]  [%& ~]
+  =/  rs  (i.ds pre)
+  ?:  ?=(%| -.rs)  rs
+  =/  rc  (enum p.rs)
+  ?:  ?=(%| -.rc)  rc
+  =/  cur  p.rc
+  |-  ^-  (each (unit (list value)) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& ~]
+      %item
+    =/  sub  (ctx-go t.ds (snoc pre v.es) p)
+    ?:  ?=(%| -.sub)  sub
+    ?^  p.sub  sub
+    $(cur +.st)
+  ==
+::
+++  ex-ctx
+  ::  \E x1\in S1, x2\in S2(x1), … : P
+  |=  [ds=(list cdom) p=cpred]
+  ^-  (each ? eval-err)
+  =/  r  (ctx-go ds ~ p)
+  ?:  ?=(%| -.r)  r
+  [%& ?=(^ p.r)]
+::
+++  all-ctx
+  ::  \A x1\in S1, x2\in S2(x1), … : P
+  |=  [ds=(list cdom) p=cpred]
+  ^-  (each ? eval-err)
+  =/  r
+    %^  ctx-go  ds  ~
+    |=(pre=(list value) =/(b (p pre) ?:(?=(%| -.b) b [%& !p.b])))
+  ?:  ?=(%| -.r)  r
+  [%& ?=(~ p.r)]
+::
+::  +|  Control: IF, CASE, Conjunction/Disjunction Lists
+::
+++  if-val
+  ::  IF c THEN t ELSE e — only the taken branch is evaluated
+  |=  [c=value t=vthunk e=vthunk]
+  ^-  (each value eval-err)
+  ?.  ?=(%bool -.c)
+    [%| 0 (rap 3 ~['A non-boolean was used as an IF guard: ' (crip (render c)) '.'])]
+  ?:(p.c (t ~) (e ~))
+::
+++  case-val
+  ::  CASE — guards evaluated in order (lazily), first true guard's body is
+  ::  the result; else OTHER; else a typed "no case" failure. Unselected
+  ::  bodies are never evaluated, so their errors are suppressed.
+  |=  [arms=(list [g=bthunk b=vthunk]) other=(unit vthunk)]
+  ^-  (each value eval-err)
+  |-  ^-  (each value eval-err)
+  ?~  arms
+    ?~  other
+      [%| 0 'CASE: no OTHER case, and no guard evaluated to TRUE.']
+    (u.other ~)
+  =/  gr  (g.i.arms ~)
+  ?:  ?=(%| -.gr)  gr
+  ?:  p.gr  (b.i.arms ~)
+  $(arms t.arms)
+::
+++  conj-list
+  ::  /\ list — short-circuit on the first FALSE; later errors suppressed
+  |=  cs=(list bthunk)
+  ^-  (each ? eval-err)
+  ?~  cs  [%& &]
+  =/  r  (i.cs ~)
+  ?:  ?=(%| -.r)  r
+  ?.  p.r  [%& |]
+  $(cs t.cs)
+::
+++  disj-list
+  ::  \/ list — short-circuit on the first TRUE; later errors suppressed
+  |=  cs=(list bthunk)
+  ^-  (each ? eval-err)
+  ?~  cs  [%& |]
+  =/  r  (i.cs ~)
+  ?:  ?=(%| -.r)  r
+  ?:  p.r  [%& &]
+  $(cs t.cs)
+::
 ::  +|  Canonical Key (single-value-arg equality witness for tests)
 ::
 ::  +equal takes two values, and nesting the recursive value mold into a

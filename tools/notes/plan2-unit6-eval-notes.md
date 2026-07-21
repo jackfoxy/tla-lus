@@ -253,6 +253,54 @@ budget accounting is wired at 6.9 integration (each `enum-next` = one bounded
 step; the caller loops against the budget). Comprehensive coverage rides the
 differential EvalDump path once 6.5 wires enumeration into expression eval.
 
+## 6.4 landed 2026-07-21 — CHOOSE, binders, enumerable constructors, control
+
+These evaluate expression BODIES (predicates, images, guards, branches),
+which is the 6.5 semantic-node evaluator's job — so they are **gate-
+parameterized combinators over the 6.3 cursor**: the 6.5 evaluator supplies
+each gate as `|=(v (eval node ctx(x v)))` over a jam-safe (node, context)
+pair, and the resumable state stays the 6.3 `ecur`. Tested now with Hoon
+gates; full ship suite `ok=%.y`, all dojo-verified. Gate type aliases:
+`vpred`/`vmap` (single-binder value→bool/value), `vthunk`/`bthunk` (deferred
+value/bool branches), `cpred`/`cdom` (multi-binder predicate / prefix-
+dependent domain).
+
+Added to value.hoon:
+- **Streaming primitives**: `stream-find` (first element satisfying p,
+  short-circuit), `stream-collect` (fold keep/drop over the cursor).
+- **Quantifiers** `ex-over`/`all-over` (single `sexp`, short-circuit on first
+  witness/counterexample, typed error propagation). **`choose-over`** = CHOOSE
+  x∈S:P — deterministic first satisfying element in TLC enumeration order
+  (a pure fn of the cursor ⇒ stable across pause/resume), typed failure when
+  none satisfies.
+- **Enumerable constructors**, all streamed through the lazy `ecur` (never
+  eagerly expand the source): `filter-over` (`{x∈S:P}`), `map-over`
+  (`{e:x∈S}`, dedup-normalized), `fcn-over` (`[x∈S|->e]`). (`SUBSET`/`UNION`/
+  record/tuple set constructors are the 6.3 `sexp`; `DOMAIN` is 6.2.)
+- **Multi-binder context enumeration** `ctx-go` + `ex-ctx`/`all-ctx` over a
+  `(list cdom)`: nested streamed cursors, each domain gate sees the prefix
+  bound so far ⇒ **dependent bounds** (`\A x∈S, y∈T(x):P`). Short-circuit
+  threads through. TUPLE DESTRUCTURING (`<<x,y>>∈S`) is transparent here — the
+  enumeration yields the element; the 6.5 evaluator destructures it into
+  x,y when building the eval-context from each tuple.
+- **Control** with short-circuit error suppression (only the selected branch
+  runs): `if-val` (non-bool guard = typed error), `case-val` (guards lazy in
+  order, first-true body, else OTHER, else typed "no case"), `conj-list`
+  (short-circuit on first FALSE), `disj-list` (on first TRUE).
+
+Dojo-verified: `\A x∈1..3:x∈1..3`→T, `…:x∈{1,2}`→F; `\E x∈1..5:x=4`→T;
+`CHOOSE x∈1..10:x=5`→5, no-match→typed err; `{x∈1..6:x∈{2,4,6}}`→{2,4,6};
+`{{x}:x∈1..3}`→{{1},{2},{3}}; `[x∈1..3|->x]`→<<1,2,3>>; IF-true suppresses
+else-error; CASE picks first-true guard's body (other bodies' errors
+suppressed); conj/disj short-circuit and suppress later errors; multi-binder
+`\E/\A x∈1..2,y∈1..2:x=y`→T/F; dependent `\E/\A x∈1..3,y∈1..x:x=y`→T/F.
+
+DEFERRED: budget-exhaustion-immediately-before/after-a-match tests need WU1
+budget threading through the cursor (6.9 integration; the combinators already
+stream + short-circuit, so slicing wraps them via the `ecur`). Message text
+approximate (6.8 owns exact bytes). The gates become node-backed and the
+whole thing resumable when 6.5 fuses these with the semantic-node evaluator.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →
