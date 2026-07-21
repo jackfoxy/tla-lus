@@ -158,10 +158,51 @@ Verified in dojo: `<<1,4,9>>[2]` → `4`; `[a|->1,b|->2].b` → `2`;
 `DOMAIN (1:>10 @@ 5:>20)` → `{1, 5}`; `<<9>>[5]` → typed "applying a tuple
 outside its domain: 5". Automated coverage is dojo + differential-at-6.5
 (constructing an apply input exceeds the ~1-2-op test-core mull budget).
-Remaining 6.2: `ValueExcept` application (function/tuple/record, nested
-selector paths, multi-clause in source order, the `@` old-value binding),
-model values from config (typed/untyped), and canonical record/function
-constructors with duplicate-domain/field handling.
+
+### 6.2 remaining landed 2026-07-21 — EXCEPT, model values, constructors
+
+`ValueExcept`, model-value semantics, and dup-checked constructors added to
+value.hoon; full ship suite `ok=%.y`, all dojo-verified.
+
+- **EXCEPT** (`sel-step`/`except-select`/`except-put`, `sel-res` =
+  `(each (unit value) eval-err)`). A selector path is a `(list value)` of
+  already-evaluated selectors (fcn/record domain point or 1-based tuple
+  index). `except-select` mirrors `Value.select` + `Tool.OPCODE_exc`'s three
+  outcomes: `%|` hard failure (EXCEPT on a non-function, or wrong-typed
+  selector — tuple non-int, record non-string — propagates); `[%& ~]` miss
+  (a step out of domain → skip the whole clause, TLC warns
+  `TLC_EXCEPT_APPLIED_TO_UNKNOWN_FIELD`); `[%& `old]` hit (`old` = the
+  current value, the `@` binding). `except-put` rebuilds via structural
+  `turn`/`snap` (tlc2 `takeExcept`), leaving unmatched steps unchanged and
+  earlier values immutable; only ever reached on a hit. Clause folding +
+  `@`/replacement evaluation are the 6.5 evaluator's job (fold source-order:
+  select → if miss warn+skip, else bind `@`=old, eval rhs, `except-put`).
+  Dojo: `[F EXCEPT ![2]=99]`→`<<1, 99, 3>>`; select `![2]`→`@`=2, `![9]`→miss;
+  `[R EXCEPT !.b.c=42]`→`[a |-> 1, b |-> [c |-> 42]]`; `[T EXCEPT ![3]=30]`→
+  `<<1, 2, 30>>`; multi `![1]=7,![3]=8`→`<<7, 2, 8>>`; EXCEPT on `5`→hard fail.
+- **Model values** (`mv-type`/`val-eq`/`member`). Per tlc2 `ModelValue`: a
+  name with `length>2 && char[1]=='_'` is TYPED (type = char[0]); else
+  untyped (0). Structural `equal` stays total (same name = equal) so models
+  sit in sets/domains freely; the typed-comparison FAILURES surface only at
+  the semantic `=` (`val-eq`) and `\in` (`member`), both returning
+  `(each ? eval-err)`. `val-eq`: two models compare by name when either is
+  untyped or types match, else error (differently-typed); a typed model vs a
+  non-model errors; otherwise `[%& (equal a b)]`. `member` folds `val-eq`
+  over `set-elems` (typed model vs a non-model element → error), guarding
+  non-set RHS. Dojo: `m0=m0`→T, untyped `a=b`→F, `a_1=b_2`→err, `a_1=3`→err,
+  `m0 \in {a,b,c}`→F, `a \in {a,b}`→T. Config already yields `[%model name]`
+  values (cfg-value); wiring constants into the eval context is 6.9.
+- **Constructors** (`mk-rec`/`mk-fcn`, `find-dup-key`/`find-dup-dom`). Return
+  a `vres`: a repeated record field name (tlc2 `RecordValue.normalize`
+  `Assert.fail`) or a repeated function domain point (`FcnRcdValue.normalize`)
+  is a typed failure, else the normalized value. Dojo: dup field / dup domain
+  both error. Function-constructor domains from `[x \in S |-> …]` arrive
+  pre-deduped (S is a normalized set), so dups only reach `mk-fcn` from
+  explicit pair lists.
+
+Message text is approximate (single-line, no embedded `\n`); exact
+EC-coded/byte-faithful diagnostics are 6.8's job (like `apply`/`domain`).
+Remaining 6.2 is closed; next is 6.3 enumeration or 6.5 evaluator wiring.
 
 ## Remaining subunits (dependency order)
 

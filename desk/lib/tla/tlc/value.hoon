@@ -479,6 +479,190 @@
     %set   [%| 0 'DOMAIN of a set']
   ==
 ::
+::  +|  EXCEPT (unit 6.2)
+::
+::  A selector path is a list of already-evaluated selector values (a
+::  function/record domain point, or a 1-based tuple index). tlc2's Tool
+::  evaluates each clause of `[base EXCEPT !p1 = r1, !p2 = r2, ...]` in
+::  source order: it resolves the path with +except-select (binding the
+::  current value as `@` in the replacement), then rebuilds with
+::  +except-put. Three select outcomes mirror Value.select/Tool.OPCODE_exc:
+::    %|          a hard failure — applying EXCEPT to a non-function, or a
+::                wrong-typed selector (propagates, aborts evaluation).
+::    [%& ~]      a miss — some path step is out of domain: the whole clause
+::                is skipped and TLC warns TLC_EXCEPT_APPLIED_TO_UNKNOWN_FIELD.
+::    [%& `old]   a hit — `old` is the value at the path (bound as `@`).
+::  Clause folding and `@`/replacement evaluation are wired by the 6.5
+::  evaluator; +except-put is only reached on a hit, so every step is
+::  present and structural sharing keeps earlier values immutable.
+::
++$  sel-res  (each (unit value) eval-err)
+::
+++  except-nonfcn
+  |=  base=value
+  ^-  sel-res
+  :-  %|
+  :-  0
+  (rap 3 ~['Attempted to apply EXCEPT construct to the value ' (crip (render base)) '.'])
+::
+++  sel-step
+  ::  one path step: the child at selector `sel` in `base`
+  |=  [base=value sel=value]
+  ^-  sel-res
+  ?-  -.base
+      %fcn   [%& (find-image p.base sel)]
+      %seq
+    ?.  ?=(%int -.sel)
+      :-  %|
+      :-  0
+      (rap 3 ~['Attempted to access tuple at a non integral index: ' (crip (render sel))])
+    =/  i  (idx-of sel)
+    ?:  |(=(0 i) (gth i (lent p.base)))  [%& ~]
+    [%& `(snag (dec i) p.base)]
+      %rec
+    ?.  ?=(%str -.sel)
+      :-  %|
+      :-  0
+      (rap 3 ~['Attempted to access record by a non-string argument: ' (crip (render sel))])
+    =/  hit  (skim p.base |=(fd=vfield =(k.fd p.sel)))
+    ?~(hit [%& ~] [%& `v.i.hit])
+  ::
+    %intv   (except-nonfcn base)
+    %set    (except-nonfcn base)
+    %bool   (except-nonfcn base)
+    %int    (except-nonfcn base)
+    %str    (except-nonfcn base)
+    %model  (except-nonfcn base)
+  ==
+::
+++  except-select
+  ::  resolve a selector path to its current value (the `@` binding), a
+  ::  miss (skip the clause), or a hard failure
+  |=  [base=value path=(list value)]
+  ^-  sel-res
+  ?~  path  [%& `base]
+  =/  step  (sel-step base i.path)
+  ?-  -.step
+    %|  step
+    %&  ?~(p.step [%& ~] $(base u.p.step, path t.path))
+  ==
+::
+++  except-put
+  ::  rebuild `base` with the value at `path` replaced by `rhs` (tlc2
+  ::  takeExcept); a step that does not match leaves `base` unchanged
+  |=  [base=value path=(list value) rhs=value]
+  ^-  value
+  ?~  path  rhs
+  ?-  -.base
+      %fcn
+    :-  %fcn
+    %+  turn  p.base
+    |=  pr=vpair
+    ?.  (equal d.pr i.path)  pr
+    [d.pr (except-put r.pr t.path rhs)]
+      %seq
+    =/  i  (idx-of i.path)
+    ?:  |(=(0 i) (gth i (lent p.base)))  base
+    =/  old  (snag (dec i) p.base)
+    [%seq (snap p.base (dec i) (except-put old t.path rhs))]
+      %rec
+    :-  %rec
+    %+  turn  p.base
+    |=  fd=vfield
+    ?.  &(?=(%str -.i.path) =(k.fd p.i.path))  fd
+    [k.fd (except-put v.fd t.path rhs)]
+  ::
+    %intv   base
+    %set    base
+    %bool   base
+    %int    base
+    %str    base
+    %model  base
+  ==
+::
+::  +|  Model Values (unit 6.2)
+::
+::  A model value carries a name (its `%model` payload). Following tlc2
+::  ModelValue, a name longer than two characters whose second character is
+::  `_` is TYPED with type = its first character; every other name is
+::  untyped (type 0). Structural +equal is total (same name = equal) so
+::  model values sit in sets/domains without error; the typed-comparison
+::  failures surface only at the semantic `=` (+val-eq) and `\in` (+member).
+::
+++  mv-type
+  |=  name=@t
+  ^-  @
+  =/  s  (trip name)
+  ?.  (gth (lent s) 2)  0
+  ?.  =('_' (snag 1 s))  0
+  (snag 0 s)
+::
+++  val-eq
+  ::  the semantic `=` operator: +equal, plus tlc2's typed model errors
+  |=  [a=value b=value]
+  ^-  (each ? eval-err)
+  ?:  ?&(?=(%model -.a) ?=(%model -.b))
+    =/  ta  (mv-type p.a)
+    =/  tb  (mv-type p.b)
+    ?:  |(=(0 ta) =(0 tb) =(ta tb))  [%& =(p.a p.b)]
+    :-  %|
+    :-  0
+    (rap 3 ~['Attempted to check equality of the differently-typed model values ' p.a ' and ' p.b '.'])
+  ?:  &(?=(%model -.a) !=(0 (mv-type p.a)))
+    [%| 0 (rap 3 ~['Attempted to check equality of typed model value ' p.a ' and non-model value ' (crip (render b)) '.'])]
+  ?:  &(?=(%model -.b) !=(0 (mv-type p.b)))
+    [%| 0 (rap 3 ~['Attempted to check equality of typed model value ' p.b ' and non-model value ' (crip (render a)) '.'])]
+  [%& (equal a b)]
+::
+++  member
+  ::  the semantic `\in` over a set or interval, surfacing typed model errors
+  |=  [x=value s=value]
+  ^-  (each ? eval-err)
+  ?.  (set-like s)
+    [%| 0 (rap 3 ~['Attempted to check membership in the non-set value ' (crip (render s)) '.'])]
+  =/  es  (set-elems s)
+  |-  ^-  (each ? eval-err)
+  ?~  es  [%& |]
+  =/  r  (val-eq x i.es)
+  ?-  -.r
+    %|  r
+    %&  ?:(p.r [%& &] $(es t.es))
+  ==
+::
+::  +|  Canonical Constructors With Duplicate Detection (unit 6.2)
+::
+++  find-dup-key
+  |=  fs=(list vfield)
+  ^-  (unit @t)
+  ?~  fs  ~
+  ?:  (lien t.fs |=(f=vfield =(k.f k.i.fs)))  `k.i.fs
+  $(fs t.fs)
+::
+++  find-dup-dom
+  |=  ps=(list vpair)
+  ^-  (unit value)
+  ?~  ps  ~
+  ?:  (lien t.ps |=(pr=vpair (equal d.pr d.i.ps)))  `d.i.ps
+  $(ps t.ps)
+::
+++  mk-rec
+  ::  canonical record; a repeated field name is a typed failure (tlc2
+  ::  RecordValue.normalize)
+  |=  fs=(list vfield)
+  ^-  vres
+  =/  dup  (find-dup-key fs)
+  ?~  dup  [%& (normalize [%rec fs])]
+  [%| 0 (rap 3 ~['Field name ' u.dup ' occurs multiple times in record.'])]
+::
+++  mk-fcn
+  ::  canonical function; a repeated domain point is a typed failure (tlc2
+  ::  FcnRcdValue.normalize)
+  |=  ps=(list vpair)
+  ^-  vres
+  =/  dup  (find-dup-dom ps)
+  ?~  dup  [%& (normalize [%fcn ps])]
+  [%| 0 (rap 3 ~['The value ' (crip (render u.dup)) ' occurs multiple times in the function domain.'])]
+::
 ::  +|  Canonical Key (single-value-arg equality witness for tests)
 ::
 ::  +equal takes two values, and nesting the recursive value mold into a
