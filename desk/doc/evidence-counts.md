@@ -14,7 +14,7 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/tla/modres.hoon` |
 | `gen-sem-tests.py` | 73 | pass | Semantic graph + levels | `desk/tests/lib/tla/sem.hoon` |
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/tla/eval.hoon` |
-| `gen-mc-tests.py` | 5 | pass | Safety + liveness model checking | `desk/tests/lib/tla/mc.hoon` |
+| `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/tla/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/tla/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/tla/cfg.hoon` |
@@ -22,6 +22,6 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 
-Compared cases: **783**.  Oracle-only cases: **27**.
+Compared cases: **785**.  Oracle-only cases: **27**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

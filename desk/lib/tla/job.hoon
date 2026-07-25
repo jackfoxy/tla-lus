@@ -586,10 +586,10 @@
   ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
   =/  st=run-stats
     ?-  -.out
-      %ok        [gen.out distinct.out 0 depth.out]
-      %limited   [gen.out distinct.out 0 depth.out]
-      %inv       [gen.out distinct.out 0 depth.out]
-      %deadlock  [gen.out distinct.out 0 depth.out]
+      %ok        [gen.out distinct.out queued.out depth.out]
+      %limited   [gen.out distinct.out queued.out depth.out]
+      %inv       [gen.out distinct.out queued.out depth.out]
+      %deadlock  [gen.out distinct.out queued.out depth.out]
     ==
   =.  stats.j  st
   =/  res=result
@@ -627,7 +627,7 @@
     =/  report
       %-  wain-text
       :-  'Model checking completed. No error has been found.'
-      (counts-lines:check generated.st distinct.st depth.st)
+      (counts-lines:check generated.st distinct.st 0 depth.st)
     (finish-arts j [%ok st] report ~ pre)
   =/  tr  (trace-to:check seen.cur.kk u.bad.r)
   =/  report
@@ -636,7 +636,7 @@
       ~[(crip "Error: Temporal property {(trip pname.kk)} was violated.")]
       ~['Error: The following behavior constitutes a counter-example:']
       (render-live-trace:check tr nl.kk)
-      (counts-lines:check generated.st distinct.st depth.st)
+      (counts-lines:check generated.st distinct.st 0 depth.st)
     ==
   =/  typed=trace  [%lasso (trace-states tr act.kk) `(lent tr)]
   (finish-arts j [%violated [%property pname.kk] st] report `typed pre)

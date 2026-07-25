@@ -331,10 +331,10 @@
 ::
 +$  visit  [depth=@ud pred=@t st=state]
 +$  outcome
-  $%  [%ok gen=@ud distinct=@ud depth=@ud]
-      [%inv gen=@ud distinct=@ud depth=@ud trace=(list state) name=@t]
-      [%deadlock gen=@ud distinct=@ud depth=@ud trace=(list state)]
-      [%limited what=?(%states %depth) gen=@ud distinct=@ud depth=@ud]
+  $%  [%ok gen=@ud distinct=@ud queued=@ud depth=@ud]
+      [%inv gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t initial=?]
+      [%deadlock gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state)]
+      [%limited what=?(%states %depth) gen=@ud distinct=@ud queued=@ud depth=@ud]
       ::  a typed evaluation failure during the search (WU6.9)
       [%error msg=@t]
   ==
@@ -445,17 +445,24 @@
   =/  fp  (fingerprint order.o st)
   ?:  (~(has by seen.cur) fp)  [~ cur]
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
-    [`[%limited %depth gen.cur distinct.cur depth.cur] cur]
-  =.  seen.cur   (~(put by seen.cur) fp [d pred st])
-  =.  queue.cur  (snoc queue.cur fp)
-  =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+    [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
+  ::  TLC order (doNext): the state is counted distinct and its invariants are
+  ::  checked BEFORE it is enqueued, so a violating state is counted but never
+  ::  enqueued (fixing the states-left-on-queue count)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
+  =.  seen.cur      (~(put by seen.cur) fp [d pred st])
   =/  iv  (first-violated invs.o st e)
-  ?~  iv  [~ cur]
-  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
-  :_  cur
-  `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) p.u.iv]
+  ?^  iv
+    ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+    :_  cur
+    :-  ~
+    :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+        (trace-to seen.cur fp)  p.u.iv  =('' pred)
+    ==
+  =.  queue.cur  (snoc queue.cur fp)
+  =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+  [~ cur]
 ::
 ++  register-all
   |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t prev=(unit state)]
@@ -484,10 +491,10 @@
     ?^  out.rr  [%done u.out.rr cur.rr]
     $(cur cur.rr, spent +(spent))
   ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
-    [%done [%limited %states gen.cur distinct.cur depth.cur] cur]
+    [%done [%limited %states gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
   =/  q  queue.cur
   ?~  q
-    [%done [%ok gen.cur distinct.cur depth.cur] cur]
+    [%done [%ok gen.cur distinct.cur 0 depth.cur] cur]
   =/  fp   i.q
   =/  vis  (~(got by seen.cur) fp)
   =/  nr  (next-states:ne st.vis next.o (env-of o))
@@ -496,8 +503,8 @@
   ?~  nexts
     ?.  deadlock.o  $(cur cur(queue t.q), spent +(spent))
     :+  %done
-      [%deadlock gen.cur distinct.cur depth.cur (trace-to seen.cur fp)]
-    cur
+      [%deadlock gen.cur distinct.cur (lent t.q) depth.cur (trace-to seen.cur fp)]
+    cur(queue t.q)
   =/  cost  (lent nexts)
   =/  rr
     (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp `st.vis)
@@ -588,9 +595,9 @@
   $(n (div n 10), o [(add '0' (mod n 10)) o])
 ::
 ++  counts-lines
-  |=  [gen=@ud distinct=@ud depth=@ud]
+  |=  [gen=@ud distinct=@ud queued=@ud depth=@ud]
   ^-  wain
-  :~  (crip "{(a-tape gen)} states generated, {(a-tape distinct)} distinct states found, 0 states left on queue.")
+  :~  (crip "{(a-tape gen)} states generated, {(a-tape distinct)} distinct states found, {(a-tape queued)} states left on queue.")
       (crip "The depth of the complete state graph search is {(a-tape depth)}.")
   ==
 ::
@@ -987,12 +994,12 @@
     =/  lr  (check-live u.prop-body u.pp.c g)
     ?:  ok.lr
       :-  'Model checking completed. No error has been found.'
-      (counts-lines gen.g distinct.g depth.g)
+      (counts-lines gen.g distinct.g 0 depth.g)
     ;:  weld
       ~[(crip "Error: Temporal property {(trip u.pp.c)} was violated.")]
       ~['Error: The following behavior constitutes a counter-example:']
       (render-live-trace trace.lr nl.c)
-      (counts-lines gen.g distinct.g depth.g)
+      (counts-lines gen.g distinct.g 0 depth.g)
     ==
   ::  safety: an INVARIANT
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c 0 0]
@@ -1005,20 +1012,29 @@
   ?-    -.res
       %ok
     :-  'Model checking completed. No error has been found.'
-    (counts-lines gen.res distinct.res depth.res)
+    (counts-lines gen.res distinct.res queued.res depth.res)
   ::
       %limited
     :-  ?:  =(%states what.res)
           'Model checking stopped: state limit reached.'
         'Model checking stopped: depth limit reached.'
-    (counts-lines gen.res distinct.res depth.res)
+    (counts-lines gen.res distinct.res queued.res depth.res)
   ::
       %inv
+    ::  an initial-state violation (EC 2107) prints a distinct message with the
+    ::  offending state inline and no statistics summary; a behavior violation
+    ::  (EC 2110) prints the numbered trace and the counts (matching TLC)
+    ?:  initial.res
+      ::  a single offending initial state, rendered inline (a wet `turn` over
+      ::  the recursive state mold fuse-loops the zuse-408 compiler)
+      %+  weld
+        ~[(crip "Error: Invariant {(trip name.res)} is violated by the initial state:")]
+      ?~(trace.res ~ (render-state i.trace.res))
     ;:  weld
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl)
-      (counts-lines gen.res distinct.res depth.res)
+      (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
       %deadlock
@@ -1026,7 +1042,7 @@
       ~['Error: Deadlock reached.']
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl)
-      (counts-lines gen.res distinct.res depth.res)
+      (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
       %error  ~[(crip "Error: {(trip msg.res)}")]
@@ -1060,10 +1076,10 @@
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c cap 0]
   =/  res  (explore is.c o)
   ?-    -.res
-      %ok        =/  st  [gen.res distinct.res 0 depth.res]  [[%ok st] st]
-      %limited   =/  st  [gen.res distinct.res 0 depth.res]  [[%limited what.res st] st]
-      %inv       =/  st  [gen.res distinct.res 0 depth.res]  [[%violated [%invariant name.res] st] st]
-      %deadlock  =/  st  [gen.res distinct.res 0 depth.res]  [[%violated [%deadlock ~] st] st]
+      %ok        =/  st  [gen.res distinct.res queued.res depth.res]  [[%ok st] st]
+      %limited   =/  st  [gen.res distinct.res queued.res depth.res]  [[%limited what.res st] st]
+      %inv       =/  st  [gen.res distinct.res queued.res depth.res]  [[%violated [%invariant name.res] st] st]
+      %deadlock  =/  st  [gen.res distinct.res queued.res depth.res]  [[%violated [%deadlock ~] st] st]
       %error     [[%failed msg.res] *run-stats]
   ==
 --
