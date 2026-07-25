@@ -819,6 +819,7 @@
       consts=(map @t value)
       vars=(set @t)
       order=(list @t)                        ::  vars in declaration order
+      asmz=(list sem-thm:sem-lib)            ::  module ASSUME bodies
       nsb=sem:sem-lib                        ::  Next body
       iv=(unit @t)
       ivsb=(unit sem:sem-lib)                ::  Invariant body
@@ -857,7 +858,7 @@
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  ivsb  ?~(iv.u.nm ~ (sem-body defs u.iv.u.nm))
   :-  %&
-  :*  p.ir  defs  consts  vars  order  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
+  :*  p.ir  defs  consts  vars  order  assumes.u.mo  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
       ?~(nb '' (next-span-label u.nb modn))
   ==
 ::
@@ -874,6 +875,21 @@
   =/  pr  (parse-cfg:config cfg)
   ?:(?=(%| -.pr) ~ (consts-of constants.p.pr))
 ::
+++  check-assumes
+  ::  TLC Tool.checkAssumptions, run before the search: every module ASSUME
+  ::  must evaluate to TRUE under the constant environment. A FALSE assumption
+  ::  is EC 2104 (assumption-false); a non-boolean value or evaluation error is
+  ::  EC 2105 (assumption-error). ~ when all assumptions hold. (TLC skips
+  ::  axioms; we check every assumption — axiom marking is a documented residue.)
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne]
+  ^-  (unit [ec=@ud msg=@t])
+  ?~  asmz  ~
+  ?~  body.i.asmz  $(asmz t.asmz)
+  =/  r  (pred-bool:ne u.body.i.asmz ~ ~ e)
+  ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]
+  ?.  p.r  `[2.104 'An assumption is false.']
+  $(asmz t.asmz)
+::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines
   |=  [spec=@t cfg=@t]
@@ -881,6 +897,8 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
   ::  liveness: a temporal PROPERTY (built via node-eval; the property's
   ::  state-predicate scan still runs on the CST body — a WU6.9 residue)
   ?^  pp.c
@@ -948,6 +966,8 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [[%failed p.sc] *run-stats]
   =*  c  p.sc
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  ?^  ae  [[%failed msg.u.ae] *run-stats]
   ::  liveness (temporal property)
   ?^  pp.c
     =/  prop  (body-of-def tree.c u.pp.c)

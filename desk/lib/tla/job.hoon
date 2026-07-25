@@ -424,6 +424,15 @@
   =.  diags.j  (snoc diags.j dg)
   (finish j [%failed msg.d] (snoc pre [%diagnostic dg]))
 ::
+++  assume-fail
+  ::  a false (EC 2104) or non-boolean (EC 2105) ASSUME is a typed TLC failure
+  ::  at the model-checking stage, recorded like a config diagnostic
+  |=  [j=job-2 ec=@ud msg=@t pre=(list event)]
+  ^-  step-result-2
+  =/  dg=diagnostic  [[%tlc ec] %error %explore msg ~ ~]
+  =.  diags.j  (snoc diags.j dg)
+  (finish j [%failed msg] (snoc pre [%diagnostic dg]))
+::
 ++  do-config
   ::  consume the parsed root tree and build the engine continuation.
   ::  Every config this engine cannot process faithfully is a typed
@@ -494,6 +503,10 @@
   ?~  mo  (finish j [%failed 'semantic graph generation failed'] pre)
   =/  defs    (defmap-of:ne u.mo)
   =/  consts  (consts-of:check constants.rs)
+  ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
+  ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
+  =/  ae  (check-assumes:check assumes.u.mo (make-env:ne defs consts vars))
+  ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
   =/  isb  (sem-body:check defs u.in)
   =/  nsb  (sem-body:check defs u.nx)
   ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
