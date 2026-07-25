@@ -347,6 +347,38 @@ through it (`tests/lib/tla/node-eval.hoon`, adapted from the CST test), plus
   OTHER entirely; now includes it as a `$Pair` with a `%nullodn` guard (tlc2
   null first component), which `eval-case` recognizes as the default.
 
+## 6.6 landed 2026-07-21 — states, prime, UNCHANGED
+
+node-eval.hoon `eenv` gained `s0`/`s1` states + `primed`/`enabled` control
+bits (the EvalControl subset). `+$ state (map @t value)` keyed by variable
+identity (name); absence = unassigned = a typed read failure. All 8
+state/prime/UNCHANGED cases green (`tests/lib/tla/neval-state.hoon`), full
+suite unaffected.
+
+- **Variable resolution** (`lookup-var`, wired into `eval-apply`'s
+  `%variable` arm): from `s1` under a prime, else `s0`; an unassigned read is
+  a typed failure (distinct message for the primed/successor vs current
+  case).
+- **Prime** (`'`, builtin arity-1 weight-0): evaluate the operand with
+  `primed=&` — priming distributes to variable references (a constant/op is
+  prime-invariant). Nested prime is a WU4 level error; an unassigned primed
+  variable is a typed failure.
+- **UNCHANGED e** (`eval-unchanged`): `e' = e` — `val-eq` of the successor
+  (primed) and current evaluations; tuples/composites compare structurally.
+- **Predicate entry points**: `eval-pred [root src nm s0 s1]` → `(each ?
+  eval-err)` requiring a boolean — a constant predicate passes empty states,
+  a state predicate only `s0`, a fully-assigned action predicate both.
+  `base-env` builds the env for a module's defs under given states.
+- `x' = e` needs no special casing at 6.6: `x'` already resolves from `s1`,
+  so an equality is `bi-eq` of the primed LHS and the current RHS. Assignment
+  vs filtering (partial successor solving) is WU6.7.
+
+DEFERRED to 6.7: partial-successor action solving, ENABLED existential search
+(the `enabled` bit is carried but unused). EvalDump still needs a STATE MODE
+for differential fixtures (6.0 note); 6.6 is dojo/probe-verified with
+hand-built states. Substitution-around-prime needs INSTANCE ($SubstIn, a 6.5
+residue).
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →

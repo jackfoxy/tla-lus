@@ -23,11 +23,23 @@
 ::  value bindings (constants, bound variables, expression parameters, arity-0
 ::  LET values via their defs); `ops` holds operator definitions (module defs,
 ::  LET operators, operator-valued parameters). `atv` is the EXCEPT `@` value.
+::  a state maps a stable variable identity to its assigned value; absence
+::  means unassigned (a typed failure when such a variable is read). WU6.6
+::  evaluates fully-assigned state/action predicates; partial-successor
+::  action solving is WU6.7.
++$  state  (map @t value:v)
 +$  eenv
   $:  vals=(map @t value:v)
       ops=(map @t sem-def:sm)
       atv=(unit value:v)
       fuel=@ud
+      ::  current (s0) and successor (s1) states; `primed` resolves variable
+      ::  references from s1 (the EvalControl.Primed bit), `enabled` marks an
+      ::  ENABLED context (WU6.7 successor search)
+      s0=state
+      s1=state
+      primed=?
+      enabled=?
   ==
 +$  eres  (each value:v eval-err:v)
 ::
@@ -78,7 +90,7 @@
       %formal-param
     ?:(=(~ args.n) (lookup-val nm e) (eval-user n e))
   ::
-    %variable         [%| 0 'variable reference requires a state (unit 6.6).']
+    %variable         (lookup-var nm e)
     %thm-assump       [%| 0 'a theorem/assumption is not an evaluable value.']
     %module-instance  [%| 0 'a module instance is not an evaluable value.']
   ==
@@ -88,6 +100,19 @@
   ^-  eres
   =/  hit  (~(get by vals.e) nm)
   ?~  hit  [%| 0 (rap 3 ~['undefined identifier: ' nm])]
+  [%& u.hit]
+::
+++  lookup-var
+  ::  a variable resolves from the successor state under a prime, else the
+  ::  current state; an unassigned read is a typed failure
+  |=  [nm=@t e=eenv]
+  ^-  eres
+  =/  st  ?:(primed.e s1.e s0.e)
+  =/  hit  (~(get by st) nm)
+  ?~  hit
+    ?:  primed.e
+      [%| 0 (rap 3 ~['primed variable is unassigned in the successor state: ' nm])]
+    [%| 0 (rap 3 ~['variable is unassigned in the current state: ' nm])]
   [%& u.hit]
 ::
 ::  +|  Helpers: Argument And Boolean Evaluation
@@ -230,6 +255,9 @@
   ?:  =(nm '\\in')     (bi-in as e |)
   ?:  =(nm '\\notin')  (bi-in as e &)
   ?:  =(nm '\\subseteq')  (bi-subseteq as e)
+  ::  prime and UNCHANGED (state/action; WU6.6)
+  ?:  =(nm '\'')          (eval (snag 0 as) e(primed &))
+  ?:  =(nm 'UNCHANGED')   (eval-unchanged as e)
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
     (force:v (need-sexp (eval-domain n e)))
@@ -302,6 +330,19 @@
   ?:  ?=(%| -.a)  a
   =/  b  (eval-bool (snag 1 as) e)
   ?:(?=(%| -.b) b [%& [%bool =(p.a p.b)]])
+::
+++  eval-unchanged
+  ::  UNCHANGED e is e' = e: the successor value of e equals its current
+  ::  value (tuples and composites compare structurally via +val-eq)
+  |=  [as=(list sem:sm) e=eenv]
+  ^-  eres
+  =/  cur  (eval (snag 0 as) e(primed |))
+  ?:  ?=(%| -.cur)  cur
+  =/  nxt  (eval (snag 0 as) e(primed &))
+  ?:  ?=(%| -.nxt)  nxt
+  =/  r  (val-eq:v p.nxt p.cur)
+  ?:  ?=(%| -.r)  r
+  [%& [%bool p.r]]
 ::
 ++  bi-in
   |=  [as=(list sem:sm) e=eenv neg=?]
@@ -668,7 +709,26 @@
   =/  d  (~(get by (defmap-of u.mo)) nm)
   ?~  d  [%| 0 'definition not found.']
   ?~  body.u.d  [%| 0 'definition has no body.']
-  (eval u.body.u.d [~ (defmap-of u.mo) ~ default-fuel])
+  (eval u.body.u.d [~ (defmap-of u.mo) ~ default-fuel ~ ~ | |])
+::
+++  base-env
+  ::  the initial environment for a module's definitions under given states
+  |=  [mo=sem-module:sm s0=state s1=state]
+  ^-  eenv
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | |]
+::
+++  eval-pred
+  ::  evaluate the boolean definition `nm` under current/successor states
+  ::  (a constant predicate: empty states; a state predicate: only s0; a
+  ::  fully-assigned action predicate: both). The result must be boolean.
+  |=  [root=@t src=(map @t @t) nm=@t s0=state s1=state]
+  ^-  (each ? eval-err:v)
+  =/  mo  (generate:sm root src)
+  ?~  mo  [%| 0 'semantic graph generation failed.']
+  =/  d  (~(get by (defmap-of u.mo)) nm)
+  ?~  d  [%| 0 'definition not found.']
+  ?~  body.u.d  [%| 0 'definition has no body.']
+  (eval-bool u.body.u.d (base-env u.mo s0 s1))
 ::
 ++  eval-text
   ::  evaluate a constant expression via the semantic graph, rendered like
