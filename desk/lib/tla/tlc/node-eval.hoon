@@ -40,8 +40,14 @@
       s1=state
       primed=?
       enabled=?
+      ::  declared VARIABLE names — the assignable identities the action
+      ::  solver (WU6.7) and ENABLED distinguish from constants/operators
+      vars=(set @t)
   ==
 +$  eres  (each value:v eval-err:v)
+::  the action solver yields the ordered list of complete states satisfying
+::  an action; a typed failure short-circuits (matching tlc2's stream)
++$  sres  (each (list state) eval-err:v)
 ::
 ++  default-fuel  10.000
 ::
@@ -258,6 +264,7 @@
   ::  prime and UNCHANGED (state/action; WU6.6)
   ?:  =(nm '\'')          (eval (snag 0 as) e(primed &))
   ?:  =(nm 'UNCHANGED')   (eval-unchanged as e)
+  ?:  =(nm 'ENABLED')     (eval-enabled (snag 0 as) e)
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
     (force:v (need-sexp (eval-domain n e)))
@@ -690,6 +697,202 @@
   ?:  =(nm '\\geq')  [%& [%bool !(slth:v x y)]]
   [%| 0 (rap 3 ~['unsupported native operator: ' nm])]
 ::
+::  +|  Action Solving (WU6.7): initial and successor state streams
+::
+::  `solve` walks an action predicate the way tlc2's getInitStates/
+::  getNextStates + ActionItemList do: a conjunction threads the partial
+::  state, a disjunction branches, a bounded \E branches over its domain, an
+::  equality whose left side is an ASSIGNABLE state variable (an unprimed var
+::  in %init, a primed var in %next, not yet bound) ASSIGNS it, every other
+::  boolean sub-expression FILTERS (prune the branch when false). The partial
+::  state is `part`; for %init it is read under plain names (the state being
+::  built), for %next it is the successor read under a prime while `cur` is
+::  the fixed current state. Assignment vs filtering is decided by resolved
+::  variable identity, never by rendered names. Branch and binding order
+::  match Java so the ordered stream is comparable.
+::
+++  senv
+  ::  the evaluation env for a filter/rhs during solving
+  |=  [mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  eenv
+  ?:  =(%init mode)  e(s0 part, s1 ~, primed |)
+  e(s0 cur, s1 part, primed |)
+::
+++  assignable-sem
+  ::  the variable name assigned by `lhs`, if it is an unbound assignable
+  |=  [lhs=sem:sm mode=?(%init %next) vars=(set @t) part=state]
+  ^-  (unit @t)
+  ?.  ?=(%apply -.lhs)  ~
+  =/  nm=(unit @t)
+    ?:  =(%next mode)
+      ?.  =('\'' name.op.lhs)  ~
+      =/  a  (snag 0 args.lhs)
+      ?.  ?=(%apply -.a)  ~
+      ?.  ?=(%variable kind.op.a)  ~
+      `name.op.a
+    ?.  ?=(%variable kind.op.lhs)  ~
+    `name.op.lhs
+  ?~  nm  ~
+  ?.  (~(has in vars) u.nm)  ~
+  ?:  (~(has by part) u.nm)  ~
+  nm
+::
+++  unchanged-vars
+  ::  the variable names of UNCHANGED e (a variable or a tuple of variables)
+  |=  n=sem:sm
+  ^-  (list @t)
+  ?.  ?=(%apply -.n)  ~
+  ?:  ?=(%variable kind.op.n)  ~[name.op.n]
+  ?.  =('$Tuple' name.op.n)  ~
+  %+  murn  args.n
+  |=  a=sem:sm
+  ?:(&(?=(%apply -.a) ?=(%variable kind.op.a)) `name.op.a ~)
+::
+++  complete
+  |=  [st=state vars=(set @t)]
+  ^-  ?
+  (levy ~(tap in vars) |=(nm=@t (~(has by st) nm)))
+::
+++  drain-sexp
+  ::  the domain's elements in TLC enumeration order (branch order)
+  |=  x=sexp:v
+  ^-  (each (list value:v) eval-err:v)
+  =/  rc  (enum:v x)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list value:v)
+  =/  cur  p.rc
+  |-  ^-  (each (list value:v) eval-err:v)
+  =/  st  (enum-next:v cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (flop acc)]
+    %item  $(acc [v.es acc], cur +.st)
+  ==
+::
+++  solve
+  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  ?.  ?=(%apply -.n)
+    ?:  ?=(%letin -.n)  (solve-letin n mode cur part e)
+    (solve-filter n mode cur part e)
+  =/  nm  name.op.n
+  ?:  |(=(nm '$ConjList') =(nm '\\land'))
+    (solve-conj args.n mode cur part e)
+  ?:  |(=(nm '$DisjList') =(nm '\\lor'))
+    (solve-disj args.n mode cur part e)
+  ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e)
+  ?:  =(nm '$BoundedExists')  (solve-exists n mode cur part e)
+  ?:  =(nm 'UNCHANGED')  (solve-unchanged (snag 0 args.n) mode cur part e)
+  ?:  =(nm '=')
+    =/  as  (assignable-sem (snag 0 args.n) mode vars.e part)
+    ?~  as  (solve-filter n mode cur part e)
+    =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
+    ?:  ?=(%| -.rv)  rv
+    [%& ~[(~(put by part) u.as p.rv)]]
+  (solve-filter n mode cur part e)
+::
+++  solve-filter
+  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  b  (eval-bool n (senv mode cur part e))
+  ?:  ?=(%| -.b)  b
+  ?:(p.b [%& ~[part]] [%& ~])
+::
+++  solve-letin
+  |=  [n=sem-letin:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  ?~  body.n  [%| 0 'LET with no body in an action.']
+  =/  e2=eenv
+    =/  os  ops.e
+    |-  ^-  eenv
+    ?~  lets.n  e(ops os)
+    $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
+  (solve u.body.n mode cur part e2)
+::
+++  solve-conj
+  ::  thread the partial state left-to-right across the conjuncts
+  |=  [cs=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  acc=(list state)  ~[part]
+  |-  ^-  sres
+  ?~  cs  [%& acc]
+  =/  step  (solve-each i.cs mode cur acc e)
+  ?:  ?=(%| -.step)  step
+  $(cs t.cs, acc p.step)
+::
+++  solve-each
+  ::  solve `n` from every partial state, concatenating results in order
+  |=  [n=sem:sm mode=?(%init %next) cur=state parts=(list state) e=eenv]
+  ^-  sres
+  =|  out=(list state)
+  |-  ^-  sres
+  ?~  parts  [%& out]
+  =/  r  (solve n mode cur i.parts e)
+  ?:  ?=(%| -.r)  r
+  $(parts t.parts, out (weld out p.r))
+::
+++  solve-disj
+  ::  branch: each disjunct solved from the same partial state, in order
+  |=  [ds=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =|  out=(list state)
+  |-  ^-  sres
+  ?~  ds  [%& out]
+  =/  r  (solve i.ds mode cur part e)
+  ?:  ?=(%| -.r)  r
+  $(ds t.ds, out (weld out p.r))
+::
+++  solve-ite
+  |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  b  (eval-bool (snag 0 as) (senv mode cur part e))
+  ?:  ?=(%| -.b)  b
+  (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e)
+::
+++  solve-exists
+  ::  \E x \in S : A — branch over the domain in enumeration order
+  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  bs  (flatten-bound bound.n)
+  ?.  ?=([* ~] bs)
+    [%| 0 'an action existential over multiple binders is unsupported.']
+  =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
+  ?:  ?=(%| -.sd)  sd
+  =/  els  (drain-sexp p.sd)
+  ?:  ?=(%| -.els)  els
+  =/  body  (snag 0 args.n)
+  =|  out=(list state)
+  =/  xs  p.els
+  |-  ^-  sres
+  ?~  xs  [%& out]
+  =/  e2  e(vals (~(put by vals.e) nm.i.bs i.xs))
+  =/  r  (solve body mode cur part e2)
+  ?:  ?=(%| -.r)  r
+  $(xs t.xs, out (weld out p.r))
+::
+++  solve-unchanged
+  ::  UNCHANGED e assigns each named variable to its current value
+  |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  names  (unchanged-vars arg)
+  =/  out=state  part
+  =.  out
+    |-  ^-  state
+    ?~  names  out
+    =/  cv  (~(get by cur) i.names)
+    ?~  cv  $(names t.names)
+    $(names t.names, out (~(put by out) i.names u.cv))
+  [%& ~[out]]
+::
+++  eval-enabled
+  ::  ENABLED A: a successor state satisfying A exists from the current
+  ::  state; the witness is discarded (EvalControl.Enabled)
+  |=  [n=sem:sm e=eenv]
+  ^-  eres
+  =/  r  (solve n %next s0.e ~ e(enabled &))
+  ?:  ?=(%| -.r)  r
+  [%& [%bool (lien p.r |=(st=state (complete st vars.e)))]]
+::
 ::  +|  Test / Driver Entrypoints
 ::
 ++  defmap-of
@@ -709,13 +912,18 @@
   =/  d  (~(get by (defmap-of u.mo)) nm)
   ?~  d  [%| 0 'definition not found.']
   ?~  body.u.d  [%| 0 'definition has no body.']
-  (eval u.body.u.d [~ (defmap-of u.mo) ~ default-fuel ~ ~ | |])
+  (eval u.body.u.d (base-env u.mo ~ ~))
+::
+++  vars-of
+  |=  mo=sem-module:sm
+  ^-  (set @t)
+  (silt (turn vars.mo |=([nm=@t at=sspan:sm] nm)))
 ::
 ++  base-env
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | |]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo)]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -729,6 +937,52 @@
   ?~  d  [%| 0 'definition not found.']
   ?~  body.u.d  [%| 0 'definition has no body.']
   (eval-bool u.body.u.d (base-env u.mo s0 s1))
+::
+++  solve-init
+  ::  the complete ordered stream of initial states satisfying `nm`; every
+  ::  state must assign all variables, else a typed incomplete-init failure
+  |=  [root=@t src=(map @t @t) nm=@t]
+  ^-  sres
+  =/  mo  (generate:sm root src)
+  ?~  mo  [%| 0 'semantic graph generation failed.']
+  =/  d  (~(get by (defmap-of u.mo)) nm)
+  ?~  d  [%| 0 'definition not found.']
+  ?~  body.u.d  [%| 0 'definition has no body.']
+  =/  e  (base-env u.mo ~ ~)
+  =/  r  (solve u.body.u.d %init ~ ~ e)
+  ?:  ?=(%| -.r)  r
+  ?.  (levy p.r |=(st=state (complete st vars.e)))
+    [%| 0 'incomplete initial state: a variable is unassigned.']
+  [%& p.r]
+::
+++  solve-next
+  ::  the complete ordered stream of successor states of `cur` under `nm`
+  |=  [root=@t src=(map @t @t) nm=@t cur=state]
+  ^-  sres
+  =/  mo  (generate:sm root src)
+  ?~  mo  [%| 0 'semantic graph generation failed.']
+  =/  d  (~(get by (defmap-of u.mo)) nm)
+  ?~  d  [%| 0 'definition not found.']
+  ?~  body.u.d  [%| 0 'definition has no body.']
+  =/  e  (base-env u.mo cur ~)
+  =/  r  (solve u.body.u.d %next cur ~ e)
+  ?:  ?=(%| -.r)  r
+  ?.  (levy p.r |=(st=state (complete st vars.e)))
+    [%| 0 'incomplete next state: a variable is unassigned.']
+  [%& p.r]
+::
+++  render-states
+  ::  a stable rendering of a state stream for differential comparison:
+  ::  each state as "k=<v>,…" (vars sorted), states in stream order
+  |=  sts=(list state)
+  ^-  (list tape)
+  %+  turn  sts
+  |=  st=state
+  =/  ps  (sort ~(tap by st) |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b)))
+  %+  roll  ps
+  |=  [[k=@t val=value:v] acc=tape]
+  =/  piece  "{(trip k)}={(render:v val)}"
+  ?~(acc piece "{acc},{piece}")
 ::
 ++  eval-text
   ::  evaluate a constant expression via the semantic graph, rendered like

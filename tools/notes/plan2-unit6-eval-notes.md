@@ -379,6 +379,49 @@ for differential fixtures (6.0 note); 6.6 is dojo/probe-verified with
 hand-built states. Substitution-around-prime needs INSTANCE ($SubstIn, a 6.5
 residue).
 
+## 6.7 landed 2026-07-21 — action solving + ENABLED
+
+node-eval.hoon gained the semantic-node action solver (`solve` + friends) —
+the replacement for check.hoon's ad-hoc CST `gen`. All 6 cases green
+(`tests/lib/tla/neval-action.hoon`); full suite unaffected. `eenv` gained
+`vars=(set @t)` (declared VARIABLE names, from `vars-of`) so assignment is
+decided by variable IDENTITY, never rendered names. `+$ sres = (each (list
+state) eval-err)`.
+
+- **`solve [n mode cur part e]`** mirrors tlc2 getInitStates/getNextStates +
+  ActionItemList: `$ConjList`/`\land`→`solve-conj` (thread the partial state
+  left-to-right), `$DisjList`/`\lor`→`solve-disj` (branch from the same
+  partial), `$IfThenElse`→eval guard then the taken branch, `$BoundedExists`→
+  `solve-exists` (branch over the domain in enumeration order via
+  `drain-sexp`), `UNCHANGED`→`solve-unchanged` (assign each named var to its
+  current value), `=` whose LHS is an ASSIGNABLE unbound state var
+  (`assignable-sem`: unprimed var in %init / primed var in %next, declared,
+  not yet in `part`)→ASSIGN, everything else→`solve-filter` (prune when
+  false). `senv` builds the eval env: %init reads the partial under plain
+  names (`s0=part`), %next reads `x` from `cur` and `x'` from the partial
+  (`s0=cur, s1=part`).
+- **Entry points**: `solve-init`/`solve-next [root src nm (cur)]` → `sres`,
+  each checking every state assigns ALL vars (else typed incomplete-init/next
+  failure — tlc2's incomplete-state error). `render-states` = stable
+  `k=<v>,…` per state in stream order for differential comparison.
+- **`ENABLED A`** (`eval-enabled`, wired into eval-builtin): solve A in %next
+  from the current state, TRUE iff a COMPLETE successor exists (witness
+  discarded). Conflicting assignment (`x'=x /\ x'=x+1`: second `=` filters
+  since x' is bound → false) ⇒ no successor ⇒ FALSE.
+
+Verified: Init→1 state; Next disjunction→2 successors in branch order; `\E
+d\in1..2 /\ UNCHANGED y`→domain order; y'-unassigned action→incomplete
+failure; ENABLED witness→T, conflicting→F.
+
+DEFERRED: (1) wiring `solve` into check.hoon's BFS (replacing `gen`) + the
+job continuation — an integration step that touches WU1's kernel, folded
+into 6.9. (2) RESUMABILITY/budgeting the solver (persist action stack, domain
+cursors, branch position) — the solver is currently eager/streaming; 6.9
+owns the resumable wrapper. (3) ENABLED first-witness short-circuit (correct
+but computes all successors then tests; fine for finite domains). (4) multi-
+binder action `\E`. EvalDump STATE MODE still owed for oracle-differential
+init/next fixtures.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →
