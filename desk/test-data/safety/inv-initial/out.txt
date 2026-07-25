@@ -1,0 +1,9 @@
+SAFETY
+VERDICT violated-initial
+EC 2107
+INV Inv
+TRACE 1
+STATE 1 -1
+LABEL <Initial predicate>
+x = 5
+ENDSTATE

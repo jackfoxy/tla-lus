@@ -1,0 +1,9 @@
+SAFETY
+VERDICT ok
+EC 0
+STAT generated 4
+STAT distinct 1
+STAT queue 0
+STAT depth 1
+STAT outdegree 0 0 0 0
+TRACE 0

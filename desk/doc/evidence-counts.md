@@ -20,7 +20,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/tla/cfg.hoon` |
 | `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/tla/cfg-val.hoon` |
 | `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
+| `gen-safety-tests.py` | 15 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 
-Compared cases: **783**.  Oracle-only cases: **11**.
+Compared cases: **783**.  Oracle-only cases: **26**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

@@ -51,6 +51,7 @@ GENERATORS = [
     ("gen-cfg-tests.py",    "pass",        "TLC .cfg parse (ModelConfig)",       "desk/tests/lib/tla/cfg.hoon"),
     ("gen-cfg-val-tests.py", "pass",        "Config-vs-graph validation (SpecProcessor)", "desk/tests/lib/tla/cfg-val.hoon"),
     ("gen-core-eval-tests.py", "oracle-only", "Core value/evaluation (Tool.eval)", "(no semantic-node evaluator yet — unit 6.5)"),
+    ("gen-safety-tests.py",  "oracle-only", "Single-worker safety (tlc2.TLC/ModelChecker)", "(no FP64/safety comparator yet — unit 7.1+)"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically

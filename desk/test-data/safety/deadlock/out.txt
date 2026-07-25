@@ -1,0 +1,20 @@
+SAFETY
+VERDICT deadlock
+EC 2114
+STAT generated 3
+STAT distinct 3
+STAT queue 0
+STAT depth 3
+TRACE 3
+STATE 1 0xd0ba3e880dcdd983
+LABEL <Initial predicate>
+x = 0
+ENDSTATE
+STATE 2 0xf67893cfa654c4b3
+LABEL <Next line 5, col 9 to line 5, col 27 of module A>
+x = 1
+ENDSTATE
+STATE 3 0x9d3f64075affe3e3
+LABEL <Next line 5, col 9 to line 5, col 27 of module A>
+x = 2
+ENDSTATE

@@ -1,0 +1,5 @@
+CONSTANT P = {a, b}
+SYMMETRY Perms
+INIT Init
+NEXT Next
+INVARIANT Inv
