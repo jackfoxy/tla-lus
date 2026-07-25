@@ -1272,6 +1272,105 @@
   ?:  p.r  [%& &]
   $(cs t.cs)
 ::
+::  +|  Canonical FP64 Input Bytes (unit 6.8)
+::
+::  The exact byte stream tlc2 folds into FP64 for a value's fingerprint (the
+::  INPUT contract; Work Unit 7 owns the hash itself). Reproduces the
+::  `Value.fingerPrint` Extend order: a KIND tag byte, then the components.
+::  `Extend(int)` is 4 bytes little-endian, `Extend(byte/char)` is one byte,
+::  `Extend(String)` is the chars. Values are normalized first so equal
+::  values yield identical bytes across representations — crucially, tlc2
+::  fingerprints an interval AS a SetEnum of ints, and a tuple/record AS an
+::  FcnRcd (int-keyed / string-keyed), so those cross-representation equals
+::  coincide here too. One documented deviation: a MODEL value's tlc2
+::  fingerprint folds the UniqueString interning id (`tok`), which is not
+::  reproducible (the deferred family-5 UniqueString-order difference); we
+::  fold the model NAME instead — still injective over model values, but not
+::  byte-identical to tlc2 for model values.
+::
+::  tlc2 ValueConstants kind bytes used here:
+++  k-bool   0
+++  k-int    1
+++  k-str    3
+++  k-set    5
+++  k-fcn    9
+++  k-model  22
+::
+++  int32-le
+  ::  a 32-bit two's-complement little-endian encoding (tlc2 ints are Java
+  ::  ints; Extend folds the low byte first)
+  |=  n=@sd
+  ^-  (list @D)
+  =/  o  (old:si n)
+  =/  u  (mod ?:(-.o +.o (sub (bex 32) (mod +.o (bex 32)))) (bex 32))
+  ~[(cut 3 [0 1] u) (cut 3 [1 1] u) (cut 3 [2 1] u) (cut 3 [3 1] u)]
+::
+++  fp-input
+  ::  the canonical fingerprint-input byte stream for a value
+  |=  v=value
+  ^-  (list @D)
+  (fp-enc (normalize v))
+::
+++  fp-enc
+  ::  encode an already-normalized value. Recursion over the value lists is
+  ::  hand-rolled: a wet turn/zing over the recursive value mold fuse-loops
+  ::  the zuse-408 compiler.
+  |=  v=value
+  ^-  (list @D)
+  ?-  -.v
+      %bool   ~[k-bool ?:(p.v 't' 'f')]
+      %int    [k-int (int32-le p.v)]
+      %str    (fp-str p.v)
+      %model  :(weld ~[k-model] (int32-le (sun:si (met 3 p.v))) (rip 3 p.v))
+      %intv
+    =/  els  (expand-intv lo.v hi.v)
+    :-  k-set
+    %+  weld  (int32-le (sun:si (lent els)))
+    (fp-set els)
+  ::
+      %set
+    :-  k-set
+    %+  weld  (int32-le (sun:si (lent p.v)))
+    (fp-set p.v)
+  ::
+      %seq
+    :-  k-fcn
+    %+  weld  (int32-le (sun:si (lent p.v)))
+    =/  i  1
+    |-  ^-  (list @D)
+    ?~  p.v  ~
+    %+  weld
+      :(weld ~[k-int] (int32-le (sun:si i)) (fp-enc i.p.v))
+    $(p.v t.p.v, i +(i))
+  ::
+      %rec
+    :-  k-fcn
+    %+  weld  (int32-le (sun:si (lent p.v)))
+    |-  ^-  (list @D)
+    ?~  p.v  ~
+    (weld (weld (fp-str k.i.p.v) (fp-enc v.i.p.v)) $(p.v t.p.v))
+  ::
+      %fcn
+    :-  k-fcn
+    %+  weld  (int32-le (sun:si (lent p.v)))
+    |-  ^-  (list @D)
+    ?~  p.v  ~
+    (weld (weld (fp-enc d.i.p.v) (fp-enc r.i.p.v)) $(p.v t.p.v))
+  ==
+::
+++  fp-set
+  ::  concatenated element encodings (hand-rolled to avoid a fuse-loop)
+  |=  vs=(list value)
+  ^-  (list @D)
+  ?~  vs  ~
+  (weld (fp-enc i.vs) $(vs t.vs))
+::
+++  fp-str
+  ::  a STRINGVALUE fingerprint field: tag, length, chars
+  |=  s=@t
+  ^-  (list @D)
+  :(weld ~[k-str] (int32-le (sun:si (met 3 s))) (rip 3 s))
+::
 ::  +|  Canonical Key (single-value-arg equality witness for tests)
 ::
 ::  +equal takes two values, and nesting the recursive value mold into a

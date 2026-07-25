@@ -422,6 +422,48 @@ but computes all successors then tests; fine for finite domains). (4) multi-
 binder action `\E`. EvalDump STATE MODE still owed for oracle-differential
 init/next fixtures.
 
+## 6.8 landed 2026-07-25 — canonical FP64 input bytes + typed-error shape
+
+value.hoon gained `fp-input : value -> (list @D)`, the exact byte stream tlc2
+folds into FP64 (the INPUT contract; WU7 owns the hash). Reproduces
+`Value.fingerPrint` Extend order from the pinned tree: a KIND tag byte then
+components, `Extend(int)`=4 bytes LITTLE-ENDIAN, `Extend(byte/char)`=1 byte,
+`Extend(String)`=chars; value NORMALIZED first. 13-case differential green
+(`tests/lib/tla/neval-fp.hoon`); full suite unaffected.
+
+- **Kind bytes** (tlc2 ValueConstants): BOOL 0, INT 1, STRING 3, SETENUM 5,
+  FCNRCD 9, MODEL 22. **Cross-representation collapse** (the key insight):
+  tlc2 fingerprints an INTERVAL as a SetEnum of its ints, and a TUPLE/RECORD
+  as an FcnRcd (int-keyed 1..n / string-keyed) — so interval=set,
+  tuple=function, record=function coincide byte-for-byte, exactly matching
+  +equal's cross-rep equalities. `fp-enc` therefore encodes intv→SETENUM,
+  seq→FCNRCD int keys, rec/fcn→FCNRCD (string/domain keys), all sorted by
+  normalize. `int32-le` does 32-bit two's-complement LE (verified:
+  `fp-input(-7)` = `[1 249 255 255 255]`).
+- **Deviations documented**: (1) MODEL values — tlc2 folds the UniqueString
+  interning id `tok` (UniqueString.fingerPrint = Extend(tok)), NOT
+  reproducible = the deferred family-5 difference; we fold the model NAME
+  instead (still injective over model values, not tlc2-byte-identical). (2)
+  Non-ASCII strings — tlc2 folds UTF-16 low bytes + `length()` in chars; we
+  fold UTF-8 bytes + byte count (identical for ASCII). STRINGS otherwise
+  fingerprint by content (reproducible), only MODEL uses tok.
+- **Hoon gotcha**: `turn`/`zing` over the recursive `value` mold fuse-loops
+  the zuse-408 compiler — `fp-enc`'s list recursions are hand-rolled (`fp-set`
+  + inline `|-`), never `turn`.
+- `fp-of-text` (node-eval): fingerprint bytes of a constant expression, driven
+  by text so no value crosses a low-budget test core.
+
+Typed error taxonomy (task 4): node-eval defines the single `ev-diag` shape
+`[code category msg at stack recoverable]` + `ec-category`
+(undefined/type/non-enumerable/resource/incomplete/comparison/arithmetic/
+no-case/choose-empty/except/unsupported/runtime) + `to-diag` lifter. Per-site
+emission (replacing the bare `[code msg]` eval-err with real EC numbers +
+spans + op stack) and the EvalDump error-fixture differential (task 5) are the
+follow-on sweep — the shape/category contract is defined now.
+
+Also fixed a small evaluator gap: unary minus `-7` (generated as `-` with one
+arg) now negates in `eval-native`.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →

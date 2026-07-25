@@ -48,6 +48,38 @@
 ::  the action solver yields the ordered list of complete states satisfying
 ::  an action; a typed failure short-circuits (matching tlc2's stream)
 +$  sres  (each (list state) eval-err:v)
+::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
+::  and coarse category, message, source location, operator/evaluation stack,
+::  and whether a checker may recover. Per-site emission (replacing the bare
+::  [code msg] eval-err) and EvalDump error fixtures are the follow-on sweep.
++$  ec-category
+  $?  %undefined       ::  undefined operator or identifier
+      %type            ::  type error (non-boolean, wrong argument kind)
+      %non-enumerable  ::  infinite / non-enumerable domain
+      %resource        ::  recursion / cardinality / work-budget limit
+      %incomplete      ::  incomplete initial or next state
+      %comparison      ::  illegal comparison (typed model, incomparable)
+      %arithmetic      ::  division or modulo by zero
+      %no-case         ::  CASE with no true guard and no OTHER
+      %choose-empty    ::  CHOOSE over an unsatisfiable domain
+      %except          ::  EXCEPT on a non-function / bad selector
+      %unsupported     ::  family 4/5 behavior deferred in Phase B
+      %runtime         ::  uncategorized runtime failure
+  ==
++$  ev-diag
+  $:  code=@ud
+      category=ec-category
+      msg=@t
+      at=(unit [line=@ud col=@ud])
+      stack=(list @t)
+      recoverable=?
+  ==
+::
+++  to-diag
+  ::  lift a bare eval-err into the typed diagnostic shape under a category
+  |=  [err=eval-err:v category=ec-category]
+  ^-  ev-diag
+  [code.err category msg.err ~ ~ &]
 ::
 ++  default-fuel  10.000
 ::
@@ -675,6 +707,10 @@
     ?.  ?=([* ~] as)  [%| 0 'Cardinality expects one argument.']
     ?.  (set-like:v i.as)  [%| 0 'Cardinality expects a set.']
     [%& [%int (sun:si (lent (set-elems:v (normalize:v i.as))))]]
+  ::  unary minus: `-` applied to a single integer
+  ?:  &(=(nm '-') ?=([* ~] as))
+    ?.  ?=(%int -.i.as)  [%| 0 'unary minus of a non-integer.']
+    [%& [%int (dif:si --0 p.i.as)]]
   ::  binary integer operators
   ?.  ?=([* * ~] as)  [%| 0 (rap 3 ~['unsupported native operator or arity: ' nm])]
   ?.  &(?=(%int -.i.as) ?=(%int -.i.t.as))
@@ -999,6 +1035,21 @@
   =/  r  (eval-module-def 'E' (malt ~[['E' src]]) 'Expr')
   ?:  ?=(%| -.r)  "Error evaluating expression"
   (render:v p.r)
+::
+++  fp-of-text
+  ::  the canonical FP64 input bytes of a constant expression (WU6.8), driven
+  ::  by text so no value crosses a low-budget test core
+  |=  txt=@t
+  ^-  (list @D)
+  =/  src=@t
+    %-  crip
+    ;:  weld
+      "---- MODULE E ----\0a"
+      "EXTENDS Integers, Sequences, FiniteSets\0a"
+      "Expr == {(trip txt)}\0a====\0a"
+    ==
+  =/  r  (eval-module-def 'E' (malt ~[['E' src]]) 'Expr')
+  ?:(?=(%| -.r) ~ (fp-input:v p.r))
 ::
 ++  eval-dbg
   ::  like +eval-text but surfacing the typed error message (debugging)
