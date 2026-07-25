@@ -1,8 +1,10 @@
 /-  *tla-lus
-/=  ast     /lib/tla/ast
-/=  syntax  /lib/tla/syntax
-/=  ev      /lib/tla/eval
-/=  config  /lib/tla/config
+/=  ast      /lib/tla/ast
+/=  syntax   /lib/tla/syntax
+/=  ev       /lib/tla/eval
+/=  config   /lib/tla/config
+/=  ne       /lib/tla/tlc/node-eval
+/=  sem-lib  /lib/tla/semantic
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
   ::
@@ -310,17 +312,30 @@
       [%inv gen=@ud distinct=@ud depth=@ud trace=(list state) name=@t]
       [%deadlock gen=@ud distinct=@ud depth=@ud trace=(list state)]
       [%limited what=?(%states %depth) gen=@ud distinct=@ud depth=@ud]
+      ::  a typed evaluation failure during the search (WU6.9)
+      [%error msg=@t]
   ==
 ::  fixed parameters of one search
 +$  bfs-opts
-  $:  next=node
-      inv=(unit node)
+  ::  WU6.9: the search runs on Work Unit 3 SEMANTIC nodes via node-eval, not
+  ::  the CST. `next`/`inv` are semantic bodies; `defs`/`consts` build the
+  ::  evaluation context (operator definitions + config constant assignments).
+  $:  next=sem:sem-lib
+      inv=(unit sem:sem-lib)
       inv-name=@t
       vars=(set @t)
+      defs=(map @t sem-def:sem-lib)
+      consts=(map @t value)
       deadlock=?     ::  report deadlocked states as violations
       cap=@ud        ::  distinct-state bound (0 = unbounded)
       maxd=@ud       ::  graph-depth bound (0 = unbounded)
   ==
+::
+++  env-of
+  ::  the node-eval evaluation context for a search
+  |=  o=bfs-opts
+  ^-  eenv:ne
+  (make-env:ne defs.o consts.o vars.o)
 ::  everything required to resume a search byte-identically
 +$  bfs-cursor
   $:  init-todo=(list state)  ::  initial states not yet registered
@@ -337,10 +352,11 @@
   ==
 ::
 ++  bfs-init
-  ::  solve the Init predicate; registration is budgeted in +bfs-step
-  |=  [init=node vars=(set @t)]
+  ::  a fresh cursor over the already-solved initial states (init solving
+  ::  happens once at %config, so its typed failures surface immediately);
+  ::  registration is budgeted in +bfs-step
+  |=  is=(list state)
   ^-  bfs-cursor
-  =/  is  (gen init vars %init ~ ~)
   [is ~ ~ ~ (lent is) 0 0]
 ::
 ++  register
@@ -357,10 +373,12 @@
   =?  inits.cur  =('' pred)  (snoc inits.cur fp)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
-  ?:  ?&(?=(^ inv.o) !(ev-bool %init u.inv.o st ~))
-    :_  cur
-    `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) inv-name.o]
-  [~ cur]
+  ?~  inv.o  [~ cur]
+  =/  ir  (pred-bool:ne u.inv.o st ~ (env-of o))
+  ?:  ?=(%| -.ir)  [`[%error msg.p.ir] cur]
+  ?:  p.ir  [~ cur]
+  :_  cur
+  `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) inv-name.o]
 ::
 ++  register-all
   |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t]
@@ -395,7 +413,9 @@
     [%done [%ok gen.cur distinct.cur depth.cur] cur]
   =/  fp   i.q
   =/  vis  (~(got by seen.cur) fp)
-  =/  nexts  (gen next.o vars.o %next st.vis ~)
+  =/  nr  (next-states:ne st.vis next.o (env-of o))
+  ?:  ?=(%| -.nr)  [%done [%error msg.p.nr] cur]
+  =/  nexts  p.nr
   ?~  nexts
     ?.  deadlock.o  $(cur cur(queue t.q), spent +(spent))
     :+  %done
@@ -413,16 +433,9 @@
   ::  `cap` bounds the distinct-state count (0 = unbounded); exceeding it
   ::  yields %limited with the statistics so far, so a caller can bound a
   ::  single event's work.
-  |=  $:  init=node
-          next=node
-          inv=(unit node)
-          inv-name=@t
-          vars=(set @t)
-          cap=@ud
-      ==
+  |=  [is=(list state) o=bfs-opts]
   ^-  outcome
-  =/  o=bfs-opts  [next inv inv-name vars & cap 0]
-  =/  cur  (bfs-init init vars)
+  =/  cur  (bfs-init is)
   |-  ^-  outcome
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)  out.r
@@ -526,10 +539,9 @@
 ++  build-graph
   ::  the complete reachability graph via deterministic BFS (no early
   ::  stop), with per-state depth and predecessor for trace reconstruction
-  |=  [init=node next=node vars=(set @t)]
+  |=  [is=(list state) o=bfs-opts]
   ^-  graph
-  =/  o=bfs-opts  [next ~ '' vars | 0 0]
-  =/  cur  (bfs-init init vars)
+  =/  cur  (bfs-init is)
   |-  ^-  graph
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
@@ -768,46 +780,101 @@
   =/  inv  ?~(iv ~ (body-of-def tree u.iv))
   (simulate u.ib u.nb inv vars seed traces depth)
 ::
+++  sem-body
+  ::  the semantic body of the operator definition named `nm`
+  |=  [defs=(map @t sem-def:sem-lib) nm=@t]
+  ^-  (unit sem:sem-lib)
+  =/  d  (~(get by defs) nm)
+  ?~(d ~ body.u.d)
+::
+::  the shared WU6.9 search context: everything the safety/liveness engines
+::  need, resolved from the semantic graph, with the initial states solved
++$  sctx
+  $:  is=(list state)                       ::  solved initial states
+      defs=(map @t sem-def:sem-lib)
+      consts=(map @t value)
+      vars=(set @t)
+      nsb=sem:sem-lib                        ::  Next body
+      iv=(unit @t)
+      ivsb=(unit sem:sem-lib)                ::  Invariant body
+      pp=(unit @t)                           ::  property name (liveness)
+      tree=node
+      nl=@t                                  ::  Next span label
+  ==
+::
+++  search-ctx
+  ::  parse, generate the WU3 graph, resolve config targets, solve the
+  ::  initial states; a typed failure short-circuits with a message line
+  |=  [spec=@t cfg=@t]
+  ^-  (each sctx @t)
+  =/  pr  (parse:syntax spec)
+  ?:  ?=(%| -.pr)  [%| 'parse error']
+  =/  tree  p.pr
+  =/  vars  (var-names tree)
+  =/  nm  (cfg-names cfg)
+  ?~  nm  [%| 'config error']
+  =/  in  in.u.nm
+  =/  nx  nx.u.nm
+  ?~  in  [%| 'no INIT in config']
+  ?~  nx  [%| 'no NEXT in config']
+  =/  modn  (module-name-of tree)
+  =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
+  ?~  mo  [%| 'semantic error']
+  =/  defs  (defmap-of:ne u.mo)
+  =/  isb  (sem-body defs u.in)
+  =/  nsb  (sem-body defs u.nx)
+  ?~  isb  [%| 'no Init definition']
+  ?~  nsb  [%| 'no Next definition']
+  =/  consts  (const-map cfg)
+  =/  nb  (body-of-def tree u.nx)
+  =/  ir  (init-states:ne u.isb (make-env:ne defs consts vars))
+  ?:  ?=(%| -.ir)  [%| msg.p.ir]
+  =/  ivsb  ?~(iv.u.nm ~ (sem-body defs u.iv.u.nm))
+  :-  %&
+  :*  p.ir  defs  consts  vars  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
+      ?~(nb '' (next-span-label u.nb modn))
+  ==
+::
+++  consts-of
+  ::  arity-0 config constant assignments as an evaluation binding map (WU6.9
+  ::  task 1); operator-valued constants are a later increment
+  |=  cs=(list cfg-const:config)
+  ^-  (map @t value)
+  (malt (murn cs |=(c=cfg-const:config ?~(args.c `[lhs.c val.c] ~))))
+::
+++  const-map
+  |=  cfg=@t
+  ^-  (map @t value)
+  =/  pr  (parse-cfg:config cfg)
+  ?:(?=(%| -.pr) ~ (consts-of constants.p.pr))
+::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines
   |=  [spec=@t cfg=@t]
   ^-  wain
-  =/  pr  (parse:syntax spec)
-  ?:  ?=(%| -.pr)  ~['Parse error']
-  =/  tree  p.pr
-  =/  vars  (var-names tree)
-  =/  nm  (cfg-names cfg)
-  ?~  nm  ~['Config error']
-  =/  in  in.u.nm
-  =/  nx  nx.u.nm
-  =/  iv  iv.u.nm
-  =/  pp  pp.u.nm
-  ?~  in  ~['No INIT']
-  ?~  nx  ~['No NEXT']
-  =/  init-body  (body-of-def tree u.in)
-  =/  next-body  (body-of-def tree u.nx)
-  ?~  init-body  ~['No Init def']
-  ?~  next-body  ~['No Next def']
-  =/  nl  (next-span-label u.next-body (module-name-of tree))
-  ::  liveness: a temporal PROPERTY
-  ?^  pp
-    =/  prop-body  (body-of-def tree u.pp)
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  ::  liveness: a temporal PROPERTY (built via node-eval; the property's
+  ::  state-predicate scan still runs on the CST body — a WU6.9 residue)
+  ?^  pp.c
+    =/  prop-body  (body-of-def tree.c u.pp.c)
     ?~  prop-body  ~['No property def']
-    =/  g  (build-graph u.init-body u.next-body vars)
-    =/  lr  (check-live u.prop-body u.pp g)
+    =/  o=bfs-opts  [nsb.c ~ '' vars.c defs.c consts.c | 0 0]
+    =/  g  (build-graph is.c o)
+    =/  lr  (check-live u.prop-body u.pp.c g)
     ?:  ok.lr
       :-  'Model checking completed. No error has been found.'
       (counts-lines gen.g distinct.g depth.g)
     ;:  weld
-      ~[(crip "Error: Temporal property {(trip u.pp)} was violated.")]
+      ~[(crip "Error: Temporal property {(trip u.pp.c)} was violated.")]
       ~['Error: The following behavior constitutes a counter-example:']
-      (render-live-trace trace.lr nl)
+      (render-live-trace trace.lr nl.c)
       (counts-lines gen.g distinct.g depth.g)
     ==
   ::  safety: an INVARIANT
-  =/  inv-body  ?~(iv ~ (body-of-def tree u.iv))
-  =/  res  (explore u.init-body u.next-body inv-body ?~(iv '' u.iv) vars 0)
-  (render-outcome res nl)
+  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c defs.c consts.c & 0 0]
+  (render-outcome (explore is.c o) nl.c)
 ::
 ++  render-outcome
   ::  TLC's terminal lines for a safety outcome
@@ -839,6 +906,8 @@
       (render-trace trace.res nl)
       (counts-lines gen.res distinct.res depth.res)
     ==
+  ::
+      %error  ~[(crip "Error: {(trip msg.res)}")]
   ==
 ::
 ::  +|  Structured Result (for the Gall job engine, unit 13)
@@ -850,39 +919,28 @@
   ::  invocation is bounded; a spec that exceeds it yields %limited.
   |=  [spec=@t cfg=@t cap=@ud]
   ^-  [result run-stats]
-  =/  pr  (parse:syntax spec)
-  ?:  ?=(%| -.pr)  [[%failed 'parse error'] *run-stats]
-  =/  tree  p.pr
-  =/  vars  (var-names tree)
-  =/  nm  (cfg-names cfg)
-  ?~  nm  [[%failed 'config error'] *run-stats]
-  =/  in  in.u.nm
-  =/  nx  nx.u.nm
-  =/  iv  iv.u.nm
-  =/  pp  pp.u.nm
-  ?~  in  [[%failed 'no INIT in config'] *run-stats]
-  ?~  nx  [[%failed 'no NEXT in config'] *run-stats]
-  =/  ib  (body-of-def tree u.in)
-  =/  nb  (body-of-def tree u.nx)
-  ?~  ib  [[%failed 'no Init definition'] *run-stats]
-  ?~  nb  [[%failed 'no Next definition'] *run-stats]
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  [[%failed p.sc] *run-stats]
+  =*  c  p.sc
   ::  liveness (temporal property)
-  ?^  pp
-    =/  prop  (body-of-def tree u.pp)
+  ?^  pp.c
+    =/  prop  (body-of-def tree.c u.pp.c)
     ?~  prop  [[%failed 'no property definition'] *run-stats]
-    =/  g   (build-graph u.ib u.nb vars)
+    =/  o=bfs-opts  [nsb.c ~ '' vars.c defs.c consts.c | 0 0]
+    =/  g   (build-graph is.c o)
     =/  st  [gen.g distinct.g 0 depth.g]
-    =/  lr  (check-live u.prop u.pp g)
+    =/  lr  (check-live u.prop u.pp.c g)
     ?:  ok.lr  [[%ok st] st]
-    [[%violated [%property u.pp] st] st]
+    [[%violated [%property u.pp.c] st] st]
   ::  safety (invariant)
-  =/  inv-body  ?~(iv ~ (body-of-def tree u.iv))
-  =/  o  (explore u.ib u.nb inv-body ?~(iv '' u.iv) vars cap)
-  ?-    -.o
-      %ok        =/  st  [gen.o distinct.o 0 depth.o]  [[%ok st] st]
-      %limited   =/  st  [gen.o distinct.o 0 depth.o]  [[%limited what.o st] st]
-      %inv       =/  st  [gen.o distinct.o 0 depth.o]  [[%violated [%invariant name.o] st] st]
-      %deadlock  =/  st  [gen.o distinct.o 0 depth.o]  [[%violated [%deadlock ~] st] st]
+  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c defs.c consts.c & cap 0]
+  =/  res  (explore is.c o)
+  ?-    -.res
+      %ok        =/  st  [gen.res distinct.res 0 depth.res]  [[%ok st] st]
+      %limited   =/  st  [gen.res distinct.res 0 depth.res]  [[%limited what.res st] st]
+      %inv       =/  st  [gen.res distinct.res 0 depth.res]  [[%violated [%invariant name.res] st] st]
+      %deadlock  =/  st  [gen.res distinct.res 0 depth.res]  [[%violated [%deadlock ~] st] st]
+      %error     [[%failed msg.res] *run-stats]
   ==
 --
 

@@ -1007,6 +1007,41 @@
     [%| 0 'incomplete next state: a variable is unassigned.']
   [%& p.r]
 ::
+++  make-env
+  ::  a static evaluation environment from a module's operator definitions,
+  ::  the config constant assignments, and the declared variables (WU6.9: the
+  ::  context the checker builds once and reuses across the BFS)
+  |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
+  ^-  eenv
+  [consts defs ~ default-fuel ~ ~ | | vars]
+::
+++  init-states
+  ::  the complete initial-state stream for an Init BODY under a prebuilt env
+  |=  [body=sem:sm e=eenv]
+  ^-  sres
+  =/  r  (solve body %init ~ ~ e)
+  ?:  ?=(%| -.r)  r
+  ?.  (levy p.r |=(st=state (complete st vars.e)))
+    [%| 0 'incomplete initial state: a variable is unassigned.']
+  [%& p.r]
+::
+++  next-states
+  ::  the complete successor stream of `cur` for a Next BODY under a prebuilt
+  ::  env (the checker's per-state call; the graph is generated once, upstream)
+  |=  [cur=state body=sem:sm e=eenv]
+  ^-  sres
+  =/  r  (solve body %next cur ~ e(s0 cur))
+  ?:  ?=(%| -.r)  r
+  ?.  (levy p.r |=(st=state (complete st vars.e)))
+    [%| 0 'incomplete next state: a variable is unassigned.']
+  [%& p.r]
+::
+++  pred-bool
+  ::  a state/action predicate BODY as a boolean under given states
+  |=  [body=sem:sm s0=state s1=state e=eenv]
+  ^-  (each ? eval-err:v)
+  (eval-bool body e(s0 s0, s1 s1))
+::
 ++  render-states
   ::  a stable rendering of a state stream for differential comparison:
   ::  each state as "k=<v>,…" (vars sorted), states in stream order

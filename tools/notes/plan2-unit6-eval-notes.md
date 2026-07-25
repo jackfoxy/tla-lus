@@ -464,6 +464,47 @@ follow-on sweep — the shape/category contract is defined now.
 Also fixed a small evaluator gap: unary minus `-7` (generated as `-` with one
 arg) now negates in `eval-native`.
 
+## 6.9 landed 2026-07-25 — integrate the evaluator into the checker
+
+Production SAFETY and LIVENESS-BUILD model checking now runs on the Work Unit
+3 semantic graph via node-eval, retiring the CST solver on those paths. The mc
++ sim goldens stay byte-identical; full suite green.
+
+- **node-eval** gained the checker-facing entry points: `make-env [defs consts
+  vars]` (build the static context once), `init-states`/`next-states` (solve
+  Init/Next under a prebuilt env, incomplete-state = typed failure),
+  `pred-bool` (state/action predicate as a boolean).
+- **check.hoon** rewired: `bfs-opts` now carries semantic `next`/`inv` bodies
+  + `defs` (operator definitions) + `consts` (config constants); `env-of`
+  builds the node-eval env. `bfs-init` takes the already-solved init states;
+  `register` checks the invariant via `pred-bool`; `bfs-step` generates
+  successors via `next-states`; a typed evaluation failure surfaces as a new
+  `[%error msg]` outcome. `explore`/`build-graph` take `[is o]`. A shared
+  `search-ctx [spec cfg]` parses, generates the graph, resolves config
+  targets, and solves the initial states; the standalone `check` and
+  `run-check` both use it. Config constants wire in via `consts-of` /
+  `const-map` (arity-0 assignments; **task 1**).
+- **job.hoon** `do-config` rewired: for safety/liveness it generates the
+  semantic module, builds `defs`/`consts`, resolves Init/Next/Inv semantic
+  bodies, solves the initial states (a typed failure → `%failed`), and stores a
+  semantic `bfs-opts` in the `%bfs`/`%live` continuation. `finish-bfs` maps the
+  `%error` outcome to `%failed`. States are the same `value` mold in both
+  cores (value.hoon aliases eval's), so node-eval's solve output drops straight
+  into the BFS. Verified: node-eval reproduces the mc corpus constructs
+  (`(x+1)%4` wrap, `~a` boolean-not assignment, disjunction branch order) —
+  `tests/lib/tla/neval-mc.hoon`.
+
+RESIDUE (documented, on CST): **simulation** (`sim-init`/`sim-step`/
+`simulate-spec`, jammed `sim-opts` = CST) and the **liveness property scan**
+(`check-live`/`live-scan` evaluate the state predicate on the CST inner node —
+the graph BUILD is semantic, only the scan is CST). The `%live` continuation
+carries the CST `inner` node for that scan. Migrating these off the CST is the
+close-out follow-on. Also: the resumable solver cursor (per-`next` domain
+cursors / branch position, task 3's fine-grained persistence) — the solver is
+atomic per state as `gen` was, and the BFS-level cursor stays resumable at the
+same granularity; old jammed konts with CST `bfs-opts` are invalidated by the
+shape change (agent-state migration fails active jobs, the existing pattern).
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →

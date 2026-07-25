@@ -3,6 +3,7 @@
 /=  syntax    /lib/tla/syntax
 /=  check     /lib/tla/check
 /=  semantic  /lib/tla/semantic
+/=  ne        /lib/tla/tlc/node-eval
 /=  config    /lib/tla/config
 |%
   ::  Resumable Job Kernel (unit P2-1)
@@ -486,6 +487,20 @@
       %-  save-kont
       [%sim ?~(iv '' u.iv) nl act o (sim-init:check u.ib vars seed.mode)]
     (more j pre)
+  ::  WU6.9: safety and liveness run on the Work Unit 3 SEMANTIC graph via
+  ::  node-eval (the simulation path above keeps the CST solver, a residue).
+  =/  mo  (generate:semantic root.src.request.j modules.src.request.j)
+  ?~  mo  (finish j [%failed 'semantic graph generation failed'] pre)
+  =/  defs    (defmap-of:ne u.mo)
+  =/  consts  (consts-of:check constants.rs)
+  =/  isb  (sem-body:check defs u.in)
+  =/  nsb  (sem-body:check defs u.nx)
+  ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
+  ?~  nsb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+  =/  ivsb  ?~(iv ~ (sem-body:check defs u.iv))
+  =/  isr  (init-states:ne u.isb (make-env:ne defs consts vars))
+  ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
+  =/  is  p.isr
   ?^  pp
     =/  pb  (body-of-def:check tree u.pp)
     ?~  pb
@@ -498,19 +513,19 @@
         [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
       pre
     =/  o=bfs-opts:check
-      [u.nb ~ '' vars | max-states.lims max-depth.lims]
+      [u.nsb ~ '' vars defs consts | max-states.lims max-depth.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  kind.up  inner.up  u.pp  nl  act
-          o  (bfs-init:check u.ib vars)  ~  ~
+          o  (bfs-init:check is)  ~  ~
       ==
     (more j pre)
   ::  safety search
   =/  o=bfs-opts:check
-    :*  u.nb  ivb  ?~(iv '' u.iv)  vars
+    :*  u.nsb  ivsb  ?~(iv '' u.iv)  vars  defs  consts
         deadlock.mode  max-states.lims  max-depth.lims
     ==
-  =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check u.ib vars)])
+  =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -549,6 +564,7 @@
   ::  seal a safety search: wire result, stats, report + trace artifacts
   |=  [j=job-2 out=outcome:check nl=@t act=next-act pre=(list event)]
   ^-  step-result-2
+  ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
   =/  st=run-stats
     ?-  -.out
       %ok        [gen.out distinct.out 0 depth.out]
