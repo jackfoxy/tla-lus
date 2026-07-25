@@ -301,6 +301,52 @@ stream + short-circuit, so slicing wraps them via the `ecur`). Message text
 approximate (6.8 owns exact bytes). The gates become node-backed and the
 whole thing resumable when 6.5 fuses these with the semantic-node evaluator.
 
+## 6.5 landed 2026-07-21 — semantic-node evaluator (retires CST eval)
+
+New `desk/lib/tla/tlc/node-eval.hoon`: a dispatcher over the WU3 `sem` graph
+producing values via the 6.1-6.4 core. Imports `v` (value) and `sm`
+(semantic, for `sem` types + `generate`). All 37 REPL baseline cases pass
+through it (`tests/lib/tla/node-eval.hoon`, adapted from the CST test), plus
+14 probe cases (`tests/lib/tla/neval-probe.hoon`).
+
+- **Context** = two maps, NOT a tagged union (unioning recursive `value` +
+  `sem-def` risks the mold hang): `eenv=[vals=(map @t value) ops=(map @t
+  sem-def) atv=(unit value) fuel=@ud]`. `vals` = constants/bound-vars/
+  expression-params; `ops` = module/LET operator defs + op-valued params;
+  `atv` = the EXCEPT `@`; `fuel` = recursion budget.
+- **Dispatch** (`eval` over `-.n`): `%lit`/`%atref`/`%nullodn`/`%letin`/
+  `%apply`. `eval-apply` routes by op kind: `%builtin`→`eval-builtin`,
+  `%constant`/`%new-constant`→val lookup, `%user-op`/applied `%formal-param`→
+  `eval-user`, bare `%formal-param`→val lookup, `%variable`→typed 6.6 stub.
+- **Laziness kept**: `eval-domain` returns a lazy `sexp` for set-denoting
+  positions (SUBSET/UNION/cup/cap/diff/times/setoffcns/setofrcds), used by
+  `\in`/`\subseteq`/binders so an exponential domain is never forced; a set
+  used as a plain value is `force`d.
+- **Builtins**: =,/=,¬,∧,∨,⇒,≡,ConjList/DisjList (short-circuit),∈,∉,⊆,
+  set ctors (forced), DOMAIN, FcnApply, Except (via except-select/@/put),
+  SetEnumerate, Tuple, RcdConstructor/RcdSelect ($Pair/str-lit args),
+  IfThenElse, Case (OTHER = nullodn guard), Bounded Forall/Exists/Choose,
+  SubsetOf/SetOfAll/FcnConstructor (single binder), quantifiers multi-binder
+  via `all-ctx`/`ex-ctx`.
+- **Native table** (`native-set`): StandardModule `%user-op`s with no body —
+  +,-,*,^,\div,%,<,>,\leq,\geq,..,\o,Len,Head,Tail,Append,Cardinality —
+  supplied natively (family 4 proper deferred; unknown bodyless op = typed
+  unsupported). `eval-user`: module def→bind params (unused expr param not
+  evaluated = lazy arg; op-valued param→bind def)→eval body w/ fuel-1; else
+  native; else unsupported.
+- **`eval-text`** = the CST-retirement entrypoint (wrap `Expr == <txt>`
+  EXTENDS Integers/Sequences/FiniteSets → generate → eval the def body →
+  render). `eval-dbg` surfaces the typed error (debugging).
+
+**Two WU3 generator gaps fixed in semantic.hoon** (were ungenerated → null):
+- `%n-fcnconst` (`[x\in S|->e]` expression): new `g-fcnconst` emits
+  `$FcnConstructor` (binders + body); reusing `g-fcn-body` was wrong — it
+  reads the body's identifier as a function name and false-flags recursion.
+  Body = last NODE kid (rear-of-all-kids grabs the `]` token).
+- `%n-otherarm` (CASE `OTHER`): `g-case` skimmed only `%n-casearm`, dropping
+  OTHER entirely; now includes it as a `$Pair` with a `%nullodn` guard (tlc2
+  null first component), which `eval-case` recognizes as the default.
+
 ## Remaining subunits (dependency order)
 
 6.1 value molds/primitives → 6.2 composites+EXCEPT+model / 6.3 enumeration →

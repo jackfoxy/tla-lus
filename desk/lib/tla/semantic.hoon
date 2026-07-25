@@ -1228,6 +1228,9 @@
     =/  g  (g-list exprs c)
     [`(builtin-apply '$SetOfFcns' n c [~ ~ rs.g]) ds.g]
   ::
+      %n-fcnconst
+    (g-fcnconst n c)
+  ::
       ?(%n-rcdconstructor %n-setofrcds)
     (g-rcd n c)
   ::
@@ -1543,6 +1546,30 @@
   :-  `(builtin-apply '$SubsetOf' n c [~ [[sbinds r.gr] ~] (drop-nulls ~[r.gx])])
   (weld ds.gr ds.gx)
 ::
+++  g-fcnconst
+  ::  the function-constructor expression [x \in S |-> e] ($FcnConstructor);
+  ::  unlike a function definition body it has no name and is never recursive
+  |=  [n=node c=ctx]
+  ^-  gout
+  =/  kids  (kids-of n)
+  =/  qbounds  (skim kids |=(k=node (is-kind k %n-quantbound)))
+  ::  the body is the last node kid (after the quantbounds), skipping the
+  ::  bracket/|-> tokens that a rear-of-all-kids would wrongly pick up
+  =/  body  (rear-node (skim kids |=(k=node ?=(%node -.k))))
+  =/  c2=ctx
+    =/  qbs  qbounds
+    =/  acc  c
+    |-  ^-  ctx
+    ?~  qbs  acc
+    $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
+  =/  gb  (g-qbound-groups qbounds c2)
+  =/  gx  (g-x body c2)
+  :-  :-  ~
+      :*  %apply  ['$FcnConstructor' %builtin]  (expr-level body c2)
+          (span-of:ast n)  ~  bs.gb  (drop-nulls ~[r.gx])
+      ==
+  (weld ds.gb ds.gx)
+::
 ++  g-setofall
   |=  [n=node c=ctx]
   ^-  gout
@@ -1603,7 +1630,9 @@
 ++  g-case
   |=  [n=node c=ctx]
   ^-  gout
-  =/  arms  (skim (kids-of n) |=(k=node (is-kind k %n-casearm)))
+  =/  arms
+    %+  skim  (kids-of n)
+    |=(k=node |((is-kind k %n-casearm) (is-kind k %n-otherarm)))
   =/  parts
     =|  out=(list sem)
     =|  ds=(list sdiag)
@@ -1611,11 +1640,16 @@
     |-  ^-  [(list sem) (list sdiag)]
     ?~  as  [(flop out) ds]
     =/  ak  (skim (kids-of i.as) |=(k=node ?=(%node -.k)))
-    ?.  =(2 (lent ak))  $(as t.as)
     =/  g  (g-list ak c)
+    ::  an OTHER arm has just a body; give it a nullODN guard so the
+    ::  evaluator (and tlc2's null first component) recognizes the default
+    =/  args=(list sem)
+      ?:  (is-kind i.as %n-otherarm)  [`sem`[%nullodn ~] rs.g]
+      rs.g
+    ?.  =(2 (lent args))  $(as t.as, ds (weld ds ds.g))
     =/  pr=sem
       :*  %apply  ['$Pair' %builtin]  (expr-level i.as c)  (span-of:ast i.as)
-          ~  ~  rs.g
+          ~  ~  args
       ==
     $(as t.as, out [pr out], ds (weld ds ds.g))
   [`(builtin-apply '$Case' n c [~ ~ -.parts]) +.parts]
