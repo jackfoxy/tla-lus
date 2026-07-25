@@ -344,8 +344,9 @@
   ::  the CST. `next`/`inv` are semantic bodies; `defs`/`consts` build the
   ::  evaluation context (operator definitions + config constant assignments).
   $:  next=sem:sem-lib
-      inv=(unit sem:sem-lib)
-      inv-name=@t
+      invs=(list [name=@t body=sem:sem-lib])   ::  invariants, declaration order
+      cons=(list sem:sem-lib)                  ::  state constraints (CONSTRAINT)
+      acons=(list sem:sem-lib)                 ::  action constraints
       vars=(set @t)
       order=(list @t)   ::  vars in TLC declaration order (FP64 byte order)
       defs=(map @t sem-def:sem-lib)
@@ -383,10 +384,63 @@
   ^-  bfs-cursor
   [is ~ ~ ~ (lent is) 0 0]
 ::
+++  con-hold
+  ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
+  |=  [cs=(list sem:sem-lib) st=state e=eenv:ne]
+  ^-  (each ? @t)
+  ?~  cs  [%& &]
+  =/  r  (pred-bool:ne i.cs st ~ e)
+  ?:  ?=(%| -.r)  [%| msg.p.r]
+  ?.  p.r  [%& |]
+  $(cs t.cs)
+::
+++  acon-hold
+  ::  do all action constraints (ACTION_CONSTRAINT) hold on the transition
+  ::  cur -> nxt? (an action-level predicate: cur under plain names, nxt primed)
+  |=  [cs=(list sem:sem-lib) cur=state nxt=state e=eenv:ne]
+  ^-  (each ? @t)
+  ?~  cs  [%& &]
+  =/  r  (pred-bool:ne i.cs cur nxt e)
+  ?:  ?=(%| -.r)  [%| msg.p.r]
+  ?.  p.r  [%& |]
+  $(cs t.cs)
+::
+++  first-violated
+  ::  the first invariant (declaration order) violated by `st`; ~ = all hold,
+  ::  [%& name] = violated, [%| msg] = an evaluation error during the check
+  |=  [ivs=(list [name=@t body=sem:sem-lib]) st=state e=eenv:ne]
+  ^-  (unit (each @t @t))
+  ?~  ivs  ~
+  =/  r  (pred-bool:ne body.i.ivs st ~ e)
+  ?:  ?=(%| -.r)  `[%| msg.p.r]
+  ?.  p.r  `[%& name.i.ivs]
+  $(ivs t.ivs)
+::
 ++  register
-  ::  admit one state at depth `d`: depth bound, dedup, then the
-  ::  invariant check TLC runs as each state is generated
-  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t]
+  ::  admit one generated state at depth `d`. TLC order: a state pruned by a
+  ::  CONSTRAINT (or a transition pruned by an ACTION_CONSTRAINT) is not
+  ::  enqueued; a first-seen in-model state is enqueued and checked against the
+  ::  invariants in declaration order. `prev` is the predecessor state (~ for an
+  ::  initial state), needed to evaluate action constraints.
+  ::  (Simplification vs TLC: TLC still checks invariants on constraint-pruned
+  ::  states; we skip them. No corpus case combines a constraint with an
+  ::  invariant on the pruned boundary — documented in the parity ledger.)
+  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t prev=(unit state)]
+  ^-  [out=(unit outcome) cur=bfs-cursor]
+  =/  e  (env-of o)
+  =/  ch  (con-hold cons.o st e)
+  ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
+  ?.  p.ch  [~ cur]
+  ?^  prev
+    =/  ah  (acon-hold acons.o u.prev st e)
+    ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
+    ?.  p.ah  [~ cur]
+    (register-in o cur st d pred e)
+  (register-in o cur st d pred e)
+::
+++  register-in
+  ::  the in-model path: dedup, depth bound, enqueue, ordered invariant check
+  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t e=eenv:ne]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   =/  fp  (fingerprint order.o st)
   ?:  (~(has by seen.cur) fp)  [~ cur]
@@ -397,19 +451,18 @@
   =?  inits.cur  =('' pred)  (snoc inits.cur fp)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
-  ?~  inv.o  [~ cur]
-  =/  ir  (pred-bool:ne u.inv.o st ~ (env-of o))
-  ?:  ?=(%| -.ir)  [`[%error msg.p.ir] cur]
-  ?:  p.ir  [~ cur]
+  =/  iv  (first-violated invs.o st e)
+  ?~  iv  [~ cur]
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
   :_  cur
-  `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) inv-name.o]
+  `[%inv gen.cur distinct.cur depth.cur (trace-to seen.cur fp) p.u.iv]
 ::
 ++  register-all
-  |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t]
+  |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t prev=(unit state)]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   |-  ^-  [out=(unit outcome) cur=bfs-cursor]
   ?~  sts  [~ cur]
-  =/  rr  (register o cur i.sts d pred)
+  =/  rr  (register o cur i.sts d pred prev)
   ?^  out.rr  rr
   $(sts t.sts, cur cur.rr)
 ::
@@ -427,7 +480,7 @@
   ::  register pending initial states first (depth 1, no predecessor)
   =/  todo  init-todo.cur
   ?^  todo
-    =/  rr  (register o cur(init-todo t.todo) i.todo 1 '')
+    =/  rr  (register o cur(init-todo t.todo) i.todo 1 '' ~)
     ?^  out.rr  [%done u.out.rr cur.rr]
     $(cur cur.rr, spent +(spent))
   ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
@@ -447,7 +500,7 @@
     cur
   =/  cost  (lent nexts)
   =/  rr
-    (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp)
+    (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp `st.vis)
   ?^  out.rr  [%done u.out.rr cur.rr]
   $(cur cur.rr, spent (add spent cost))
 ::
@@ -811,6 +864,23 @@
   =/  d  (~(get by defs) nm)
   ?~(d ~ body.u.d)
 ::
+++  resolve-bodies
+  ::  the sem bodies of a name list (unresolvable names dropped)
+  |=  [defs=(map @t sem-def:sem-lib) nms=(list @t)]
+  ^-  (list sem:sem-lib)
+  %+  murn  nms
+  |=(nm=@t (sem-body defs nm))
+::
+++  resolve-invs
+  ::  named invariants paired with their sem bodies, in declaration order
+  |=  [defs=(map @t sem-def:sem-lib) nms=(list @t)]
+  ^-  (list [name=@t body=sem:sem-lib])
+  %+  murn  nms
+  |=  nm=@t
+  ^-  (unit [name=@t body=sem:sem-lib])
+  =/  b  (sem-body defs nm)
+  ?~(b ~ `[nm u.b])
+::
 ::  the shared WU6.9 search context: everything the safety/liveness engines
 ::  need, resolved from the semantic graph, with the initial states solved
 +$  sctx
@@ -821,8 +891,10 @@
       order=(list @t)                        ::  vars in declaration order
       asmz=(list sem-thm:sem-lib)            ::  module ASSUME bodies
       nsb=sem:sem-lib                        ::  Next body
-      iv=(unit @t)
-      ivsb=(unit sem:sem-lib)                ::  Invariant body
+      invs=(list [name=@t body=sem:sem-lib])  ::  invariants (declaration order)
+      cons=(list sem:sem-lib)                 ::  state constraints
+      acons=(list sem:sem-lib)                ::  action constraints
+      ddl=?                                   ::  check deadlock (cfg flag)
       pp=(unit @t)                           ::  property name (liveness)
       tree=node
       nl=@t                                  ::  Next span label
@@ -838,12 +910,14 @@
   =/  tree  p.pr
   =/  vars  (var-names tree)
   =/  order  (var-order tree)
-  =/  nm  (cfg-names cfg)
-  ?~  nm  [%| 'config error']
-  =/  in  in.u.nm
-  =/  nx  nx.u.nm
+  =/  cr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.cr)  [%| 'config error']
+  =/  ca  p.cr
+  =/  in  init.ca
+  =/  nx  next.ca
   ?~  in  [%| 'no INIT in config']
   ?~  nx  [%| 'no NEXT in config']
+  =/  pp  ?~(properties.ca ~ `i.properties.ca)
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
@@ -856,9 +930,13 @@
   =/  nb  (body-of-def tree u.nx)
   =/  ir  (init-states:ne u.isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
-  =/  ivsb  ?~(iv.u.nm ~ (sem-body defs u.iv.u.nm))
+  =/  invs   (resolve-invs defs invariants.ca)
+  =/  cons   (resolve-bodies defs constraints.ca)
+  =/  acons  (resolve-bodies defs action-constraints.ca)
+  =/  ddl    !=(%false deadlock.ca)
   :-  %&
-  :*  p.ir  defs  consts  vars  order  assumes.u.mo  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
+  :*  p.ir  defs  consts  vars  order  assumes.u.mo  u.nsb
+      invs  cons  acons  ddl  pp  tree
       ?~(nb '' (next-span-label u.nb modn))
   ==
 ::
@@ -904,7 +982,7 @@
   ?^  pp.c
     =/  prop-body  (body-of-def tree.c u.pp.c)
     ?~  prop-body  ~['No property def']
-    =/  o=bfs-opts  [nsb.c ~ '' vars.c order.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c defs.c consts.c | 0 0]
     =/  g  (build-graph is.c o)
     =/  lr  (check-live u.prop-body u.pp.c g)
     ?:  ok.lr
@@ -917,7 +995,7 @@
       (counts-lines gen.g distinct.g depth.g)
     ==
   ::  safety: an INVARIANT
-  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c order.c defs.c consts.c & 0 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c 0 0]
   (render-outcome (explore is.c o) nl.c)
 ::
 ++  render-outcome
@@ -972,14 +1050,14 @@
   ?^  pp.c
     =/  prop  (body-of-def tree.c u.pp.c)
     ?~  prop  [[%failed 'no property definition'] *run-stats]
-    =/  o=bfs-opts  [nsb.c ~ '' vars.c order.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c defs.c consts.c | 0 0]
     =/  g   (build-graph is.c o)
     =/  st  [gen.g distinct.g 0 depth.g]
     =/  lr  (check-live u.prop u.pp.c g)
     ?:  ok.lr  [[%ok st] st]
     [[%violated [%property u.pp.c] st] st]
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c order.c defs.c consts.c & cap 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c cap 0]
   =/  res  (explore is.c o)
   ?-    -.res
       %ok        =/  st  [gen.res distinct.res 0 depth.res]  [[%ok st] st]

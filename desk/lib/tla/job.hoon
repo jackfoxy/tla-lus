@@ -458,8 +458,9 @@
     (finish j [%failed 'unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)'] pre)
   =/  in  init.mode.rs
   =/  nx  next.mode.rs
-  ::  the engine takes a single invariant/property (the first); multiple
-  ::  invariants are validated but only one is checked (unit 10 residue)
+  ::  all invariants are checked in declaration order (7.3); `iv` is the first
+  ::  one, still used for the INVARIANT/PROPERTY-conflict guard and definition
+  ::  existence checks below
   =/  iv=(unit @t)  ?~(invariants.rs ~ `i.invariants.rs)
   =/  pp=(unit @t)  ?~(properties.rs ~ `i.properties.rs)
   ?~  in  (finish j [%failed 'no INIT in config'] pre)
@@ -511,7 +512,9 @@
   =/  nsb  (sem-body:check defs u.nx)
   ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
   ?~  nsb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
-  =/  ivsb  ?~(iv ~ (sem-body:check defs u.iv))
+  =/  invs   (resolve-invs:check defs invariants.rs)
+  =/  cons   (resolve-bodies:check defs constraints.rs)
+  =/  acons  (resolve-bodies:check defs action-constraints.rs)
   =/  isr  (init-states:ne u.isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
@@ -527,17 +530,19 @@
         [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
       pre
     =/  o=bfs-opts:check
-      [u.nsb ~ '' vars order defs consts | max-states.lims max-depth.lims]
+      [u.nsb ~ ~ ~ vars order defs consts | max-states.lims max-depth.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  kind.up  inner.up  u.pp  nl  act
           o  (bfs-init:check is)  ~  ~
       ==
     (more j pre)
-  ::  safety search
+  ::  safety search: all invariants (ordered), state/action constraints, and
+  ::  the effective deadlock flag (CLI flag AND the cfg CHECK_DEADLOCK flag,
+  ::  matching TLC's `deadlock && getCheckDeadlock()`)
   =/  o=bfs-opts:check
-    :*  u.nsb  ivsb  ?~(iv '' u.iv)  vars  order  defs  consts
-        deadlock.mode  max-states.lims  max-depth.lims
+    :*  u.nsb  invs  cons  acons  vars  order  defs  consts
+        ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
     ==
   =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
   (more j pre)
