@@ -4,6 +4,7 @@
 /=  ev       /lib/tla/eval
 /=  config   /lib/tla/config
 /=  ne       /lib/tla/tlc/node-eval
+/=  fp       /lib/tla/tlc/fingerprint
 /=  sem-lib  /lib/tla/semantic
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
@@ -231,12 +232,14 @@
 ::
 ::
 ++  fingerprint
-  ::  a canonical key for a state: sorted "var=<rendered value>" pairs
-  |=  st=state
+  ::  the canonical FP64 fingerprint of a state (Work Unit 7.1): FP64 extended
+  ::  over each variable's WU6.8 fp-input bytes in `order` (TLC's declaration
+  ::  order), matching TLCState.fingerPrint. The visited map is keyed by this
+  ::  fingerprint — no rendered text is ever a key. Worn as `@t` only so the
+  ::  existing @t-keyed seen/queue molds and the %live cursor are unchanged.
+  |=  [order=(list @t) st=state]
   ^-  @t
-  %+  roll  (sort ~(tap by st) |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b)))
-  |=  [[k=@t v=value] acc=@t]
-  (cat 3 acc (crip "{(trip k)}={(render:ev v)};"))
+  (@t (state-fp:fp order st))
 ::
 ::  +|  Config / Spec Extraction
 ::
@@ -286,6 +289,26 @@
   ?.  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~
   `(leaf-text k)
 ::
+++  var-order
+  ::  the declared VARIABLE names of a module in TLC's canonical (source
+  ::  declaration) order, which fixes the FP64 state-fingerprint byte order
+  |=  tree=node
+  ^-  (list @t)
+  =/  b  (skim (kids-of tree) |=(k=node (is-kind k %n-module)))
+  =/  body
+    =/  bb  (skim (kids-of tree) |=(k=node (is-kind k %n-body)))
+    ?~(bb ~ (kids-of i.bb))
+  %-  zing
+  %+  turn  body
+  |=  u=node
+  ^-  (list @t)
+  ?.  (is-kind u %n-variabledeclaration)  ~
+  %+  murn  (kids-of u)
+  |=  k=node
+  ^-  (unit @t)
+  ?.  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~
+  `(leaf-text k)
+::
 ++  cfg-names
   ::  the INIT/NEXT/first-INVARIANT/first-PROPERTY names from a .cfg via
   ::  the real config parser (unit 5); ~ when the cfg is malformed. Full
@@ -324,6 +347,7 @@
       inv=(unit sem:sem-lib)
       inv-name=@t
       vars=(set @t)
+      order=(list @t)   ::  vars in TLC declaration order (FP64 byte order)
       defs=(map @t sem-def:sem-lib)
       consts=(map @t value)
       deadlock=?     ::  report deadlocked states as violations
@@ -364,7 +388,7 @@
   ::  invariant check TLC runs as each state is generated
   |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t]
   ^-  [out=(unit outcome) cur=bfs-cursor]
-  =/  fp  (fingerprint st)
+  =/  fp  (fingerprint order.o st)
   ?:  (~(has by seen.cur) fp)  [~ cur]
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
     [`[%limited %depth gen.cur distinct.cur depth.cur] cur]
@@ -794,6 +818,7 @@
       defs=(map @t sem-def:sem-lib)
       consts=(map @t value)
       vars=(set @t)
+      order=(list @t)                        ::  vars in declaration order
       nsb=sem:sem-lib                        ::  Next body
       iv=(unit @t)
       ivsb=(unit sem:sem-lib)                ::  Invariant body
@@ -811,6 +836,7 @@
   ?:  ?=(%| -.pr)  [%| 'parse error']
   =/  tree  p.pr
   =/  vars  (var-names tree)
+  =/  order  (var-order tree)
   =/  nm  (cfg-names cfg)
   ?~  nm  [%| 'config error']
   =/  in  in.u.nm
@@ -831,7 +857,7 @@
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  ivsb  ?~(iv.u.nm ~ (sem-body defs u.iv.u.nm))
   :-  %&
-  :*  p.ir  defs  consts  vars  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
+  :*  p.ir  defs  consts  vars  order  u.nsb  iv.u.nm  ivsb  pp.u.nm  tree
       ?~(nb '' (next-span-label u.nb modn))
   ==
 ::
@@ -860,7 +886,7 @@
   ?^  pp.c
     =/  prop-body  (body-of-def tree.c u.pp.c)
     ?~  prop-body  ~['No property def']
-    =/  o=bfs-opts  [nsb.c ~ '' vars.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ '' vars.c order.c defs.c consts.c | 0 0]
     =/  g  (build-graph is.c o)
     =/  lr  (check-live u.prop-body u.pp.c g)
     ?:  ok.lr
@@ -873,7 +899,7 @@
       (counts-lines gen.g distinct.g depth.g)
     ==
   ::  safety: an INVARIANT
-  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c defs.c consts.c & 0 0]
+  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c order.c defs.c consts.c & 0 0]
   (render-outcome (explore is.c o) nl.c)
 ::
 ++  render-outcome
@@ -926,14 +952,14 @@
   ?^  pp.c
     =/  prop  (body-of-def tree.c u.pp.c)
     ?~  prop  [[%failed 'no property definition'] *run-stats]
-    =/  o=bfs-opts  [nsb.c ~ '' vars.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ '' vars.c order.c defs.c consts.c | 0 0]
     =/  g   (build-graph is.c o)
     =/  st  [gen.g distinct.g 0 depth.g]
     =/  lr  (check-live u.prop u.pp.c g)
     ?:  ok.lr  [[%ok st] st]
     [[%violated [%property u.pp.c] st] st]
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c defs.c consts.c & cap 0]
+  =/  o=bfs-opts  [nsb.c ivsb.c ?~(iv.c '' u.iv.c) vars.c order.c defs.c consts.c & cap 0]
   =/  res  (explore is.c o)
   ?-    -.res
       %ok        =/  st  [gen.res distinct.res 0 depth.res]  [[%ok st] st]

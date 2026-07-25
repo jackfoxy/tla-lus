@@ -469,6 +469,7 @@
       [%failed (rap 3 ~['no definition for INVARIANT ' u.iv])]
     pre
   =/  vars  (var-names:check tree)
+  =/  order  (var-order:check tree)
   =/  modn  (module-name-of:check tree)
   =/  nl    (next-span-label:check u.nb modn)
   =/  act=next-act
@@ -513,7 +514,7 @@
         [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
       pre
     =/  o=bfs-opts:check
-      [u.nsb ~ '' vars defs consts | max-states.lims max-depth.lims]
+      [u.nsb ~ '' vars order defs consts | max-states.lims max-depth.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  kind.up  inner.up  u.pp  nl  act
@@ -522,7 +523,7 @@
     (more j pre)
   ::  safety search
   =/  o=bfs-opts:check
-    :*  u.nsb  ivsb  ?~(iv '' u.iv)  vars  defs  consts
+    :*  u.nsb  ivsb  ?~(iv '' u.iv)  vars  order  defs  consts
         deadlock.mode  max-states.lims  max-depth.lims
     ==
   =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
