@@ -7,6 +7,7 @@
 /=  config    /lib/config
 /=  mod       /lib/modules
 /=  stdmods   /lib/stdmods
+/=  sp        /lib/source-path
 |%
   ::  Resumable Job Kernel (unit P2-1)
   ::
@@ -205,14 +206,20 @@
   ==
 ::
 ++  validate-clay
+  ::  the whole path surface is judged before a job exists: desk, root
+  ::  module name, search roots, and the config path (which must itself
+  ::  lie under a declared root). A bad path names its offending segment
   |=  req=request
   ^-  (unit @t)
   ?>  ?=(%clay -.src.req)
-  ?:  =('' root.src.req)
-    `'empty root module name'
-  ?~  roots.src.req
-    `'a %clay bundle needs at least one module-search root'
-  ~
+  =/  e
+    %:  check-bundle:sp
+      desk.src.req
+      root.src.req
+      cfg.src.req
+      roots.src.req
+    ==
+  ?~(e ~ `(err-text:sp u.e))
 ::
 ++  validate-bundle
   ::  size limits are enforced here, before any work is scheduled
@@ -440,15 +447,6 @@
 ::  +|  Stage: %modules (asynchronous Clay source load)
 ::
 ::
-++  mod-path
-  ::  util.FilenameToStream's mapping, under one search root: a module
-  ::  name is the lowercased name plus the .tla extension (Clay path
-  ::  segments cannot carry case; +resolve still validates the declared,
-  ::  case-sensitive name)
-  |=  [rot=path name=module-name]
-  ^-  path
-  (weld rot `path`~[`@ta`(crip (cass (trip name))) %tla])
-::
 ++  missing-msg
   |=  [name=module-name from=module-name]
   ^-  @t
@@ -486,13 +484,25 @@
   ==
 ::
 ++  load-ask
-  ::  put one read in flight and return its tagged request
+  ::  put one read in flight and return its tagged request. The path is
+  ::  canonicalized by lib/source-path, the only constructor of a
+  ::  source-ref, so an escaping or out-of-root read cannot be issued
   |=  [c=lcur p=lread pax=path]
-  ^-  [read-request lcur]
+  ^-  (each [read-request lcur] path-err:sp)
+  =/  rr  (read-ref:sp ship.c desk.c cas.c roots.c pax)
+  ?:  ?=(%| -.rr)  [%| p.rr]
   =/  tag  next.c
   =.  next.c  +(next.c)
   =.  pend.c  (~(put by pend.c) tag p)
-  [[tag ship.c desk.c cas.c pax] c]
+  [%& [[tag p.rr] c]]
+::
+++  load-cand
+  ::  the candidate file for a module under one search root, as a read
+  |=  [c=lcur p=lread rot=path name=module-name]
+  ^-  (each [read-request lcur] path-err:sp)
+  =/  mp  (module-path:sp rot name)
+  ?:  ?=(%| -.mp)  [%| p.mp]
+  (load-ask c p p.mp)
 ::
 ++  load-drain
   ::  absorb delivered responses. A hit registers the module (or the
@@ -527,10 +537,13 @@
     ?:  ?=(%| -.res.r)
       ::  not under this search root: try the next one
       ?^  try.u.p
-        =^  rq  c
-          %^  load-ask  c  [%module name.u.p from.u.p t.try.u.p]
-          (mod-path i.try.u.p name.u.p)
-        $(reads [rq reads])
+        =/  la
+          %^  load-cand  c  [%module name.u.p from.u.p t.try.u.p]
+          [i.try.u.p name.u.p]
+        ?:  ?=(%| -.la)
+          [c (flop reads) `[%fail (err-text:sp p.la)]]
+        =.  c  +.p.la
+        $(reads [-.p.la reads])
       ::  a name with no user file falls back to the standard modules,
       ::  which the resolver supplies from the vendored set
       ?:  (~(has by standard-modules:stdmods) name.u.p)
@@ -541,19 +554,21 @@
     =.  bytes.c  (add bytes.c (met 3 txt))
     ?:  (gth bytes.c max-source.lims)
       [c (flop reads) `[%limited %source]]
-    =/  pr  (mule |.((parse:syntax txt)))
-    ?:  ?=(%| -.pr)
-      [c (flop reads) `[%fail (rap 3 ~['Could not parse module ' name.u.p '.'])]]
-    ?:  ?=(%| -.p.pr)
-      [c (flop reads) `[%fail (rap 3 ~['Could not parse module ' name.u.p '.'])]]
-    =/  tree  p.p.pr
-    =/  dec   (module-name-of:mod tree)
-    ?:  &(?=(^ dec) !=(u.dec name.u.p))
-      [c (flop reads) `[%fail (mismatch-msg name.u.p u.dec)]]
     =.  mods.c  (~(put by mods.c) name.u.p txt)
     =.  have.c  (~(put in have.c) name.u.p)
     ?:  (gth ~(wyt by mods.c) max-modules.lims)
       [c (flop reads) `[%limited %modules]]
+    ::  an unparsable module is registered as it arrived and contributes
+    ::  no references: the %parse stage then reports SANY's own error
+    ::  text, exactly as it does for an inline bundle
+    =/  pr  (mule |.((parse:syntax txt)))
+    ?.  ?&(?=(%& -.pr) ?=(%& -.p.pr))  $
+    =/  tree  p.p.pr
+    ::  SANY's file-name check: the file is named for the lowercased
+    ::  module, but the declared name must match the requested one
+    =/  dec  (module-name-of:mod tree)
+    ?:  &(?=(^ dec) !=(u.dec name.u.p))
+      [c (flop reads) `[%fail (mismatch-msg name.u.p u.dec)]]
     ::  inner modules are registered from their outer file, so a
     ::  reference to one never becomes a read
     =.  have.c
@@ -575,29 +590,31 @@
   ::  request up to `budget` new reads: the config first, then queued
   ::  module names in BFS order, each at its first search root
   |=  [c=lcur budget=@ud]
-  ^-  [lcur (list read-request)]
+  ^-  [cur=lcur reads=(list read-request) err=(unit lerr)]
   =|  out=(list read-request)
   =/  n  0
-  |-  ^-  [lcur (list read-request)]
-  ?:  (gte n budget)  [c (flop out)]
+  |-  ^-  [lcur (list read-request) (unit lerr)]
+  ?:  (gte n budget)  [c (flop out) ~]
   ?:  cfg-todo.c
     ::  test a copy: narrowing the cursor's own field would freeze it
     =/  cp  cfg-path.c
     ?~  cp  $(cfg-todo.c |)
     =.  cfg-todo.c  |
-    =^  rq  c  (load-ask c [%cfg ~] u.cp)
-    $(out [rq out], n +(n))
+    =/  la  (load-ask c [%cfg ~] u.cp)
+    ?:  ?=(%| -.la)  [c (flop out) `[%fail (err-text:sp p.la)]]
+    =.  c  +.p.la
+    $(out [-.p.la out], n +(n))
   =/  que  queue.c
-  ?~  que  [c (flop out)]
+  ?~  que  [c (flop out) ~]
   ::  a bundle with no search root is rejected at +validate
   =/  rts  roots.c
   ?>  ?=(^ rts)
   =/  q  i.que
   =.  c  c(queue t.que)
-  =^  rq  c
-    %^  load-ask  c  [%module name.q from.q t.rts]
-    (mod-path i.rts name.q)
-  $(out [rq out], n +(n))
+  =/  la  (load-cand c [%module name.q from.q t.rts] [i.rts name.q])
+  ?:  ?=(%| -.la)  [c (flop out) `[%fail (err-text:sp p.la)]]
+  =.  c  +.p.la
+  $(out [-.p.la out], n +(n))
 ::
 ++  load-fail
   ::  a resolution failure is a typed diagnostic at the %modules stage,
@@ -617,6 +634,10 @@
   ^-  step-result-2
   ?.  ?=(%clay -.src.request.j)
     (finish j [%failed 'internal: %modules on an inline bundle'] pre)
+  ::  the whole run reads one revision; the agent pins it at submit, and
+  ::  lib/source-path will not name a file at an unpinned case
+  ?.  ?=(%ud -.cas.src.request.j)
+    (load-fail j (err-text:sp [%unpinned cas.src.request.j]) pre)
   =/  c=lcur
     ?:  ?&(?=(^ k) ?=(%load -.u.k))  cur.u.k
     (load-init src.request.j)
@@ -628,8 +649,13 @@
       %limited  (finish j [%limited what.u.err.dr stats.j] pre)
     ==
   =/  am  (load-ask-more c default-load-budget)
-  =.  c  -.am
-  =/  reads  (weld reads.dr +.am)
+  =.  c  cur.am
+  ?^  err.am
+    ?-  -.u.err.am
+      %fail     (load-fail j msg.u.err.am pre)
+      %limited  (finish j [%limited what.u.err.am stats.j] pre)
+    ==
+  =/  reads  (weld reads.dr reads.am)
   ?^  pend.c
     =.  cont.j  (save-kont [%load c])
     (await j reads pre)

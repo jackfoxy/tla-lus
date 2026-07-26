@@ -442,10 +442,49 @@
   !>((clay-failure f (clay-req 'Spec' `/src/cfg/txt ~[/src])))
 ::
 ++  test-clay-unparsable-module
+  ::  the loader registers the text as it arrived and extracts no
+  ::  references, so the %parse stage reports SANY's own error — the
+  ::  identical failure an inline bundle of the same text produces
   =/  f  (mk-fs ~[[/src/spec/tla 'not a module'] [/src/cfg/txt mc-cfg]])
+  =/  cj  +:(run-clay f (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
+  =/  ij  (run-inline (inline-req 'spec' ~[['spec' 'not a module']] mc-cfg) 256)
+  ;:  weld
+    (expect-eq !>(result.ij) !>(result.cj))
+    (expect-eq !>(diags.ij) !>(diags.cj))
+    (expect-eq !>(`%parse) !>(?~(diags.cj ~ `stage.i.diags.cj)))
+  ==
+::
+::  +|  Path Canonicalization And Escape (unit 10.2)
+::
+::
+++  test-clay-escaping-search-root-rejected
+  ::  no job is created: the offending segment is named at submit
   %+  expect-eq
-    !>(['Could not parse module spec.' `%modules])
-  !>((clay-failure f (clay-req 'spec' `/src/cfg/txt ~[/src])))
+    !>(`'path segment \'..\' escapes its search root in /src/..')
+  !>((validate:job-lib (clay-req 'spec' `/src/cfg/txt ~[`path`~[%src `@ta`'..']])))
+::
+++  test-clay-config-out-of-root-rejected
+  %+  expect-eq
+    !>(`'path /secrets/cfg/txt is not under a declared search root')
+  !>((validate:job-lib (clay-req 'spec' `/secrets/cfg/txt ~[/src])))
+::
+++  test-clay-bad-module-name-rejected
+  %+  expect-eq
+    !>(`'invalid module name \'a b\'')
+  !>((validate:job-lib (clay-req 'a b' `/src/cfg/txt ~[/src])))
+::
+++  test-clay-unpinned-case-fails
+  ::  the agent pins the revision at submit; a cursor that reaches the
+  ::  load stage unpinned names files through nothing and stops
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =/  s  src.req
+  ?>  ?=(%clay -.s)
+  =.  cas.s  da+t0
+  =.  src.req  s
+  =/  j  +:(run-clay multi-fs req 256)
+  %+  expect-eq
+    !>(`[%failed 'the Clay revision was not pinned to a concrete number'])
+  !>(result.j)
 ::
 ::  +|  Limits During The Load
 ::

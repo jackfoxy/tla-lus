@@ -233,6 +233,69 @@ No in-scope Gall/Clay behavior is left unclassified.
 - Adding two members to the `kont` `$%` (5 → 7) did **not** trip the
   zuse-408 mold compiler; `kont` is not itself in a recursive cycle.
 
+## 10.2 Path canonicalization and escape prevention (done)
+
+### What landed
+
+- **`desk/lib/source-path.hoon`** — the only constructor of a
+  `source-ref`. `+read-ref` requires a pinned (`%ud`) case, a well-formed
+  desk, canonical segments, and a path under a declared search root;
+  `+check-bundle` judges a whole `%clay` bundle at submit;
+  `+module-path`/`+module-seg` own the `util.FilenameToStream` mapping;
+  `+path-err` + `+err-text` are the typed error and its message.
+- **`lib/job`**: `+validate-clay` is now `check-bundle` + `err-text` (so
+  the submit-time rejection names the offending segment), `+mod-path` is
+  gone in favour of `module-path:sp`, `+load-ask` builds every request
+  through `read-ref:sp` (a path error becomes a typed `%modules`
+  failure), and `+do-load` refuses to start on an unpinned case.
+- **Parse-failure parity**: the loader no longer fails a module that will
+  not parse. It registers the text as it arrived and contributes no
+  references, so `%parse` reports SANY's own error text — the identical
+  failure an inline bundle of the same text produces. (The declared-name
+  check stays in the loader: the file name is lowercased, so only the
+  loader can compare it against the requested, case-sensitive name.)
+
+### Decisions
+
+- **The config must live under a search root.** The plan's escape rule is
+  "every candidate must stay under a declared search root"; making the
+  config an exception would leave one unguarded path. The fixtures
+  already satisfy it (`roots ~[/test-data/clay/multi]`, cfg
+  `/test-data/clay/multi/cfg/txt`).
+- **`.` is not a legal segment character.** Rejecting dotted segments
+  costs nothing here (Clay stores the extension as its own segment) and
+  catches a filesystem-style path smuggled into one knot.
+- **Uppercase is rejected** rather than silently lowercased: Clay cannot
+  store it, so naming it is more honest than papering over it.
+- **The escape guard is defense in depth, not a Clay vulnerability.** A
+  `..` segment in Clay is a malformed knot, not traversal, and a read is
+  already confined to one desk. Recorded as such in compatibility.md so
+  nobody later mistakes the guard for a fixed hole.
+
+### Evidence
+
+- `desk/tests/lib/source-path.hoon` — 18 cases: accepted (in-root, nested
+  root, `/` as the desk, lowercasing, a whole valid bundle) and rejected
+  (`.`/`..`, `$`-prefixed, dotted, uppercase, empty segment, out-of-root,
+  a root's own prefix, `%da`/`%tas` case, empty desk, malformed module
+  name, no roots, empty root name, escaping search root, config outside
+  the roots, escaping config) — each asserting the typed error *and*,
+  for the representative ones, its rendered message.
+- `desk/tests/lib/clay-load.hoon` grew to 21: the four new cases are the
+  submit rejections seen through `+validate` (escaping root, config out of
+  root, malformed module name) and an unpinned-case run stopping at
+  `%modules`; `test-clay-unparsable-module` is now a differential against
+  the inline run rather than a hardcoded loader message.
+- Full ship suite `ok=%.y`.
+
+### Hoon gotchas hit
+
+- `levy`/`lien` are wet: fed a `?~`-narrowed tape they mull-grow. Widen at
+  the call site (`` (levy `tape`t knot-char) ``).
+- `-.(some-call)` is a syntax error; use `=/` and then `-.face` (or `-:`).
+- A path literal cannot spell `..`, `$foo`, `spec.tla`, `Spec`, or an
+  empty segment — build those paths flat with `` `@ta` `` casts.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

@@ -433,6 +433,43 @@ Known deviations recorded now:
   exist, and the pinned (settled) case makes an unanswered read a Clay
   bug, but no timer forces the issue.
 
+### 10.2 Path canonicalization and escape prevention — at parity
+
+`lib/source-path` is the **only** constructor of a `source-ref`, so a Clay
+read cannot be named except through the guard.
+
+- **Segments**: empty, `.`/`..`, `$`-prefixed, dotted, and non-knot
+  (e.g. uppercase) segments are typed errors naming the segment and the
+  path it appeared in.
+- **Roots**: every candidate — the config included — must lie under a
+  declared search root. Declaring `/` legitimately scopes the whole desk.
+- **Pinned revision**: `+read-ref` refuses a `%da`/`%tas` case outright, so
+  the revision the agent pinned at submit governs every read of the run and
+  no read can block on an unsettled case.
+- **Name mapping** is `util.FilenameToStream`'s and is exact: a module name
+  becomes the lowercased name plus `.tla` under each search root, tried in
+  order. The case-sensitive declared-name check stays with the resolver.
+- Judged twice: the whole bundle (desk, root module name, search roots,
+  config path) at submit, before a job exists; and each path again as it is
+  turned into a read.
+
+Clay is not a POSIX filesystem — a `..` segment is a malformed knot, not a
+traversal, and a read is already confined to one desk. The guard is
+therefore defense in depth plus an honest diagnostic: a malformed path is
+named rather than silently missing.
+
+Representation-agnostic sources (task 4): diagnostics and spans key on the
+module name for both `%inline` and `%clay` runs, and an unparsable module
+now reaches `%parse` on both paths, so SANY's own parse-error text is the
+verdict either way (the loader registers the text as it arrived and simply
+contributes no references). Two Clay diagnostics remain *better* than the
+inline path rather than identical, which is an approved difference:
+
+| Condition | Inline | Clay |
+|---|---|---|
+| referenced module absent | `module resolution failed` / `semantic graph generation failed` (downstream) | `Cannot find source file for module X imported in module Y.` at `%modules` |
+| declared name ≠ file name | same downstream failure | `File name 'X' does not match the name 'Y' …` at `%modules` |
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

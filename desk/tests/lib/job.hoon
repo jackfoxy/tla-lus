@@ -274,7 +274,7 @@
   ;:  weld
     %+  expect-eq
       !>(~)
-    !>((validate:job-lib (clay-req 'spec' `/cfg/txt ~[/src])))
+    !>((validate:job-lib (clay-req 'spec' `/src/cfg/txt ~[/src])))
   ::
     %+  expect-eq
       !>(`'a %check request requires a config')
@@ -282,11 +282,11 @@
   ::
     %+  expect-eq
       !>(`'a %clay bundle needs at least one module-search root')
-    !>((validate:job-lib (clay-req 'spec' `/cfg/txt ~)))
+    !>((validate:job-lib (clay-req 'spec' `/src/cfg/txt ~)))
   ::
     %+  expect-eq
       !>(`'empty root module name')
-    !>((validate:job-lib (clay-req '' `/cfg/txt ~[/src])))
+    !>((validate:job-lib (clay-req '' `/src/cfg/txt ~[/src])))
   ==
 ::
 ++  test-validate-translate-rejected
@@ -374,7 +374,7 @@
     ::  a Clay bundle loads its sources first (unit 10.1)
     %+  expect-eq
       !>(`(list stage)`~[%modules %parse %config %explore])
-    !>((plan:job-lib (clay-req 'spec' `/cfg/txt ~[/src])))
+    !>((plan:job-lib (clay-req 'spec' `/src/cfg/txt ~[/src])))
   ==
 ::
 ::  +|  Analyze Pipeline (unit 4.8)
