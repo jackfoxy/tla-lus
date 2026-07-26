@@ -22,15 +22,28 @@ directory of the files a `%clay` `source-bundle` would name:
 - `multi/` — root `spec` EXTENDS user module `helper` (two-module bundle);
   equals inline `test-multi-module-check` → `[%ok [5 4 0 4]]`.
 - `single/` — one-module counter; the async loader requests one read and
-  closes the graph → `[%ok [3 3 0 3]]`.
+  closes the graph → `[%ok [4 3 0 3]]` (measured in 10.1; the 10.0 draft
+  said `[3 3 0 3]`, which undercounted the initial state).
 
-## Serving over Clay (unit 10.1+)
+## Serving over Clay (unit 10.1)
 
-The agent reads sources through Clay cards, not `.^` in a stage. On the fake
-ship these files are placed on a desk the agent can `%warp`/`%cx` read via the
-`%tla` mark (present: `desk/mar/tla.hoon`). The cfg path resolves under a
-non-`.tla` mark. The differential harness submits the same files as (a) an
-inline bundle and (b) a `%clay` bundle and asserts equal results.
+The agent reads sources through Clay cards, not `.^` in a stage. These files
+are committed to the `%tla-lus` desk itself, so a fake ship can serve them to
+the agent over `%warp`/`%writ` (`.tla` via the `%tla` mark, `cfg.txt` via
+`%txt`). A live run:
+
+```
+:tla-lus &tla-lus-action [%submit ~.c1 [[%check [| ~ [%exhaustive &]]]
+  [%clay our %tla-lus [%da now] 'spec'
+    [~ /test-data/clay/multi/cfg/txt] ~[/test-data/clay/multi]]
+  [1.000.000 64 100.000 1.000 ~m10 1.000.000] |]]
++tla-lus!tla-lus/status ~.c1
+```
+
+The automated differential is `tests/lib/clay-load.hoon`, which mirrors these
+texts and plays the agent from an in-test file system: it runs the same
+sources as (a) an inline bundle and (b) a `%clay` bundle and asserts equal
+results, so the Clay path is covered without a live Clay.
 
 ## Rule
 

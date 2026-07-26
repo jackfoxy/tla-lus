@@ -40,6 +40,65 @@
   ^-  card
   [%pass [%job id %step ~] %arvo %b %wait now]
 ::
+++  read-card
+  ::  One asynchronous Clay read for a paused job, tagged on its load
+  ::  wire; the %writ comes back to on-arvo and resumes the job
+  |=  [id=req-id r=read-request]
+  ^-  card
+  :*  %pass  [%job id %load (scot %ud tag.r) ~]  %arvo  %c  %warp
+      ship.source-ref.r  desk.source-ref.r
+      `[%sing %x cas.source-ref.r path.source-ref.r]
+  ==
+::
+++  file-exists
+  ::  Does the file exist at the pinned revision? A %sing read of a path
+  ::  that was never born has no settled answer, so an absent file is
+  ::  answered synchronously rather than warped for
+  |=  r=source-ref
+  ^-  ?
+  =/  pax  (weld ~[(scot %p ship.r) desk.r (scot cas.r)] path.r)
+  =/  m  (mule |.(.^(? %cu pax)))
+  ?:(?=(%| -.m) | p.m)
+::
+++  writ-text
+  ::  A %writ body, mark-agnostically: a marked text file is stored as
+  ::  either an atom (%tla) or a wain (%txt)
+  |=  rit=riot:clay
+  ^-  (each @t @t)
+  ?~  rit  [%| 'no such file']
+  =/  nun  q.q.r.u.rit
+  ?@  nun  [%& `@t`nun]
+  =/  m  (mule |.((of-wain:format ;;(wain nun))))
+  ?:(?=(%| -.m) [%| 'unreadable file body'] [%& p.m])
+::
+++  do-reads
+  ::  Route a paused job's read-requests: existing files become Clay
+  ::  cards, absent ones become responses the caller delivers at once
+  |=  [id=req-id reads=(list read-request)]
+  ^-  [caz=(list card) miss=(list read-response)]
+  =|  caz=(list card)
+  =|  miss=(list read-response)
+  |-  ^-  [(list card) (list read-response)]
+  ?~  reads  [(flop caz) (flop miss)]
+  ?:  (file-exists source-ref.i.reads)
+    $(reads t.reads, caz [(read-card id i.reads) caz])
+  $(reads t.reads, miss [[tag.i.reads %| 'no such file'] miss])
+::
+++  pin-case
+  ::  Pin a Clay bundle's revision for the whole run: a %da/%tas case is
+  ::  resolved to a concrete aeon at submit, so a commit mid-run cannot
+  ::  split the source set and no read can block on an unsettled case
+  |=  req=request
+  ^-  (each request @t)
+  ?.  ?=(%clay -.src.req)  [%& req]
+  =/  s  src.req
+  =/  pax  /(scot %p ship.s)/[desk.s]/(scot cas.s)
+  =/  m  (mule |.(.^(cass:clay %cw pax)))
+  ?:  ?=(%| -.m)
+    [%| 'cannot resolve the Clay revision: unknown desk or unsettled case']
+  =.  cas.s  [%ud ud.p.m]
+  [%& req(src s)]
+::
 ++  snapshot
   ::  Current state of a job as updates, for (re)joining watchers
   |=  [id=req-id j=job-2:job-lib]
@@ -55,6 +114,26 @@
   |=  j=job-2:job-lib
   ^-  ?
   ?=(^ result.j)
+::
+++  advance
+  ::  Fan out a step's events and schedule what comes next: another
+  ::  bounded step, nothing (terminal), or the Clay reads the job is
+  ::  waiting on. Reads that cannot exist are answered immediately and a
+  ::  step is scheduled, so a paused job always makes progress
+  |=  [id=req-id r=step-result-2:job-lib now=@da]
+  ^-  [(list card) job-2:job-lib]
+  ?-    -.r
+      %more  [(snoc (efacts id events.r) (wait id now)) job.r]
+      %stop  [(efacts id events.r) job.r]
+      %await
+    =/  dr  (do-reads id reads.r)
+    :_  (deliver:job-lib job.r miss.dr)
+    ;:  weld
+      (efacts id events.r)
+      caz.dr
+      ?~(miss.dr ~ ~[(wait id now)])
+    ==
+  ==
 --
 %-  agent:dbug
 =|  state-2
@@ -101,8 +180,12 @@
     ?^  bad
       :_  this
       [(fact id.act [%rejected id.act u.bad]) ~]
+    =/  pin  (pin-case request.act)
+    ?:  ?=(%| -.pin)
+      :_  this
+      [(fact id.act [%rejected id.act p.pin]) ~]
     =.  jobs.state
-      (~(put by jobs.state) id.act (init:job-lib request.act now.bowl))
+      (~(put by jobs.state) id.act (init:job-lib p.pin now.bowl))
     :_  this
     :~  (fact id.act [%ack id.act])
         (wait id.act now.bowl)
@@ -190,16 +273,26 @@
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
     =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
-    =.  jobs.state  (~(put by jobs.state) id job.res)
-    ?-    -.res
-        %more
-      :_  this
-      (snoc (efacts id events.res) (wait id now.bowl))
-    ::
-        %stop
-      :_  this
-      (efacts id events.res)
-    ==
+    =/  adv  (advance id res now.bowl)
+    =.  jobs.state  (~(put by jobs.state) id +.adv)
+    [-.adv this]
+  ::
+      [%job @ %load @ ~]
+    ::  a Clay read for a paused job: deliver the body and resume it.
+    ::  Responses for deleted, terminal, or no-longer-pending reads are
+    ::  dropped by the job (the load cursor ignores unknown tags)
+    ?.  ?=([%clay %writ *] sign-arvo)
+      (on-arvo:default wire sign-arvo)
+    =/  id   `req-id`i.t.wire
+    =/  tag  (slav %ud i.t.t.t.wire)
+    =/  cur  (~(get by jobs.state) id)
+    ?~  cur  `this
+    ?:  (terminal u.cur)  `this
+    =/  j    (deliver:job-lib u.cur ~[[tag (writ-text p.sign-arvo)]])
+    =/  res  (step:job-lib j default-budget:job-lib now.bowl)
+    =/  adv  (advance id res now.bowl)
+    =.  jobs.state  (~(put by jobs.state) id +.adv)
+    [-.adv this]
   ==
 ::
 ++  on-fail  on-fail:default

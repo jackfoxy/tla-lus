@@ -121,6 +121,118 @@ at the nine granular rows.
 
 No in-scope Gall/Clay behavior is left unclassified.
 
+## 10.1 Asynchronous source-load stage (done)
+
+### What landed
+
+- **`sur/tla-lus`**: `source-ref` (`[ship desk case path]`), `read-request`
+  (`[tag source-ref]`), `read-response` (`[tag (each @t @t)]`), and the
+  `%await` arm of `step-result`. Also finished the `%clay` `source-bundle`
+  shape: `root` is a **module name**, not a path (the file is
+  `<search-root>/<lowercased-name>/tla`), and `cfg` is a desk path under a
+  marked non-`.tla` extension.
+- **`lib/job`**: a new `%modules` stage, planned first for a `%clay`
+  bundle. `+do-load` drives a `%load` cursor (`lcur`) that owns the BFS
+  queue, the reads in flight (`pend`, by tag), the delivered-but-unabsorbed
+  `inbox`, the loaded texts, and the byte/module accounting. `+deliver`
+  is the agent's entry point: it appends responses to the cursor's inbox
+  (dropping nothing, judging nothing) and `+step` absorbs them.
+  `+load-drain` does the judging: hit → parse, declared-name check,
+  register, enqueue references; miss → next search root, then the
+  standard modules, then a typed failure.
+- **Sources through the pipeline**: a new `srcs` record (`root`/`modules`/
+  `cfg`) travels on the continuation (`%src`, and on `%parse`/`%tree` as
+  `(unit srcs)`). `+srcs-of` returns the request's inline bundle or the
+  loaded set, so `%parse`, `%semantic`, and `%config` are
+  representation-agnostic — every `?> ?=(%inline …)` is gone. `+carry`
+  keeps an inline bundle from ever being copied into the continuation.
+- **`app/tla-lus`**: `+advance` handles all three step outcomes.
+  On `%await` it turns each `read-request` into a tagged
+  `%warp`/`%sing`/`%x` card on wire `[%job id %load <tag> ~]`;
+  `on-arvo [%job @ %load @ ~]` converts the `%writ` back into a
+  `read-response`, delivers it, and re-enters `+step`.
+- **Pinned revision at submit**: `+pin-case` resolves the requested case
+  with `.^(cass:clay %cw …)` and stores `[%ud n]` in the job's request.
+
+### Clay facts that shaped the design (verified on the fake ship)
+
+- **A future `%da` case is not settled**: `.^(cass:clay %cw /=desk=/(scot
+  %da (add now ~d1)))` bails. A `%sing` `%warp` at an unsettled case waits
+  for a commit, so a job could hang forever. Hence the `%ud` pin at submit,
+  wrapped in `mule` → a typed rejection instead of a crashed poke.
+- **Absent files are answered synchronously**: the agent probes
+  `.^(? %cu …)` and, when the path does not exist at the pinned revision,
+  synthesizes the negative `read-response` and schedules a wake instead of
+  warping. This makes "not under this search root" deterministic and
+  keeps the missing-file path from depending on Clay's unborn-path
+  behavior. Existing files always go through the real `%warp`/`%writ`.
+- **Mark-agnostic bodies**: a `%writ` cage for a `.tla` file is an atom
+  (`%tla`), for a `.txt` file a `wain` (`%txt`). `+writ-text` reads the
+  vase's noun directly (`?@` → cord, else `of-wain`), so no mark table is
+  needed.
+
+### Deliberate deviations
+
+- A standard-module name **is read for** before falling back to the
+  vendored text (the plan said standard modules need no read). Attempting
+  the read is exactly what lets a user file shadow a standard module, as
+  the inline resolver does; the cost is one miss per standard name.
+- The load stage parses each module to extract references and discards the
+  tree; `%parse` re-parses the root. Sharing that work through a
+  content-hash cache is 10.3.
+- A paused job has no watchdog timer (see compatibility.md).
+
+### Evidence
+
+- `desk/tests/lib/clay-load.hoon` — 17 cases, all green: the multi-module
+  differential against the frozen inline golden (`[%ok [5 4 0 4]]`), the
+  single-module case, Clay-equals-inline, the await protocol (first slice
+  asks for cfg + root, load budget slices a nine-way fan-out to 8 reads),
+  pause/resume at **every** boundary including across the Clay boundary,
+  stale/duplicate/unknown-tag responses ignored, search-root order,
+  standard-module fallback, the four typed `%modules` failures, and
+  `%limited %source`/`%modules` at growth.
+- Full ship suite `ok=%.y`.
+- **Live** on `~zod` (this is the `op-gall-writ` evidence; it cannot be
+  driven from a hand-built bowl because the case pin needs the real desk):
+
+  ```
+  :tla-lus &tla-lus-action [%submit ~.c1 [[%check [| ~ [%exhaustive &]]]
+    [%clay our %tla-lus [%da now] 'spec'
+      [~ /test-data/clay/multi/cfg/txt] ~[/test-data/clay/multi]]
+    [1.000.000 64 100.000 1.000 ~m10 1.000.000] |]]
+  +tla-lus!tla-lus/status ~.c1
+  ```
+
+  → case pinned `[%ud 268]`, `result=[~ [%ok [5 4 0 4]]]`, report artifact
+  byte-identical to the inline run. Root `'nope'` → `%failed` with the
+  `[%lus 401]` `%modules` diagnostic `Cannot find source file for module
+  nope.`
+
+### Corrections to 10.0
+
+- `test-data/clay/single/expect.txt` said `[%ok [3 3 0 3]]`; the mod-3
+  counter actually generates 4 states (1 initial + 3 successors), so the
+  frozen expectation is `[%ok [4 3 0 3]]` — measured, and asserted in
+  `test-clay-single-module` against the inline run of the same text.
+
+### Hoon gotchas hit (all previously known, all re-hit)
+
+- `=.`/`=^` into a **narrowed** wing nest-fails: `?~ inbox.c` then
+  `=. inbox.c t.inbox.c`, `?> ?=(^ roots.c)` then `=^ … c`, and
+  `?~ cfg-path.c` then `=^ … c` all failed. Fix: copy the field to a
+  local, test the copy, and put the widened value back with `c(field …)`.
+- Face access across a `$%` fork is `find-fork`: `job.r`/`result.job.r`
+  in the tests needed `?> ?=(%stop -.r)` once `step-result` grew a third
+  arm.
+- `malt` over path literals: a path literal's type is its exact segments,
+  which will not nest in `(map path @t)` — cast the list flat first
+  (`|=(l=(list [path @t]) (malt l))`).
+- `result` is **not** a free mold name in a test context (`/+ *test`
+  brings its own); read the field off the job instead of casting.
+- Adding two members to the `kont` `$%` (5 → 7) did **not** trip the
+  zuse-408 mold compiler; `kont` is not itself in a recursive cycle.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

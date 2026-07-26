@@ -30,6 +30,15 @@
   ^-  request
   [[%check [| ~ [%simulate seed num depth]]] (bundle spec `cfg) lim |]
 ::
+++  clay-req
+  ::  a %clay %check request over ~zod/%spec at a pinned revision
+  |=  [root=module-name cfg=(unit path) roots=(list path)]
+  ^-  request
+  :*  [%check [| ~ [%exhaustive &]]]
+      [%clay ~zod %spec ud+1 root cfg roots]
+      lim  |
+  ==
+::
 ++  analyze-req
   |=  mods=(list [module-name @t])
   ^-  request
@@ -199,8 +208,9 @@
   |-  ^-  [(list event) jb]
   =/  r  (step:job-lib j budget t0)
   ?-  -.r
-    %stop  [(weld acc events.r) job.r]
-    %more  $(j job.r, acc (weld acc events.r))
+    %stop   [(weld acc events.r) job.r]
+    %more   $(j job.r, acc (weld acc events.r))
+    %await  ~|(%inline-run-never-awaits !!)
   ==
 ::
 ++  run-k
@@ -212,8 +222,9 @@
   ?:  =(0 k)  [acc j]
   =/  r  (step:job-lib j budget t0)
   ?-  -.r
-    %stop  [(weld acc events.r) job.r]
-    %more  $(j job.r, k (dec k), acc (weld acc events.r))
+    %stop   [(weld acc events.r) job.r]
+    %more   $(j job.r, k (dec k), acc (weld acc events.r))
+    %await  ~|(%inline-run-never-awaits !!)
   ==
 ::
 ++  count-steps
@@ -223,8 +234,9 @@
   |-  ^-  @ud
   =/  r  (step:job-lib j budget t0)
   ?-  -.r
-    %stop  +(n)
-    %more  $(j job.r, n +(n))
+    %stop   +(n)
+    %more   $(j job.r, n +(n))
+    %await  ~|(%inline-run-never-awaits !!)
   ==
 ::
 ++  every-boundary
@@ -256,15 +268,26 @@
 ++  test-validate-ok
   (expect-eq !>(~) !>((validate:job-lib (check-req cyc-spec mc-cfg))))
 ::
-++  test-validate-clay-rejected
-  =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
-        [%clay ~zod %spec da+t0 /spec ~ ~]
-        lim  |
-    ==
-  %+  expect-eq
-    !>(`'unsupported: %clay sources are not loaded yet (unit 10)')
-  !>((validate:job-lib req))
+::  a %clay bundle is accepted (unit 10.1); what it can be rejected for
+::  before any read is its reference shape and the missing config
+++  test-validate-clay
+  ;:  weld
+    %+  expect-eq
+      !>(~)
+    !>((validate:job-lib (clay-req 'spec' `/cfg/txt ~[/src])))
+  ::
+    %+  expect-eq
+      !>(`'a %check request requires a config')
+    !>((validate:job-lib (clay-req 'spec' ~ ~[/src])))
+  ::
+    %+  expect-eq
+      !>(`'a %clay bundle needs at least one module-search root')
+    !>((validate:job-lib (clay-req 'spec' `/cfg/txt ~)))
+  ::
+    %+  expect-eq
+      !>(`'empty root module name')
+    !>((validate:job-lib (clay-req '' `/cfg/txt ~[/src])))
+  ==
 ::
 ++  test-validate-translate-rejected
   =/  req=request
@@ -347,6 +370,11 @@
     %+  expect-eq
       !>(`(list stage)`~[%parse %semantic %terminal])
     !>((plan:job-lib (analyze-req-f ~[['spec' cyc-spec]] [& & & &])))
+  ::
+    ::  a Clay bundle loads its sources first (unit 10.1)
+    %+  expect-eq
+      !>(`(list stage)`~[%modules %parse %config %explore])
+    !>((plan:job-lib (clay-req 'spec' `/cfg/txt ~[/src])))
   ==
 ::
 ::  +|  Analyze Pipeline (unit 4.8)
@@ -534,6 +562,7 @@
   ::  max-time is checked on entry to every slice
   =/  j  (init:job-lib (check-req cyc-spec mc-cfg) t0)
   =/  r  (step:job-lib j 256 (add t0 ~m11))
+  ?>  ?=(%stop -.r)
   ;:  weld
     (expect-eq !>(%stop) !>(-.r))
     (expect-eq !>(`[%limited %time *run-stats]) !>(result.job.r))
@@ -701,6 +730,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 256)
   =/  r  (step:job-lib j 256 t0)
+  ?>  ?=(%stop -.r)
   ;:  weld
     (expect-eq !>(%stop) !>(-.r))
     (expect-eq !>(~) !>(events.r))

@@ -132,12 +132,29 @@
           =ship
           =desk
           cas=case
-          root=path
+          ::  root module name; the file is <root-dir>/<lowercased-name>/tla
+          root=module-name
+          ::  cfg file path within the desk (the desk has no %cfg mark, so
+          ::  a Clay-served cfg uses a non-.tla mark, e.g. /spec-cfg/txt)
           cfg=(unit path)
-          ::  module-search roots
+          ::  module-search root directories, tried in order
           roots=(list path)
       ==
   ==
+::
+::  +|  Async Source Loading (unit 10)
+::
+::  A pure stage may not read Clay; instead it returns tagged read-requests
+::  and resumes when the agent delivers read-responses.
+::
+::  a canonical, escape-free reference to one Clay file. Unit 10.2 adds the
+::  lib/source-path construction guard that rejects `..`/absolute/out-of-root
++$  source-ref  [=ship =desk cas=case =path]
+::  one pending Clay read the kernel asks the agent to perform
++$  read-request   [tag=@ud =source-ref]
+::  the agent's answer: text on success, a typed error message on failure
++$  read-response  [tag=@ud res=(each @t @t)]
+::
 +$  limits
   $:  max-source=@ud    ::  total source bytes
       max-modules=@ud
@@ -208,6 +225,9 @@
 +$  step-result
   $%  [%more events=(list event) =job]
       [%stop events=(list event) =job]
+      ::  a pure stage requests external Clay reads and pauses; the agent
+      ::  performs them and resumes the job with the responses (unit 10)
+      [%await events=(list event) reads=(list read-request) =job]
   ==
 ::
 ::  +|  Poke Actions

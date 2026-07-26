@@ -5,6 +5,8 @@
 /=  semantic  /lib/semantic
 /=  ne        /lib/node-eval
 /=  config    /lib/config
+/=  mod       /lib/modules
+/=  stdmods   /lib/stdmods
 |%
   ::  Resumable Job Kernel (unit P2-1)
   ::
@@ -45,14 +47,67 @@
 +$  step-result-2
   $%  [%more events=(list event) job=job-2]
       [%stop events=(list event) job=job-2]
+      ::  the job is waiting on external Clay reads (unit 10): the agent
+      ::  performs them and resumes the job with +deliver
+      [%await events=(list event) reads=(list read-request) job=job-2]
   ==
 ::  the source span of the Next action, for typed trace states
 +$  next-act  (unit [name=@t at=(unit loc)])
+::  a fully loaded source set: what an %inline bundle carries in the
+::  request, and what the %modules stage loads for a %clay bundle
++$  srcs
+  $:  root=module-name
+      modules=(map module-name @t)
+      cfg=(unit @t)
+  ==
+::  one Clay read in flight: the module it stands for (with the search
+::  roots left to try) or the config file
++$  lread
+  $%  [%module name=module-name from=module-name try=(list path)]
+      [%cfg ~]
+  ==
+::  a source-load failure: a typed diagnostic, or a limit hit at growth
++$  lerr
+  $%  [%fail msg=@t]
+      [%limited what=limit-kind]
+  ==
+::  the asynchronous source-load cursor. It never reads Clay: it names
+::  the files it needs, and resumes when the agent delivers the bytes
++$  lcur
+  $:  root=module-name
+      =ship
+      =desk
+      cas=case
+      ::  module-search roots, tried in order (SimpleFilenameToStream)
+      roots=(list path)
+      cfg-path=(unit path)
+      cfg-todo=?
+      ::  BFS queue of referenced names not yet requested
+      queue=(list [name=module-name from=module-name])
+      ::  reads in flight, by tag
+      pend=(map @ud lread)
+      ::  delivered but not yet absorbed responses
+      inbox=(list read-response)
+      mods=(map module-name @t)
+      cfg=(unit @t)
+      ::  names that need no further read: loaded files, inner modules
+      ::  registered from their outer file, and standard modules
+      have=(set module-name)
+      ::  names already loaded, queued, or in flight
+      asked=(set module-name)
+      bytes=@ud
+      next=@ud
+  ==
 ::  in-flight pipeline state; versioned via the [%1 k=@] wrapper above
 +$  kont
-  $%  [%parse todo=(list module-name)]
+  $%  ::  asynchronous Clay source load
+      [%load cur=lcur]
+      ::  loaded Clay sources, handed from one stage to the next; inline
+      ::  runs never carry one (their bundle is already in the request)
+      [%src s=srcs]
+      [%parse todo=(list module-name) src=(unit srcs)]
       ::  parsed root module, consumed by the %config stage
-      [%tree t=node:check]
+      [%tree t=node:check src=(unit srcs)]
       ::  safety search
       [%bfs nl=@t act=next-act o=bfs-opts:check cur=bfs-cursor:check]
       ::  liveness: full-graph build (%explore), then property scan
@@ -92,6 +147,9 @@
 ::  work units one Gall event may spend; engine configuration,
 ::  deliberately separate from the request's user-facing limits
 ++  default-budget  256
+::  Clay reads one slice may request, bounding a wide dependency fan-out
+::  independently of the work budget
+++  default-load-budget  8
 ::  the largest a persisted continuation (jammed BFS cursor) may grow before a
 ::  search is stopped %limited — a defense-in-depth bound on the in-flight noun,
 ::  above what max-states already implies, checked at each slice boundary
@@ -119,19 +177,42 @@
   ::  accepted into a stage that would fake success.
   |=  req=request
   ^-  (unit @t)
-  ?:  ?=(%clay -.src.req)
-    `'unsupported: %clay sources are not loaded yet (unit 10)'
   ?:  ?=(%translate -.op.req)
     `'unsupported: PlusCal translation is not ported yet (unit 8)'
   ?:  ?=(%analyze -.op.req)
-    (validate-bundle req)
+    (validate-src req)
   ?:  translate.opts.op.req
     `'unsupported: translate-before-check is not ported yet (unit 8)'
   ?:  ?=(^ cfg.opts.op.req)
     `'unsupported: cfg source override; put the config in the bundle'
+  ?:  ?=(%clay -.src.req)
+    ?~  cfg.src.req
+      `'a %check request requires a config'
+    (validate-src req)
   ?~  cfg.src.req
     `'a %check request requires a config'
-  (validate-bundle req)
+  (validate-src req)
+::
+++  validate-src
+  ::  what can be checked before any work is scheduled: an inline bundle
+  ::  against the size limits, a Clay bundle against its reference shape
+  ::  (path canonicalization and escape prevention land in unit 10.2)
+  |=  req=request
+  ^-  (unit @t)
+  ?-  -.src.req
+    %inline  (validate-bundle req)
+    %clay    (validate-clay req)
+  ==
+::
+++  validate-clay
+  |=  req=request
+  ^-  (unit @t)
+  ?>  ?=(%clay -.src.req)
+  ?:  =('' root.src.req)
+    `'empty root module name'
+  ?~  roots.src.req
+    `'a %clay bundle needs at least one module-search root'
+  ~
 ::
 ++  validate-bundle
   ::  size limits are enforced here, before any work is scheduled
@@ -159,9 +240,14 @@
 ::
 ::
 ++  plan
-  ::  ordered stages for a request; every planned stage does real work
+  ::  ordered stages for a request; every planned stage does real work.
+  ::  A %clay bundle loads its sources first; whether it also needs a
+  ::  %liveness stage is unknown until its config is read, so %config
+  ::  appends that stage when the loaded config names a PROPERTY
   |=  req=request
   ^-  (list stage)
+  %+  weld
+    ?:(?=(%clay -.src.req) `(list stage)`~[%modules] ~)
   ?-    -.op.req
       %translate  ~
       %analyze
@@ -210,12 +296,41 @@
   |=  k=kont
   ^-  (unit stage)
   ?-  -.k
+    %load   `%modules
+    %src    ~
     %parse  `%parse
     %tree   ~
     %bfs    `%explore
     %live   ?:(=(%build phase.k) `%explore `%liveness)
     %sim    `%simulate
   ==
+::
+++  k-srcs
+  ::  the loaded Clay sources a continuation carries between stages
+  |=  k=(unit kont)
+  ^-  (unit srcs)
+  ?~  k  ~
+  ?+  -.u.k  ~
+    %src    `s.u.k
+    %parse  src.u.k
+    %tree   src.u.k
+  ==
+::
+++  srcs-of
+  ::  the sources a stage works on: the request's inline bundle, or the
+  ::  set the %modules stage loaded over Clay
+  |=  [j=job-2 s=(unit srcs)]
+  ^-  (unit srcs)
+  ?^  s  s
+  ?.  ?=(%inline -.src.request.j)  ~
+  `[root.src.request.j modules.src.request.j cfg.src.request.j]
+::
+++  carry
+  ::  loaded Clay sources travel with the continuation; an inline bundle
+  ::  is already in the request and is never copied into it
+  |=  [j=job-2 s=(unit srcs)]
+  ^-  (unit srcs)
+  ?:(?=(%inline -.src.request.j) ~ s)
 ::
 ++  time-exceeded
   |=  [j=job-2 now=@da]
@@ -261,8 +376,9 @@
   ^-  step-result-2
   ?+    stage.j
       ~|([%tla-lus-unplanned-stage stage.j] !!)
+    %modules   (do-load j k pre)
     %parse     (do-parse j k budget pre)
-    %semantic  (do-semantic j pre)
+    %semantic  (do-semantic j k pre)
     %config    (do-config j k pre)
     %explore   (do-explore j k budget pre)
     %liveness  (do-scan j k budget pre)
@@ -275,6 +391,28 @@
   |=  [j=job-2 evs=(list event)]
   ^-  step-result-2
   [%more ?~(evs ~[[%progress progress.j]] evs) j]
+::
+++  await
+  ::  pause the job on external Clay reads; the agent performs them and
+  ::  resumes it with +deliver. No work is scheduled in the meantime
+  |=  [j=job-2 reads=(list read-request) evs=(list event)]
+  ^-  step-result-2
+  [%await evs reads j]
+::
+++  deliver
+  ::  absorb the agent's answers into the source-load cursor. Responses
+  ::  for tags the cursor is not waiting on are dropped when it drains
+  ::  the inbox, so a duplicate or stale delivery changes nothing
+  |=  [j=job-2 rs=(list read-response)]
+  ^-  job-2
+  ?~  rs  j
+  ?~  cont.j  j
+  =/  lr  (mule |.((load-kont u.cont.j)))
+  ?.  ?=(%& -.lr)  j
+  ?.  ?=(%load -.p.lr)  j
+  =/  c  cur.p.lr
+  =.  inbox.c  (weld inbox.c rs)
+  j(cont (save-kont [%load c]))
 ::
 ++  finish
   ::  seal the job; a sealed job is never resumed
@@ -299,6 +437,208 @@
       stats.j  diags.j  artifacts.j  result.j
   ==
 ::
+::  +|  Stage: %modules (asynchronous Clay source load)
+::
+::
+++  mod-path
+  ::  util.FilenameToStream's mapping, under one search root: a module
+  ::  name is the lowercased name plus the .tla extension (Clay path
+  ::  segments cannot carry case; +resolve still validates the declared,
+  ::  case-sensitive name)
+  |=  [rot=path name=module-name]
+  ^-  path
+  (weld rot `path`~[`@ta`(crip (cass (trip name))) %tla])
+::
+++  missing-msg
+  |=  [name=module-name from=module-name]
+  ^-  @t
+  ?:  =('' from)
+    (rap 3 ~['Cannot find source file for module ' name '.'])
+  %+  rap  3
+  :~  'Cannot find source file for module '  name
+      ' imported in module '  from  '.'
+  ==
+::
+++  mismatch-msg
+  |=  [file=module-name declared=module-name]
+  ^-  @t
+  %+  rap  3
+  :~  'File name \''  file  '\' does not match the name \''
+      declared  '\' of the top level module it contains.'
+  ==
+::
+++  load-init
+  |=  s=source-bundle
+  ^-  lcur
+  ?>  ?=(%clay -.s)
+  :*  root.s  ship.s  desk.s  cas.s  roots.s
+      cfg-path=cfg.s
+      cfg-todo=?=(^ cfg.s)
+      queue=~[[root.s '']]
+      pend=~
+      inbox=~
+      mods=~
+      cfg=~
+      have=~
+      asked=(silt ~[root.s])
+      bytes=0
+      next=0
+  ==
+::
+++  load-ask
+  ::  put one read in flight and return its tagged request
+  |=  [c=lcur p=lread pax=path]
+  ^-  [read-request lcur]
+  =/  tag  next.c
+  =.  next.c  +(next.c)
+  =.  pend.c  (~(put by pend.c) tag p)
+  [[tag ship.c desk.c cas.c pax] c]
+::
+++  load-drain
+  ::  absorb delivered responses. A hit registers the module (or the
+  ::  config) and enqueues its references in appearance order; a miss
+  ::  falls back to the next search root, then to the standard modules,
+  ::  and finally fails with the text SANY reports for the same condition
+  |=  [c=lcur lims=limits]
+  ^-  [cur=lcur reads=(list read-request) err=(unit lerr)]
+  =|  reads=(list read-request)
+  |-  ^-  [lcur (list read-request) (unit lerr)]
+  ::  a narrowed wing cannot be mutated in place: copy, test, then put
+  ::  the widened tail back on the cursor
+  =/  ibx  inbox.c
+  ?~  ibx  [c (flop reads) ~]
+  =/  r  i.ibx
+  =.  c  c(inbox t.ibx)
+  =/  p  (~(get by pend.c) tag.r)
+  ::  an unknown tag is a duplicate or stale delivery: dropped
+  ?~  p  $
+  =.  pend.c  (~(del by pend.c) tag.r)
+  ?-    -.u.p
+      %cfg
+    ?:  ?=(%| -.res.r)
+      [c (flop reads) `[%fail 'Cannot find the config file.']]
+    =.  cfg.c    `p.res.r
+    =.  bytes.c  (add bytes.c (met 3 p.res.r))
+    ?:  (gth bytes.c max-source.lims)
+      [c (flop reads) `[%limited %source]]
+    $
+  ::
+      %module
+    ?:  ?=(%| -.res.r)
+      ::  not under this search root: try the next one
+      ?^  try.u.p
+        =^  rq  c
+          %^  load-ask  c  [%module name.u.p from.u.p t.try.u.p]
+          (mod-path i.try.u.p name.u.p)
+        $(reads [rq reads])
+      ::  a name with no user file falls back to the standard modules,
+      ::  which the resolver supplies from the vendored set
+      ?:  (~(has by standard-modules:stdmods) name.u.p)
+        =.  have.c  (~(put in have.c) name.u.p)
+        $
+      [c (flop reads) `[%fail (missing-msg name.u.p from.u.p)]]
+    =/  txt  p.res.r
+    =.  bytes.c  (add bytes.c (met 3 txt))
+    ?:  (gth bytes.c max-source.lims)
+      [c (flop reads) `[%limited %source]]
+    =/  pr  (mule |.((parse:syntax txt)))
+    ?:  ?=(%| -.pr)
+      [c (flop reads) `[%fail (rap 3 ~['Could not parse module ' name.u.p '.'])]]
+    ?:  ?=(%| -.p.pr)
+      [c (flop reads) `[%fail (rap 3 ~['Could not parse module ' name.u.p '.'])]]
+    =/  tree  p.p.pr
+    =/  dec   (module-name-of:mod tree)
+    ?:  &(?=(^ dec) !=(u.dec name.u.p))
+      [c (flop reads) `[%fail (mismatch-msg name.u.p u.dec)]]
+    =.  mods.c  (~(put by mods.c) name.u.p txt)
+    =.  have.c  (~(put in have.c) name.u.p)
+    ?:  (gth ~(wyt by mods.c) max-modules.lims)
+      [c (flop reads) `[%limited %modules]]
+    ::  inner modules are registered from their outer file, so a
+    ::  reference to one never becomes a read
+    =.  have.c
+      %-  ~(gas in have.c)
+      (turn (inner-modules:mod tree) |=([nm=@t *] nm))
+    =.  c
+      %+  roll  (refs-of:mod tree)
+      |=  [nm=module-name a=_c]
+      ?:  (~(has in have.a) nm)   a
+      ?:  (~(has in asked.a) nm)  a
+      %=  a
+        queue  (snoc queue.a [nm name.u.p])
+        asked  (~(put in asked.a) nm)
+      ==
+    $
+  ==
+::
+++  load-ask-more
+  ::  request up to `budget` new reads: the config first, then queued
+  ::  module names in BFS order, each at its first search root
+  |=  [c=lcur budget=@ud]
+  ^-  [lcur (list read-request)]
+  =|  out=(list read-request)
+  =/  n  0
+  |-  ^-  [lcur (list read-request)]
+  ?:  (gte n budget)  [c (flop out)]
+  ?:  cfg-todo.c
+    ::  test a copy: narrowing the cursor's own field would freeze it
+    =/  cp  cfg-path.c
+    ?~  cp  $(cfg-todo.c |)
+    =.  cfg-todo.c  |
+    =^  rq  c  (load-ask c [%cfg ~] u.cp)
+    $(out [rq out], n +(n))
+  =/  que  queue.c
+  ?~  que  [c (flop out)]
+  ::  a bundle with no search root is rejected at +validate
+  =/  rts  roots.c
+  ?>  ?=(^ rts)
+  =/  q  i.que
+  =.  c  c(queue t.que)
+  =^  rq  c
+    %^  load-ask  c  [%module name.q from.q t.rts]
+    (mod-path i.rts name.q)
+  $(out [rq out], n +(n))
+::
+++  load-fail
+  ::  a resolution failure is a typed diagnostic at the %modules stage,
+  ::  carrying the text the inline resolver reports for the same condition
+  |=  [j=job-2 msg=@t pre=(list event)]
+  ^-  step-result-2
+  =/  dg=diagnostic  [[%lus 401] %error %modules msg ~ ~]
+  =.  diags.j  (snoc diags.j dg)
+  (finish j [%failed msg] (snoc pre [%diagnostic dg]))
+::
+++  do-load
+  ::  close the module graph over asynchronous reads. No stage may touch
+  ::  Clay: this one names the files it needs and pauses (%await), and
+  ::  the sources it hands to %parse are exactly what an inline bundle of
+  ::  the same files would hand it
+  |=  [j=job-2 k=(unit kont) pre=(list event)]
+  ^-  step-result-2
+  ?.  ?=(%clay -.src.request.j)
+    (finish j [%failed 'internal: %modules on an inline bundle'] pre)
+  =/  c=lcur
+    ?:  ?&(?=(^ k) ?=(%load -.u.k))  cur.u.k
+    (load-init src.request.j)
+  =/  dr  (load-drain c limits.request.j)
+  =.  c  cur.dr
+  ?^  err.dr
+    ?-  -.u.err.dr
+      %fail     (load-fail j msg.u.err.dr pre)
+      %limited  (finish j [%limited what.u.err.dr stats.j] pre)
+    ==
+  =/  am  (load-ask-more c default-load-budget)
+  =.  c  -.am
+  =/  reads  (weld reads.dr +.am)
+  ?^  pend.c
+    =.  cont.j  (save-kont [%load c])
+    (await j reads pre)
+  ::  the graph is closed
+  ?:  &(?=(^ cfg-path.c) ?=(~ cfg.c))
+    (load-fail j 'Cannot find the config file.' pre)
+  =.  cont.j  (save-kont [%src [root.c mods.c cfg.c]])
+  (more j pre)
+::
 ::  +|  Stage: %parse
 ::
 ::
@@ -308,8 +648,11 @@
   ::  diagnostics for %terminal's verdict
   |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
   ^-  step-result-2
-  ?>  ?=(%inline -.src.request.j)
-  =/  src  src.request.j
+  =/  so  (srcs-of j (k-srcs k))
+  ?~  so
+    (finish j [%failed 'internal: %parse without loaded sources'] pre)
+  =/  src  u.so
+  =/  cry  (carry j so)
   ?:  ?=(%check -.op.request.j)
     =/  text  (~(get by modules.src) root.src)
     ?~  text
@@ -325,18 +668,19 @@
       %^  finish  j
         [%failed ?~(diags.pt 'parse error' message.i.diags.pt)]
       (weld pre evs)
-    =.  cont.j  (save-kont [%tree u.tree.pt])
+    =.  cont.j  (save-kont [%tree u.tree.pt cry])
     (more j pre)
   ::  %analyze
   =/  kk=kont
-    ?^  k  u.k
-    [%parse (sort ~(tap in ~(key by modules.src)) aor)]
+    ?:  ?&(?=(^ k) ?=(%parse -.u.k))  u.k
+    [%parse (sort ~(tap in ~(key by modules.src)) aor) cry]
   ?>  ?=(%parse -.kk)
   =/  evs  pre
   =/  spent  0
   |-  ^-  step-result-2
   ?~  todo.kk
-    =.  cont.j  ~
+    ::  Clay sources travel on to the %semantic stage
+    =.  cont.j  ?~(cry ~ (save-kont [%src u.cry]))
     (more j evs)
   ?:  (gte spent budget)
     =.  cont.j  (save-kont kk)
@@ -384,11 +728,13 @@
   ::  which +analyze-graph already enforces. Runs in a single slice: a
   ::  module bundle's analysis is bounded like a capped exploration, so
   ::  no mid-stage cursor is needed (see doc/compatibility.md)
-  |=  [j=job-2 pre=(list event)]
+  |=  [j=job-2 k=(unit kont) pre=(list event)]
   ^-  step-result-2
-  ?>  ?=(%inline -.src.request.j)
   ?>  ?=(%analyze -.op.request.j)
-  =/  src    src.request.j
+  =/  so  (srcs-of j (k-srcs k))
+  ?~  so
+    (finish j [%failed 'internal: %semantic without loaded sources'] pre)
+  =/  src    u.so
   =/  flags  flags.op.request.j
   =/  ag  (analyze-graph:semantic root.src modules.src)
   ?~  ag
@@ -455,16 +801,21 @@
   ?.  ?&(?=(^ k) ?=(%tree -.u.k))
     (finish j [%failed 'internal: %config without a parsed tree'] pre)
   =/  tree  t.u.k
-  ?>  ?=(%inline -.src.request.j)
   ?>  ?=(%check -.op.request.j)
-  =/  cfg   (need cfg.src.request.j)
+  =/  so  (srcs-of j (k-srcs k))
+  ?~  so
+    (finish j [%failed 'internal: %config without loaded sources'] pre)
+  =/  src   u.so
+  ?~  cfg.src
+    (finish j [%failed 'a %check request requires a config'] pre)
+  =/  cfg   u.cfg.src
   =/  mode  mode.opts.op.request.j
   =/  lims  limits.request.j
   ::  real config pipeline (unit 5): parse -> validate against the WU3
   ::  graph -> assemble the typed run-spec. One bounded slice (graph
   ::  generation, like a capped run-check); a config diagnostic is a
   ::  typed TLC failure, not a silent %ok.
-  =/  rso  (run-spec-of:config root.src.request.j modules.src.request.j cfg)
+  =/  rso  (run-spec-of:config root.src modules.src cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
   =/  rs  p.rso
   ?.  ?=(%init-next -.mode.rs)
@@ -513,7 +864,7 @@
     (more j pre)
   ::  WU6.9: safety and liveness run on the Work Unit 3 SEMANTIC graph via
   ::  node-eval (the simulation path above keeps the CST solver, a residue).
-  =/  mo  (generate:semantic root.src.request.j modules.src.request.j)
+  =/  mo  (generate:semantic root.src modules.src)
   ?~  mo  (finish j [%failed 'semantic graph generation failed'] pre)
   =/  defs    (defmap-of:ne u.mo)
   =/  consts  (consts-of:check constants.rs)
@@ -547,6 +898,13 @@
       %^  finish  j
         [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
       pre
+    ::  a %clay run cannot know it needs a %liveness stage until its
+    ::  config is read; the plan grows here, honestly, with its total
+    =?  j  !(lien pending.j |=(s=stage =(%liveness s)))
+      %=  j
+        pending   (snoc pending.j %liveness)
+        progress  [done.progress.j +(total.progress.j)]
+      ==
     =/  o=bfs-opts:check
       [u.nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
     =.  cont.j

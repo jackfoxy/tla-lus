@@ -370,6 +370,69 @@ Still absent after P2-1 (tracked in `parity-manifest.md`): Clay sources
 search roots, content-hash caching, quotas, artifact retention. (The
 `%analyze` semantic/level/lint flags now run the real pipeline — unit 4.8.)
 
+## Unit P2-10 — Gall + Clay integration
+
+### 10.1 Asynchronous source load — at parity for the load itself
+
+A `%clay` source bundle is no longer typed-rejected. It plans an extra
+`%modules` stage that closes the module graph over **asynchronous** reads:
+no stage touches Clay, so the kernel stays pure and resumable across the
+network boundary.
+
+- `step-result` gained `%await`: a stage returns the `read-request`s it
+  needs and pauses. The agent performs them and resumes the job with
+  `+deliver`; a paused job schedules no work.
+- The `%load` cursor is a BFS over `EXTENDS`/`INSTANCE` references in
+  appearance order, identical to `lib/modules` `+resolve`: user files
+  shadow the standard modules (the read is attempted first, and only a
+  name absent from every search root falls back to the vendored set),
+  inner modules are registered from their outer file and never read, and
+  search roots are tried in order (`SimpleFilenameToStream`).
+- Module names map to the lowercased `<name>.tla` file
+  (`util.FilenameToStream`); the case-sensitive declared-name check is
+  preserved.
+- Missing file, unparsable module, declared-name mismatch, and a missing
+  config are typed `%modules` diagnostics (`[%lus 401]`) carrying the text
+  the inline resolver reports for the same condition, then `%failed`.
+- `max-source`/`max-modules` are enforced as bytes and files *arrive*, not
+  only at submit → `%limited %source` / `%limited %modules`.
+- A per-slice `load-budget` (8 reads) bounds a wide dependency fan-out
+  independently of the work budget.
+- The revision is **pinned at submit**: the agent resolves the requested
+  case to a concrete aeon (`%cw`), so a commit mid-run cannot split the
+  source set and no read can block on an unsettled case.
+- Because a Clay run cannot know its config before reading it, `%config`
+  appends the `%liveness` stage (and grows the progress total) when the
+  loaded config names a `PROPERTY`.
+
+The measured contract is equality with the inline path: a Clay run reaches
+the same module graph, verdict, and statistics as an inline bundle of the
+same files (`tests/lib/clay-load`, 17 cases; verified live on a fake ship
+against `test-data/clay/multi` → `[%ok [5 4 0 4]]`).
+
+Not yet done in this subunit (each has a named owner):
+
+| Behavior | Owner |
+|---|---|
+| path canonicalization + escape prevention (`..`, absolute, out-of-root) | 10.2 `lib/source-path` |
+| `[ship desk case hash]` on every loaded module, hash-keyed parse cache, provenance in the artifact | 10.3 |
+| global agent quotas, artifact retention/cleanup, `%noun` on the load cursor | 10.4 |
+| `%writ` generation guard, reorder/duplicate matrix, terminal resubmit policy | 10.5 |
+| `job-3`/state-3 migration | 10.6 |
+
+Known deviations recorded now:
+
+- A standard-module name is *read for* before falling back to the vendored
+  text (the plan suggested skipping the read). Attempting it is what makes
+  a user file shadow a standard module, matching the inline resolver.
+- The load stage parses each module to extract its references and throws
+  that tree away; `%parse` re-parses the root. The content-hash cache that
+  removes the second parse is 10.3.
+- A job paused on Clay has no watchdog: if a `%writ` never arrives the job
+  stays active. Reads are answered synchronously when the path does not
+  exist, and the pinned (settled) case makes an unanswered read a Clay
+  bug, but no timer forces the issue.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,
@@ -383,7 +446,9 @@ ignored):
 | `check-opts.translate` = `&` | `unsupported: translate-before-check is not ported yet (unit 8)` |
 | `check-opts.cfg` = `` `name `` | `unsupported: cfg source override; put the config in the bundle` |
 | `%check` without a bundle cfg | `a %check request requires a config` |
-| `src` = `%clay …` | `unsupported: %clay sources are not loaded yet (unit 10)` |
+| `src` = `%clay …` with no search root | `a %clay bundle needs at least one module-search root` |
+| `src` = `%clay …` with an empty root name | `empty root module name` |
+| `src` = `%clay …` on an unknown desk / unsettled case | `cannot resolve the Clay revision: unknown desk or unsettled case` |
 | malformed / invalid config | the real TLC `CFG_*` (5001-5006) or `TLC_CONFIG_*` (2222-2281) diagnostic at `%config`, byte-matching ModelConfig/SpecProcessor (unit 5) |
 | `SPECIFICATION`-form config | `unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)` (at `%config`) |
 | unsupported temporal property form | `unsupported: temporal property form (only <>P, []<>P, []P; unit 8)` (at `%config`) |

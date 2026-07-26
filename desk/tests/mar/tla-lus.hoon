@@ -36,8 +36,8 @@
           ~zod
           %specs
           da+~2026.7.12
-          /die-hard/tla
-          `/die-hard/cfg
+          'DieHard'
+          `/die-hard/txt
           ~[/lib]
       ==
       default-limits
