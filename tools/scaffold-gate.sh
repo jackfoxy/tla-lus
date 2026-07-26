@@ -17,7 +17,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DESK="$REPO/desk"
 TLA_REPO="${TLA_REPO:-/mnt/mars/gitrepos/tlaplus}"
 PIN="4ba7d8811289fb8e95dac4d5e554c05216ba3100"
-DESK_STATE="%2"           # agent state version (app/tla-lus.hoon)
+DESK_STATE="%3"           # agent state version (app/tla-lus.hoon)
 FAIL=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }
@@ -57,8 +57,12 @@ echo "== gate 5: kelvin compatibility =="
   || fail "no sys.kelvin"
 
 echo "== gate 6: state migration =="
-grep -q 'jobs-0-to-1' "$DESK/app/tla-lus.hoon" && grep -q 'jobs-1-to-2' "$DESK/app/tla-lus.hoon" \
-  && pass "on-load migrates %0 -> %1 -> %2 (lib/migrate)" || fail "missing migration chain in on-load"
+MIGCHAIN=1
+for STEP in jobs-0-to-1 jobs-1-to-2 jobs-2-to-3; do
+  grep -q "$STEP" "$DESK/app/tla-lus.hoon" || MIGCHAIN=0
+done
+[ "$MIGCHAIN" -eq 1 ] && pass "on-load migrates %0 -> %1 -> %2 -> %3 (lib/migrate)" \
+  || fail "missing migration chain in on-load"
 
 echo "== gate 7: fixture size bound =="
 BIG=$(find "$DESK/test-data" -type f -size +100k 2>/dev/null | wc -l)

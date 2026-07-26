@@ -600,6 +600,54 @@ one. Reaching that requires submit, cancel, delete, and resubmit to land in
 a single instant, and the intervening delete is what makes the id reusable
 at all; a monotonic counter would need a state field (unit 10.6).
 
+### 10.6 API versioning and state migration — at parity
+
+**The public API now carries a revision.** `sur/tla-lus` exports
+`api-version`, and `/x/version` returns `[api state]` so a caller can tell
+what it is talking to.
+
+| revision | what changed |
+|---|---|
+| 1 | the unit-2 frozen wire |
+| 2 | a `%clay` bundle's `root` is a **module name** (it was a path); `source-ref`/`read-request`/`read-response` exist; `step-result` gained `%await` |
+
+The `action` and `update` shells are unchanged — no caller-visible change
+required a bump there. The `on-peek` `$job` projection and the artifact
+scry shape are untouched.
+
+**State is `%3`** (`job-3`). The record's fields are the same as `%2`; what
+moved under it is the request's source bundle. `jobs-2-to-3` carries
+terminal jobs over whole (submit time, statistics, artifacts, diagnostics)
+and seals an active job `%failed 'restarted: the source-load stage is new;
+resubmit'` — its continuation predates the `%modules` stage and cannot be
+resumed honestly across it. (The Work Unit 7.7 contract would catch the
+incompatible cursor at the next step anyway; the migration says so up
+front.) The async-load cursor lives in the jammed continuation, the pinned
+case in the request, and quota accounting is derived, so none of them
+needed a field on the job.
+
+Two defects in the old migration path are fixed here, both found by
+running it:
+
+- **Historical molds named live types.** `state-1` was defined as
+  `(map req-id job)` — the *current* `/sur` `$job`. When unit 10 reshaped
+  the `%clay` bundle, every "frozen" mold silently changed with it, so the
+  molds no longer described what had actually been stored. They are now
+  frozen copies (`source-bundle-2`, `request-2`, `job-1`, `job-2`) in
+  `lib/migrate`.
+- **`on-load` required the stored type to nest.** `!<` type-checks the
+  vase as stored, so *any* change to a mold reachable from the state made
+  the whole load fail — and the fallback wipes every job, including
+  completed results a caller had not collected. `on-load` now coerces the
+  noun (`;;`) through the frozen molds, still inside `mule`. A genuinely
+  unreadable state still falls back to empty; a merely restyled one no
+  longer does.
+
+A pre-unit-10 `%clay` job cannot actually appear in a stored state — the
+bundle was typed-rejected at `validate` for the whole life of `%1` and
+`%2` — so the root-path-to-module-name conversion is frozen for the type,
+not for data anyone has. It converts `/die-hard/tla` to `die-hard`.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

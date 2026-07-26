@@ -469,6 +469,61 @@ compatibility.md rather than left implicit.
   graph is closed.
 - Full ship suite `ok=%.y`.
 
+## 10.6 API versioning and state migration (done)
+
+### What the plan expected vs. what was needed
+
+The plan asked for `job-3` "carrying the async-load cursor, pinned case,
+and quota accounting". None of those needed a field: the cursor lives in
+the jammed continuation, the pinned case in the request, and the quotas
+are derived from the jobs map (10.4). So the version bump is not about new
+fields — it is about the one shape that *did* change, the `%clay` bundle's
+`root`, and about two defects the upgrade path had.
+
+### Two defects, both found by running the migration
+
+1. **Historical molds named live types.** `lib/migrate` defined `state-1`
+   as `(map req-id job)` — the *current* `/sur` `$job`. When unit 10
+   reshaped the `%clay` bundle, every "frozen" mold changed with it, so
+   they stopped describing what had been stored. Now `source-bundle-2`,
+   `request-2`, `job-1`, and `job-2` are frozen **copies**.
+2. **`on-load` required the stored type to nest.** `!<` type-checks the
+   vase as stored, so any change to a mold reachable from the state made
+   the whole load fail — and the fallback wipes every job, including
+   completed results a caller had not collected. This actually happened on
+   the dev ship at 10.1 (`tla-lus: state corrupt, unable to migrate`).
+   `on-load` now coerces the noun with `;;` through the frozen molds,
+   still inside `mule`.
+
+### What landed
+
+- `sur`: `++ api-version 2`, documented against revision 1 (the unit-2
+  frozen wire). The `action`/`update` shells stay frozen.
+- `app`: `state-3`, the lenient `on-load` chain `%0→%1→%2→%3`, and a new
+  `/x/version` scry returning `[api state]`.
+- `lib/migrate`: the frozen molds, `jobs-2-to-3`, `request-2-to-3`, and
+  `+root-name` (a pre-unit-10 root path names its module: `/die-hard/tla`
+  → `die-hard`) — frozen for the type, not for data anyone has, since a
+  `%clay` job could never be stored under `%1`/`%2`.
+- `lib/job`: `job-2`/`step-result-2` renamed `job-3`/`step-result-3` so
+  the names do not lie about which state version they belong to.
+
+### Evidence
+
+- `tests/lib/migrate.hoon` 13/13: the `%0→%1→%2` chain rebased onto the
+  frozen molds, plus `%2→%3` (terminal preserved whole with its submit
+  time, active sealed with statistics kept, the clay root converted, count
+  preserved, and `+root-name` on four shapes).
+- `tests/app/tla-lus.hoon` +4: `/x/version`, a `%2` state migrating
+  through `on-load`, a state whose **type** is stale (`!>(\`*\`…)`)
+  loading anyway — the leniency test — and a `%3` state loading unchanged.
+- Full ship suite `ok=%.y`.
+
+The live dev ship wiped its jobs on this upgrade, correctly: its `%2`
+state held `%clay` jobs written under the *new* bundle shape (a chimera
+that existed only mid-unit), which cannot clam through the frozen `%2`
+mold. No released `%2` state can contain one.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

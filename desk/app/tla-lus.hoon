@@ -13,8 +13,8 @@
   ::
 ::  +|  Types
 ::
-+$  versioned-state  $%(state-0:mig state-1:mig state-2)
-+$  state-2  [%2 jobs=(map req-id job-2:job-lib)]
++$  versioned-state  $%(state-0:mig state-1:mig state-2:mig state-3)
++$  state-3  [%3 jobs=(map req-id job-3:job-lib)]
 +$  card     card:agent:gall
 ::
 ::  +|  Card Helpers
@@ -104,7 +104,7 @@
 ::
 ++  snapshot
   ::  Current state of a job as updates, for (re)joining watchers
-  |=  [id=req-id j=job-2:job-lib]
+  |=  [id=req-id j=job-3:job-lib]
   ^-  (list update)
   ?^  result.j
     [%job id [%result u.result.j]]~
@@ -114,15 +114,15 @@
 ::
 ++  terminal
   ::  Only terminal jobs may be deleted or expose artifacts
-  |=  j=job-2:job-lib
+  |=  j=job-3:job-lib
   ^-  ?
   ?=(^ result.j)
 ::
 ++  retain
   ::  a job that just finished may have pushed the artifact store over
   ::  its bound; reclaim only then, so the scan is not paid every slice
-  |=  [j=job-2:job-lib js=(map req-id job-2:job-lib)]
-  ^-  (map req-id job-2:job-lib)
+  |=  [j=job-3:job-lib js=(map req-id job-3:job-lib)]
+  ^-  (map req-id job-3:job-lib)
   ?.  (terminal j)  js
   (reclaim:job-lib js max-retained:default-quota:job-lib)
 ::
@@ -131,8 +131,8 @@
   ::  bounded step, nothing (terminal), or the Clay reads the job is
   ::  waiting on. Reads that cannot exist are answered immediately and a
   ::  step is scheduled, so a paused job always makes progress
-  |=  [id=req-id r=step-result-2:job-lib now=@da]
-  ^-  [(list card) job-2:job-lib]
+  |=  [id=req-id r=step-result-3:job-lib now=@da]
+  ^-  [(list card) job-3:job-lib]
   ?-    -.r
       %more  [(snoc (efacts id events.r) (wait id now)) job.r]
       %stop  [(efacts id events.r) job.r]
@@ -147,7 +147,7 @@
   ==
 --
 %-  agent:dbug
-=|  state-2
+=|  state-3
 =*  state  -
 ^-  agent:gall
 |_  =bowl:gall
@@ -163,17 +163,23 @@
 ++  on-load
   |=  old-vase=vase
   ^-  (quip card _this)
-  =/  res=(each state-2 tang)
+  =/  res=(each state-3 tang)
     %-  mule  |.
-    =/  old  !<(versioned-state old-vase)
+    ::  the stored *type* names molds this version has changed (unit 10
+    ::  reshaped the %clay bundle), so the noun is coerced through the
+    ::  frozen historical molds rather than required to nest as stored —
+    ::  otherwise a shape change anywhere in the request would throw away
+    ::  every completed job's result
+    =/  old  ;;(versioned-state q.old-vase)
     ?-  -.old
-      %0  [%2 (jobs-1-to-2:mig (jobs-0-to-1:mig jobs.old))]
-      %1  [%2 (jobs-1-to-2:mig jobs.old)]
-      %2  old
+      %0  [%3 (jobs-2-to-3:mig (jobs-1-to-2:mig (jobs-0-to-1:mig jobs.old)))]
+      %1  [%3 (jobs-2-to-3:mig (jobs-1-to-2:mig jobs.old))]
+      %2  [%3 (jobs-2-to-3:mig jobs.old)]
+      %3  old
     ==
   ?:  ?=(%.y -.res)  `this(state p.res)
   %-  (slog 'tla-lus: state corrupt, unable to migrate' ~)
-  `this(state *state-2)
+  `this(state *state-3)
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -264,11 +270,18 @@
   |=  =path
   ^-  (unit (unit cage))
   ?+    path  [~ ~]
+      [%x %version ~]
+    ::  what a caller is talking to: the public API revision and the
+    ::  agent's state version
+    :^  ~  ~  %noun
+    !>  ^-  [api=@ud state=@ud]
+    [api-version 3]
+  ::
       [%x %jobs ~]
     :^  ~  ~  %noun
     !>  ^-  (list [req-id stage])
     %+  turn  ~(tap by jobs.state)
-    |=([id=req-id j=job-2:job-lib] [id stage.j])
+    |=([id=req-id j=job-3:job-lib] [id stage.j])
   ::
       [%x %job @ ~]
     =/  cur  (~(get by jobs.state) `req-id`i.t.t.path)

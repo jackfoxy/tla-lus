@@ -13,6 +13,14 @@
   ::    bindings     by variable name, alphabetical
   ::    traces       by state index (inherent)
   ::
+::  +|  API Revision
+::
+::  Bumped when a caller-visible noun changes. 1 = the unit-2 frozen wire;
+::  2 = unit 10 — a %clay bundle's `root` is a module name (it was a
+::  path), the async read nouns below exist, and `step-result` gained
+::  %await. The action/update shells are unchanged.
+++  api-version  2
+::
 ::  +|  Identifiers
 ::
 ::  caller-chosen request id; duplicate active ids are rejected

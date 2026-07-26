@@ -33,7 +33,7 @@
 ::
 ::  the persisted job: the public $job fields plus the submit time
 ::  (for max-time) and the jammed in-flight continuation
-+$  job-2
++$  job-3
   $:  =request
       =stage
       pending=(list stage)
@@ -45,12 +45,12 @@
       started=@da
       cont=(unit [%1 k=@])
   ==
-+$  step-result-2
-  $%  [%more events=(list event) job=job-2]
-      [%stop events=(list event) job=job-2]
++$  step-result-3
+  $%  [%more events=(list event) job=job-3]
+      [%stop events=(list event) job=job-3]
       ::  the job is waiting on external Clay reads (unit 10): the agent
       ::  performs them and resumes the job with +deliver
-      [%await events=(list event) reads=(list read-request) job=job-2]
+      [%await events=(list event) reads=(list read-request) job=job-3]
   ==
 ::  the source span of the Next action, for typed trace states
 +$  next-act  (unit [name=@t at=(unit loc)])
@@ -189,7 +189,7 @@
 ::
 ++  artifact-bytes
   ::  one job's stored artifacts, as a noun
-  |=  j=job-2
+  |=  j=job-3
   ^-  @ud
   ?:  =(~ artifacts.j)  0
   (met 3 (jam artifacts.j))
@@ -211,28 +211,28 @@
   ==
 ::
 ++  active-count
-  |=  js=(map req-id job-2)
+  |=  js=(map req-id job-3)
   ^-  @ud
   %+  roll  ~(val by js)
-  |=([j=job-2 a=@ud] ?:(?=(^ result.j) a +(a)))
+  |=([j=job-3 a=@ud] ?:(?=(^ result.j) a +(a)))
 ::
 ++  retained-bytes
-  |=  js=(map req-id job-2)
+  |=  js=(map req-id job-3)
   ^-  @ud
   %+  roll  ~(val by js)
-  |=([j=job-2 a=@ud] (add a (artifact-bytes j)))
+  |=([j=job-3 a=@ud] (add a (artifact-bytes j)))
 ::
 ++  inflight-source
-  |=  js=(map req-id job-2)
+  |=  js=(map req-id job-3)
   ^-  @ud
   %+  roll  ~(val by js)
-  |=([j=job-2 a=@ud] ?:(?=(^ result.j) a (add a (source-charge request.j))))
+  |=([j=job-3 a=@ud] ?:(?=(^ result.j) a (add a (source-charge request.j))))
 ::
 ++  quota-reject
   ::  the agent-wide gate a new job must pass on top of +validate. Each bound
   ::  names the resource it protects; nothing is silently queued behind a full
   ::  store
-  |=  [js=(map req-id job-2) q=gquota req=request]
+  |=  [js=(map req-id job-3) q=gquota req=request]
   ^-  (unit @t)
   ?:  (gte (active-count js) max-jobs.q)
     `'global limit: too many active jobs'
@@ -248,20 +248,20 @@
   ::  diagnostics stay — only the bulk goes, and a warning on the job records
   ::  it, so a later artifact scry that misses is explained rather than blank.
   ::  An active job is never touched
-  |=  [js=(map req-id job-2) cap=@ud]
-  ^-  (map req-id job-2)
+  |=  [js=(map req-id job-3) cap=@ud]
+  ^-  (map req-id job-3)
   ?:  (lte (retained-bytes js) cap)  js
   =/  cands
-    ^-  (list [id=req-id j=job-2])
+    ^-  (list [id=req-id j=job-3])
     %+  sort
-      ^-  (list [id=req-id j=job-2])
+      ^-  (list [id=req-id j=job-3])
       %+  skim  ~(tap by js)
-      |=  [id=req-id j=job-2]
+      |=  [id=req-id j=job-3]
       &(?=(^ result.j) !=(~ artifacts.j))
-    |=  [a=[id=req-id j=job-2] b=[id=req-id j=job-2]]
+    |=  [a=[id=req-id j=job-3] b=[id=req-id j=job-3]]
     ?:  =(started.j.a started.j.b)  (aor id.a id.b)
     (lth started.j.a started.j.b)
-  |-  ^-  (map req-id job-2)
+  |-  ^-  (map req-id job-3)
   ?~  cands  js
   ?:  (lte (retained-bytes js) cap)  js
   =/  dg=diagnostic
@@ -415,7 +415,7 @@
 ++  init
   ::  start a job at %starting with its full stage plan pending
   |=  [req=request now=@da]
-  ^-  job-2
+  ^-  job-3
   =/  stages  (plan req)
   :*  req  %starting  stages  [0 (lent stages)]
       *run-stats  ~  ~  ~  now  ~
@@ -450,7 +450,7 @@
 ++  srcs-of
   ::  the sources a stage works on: the request's inline bundle, or the
   ::  set the %modules stage loaded over Clay
-  |=  [j=job-2 s=(unit srcs)]
+  |=  [j=job-3 s=(unit srcs)]
   ^-  (unit srcs)
   ?^  s  s
   ?.  ?=(%inline -.src.request.j)  ~
@@ -459,12 +459,12 @@
 ++  carry
   ::  loaded Clay sources travel with the continuation; an inline bundle
   ::  is already in the request and is never copied into it
-  |=  [j=job-2 s=(unit srcs)]
+  |=  [j=job-3 s=(unit srcs)]
   ^-  (unit srcs)
   ?:(?=(%inline -.src.request.j) ~ s)
 ::
 ++  time-exceeded
-  |=  [j=job-2 now=@da]
+  |=  [j=job-3 now=@da]
   ^-  ?
   ?:  (lte now started.j)  |
   (gth `@dr`(sub now started.j) max-time.limits.request.j)
@@ -472,8 +472,8 @@
 ++  step
   ::  spend at most `budget` work units on the job's active stage;
   ::  already-terminal jobs are unchanged
-  |=  [j=job-2 budget=@ud now=@da]
-  ^-  step-result-2
+  |=  [j=job-3 budget=@ud now=@da]
+  ^-  step-result-3
   ?^  result.j  [%stop ~ j]
   ?:  (time-exceeded j now)
     (finish j [%limited %time stats.j] ~)
@@ -497,14 +497,14 @@
   =/  s  i.pending.j
   =/  prog=progress  [+(done.progress.j) total.progress.j]
   =/  j
-    ^-  job-2
+    ^-  job-3
     j(stage s, pending t.pending.j, progress prog)
   (run j k budget ~[[%stage s] [%progress prog]])
 ::
 ++  run
   ::  execute one bounded slice of the active stage
-  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-3
   ?+    stage.j
       ~|([%tla-lus-unplanned-stage stage.j] !!)
     %modules   (do-load j k pre)
@@ -519,23 +519,23 @@
 ::
 ++  more
   ::  a non-terminal slice; heartbeat progress when nothing else to say
-  |=  [j=job-2 evs=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 evs=(list event)]
+  ^-  step-result-3
   [%more ?~(evs ~[[%progress progress.j]] evs) j]
 ::
 ++  await
   ::  pause the job on external Clay reads; the agent performs them and
   ::  resumes it with +deliver. No work is scheduled in the meantime
-  |=  [j=job-2 reads=(list read-request) evs=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 reads=(list read-request) evs=(list event)]
+  ^-  step-result-3
   [%await evs reads j]
 ::
 ++  deliver
   ::  absorb the agent's answers into the source-load cursor. Responses
   ::  for tags the cursor is not waiting on are dropped when it drains
   ::  the inbox, so a duplicate or stale delivery changes nothing
-  |=  [j=job-2 rs=(list read-response)]
-  ^-  job-2
+  |=  [j=job-3 rs=(list read-response)]
+  ^-  job-3
   ?~  rs  j
   ?~  cont.j  j
   =/  lr  (mule |.((load-kont u.cont.j)))
@@ -550,7 +550,7 @@
   ::  does not hold is a duplicate, a stale delivery, or a leftover from
   ::  a superseded load; it must not be absorbed and must not advance the
   ::  job by a slice
-  |=  [j=job-2 tag=@ud]
+  |=  [j=job-3 tag=@ud]
   ^-  ?
   ?~  cont.j  |
   =/  lr  (mule |.((load-kont u.cont.j)))
@@ -560,8 +560,8 @@
 ::
 ++  finish
   ::  seal the job; a sealed job is never resumed
-  |=  [j=job-2 res=result pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 res=result pre=(list event)]
+  ^-  step-result-3
   =.  result.j   `res
   =.  stage.j    %terminal
   =.  pending.j  ~
@@ -569,13 +569,13 @@
   [%stop (snoc pre [%result res]) j]
 ::
 ++  cancel
-  |=  j=job-2
-  ^-  job-2
+  |=  j=job-3
+  ^-  job-3
   j(result `[%cancelled ~], stage %terminal, pending ~, cont ~)
 ::
 ++  project
   ::  the public job view: results and progress, never internal cursors
-  |=  j=job-2
+  |=  j=job-3
   ^-  job
   :*  request.j  stage.j  pending.j  progress.j
       stats.j  diags.j  artifacts.j  result.j
@@ -793,8 +793,8 @@
   ::  metadata, not the caller's output: when it does not fit inside
   ::  max-artifact it is dropped with a warning rather than failing an
   ::  otherwise sound run — but never dropped silently
-  |=  [j=job-2 ps=provs]
-  ^-  [job-2 (list event)]
+  |=  [j=job-3 ps=provs]
+  ^-  [job-3 (list event)]
   =/  txt  (render-sources ps)
   ?:  (gth (met 3 txt) max-artifact.limits.request.j)
     =/  dg=diagnostic
@@ -836,8 +836,8 @@
 ++  close-load
   ::  the module graph is closed: record what was read, then hand the
   ::  sources to %parse exactly as an inline bundle would
-  |=  [j=job-2 ps=provs s=srcs pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 ps=provs s=srcs pre=(list event)]
+  ^-  step-result-3
   =/  po  (put-sources j ps)
   =/  jp  -.po
   =.  cont.jp  (save-kont [%src s])
@@ -846,8 +846,8 @@
 ++  load-fail
   ::  a resolution failure is a typed diagnostic at the %modules stage,
   ::  carrying the text the inline resolver reports for the same condition
-  |=  [j=job-2 msg=@t pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 msg=@t pre=(list event)]
+  ^-  step-result-3
   =/  dg=diagnostic  [[%lus 401] %error %modules msg ~ ~]
   =.  diags.j  (snoc diags.j dg)
   (finish j [%failed msg] (snoc pre [%diagnostic dg]))
@@ -857,8 +857,8 @@
   ::  Clay: this one names the files it needs and pauses (%await), and
   ::  the sources it hands to %parse are exactly what an inline bundle of
   ::  the same files would hand it
-  |=  [j=job-2 k=(unit kont) pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) pre=(list event)]
+  ^-  step-result-3
   ?.  ?=(%clay -.src.request.j)
     (finish j [%failed 'internal: %modules on an inline bundle'] pre)
   ::  the whole run reads one revision; the agent pins it at submit, and
@@ -904,8 +904,8 @@
   ::  %check parses the root module into a %tree hand-off; %analyze
   ::  parses every bundle module, one work unit each, collecting
   ::  diagnostics for %terminal's verdict
-  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-3
   =/  so  (srcs-of j (k-srcs k))
   ?~  so
     (finish j [%failed 'internal: %parse without loaded sources'] pre)
@@ -913,7 +913,7 @@
   =/  cry  (carry j so)
   ::  an inline bundle's provenance is recorded here, where a Clay run
   ::  recorded its own at the close of the load
-  =/  po=[job-2 (list event)]
+  =/  po=[job-3 (list event)]
     ?:  |(?=(%clay -.src.request.j) (~(has by artifacts.j) %sources))
       [j ~]
     (put-sources j (inline-provs src))
@@ -943,7 +943,7 @@
   ?>  ?=(%parse -.kk)
   =/  evs  pre
   =/  spent  0
-  |-  ^-  step-result-2
+  |-  ^-  step-result-3
   ?~  todo.kk
     ::  Clay sources travel on to the %semantic stage
     =.  cont.j  ?~(cry ~ (save-kont [%src u.cry]))
@@ -994,8 +994,8 @@
   ::  which +analyze-graph already enforces. Runs in a single slice: a
   ::  module bundle's analysis is bounded like a capped exploration, so
   ::  no mid-stage cursor is needed (see doc/compatibility.md)
-  |=  [j=job-2 k=(unit kont) pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) pre=(list event)]
+  ^-  step-result-3
   ?>  ?=(%analyze -.op.request.j)
   =/  so  (srcs-of j (k-srcs k))
   ?~  so
@@ -1043,8 +1043,8 @@
   ::  a config diagnostic (CFG_* 5001-5006 or TLC_CONFIG_* 2222-2281) is
   ::  a typed TLC failure: record the structured diagnostic and seal the
   ::  job %failed with its message (never a silent %ok)
-  |=  [j=job-2 d=cfg-vdiag:config pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 d=cfg-vdiag:config pre=(list event)]
+  ^-  step-result-3
   =/  dg=diagnostic  [[%tlc code.d] %error %config msg.d ~ ~]
   =.  diags.j  (snoc diags.j dg)
   (finish j [%failed msg.d] (snoc pre [%diagnostic dg]))
@@ -1052,8 +1052,8 @@
 ++  assume-fail
   ::  a false (EC 2104) or non-boolean (EC 2105) ASSUME is a typed TLC failure
   ::  at the model-checking stage, recorded like a config diagnostic
-  |=  [j=job-2 ec=@ud msg=@t pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 ec=@ud msg=@t pre=(list event)]
+  ^-  step-result-3
   =/  dg=diagnostic  [[%tlc ec] %error %explore msg ~ ~]
   =.  diags.j  (snoc diags.j dg)
   (finish j [%failed msg] (snoc pre [%diagnostic dg]))
@@ -1062,8 +1062,8 @@
   ::  consume the parsed root tree and build the engine continuation.
   ::  Every config this engine cannot process faithfully is a typed
   ::  failure naming the key or form; nothing is silently ignored.
-  |=  [j=job-2 k=(unit kont) pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) pre=(list event)]
+  ^-  step-result-3
   ?.  ?&(?=(^ k) ?=(%tree -.u.k))
     (finish j [%failed 'internal: %config without a parsed tree'] pre)
   =/  tree  t.u.k
@@ -1196,8 +1196,8 @@
 ::
 ::
 ++  do-explore
-  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-3
   ?:  ?&(?=(^ k) ?=(%bfs -.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
@@ -1233,8 +1233,8 @@
 ::
 ++  finish-bfs
   ::  seal a safety search: wire result, stats, report + trace artifacts
-  |=  [j=job-2 out=outcome:check nl=@t act=next-act pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 out=outcome:check nl=@t act=next-act pre=(list event)]
+  ^-  step-result-3
   ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
   =/  st=run-stats
     ?-  -.out
@@ -1263,8 +1263,8 @@
 ::
 ::
 ++  do-scan
-  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-3
   ?.  ?&(?=(^ k) ?=(%live -.u.k) =(%scan phase.u.k))
     (finish j [%failed 'internal: %liveness without a scan continuation'] pre)
   =/  kk  u.k
@@ -1297,8 +1297,8 @@
 ::
 ::
 ++  do-sim
-  |=  [j=job-2 k=(unit kont) budget=@ud pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-result-3
   ?.  ?&(?=(^ k) ?=(%sim -.u.k))
     (finish j [%failed 'internal: %simulate without a continuation'] pre)
   =/  kk  u.k
@@ -1338,8 +1338,8 @@
   ::  recorded by a parse, semantic, or level stage (lint warnings do
   ::  not fail the run unless a lint-option elevated one to %error,
   ::  which flips its severity here)
-  |=  [j=job-2 pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 pre=(list event)]
+  ^-  step-result-3
   =/  errs
     %-  lent
     %+  skim  diags.j
@@ -1360,8 +1360,8 @@
   ::  store the report (and optional typed trace) then seal; a report
   ::  exceeding max-artifact turns the run %limited at the point of
   ::  growth, keeping the true statistics
-  |=  [j=job-2 res=result report=@t tr=(unit trace) pre=(list event)]
-  ^-  step-result-2
+  |=  [j=job-3 res=result report=@t tr=(unit trace) pre=(list event)]
+  ^-  step-result-3
   ?:  (gth (met 3 report) max-artifact.limits.request.j)
     (finish j [%limited %artifact stats.j] pre)
   =.  artifacts.j  (~(put by artifacts.j) %report [%text report])
