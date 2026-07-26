@@ -57,6 +57,16 @@
   ^-  [(list card) agent:gall]
   (~(on-arvo ag bol) [%job id %step ~] [%behn %wake ~])
 ::
+++  do-writ
+  ::  a Clay answer arriving on a job's load wire
+  |=  [ag=agent:gall id=@ta gen=@da tag=@ud]
+  ^-  [(list card) agent:gall]
+  %-  ~(on-arvo ag bol)
+  :-  `wire`[%job id %load (scot %da gen) (scot %ud tag) ~]
+  [%clay %writ ~]
+::
+++  gen0  ~2026.7.12
+::
 ++  wake-n
   ::  n wakes; returns the cards of the last one
   |=  [ag=agent:gall id=@ta n=@ud]
@@ -391,6 +401,118 @@
   ;:  weld
     (expect-eq !>([%deleted ~.0]) !>((fact-update (snag 0 caz2))))
     (expect-eq !>([%ack ~.next]) !>((fact-update (snag 0 caz))))
+  ==
+::
+::  +|  Idempotency And Delivery Robustness (unit 10.5)
+::
+::  Repeated or reordered delivery must leave both the state and the
+::  emitted event stream exactly as the single-delivery case left them.
+::
+++  test-resubmit-terminal-rejected
+  ::  an id names one run: a result is never silently replaced
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz1  ag  (do-poke ag [%cancel ~.j1])
+  =/  before  (need (scry-job ag ~.j1))
+  =^  caz   ag  (do-poke ag [%submit ~.j1 demo-req])
+  ;:  weld
+    (expect-eq !>(1) !>((lent caz)))
+    %+  expect-eq
+      !>([%rejected ~.j1 'a result for this id already exists; delete it first'])
+    !>((fact-update (snag 0 caz)))
+    (expect-eq !>(before) !>((need (scry-job ag ~.j1))))
+  ==
+::
+++  test-wake-after-completion-is-noop
+  ::  a late or duplicated timer never resumes a sealed job or re-emits
+  ::  its result
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz1  ag  (wake-n ag ~.j1 total)
+  =/  done  (need (scry-job ag ~.j1))
+  =^  caz2  ag  (do-arvo ag ~.j1)
+  =^  caz3  ag  (do-arvo ag ~.j1)
+  ;:  weld
+    (expect-eq !>(~) !>(caz2))
+    (expect-eq !>(~) !>(caz3))
+    (expect-eq !>(done) !>((need (scry-job ag ~.j1))))
+  ==
+::
+++  test-writ-stale-generation-dropped
+  ::  a response left over from an earlier job that held this id carries
+  ::  that job's generation, and is not absorbed by this one
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  before  (need (scry-job ag ~.j1))
+  =^  caz   ag  (do-writ ag ~.j1 (sub gen0 ~h1) 0)
+  ;:  weld
+    (expect-eq !>(~) !>(caz))
+    (expect-eq !>(before) !>((need (scry-job ag ~.j1))))
+  ==
+::
+++  test-writ-unheld-tag-dropped
+  ::  right job, right generation, but a read it is not holding — a
+  ::  duplicate, or one for a superseded load. No cards, no slice spent
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  before  (need (scry-job ag ~.j1))
+  =^  caz   ag  (do-writ ag ~.j1 gen0 7)
+  ;:  weld
+    (expect-eq !>(~) !>(caz))
+    (expect-eq !>(before) !>((need (scry-job ag ~.j1))))
+  ==
+::
+++  test-writ-unknown-job-dropped
+  =/  ag  `agent:gall`agent
+  =^  caz  ag  (do-writ ag ~.ghost gen0 0)
+  (expect-eq !>(~) !>(caz))
+::
+++  test-writ-terminal-job-dropped
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz1  ag  (do-poke ag [%cancel ~.j1])
+  =/  done  (need (scry-job ag ~.j1))
+  =^  caz   ag  (do-writ ag ~.j1 gen0 0)
+  ;:  weld
+    (expect-eq !>(~) !>(caz))
+    (expect-eq !>(done) !>((need (scry-job ag ~.j1))))
+  ==
+::
+++  test-stale-load-wire-dropped
+  ::  an in-flight read from an older engine shape is ignored rather
+  ::  than crashing the event
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  res  (~(on-arvo ag bol) `wire`/job/j1/load/0 [%clay %writ ~])
+  (expect-eq !>(~) !>(-.res))
+::
+++  test-delete-twice-is-noop
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz1  ag  (do-poke ag [%cancel ~.j1])
+  =^  caz2  ag  (do-poke ag [%delete-result ~.j1])
+  =^  caz   ag  (do-poke ag [%delete-result ~.j1])
+  ;:  weld
+    (expect-eq !>([%deleted ~.j1]) !>((fact-update (snag 0 caz2))))
+    (expect-eq !>(~) !>(caz))
+    (expect-eq !>(*(unit job)) !>((scry-job ag ~.j1)))
+  ==
+::
+++  test-watch-midrun-reconnect
+  ::  a watcher rejoining mid-run gets the stage and progress it is at,
+  ::  never a replay of what it already saw
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz1  ag  (wake-n ag ~.j1 2)
+  =^  caz   ag  (~(on-watch ag bol) /job/j1)
+  ;:  weld
+    (expect-eq !>(2) !>((lent caz)))
+    %+  expect-eq
+      !>([%job ~.j1 [%stage %config]])
+    !>((fact-update (snag 0 caz)))
+    %+  expect-eq
+      !>([%job ~.j1 [%progress 2 total]])
+    !>((fact-update (snag 1 caz)))
   ==
 
 --

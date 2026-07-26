@@ -42,11 +42,14 @@
 ::
 ++  read-card
   ::  One asynchronous Clay read for a paused job, tagged on its load
-  ::  wire; the %writ comes back to on-arvo and resumes the job
-  |=  [id=req-id r=read-request]
+  ::  wire; the %writ comes back to on-arvo and resumes the job. The
+  ::  wire carries the job's generation (its submit time) as well as the
+  ::  read's tag, so a response left over from an earlier job that held
+  ::  the same id cannot be absorbed by this one
+  |=  [id=req-id gen=@da r=read-request]
   ^-  card
-  :*  %pass  [%job id %load (scot %ud tag.r) ~]  %arvo  %c  %warp
-      ship.source-ref.r  desk.source-ref.r
+  :*  %pass  [%job id %load (scot %da gen) (scot %ud tag.r) ~]  %arvo  %c
+      %warp  ship.source-ref.r  desk.source-ref.r
       `[%sing %x cas.source-ref.r path.source-ref.r]
   ==
 ::
@@ -74,14 +77,14 @@
 ++  do-reads
   ::  Route a paused job's read-requests: existing files become Clay
   ::  cards, absent ones become responses the caller delivers at once
-  |=  [id=req-id reads=(list read-request)]
+  |=  [id=req-id gen=@da reads=(list read-request)]
   ^-  [caz=(list card) miss=(list read-response)]
   =|  caz=(list card)
   =|  miss=(list read-response)
   |-  ^-  [(list card) (list read-response)]
   ?~  reads  [(flop caz) (flop miss)]
   ?:  (file-exists source-ref.i.reads)
-    $(reads t.reads, caz [(read-card id i.reads) caz])
+    $(reads t.reads, caz [(read-card id gen i.reads) caz])
   $(reads t.reads, miss [[tag.i.reads %| 'no such file'] miss])
 ::
 ++  pin-case
@@ -134,7 +137,7 @@
       %more  [(snoc (efacts id events.r) (wait id now)) job.r]
       %stop  [(efacts id events.r) job.r]
       %await
-    =/  dr  (do-reads id reads.r)
+    =/  dr  (do-reads id started.job.r reads.r)
     :_  (deliver:job-lib job.r miss.dr)
     ;:  weld
       (efacts id events.r)
@@ -181,9 +184,17 @@
   ?-    -.act
       %submit
     =/  cur  (~(get by jobs.state) id.act)
-    ?:  &(?=(^ cur) !(terminal u.cur))
+    ?^  cur
+      ::  an id names one run: an active one is not disturbed, and a
+      ::  result is never silently replaced by a resubmit (delete it
+      ::  first — the explicit path)
       :_  this
-      [(fact id.act [%rejected id.act 'duplicate active id']) ~]
+      :_  ~
+      %+  fact  id.act
+      :+  %rejected  id.act
+      ?:  (terminal u.cur)
+        'a result for this id already exists; delete it first'
+      'duplicate active id'
     =/  bad  (validate:job-lib request.act)
     ?^  bad
       :_  this
@@ -294,23 +305,34 @@
     =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
   ::
-      [%job @ %load @ ~]
+      [%job @ %load @ @ ~]
     ::  a Clay read for a paused job: deliver the body and resume it.
-    ::  Responses for deleted, terminal, or no-longer-pending reads are
-    ::  dropped by the job (the load cursor ignores unknown tags)
+    ::  Everything that is not a live answer to a read this job is
+    ::  actually holding — an unknown or deleted job, a sealed one, a
+    ::  response from an earlier job that held this id, a duplicate, or
+    ::  one for a superseded load — is dropped without a step, so a
+    ::  repeated or reordered delivery changes neither state nor events
     ?.  ?=([%clay %writ *] sign-arvo)
       (on-arvo:default wire sign-arvo)
     =/  id   `req-id`i.t.wire
-    =/  tag  (slav %ud i.t.t.t.wire)
+    =/  gen  (slav %da i.t.t.t.wire)
+    =/  tag  (slav %ud i.t.t.t.t.wire)
     =/  cur  (~(get by jobs.state) id)
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
+    ?.  =(gen started.u.cur)  `this
+    ?.  (awaiting:job-lib u.cur tag)  `this
     =/  j    (deliver:job-lib u.cur ~[[tag (writ-text p.sign-arvo)]])
     =/  res  (step:job-lib j default-budget:job-lib now.bowl)
     =/  adv  (advance id res now.bowl)
     =.  jobs.state  (~(put by jobs.state) id +.adv)
     =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
+  ::
+      [%job @ %load *]
+    ::  a load wire this version does not recognise (an in-flight read
+    ::  from an older engine) is dropped, never a crashed event
+    `this
   ==
 ::
 ++  on-fail  on-fail:default

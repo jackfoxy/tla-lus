@@ -423,6 +423,52 @@ No in-scope Gall/Clay behavior is left unclassified.
   one frees it too.
 - Full ship suite `ok=%.y`.
 
+## 10.5 Idempotency and delivery robustness (done)
+
+### What landed
+
+- **Submit policy chosen: reject.** A terminal id used to fall through and
+  be silently overwritten by a fresh job. Now both the active and the
+  terminal cases are rejected, with different messages. The plan allowed
+  "replace under an explicit flag"; there is no flag in the frozen
+  `action`, and delete-then-submit already expresses the intent
+  explicitly, so reject is the whole policy.
+- **`%writ` generation guard.** The load wire became
+  `[%job id %load <generation> <tag> ~]`, the generation being the job's
+  `started` time. `on-arvo` now requires: known job, not sealed, matching
+  generation, and `+awaiting` (the job is really holding that tag).
+- **Dropped responses cost no slice.** This was the subtle one: before,
+  any `%writ` for a live job re-entered `+step` even when `+deliver`
+  absorbed nothing, so a stale or duplicate delivery would advance the
+  job by a slice and schedule an extra timer — changing the event stream
+  the plan says must be unchanged. `+awaiting` is checked *before*
+  delivering, and a response that fails it produces no cards at all.
+- **Unrecognised load wire**: a catch-all `[%job @ %load *]` arm ignores
+  an in-flight read from an older engine shape instead of falling through
+  to `on-arvo:default`, which would crash the event.
+
+### The generation is the submit time
+
+`started` is already on the job and unique per run in practice. Two runs
+of one id created in the same Arvo instant would share a generation —
+reaching that needs submit, cancel, delete, and resubmit in a single
+instant, and the delete is what makes the id reusable at all. A monotonic
+counter would need a state field, which is 10.6's to add. Recorded in
+compatibility.md rather than left implicit.
+
+### Evidence
+
+- `tests/app/tla-lus.hoon` +9: terminal resubmit rejected (and the stored
+  result untouched), wake after completion twice over, `%writ` with a
+  stale generation / an unheld tag / an unknown job / a sealed job, an
+  unrecognised load wire, a second delete, and a mid-run watcher
+  reconnect. Each asserts *no cards* and a byte-identical job.
+- `tests/lib/clay-load.hoon` +2: a full run whose every round of answers
+  is delivered back to front produces the identical event stream and final
+  job; `+awaiting` holds exactly the tags asked for, and none once the
+  graph is closed.
+- Full ship suite `ok=%.y`.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

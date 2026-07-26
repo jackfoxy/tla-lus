@@ -586,4 +586,54 @@
     (expect-eq !>(2) !>(~(wyt by cache.c)))
     (expect !>(!=(res.b res.c)))
   ==
+::
+::  +|  Delivery Robustness (unit 10.5)
+::
+::
+++  run-clay-reversed
+  ::  the same run with each round of answers delivered back to front
+  |=  [f=fs req=request budget=@ud]
+  ^-  [(list event) jb]
+  =/  j  (init:job-lib req t0)
+  =|  acc=(list event)
+  |-  ^-  [(list event) jb]
+  =/  r  (step:job-lib j budget t0)
+  ?-    -.r
+      %stop  [(weld acc events.r) job.r]
+      %more  $(j job.r, acc (weld acc events.r))
+      %await
+    =/  rs  `(list read-request)`reads.r
+    ?>  ?=(^ rs)
+    %=  $
+      j    (deliver:job-lib job.r (flop (answers f rs)))
+      acc  (weld acc events.r)
+    ==
+  ==
+::
+++  test-clay-reordered-responses
+  ::  responses are absorbed by tag, so the order Clay answers in cannot
+  ::  change the event stream or the job the run ends with
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =/  clean  (run-clay multi-fs req 256)
+  =/  flipped  (run-clay-reversed multi-fs req 256)
+  ;:  weld
+    (expect-eq !>(-.clean) !>(-.flipped))
+    (expect-eq !>(+.clean) !>(+.flipped))
+  ==
+::
+++  test-awaiting-only-held-tags
+  ::  the predicate the agent guards a %writ with: a job holds exactly
+  ::  the reads it asked for, and none once its graph is closed
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =/  r  (step:job-lib (init:job-lib req t0) 256 t0)
+  ?>  ?=(%await -.r)
+  =/  rs  `(list read-request)`reads.r
+  ?>  ?=(^ rs)
+  =/  done  +:(run-clay multi-fs req 256)
+  ;:  weld
+    (expect !>((awaiting:job-lib job.r tag.i.rs)))
+    (expect !>(!(awaiting:job-lib job.r 99)))
+    (expect !>(!(awaiting:job-lib done tag.i.rs)))
+  ==
+
 --

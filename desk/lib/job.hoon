@@ -545,6 +545,19 @@
   =.  inbox.c  (weld inbox.c rs)
   j(cont (save-kont [%load c]))
 ::
+++  awaiting
+  ::  is this job actually waiting on that read? A response for a tag it
+  ::  does not hold is a duplicate, a stale delivery, or a leftover from
+  ::  a superseded load; it must not be absorbed and must not advance the
+  ::  job by a slice
+  |=  [j=job-2 tag=@ud]
+  ^-  ?
+  ?~  cont.j  |
+  =/  lr  (mule |.((load-kont u.cont.j)))
+  ?.  ?=(%& -.lr)  |
+  ?.  ?=(%load -.p.lr)  |
+  (~(has by pend.cur.p.lr) tag)
+::
 ++  finish
   ::  seal the job; a sealed job is never resumed
   |=  [j=job-2 res=result pre=(list event)]

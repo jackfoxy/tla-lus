@@ -563,6 +563,43 @@ Known limits of this design, recorded rather than hidden:
   two answer different questions (stored noun vs. produced document) and
   are documented rather than unified.
 
+### 10.5 Idempotency and delivery robustness — at parity
+
+Repeated or reordered delivery leaves both the job and the emitted event
+stream exactly as the single-delivery case left them.
+
+- **Submit**: an id names one run. An active id is rejected and left
+  undisturbed; a **terminal** id is rejected too — `a result for this id
+  already exists; delete it first` — rather than silently replacing a
+  result the caller may not have read. Delete-then-submit is the explicit
+  path (there is no replace flag; adding one would be a wire change). A
+  retried submit never schedules a second timer.
+- **Wake**: a timer for a deleted, cancelled, or completed job emits
+  nothing and leaves the job byte-identical.
+- **`%writ`**: the wire is `[%job id %load <generation> <tag> ~]`, where
+  the generation is the job's submit time. A response is absorbed only if
+  it is for a known, unsealed job, of the right generation, holding that
+  tag. So a response left over from an earlier job that held the same id,
+  a duplicate, one for a superseded load, and one for a tag already
+  satisfied are all dropped — and, critically, dropped **without a
+  step**, so a stale delivery cannot spend a slice or schedule a second
+  timer. Responses are absorbed by tag, so the order Clay answers in
+  cannot change the run.
+- **Unrecognised load wire**: an in-flight read whose wire shape predates
+  this engine is ignored rather than crashing the event.
+- **Cancel/delete**: cancel seals a job at any stage, including one paused
+  on Clay; cancel of an unknown or terminal id is a no-op; delete requires
+  a terminal job, frees its quota, and a second delete is a no-op.
+- **Watcher reconnect**: rejoining after the end gives exactly the terminal
+  result with no partial-stage replay; mid-run it gives the stage and
+  progress the job is actually at.
+
+One residual sharp edge, recorded: the generation is the job's submit time,
+so two runs of the same id created in the same Arvo instant would share
+one. Reaching that requires submit, cancel, delete, and resubmit to land in
+a single instant, and the intervening delete is what makes the id reusable
+at all; a monotonic counter would need a state field (unit 10.6).
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,
