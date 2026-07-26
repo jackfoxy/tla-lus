@@ -61,11 +61,21 @@
       modules=(map module-name @t)
       cfg=(unit @t)
   ==
-::  one Clay read in flight: the module it stands for (with the search
-::  roots left to try) or the config file
+::  one Clay read in flight: the module it stands for (the path being
+::  tried and the search roots left after it) or the config file
 +$  lread
-  $%  [%module name=module-name from=module-name try=(list path)]
+  $%  [%module name=module-name from=module-name pax=path try=(list path)]
       [%cfg ~]
+  ==
+::  what a run consumed: where each source came from, and its content
+::  hash. The id is the frozen wire typing, so inline and Clay sources
+::  are recorded the same way
++$  prov   [id=source-id hash=@]
++$  provs
+  $:  root=module-name
+      ::  by module name, so the record is deterministic
+      mods=(list [name=module-name p=prov])
+      cfg=(unit prov)
   ==
 ::  a source-load failure: a typed diagnostic, or a limit hit at growth
 +$  lerr
@@ -90,6 +100,8 @@
       ::  delivered but not yet absorbed responses
       inbox=(list read-response)
       mods=(map module-name @t)
+      ::  the path each loaded module was actually read from
+      refs=(map module-name path)
       cfg=(unit @t)
       ::  names that need no further read: loaded files, inner modules
       ::  registered from their outer file, and standard modules
@@ -476,6 +488,7 @@
       pend=~
       inbox=~
       mods=~
+      refs=~
       cfg=~
       have=~
       asked=(silt ~[root.s])
@@ -497,12 +510,14 @@
   [%& [[tag p.rr] c]]
 ::
 ++  load-cand
-  ::  the candidate file for a module under one search root, as a read
-  |=  [c=lcur p=lread rot=path name=module-name]
+  ::  the candidate file for a module under one search root, as a read.
+  ::  The pending entry remembers the path so a hit can record where the
+  ::  module actually came from
+  |=  [c=lcur from=module-name name=module-name rot=path try=(list path)]
   ^-  (each [read-request lcur] path-err:sp)
   =/  mp  (module-path:sp rot name)
   ?:  ?=(%| -.mp)  [%| p.mp]
-  (load-ask c p p.mp)
+  (load-ask c [%module name from p.mp try] p.mp)
 ::
 ++  load-drain
   ::  absorb delivered responses. A hit registers the module (or the
@@ -536,10 +551,9 @@
       %module
     ?:  ?=(%| -.res.r)
       ::  not under this search root: try the next one
-      ?^  try.u.p
-        =/  la
-          %^  load-cand  c  [%module name.u.p from.u.p t.try.u.p]
-          [i.try.u.p name.u.p]
+      =/  tr  try.u.p
+      ?^  tr
+        =/  la  (load-cand c from.u.p name.u.p i.tr t.tr)
         ?:  ?=(%| -.la)
           [c (flop reads) `[%fail (err-text:sp p.la)]]
         =.  c  +.p.la
@@ -555,6 +569,7 @@
     ?:  (gth bytes.c max-source.lims)
       [c (flop reads) `[%limited %source]]
     =.  mods.c  (~(put by mods.c) name.u.p txt)
+    =.  refs.c  (~(put by refs.c) name.u.p pax.u.p)
     =.  have.c  (~(put in have.c) name.u.p)
     ?:  (gth ~(wyt by mods.c) max-modules.lims)
       [c (flop reads) `[%limited %modules]]
@@ -611,10 +626,97 @@
   ?>  ?=(^ rts)
   =/  q  i.que
   =.  c  c(queue t.que)
-  =/  la  (load-cand c [%module name.q from.q t.rts] [i.rts name.q])
+  =/  la  (load-cand c from.q name.q i.rts t.rts)
   ?:  ?=(%| -.la)  [c (flop out) `[%fail (err-text:sp p.la)]]
   =.  c  +.p.la
   $(out [-.p.la out], n +(n))
+::
+++  id-text
+  ::  a source id as text: the scry path a Clay read used, or the
+  ::  inline bundle's own name for it
+  |=  id=source-id
+  ^-  @t
+  ?-    -.id
+      %inline  ?:(=('' name.id) 'inline' (rap 3 ~['inline/' name.id]))
+      %clay
+    (spat `path`[(scot %p ship.id) desk.id (scot cas.id) path.id])
+  ==
+::
+++  render-sources
+  ::  the provenance record: every source this run consumed, named by
+  ::  where it came from and hashed by what it contained. Vendored
+  ::  standard modules are not listed — they are fixed by the desk
+  |=  ps=provs
+  ^-  @t
+  %-  wain-text
+  ;:  weld
+    ~[(rap 3 ~['root ' root.ps])]
+  ::
+    %+  turn  mods.ps
+    |=  [nm=module-name p=prov]
+    ^-  @t
+    (rap 3 ~['module ' nm ' ' (scot %ux hash.p) ' ' (id-text id.p)])
+  ::
+    ?~  cfg.ps  ~
+    :_  ~
+    (rap 3 ~['config ' (scot %ux hash.u.cfg.ps) ' ' (id-text id.u.cfg.ps)])
+  ==
+::
+++  put-sources
+  ::  store the provenance record as soon as the sources are known, so a
+  ::  run that later fails still says what it read. It is engine
+  ::  metadata, not the caller's output: when it does not fit inside
+  ::  max-artifact it is dropped with a warning rather than failing an
+  ::  otherwise sound run — but never dropped silently
+  |=  [j=job-2 ps=provs]
+  ^-  [job-2 (list event)]
+  =/  txt  (render-sources ps)
+  ?:  (gth (met 3 txt) max-artifact.limits.request.j)
+    =/  dg=diagnostic
+      :*  [%lus 402]  %warning  %modules
+          'source provenance omitted: it exceeds max-artifact'
+          ~  ~
+      ==
+    [j(diags (snoc diags.j dg)) ~[[%diagnostic dg]]]
+  [j(artifacts (~(put by artifacts.j) %sources [%text txt])) ~]
+::
+++  clay-provs
+  ::  what the load cursor read, by module name
+  |=  c=lcur
+  ^-  provs
+  :+  root.c
+    %+  turn  (sort ~(tap in ~(key by mods.c)) aor)
+    |=  nm=module-name
+    ^-  [module-name prov]
+    :-  nm
+    :-  [%clay ship.c desk.c cas.c (~(gut by refs.c) nm ~)]
+    (shax (~(gut by mods.c) nm ''))
+  ?~  cfg.c  ~
+  ?~  cfg-path.c  ~
+  `[[%clay ship.c desk.c cas.c u.cfg-path.c] (shax u.cfg.c)]
+::
+++  inline-provs
+  ::  an inline bundle records the same shape: the caller supplied the
+  ::  bytes, so the id is the bundle's own name for each module
+  |=  s=srcs
+  ^-  provs
+  :+  root.s
+    %+  turn  (sort ~(tap in ~(key by modules.s)) aor)
+    |=  nm=module-name
+    ^-  [module-name prov]
+    [nm [%inline nm] (shax (~(gut by modules.s) nm ''))]
+  ?~  cfg.s  ~
+  `[[%inline ''] (shax u.cfg.s)]
+::
+++  close-load
+  ::  the module graph is closed: record what was read, then hand the
+  ::  sources to %parse exactly as an inline bundle would
+  |=  [j=job-2 ps=provs s=srcs pre=(list event)]
+  ^-  step-result-2
+  =/  po  (put-sources j ps)
+  =/  jp  -.po
+  =.  cont.jp  (save-kont [%src s])
+  (more jp (weld pre +.po))
 ::
 ++  load-fail
   ::  a resolution failure is a typed diagnostic at the %modules stage,
@@ -662,8 +764,9 @@
   ::  the graph is closed
   ?:  &(?=(^ cfg-path.c) ?=(~ cfg.c))
     (load-fail j 'Cannot find the config file.' pre)
-  =.  cont.j  (save-kont [%src [root.c mods.c cfg.c]])
-  (more j pre)
+  ::  `j` is narrowed to the %clay bundle here, so the hand-off happens
+  ::  in a gate of its own rather than by writing back into it
+  (close-load j (clay-provs c) [root.c mods.c cfg.c] pre)
 ::
 ::  +|  Stage: %parse
 ::
@@ -679,6 +782,14 @@
     (finish j [%failed 'internal: %parse without loaded sources'] pre)
   =/  src  u.so
   =/  cry  (carry j so)
+  ::  an inline bundle's provenance is recorded here, where a Clay run
+  ::  recorded its own at the close of the load
+  =/  po=[job-2 (list event)]
+    ?:  |(?=(%clay -.src.request.j) (~(has by artifacts.j) %sources))
+      [j ~]
+    (put-sources j (inline-provs src))
+  =.  j    -.po
+  =.  pre  (weld pre +.po)
   ?:  ?=(%check -.op.request.j)
     =/  text  (~(get by modules.src) root.src)
     ?~  text
@@ -841,7 +952,12 @@
   ::  graph -> assemble the typed run-spec. One bounded slice (graph
   ::  generation, like a capped run-check); a config diagnostic is a
   ::  typed TLC failure, not a silent %ok.
-  =/  rso  (run-spec-of:config root.src modules.src cfg)
+  ::  the semantic graph is generated once and reused by the config
+  ::  assembly and the checker (it used to be built twice, reparsing
+  ::  every module both times)
+  =/  mo  (generate:semantic root.src modules.src)
+  ?~  mo  (config-fail j [0 'internal: module generation failed'] pre)
+  =/  rso  (run-spec-with:config u.mo cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
   =/  rs  p.rso
   ?.  ?=(%init-next -.mode.rs)
@@ -890,8 +1006,6 @@
     (more j pre)
   ::  WU6.9: safety and liveness run on the Work Unit 3 SEMANTIC graph via
   ::  node-eval (the simulation path above keeps the CST solver, a residue).
-  =/  mo  (generate:semantic root.src modules.src)
-  ?~  mo  (finish j [%failed 'semantic graph generation failed'] pre)
   =/  defs    (defmap-of:ne u.mo)
   =/  consts  (consts-of:check constants.rs)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);

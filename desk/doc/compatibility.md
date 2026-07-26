@@ -470,6 +470,45 @@ inline path rather than identical, which is an approved difference:
 | referenced module absent | `module resolution failed` / `semantic graph generation failed` (downstream) | `Cannot find source file for module X imported in module Y.` at `%modules` |
 | declared name ≠ file name | same downstream failure | `File name 'X' does not match the name 'Y' …` at `%modules` |
 
+### 10.3 Revision and content identity — at parity
+
+A run records what it read. Every module and the config carry a
+`[source-id hash]` — the frozen wire id (`%inline name` or
+`%clay ship desk case path`) plus the `shax` of the content — and the pair
+is rendered into a **`%sources` artifact**, stored as soon as the sources
+are known (at the close of the Clay load, or on entry to `%parse` for an
+inline bundle) so a run that later fails still says what it read:
+
+```
+root spec
+module helper 0x…  /~zod/tla-lus/268/test-data/clay/multi/helper/tla
+module spec 0x…    /~zod/tla-lus/268/test-data/clay/multi/spec/tla
+config 0x…         /~zod/tla-lus/268/test-data/clay/multi/cfg/txt
+```
+
+Modules are listed by name, so the record is deterministic and an inline
+run's hashes are directly comparable to a Clay run's — only the id column
+differs.
+
+- **One revision governs a run.** The case pinned at submit is used for
+  every read; a commit mid-run cannot split the source set. The whole read
+  stream of a run is asserted to carry one ship, desk, and revision.
+- **The parse cache keys on content**, not on location, so the same text
+  read from two files parses once and a cache hit can never cross content.
+- `%config` now generates the semantic graph **once** and hands it to the
+  config assembly, instead of building (and reparsing every module) twice.
+- Provenance is engine metadata, not the caller's output: when it does not
+  fit inside `max-artifact` it is dropped with a `[%lus 402]` **warning**
+  rather than failing an otherwise sound run — but never silently.
+
+Vendored standard modules are not listed: they are not read, and are fixed
+by the desk revision. Remaining duplicate work, tracked as residue: the
+load stage still parses each module once only to extract its references
+and discards the tree, and `%parse` re-parses the root through
+`parse-typed` (which is what produces SANY's diagnostics). Sharing those
+trees needs a cache that survives across stages, which would put syntax
+trees into the persisted continuation.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

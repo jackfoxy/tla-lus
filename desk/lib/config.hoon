@@ -770,9 +770,16 @@
   ^-  (each run-spec cfg-vdiag)
   =/  mo  (generate:sem-lib root src)
   ?~  mo  [%| 0 'internal: module generation failed']
+  (run-spec-with u.mo cfg)
+::
+++  run-spec-with
+  ::  the same, over a semantic graph the caller already generated, so a
+  ::  pipeline that needs both does not build (and reparse) it twice
+  |=  [mo=sem-module:sem-lib cfg=@t]
+  ^-  (each run-spec cfg-vdiag)
   =/  pr  (parse-cfg cfg)
   ?:  ?=(%| -.pr)  [%| code.p.pr msg.p.pr]
-  (assemble-run-spec u.mo p.pr)
+  (assemble-run-spec mo p.pr)
 ::
 ::  +|  Entrypoint
 ::

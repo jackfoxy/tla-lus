@@ -296,6 +296,76 @@ No in-scope Gall/Clay behavior is left unclassified.
 - A path literal cannot spell `..`, `$foo`, `spec.tla`, `Spec`, or an
   empty segment — build those paths flat with `` `@ta` `` casts.
 
+## 10.3 Revision and content identity (done)
+
+### What landed
+
+- **Provenance**: `lib/job` gained `prov` (`[id=source-id hash=@]`) and
+  `provs` (root, modules by name, config). The Clay cursor records the
+  path each module was actually read from (`refs`, filled from the
+  pending read's own `pax`), so `+clay-provs` can name every file;
+  `+inline-provs` produces the same shape for a bundle. `+render-sources`
+  writes the `%sources` artifact, `+put-sources` stores it.
+- **Where it is stored**: at the close of the load (`+close-load`) for
+  Clay, on entry to `%parse` for inline — as early as the sources are
+  known, so a run that later fails still records what it read.
+- **One revision**: already true after 10.2 (pin at submit +
+  `read-ref` refusing an unpinned case); 10.3 asserts it over the whole
+  read stream of a run.
+- **Semantic graph generated once**: `do-config` used to call
+  `run-spec-of:config` (which generates the graph internally) *and*
+  `generate:semantic` — building the graph and reparsing every module
+  twice. New `+run-spec-with:config` takes an already-generated
+  `sem-module`; `do-config` generates once and passes it. Observable
+  behavior is unchanged, including the `[%tlc 0] internal: module
+  generation failed` diagnostic (which `run-spec-of` used to emit and
+  `do-config` now emits directly).
+
+### Decisions
+
+- **A provenance record cannot fail a run.** It is engine metadata, not
+  the caller's output. When it does not fit inside `max-artifact` it is
+  dropped with a `[%lus 402]` warning diagnostic. The first
+  implementation made it `%limited %artifact`, which changed
+  `test-limited-artifact` from `[5 4 0 4]` to `[0 0 0 0]` — failing a
+  sound run because the *engine* wanted to write a note. Warning is the
+  honest reading of "bounded" here, and it leaves the frozen behavior
+  of the report limit untouched.
+- **Standard modules are not listed**: they are vendored, never read, and
+  fixed by the desk revision.
+- **The cross-stage parse cache was not built.** Sharing trees between
+  the load stage, `%parse`, and `generate` would put syntax trees into
+  the persisted continuation (jammed at every slice). The cheap half of
+  the win — not generating the semantic graph twice — is taken; the rest
+  is documented residue.
+
+### Evidence
+
+- `tests/lib/clay-load.hoon` grew to 26: `test-clay-provenance` and
+  `test-inline-provenance` are goldens of the record (built independently
+  in the test from `shax` of each fixture text, so they assert the hash is
+  really the content hash and that both representations agree);
+  `test-provenance-omitted-not-silent`; `test-clay-one-revision` (every
+  read of a run carries one ship/desk/revision);
+  `test-parse-cache-is-content-keyed`.
+- Full ship suite `ok=%.y`.
+
+### Hoon gotchas hit
+
+- `?:` branches of different shapes (`[%& j]` vs a gate call returning
+  `(each …)`) unify into a fork whose `p` cannot be found — `find-fork` on
+  `p.sa`. Cast the `=/` (`=/ sa=(each job-2 step-result-2)`).
+- Writing a *wide* value back into a face the compiler narrowed (here `j`,
+  narrowed by `?=(%clay -.src.request.j)`) nest-fails. Hand the value to a
+  gate of its own instead (`+close-load`).
+- `join` is wet: fed a fixed-length list literal it mull-grows. Bind the
+  lines as `(list @t)` first.
+- **Stale scrollback bit hard again**: a `FAILED` line from a previous
+  `-test` run sat above the visible pane and looked like the current
+  result twice in a row. `tmux clear-history` does not clear the visible
+  screen. Print a marker (`'MARKER-A'`) before the run and read only the
+  output after it.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

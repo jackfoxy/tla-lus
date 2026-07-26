@@ -1,6 +1,7 @@
 /-  *tla-lus
 /+  *test
 /=  job-lib  /lib/job
+/=  mod      /lib/modules
 |%
   ::  Tests For The Asynchronous Clay Source-Load Stage (unit P2-10.1)
   ::
@@ -230,13 +231,13 @@
     $(j (deliver:job-lib job.r (answers f rs)), n +(n))
   ==
 ::
-++  read-paths
-  ::  every file path a run asks for, in request order
+++  read-refs
+  ::  every file a run asks for, in request order
   |=  [f=fs req=request budget=@ud]
-  ^-  (list path)
+  ^-  (list source-ref)
   =/  j  (init:job-lib req t0)
-  =|  acc=(list path)
-  |-  ^-  (list path)
+  =|  acc=(list source-ref)
+  |-  ^-  (list source-ref)
   =/  r  (step:job-lib j budget t0)
   ?-    -.r
       %stop  (flop acc)
@@ -246,9 +247,14 @@
     ?>  ?=(^ rs)
     %=  $
       j    (deliver:job-lib job.r (answers f rs))
-      acc  (weld (flop (turn rs |=(q=read-request path.source-ref.q))) acc)
+      acc  (weld (flop (turn rs |=(q=read-request source-ref.q))) acc)
     ==
   ==
+::
+++  read-paths
+  |=  [f=fs req=request budget=@ud]
+  ^-  (list path)
+  (turn (read-refs f req budget) |=(r=source-ref path.r))
 ::
 ++  run-inline
   |=  [req=request budget=@ud]
@@ -504,4 +510,80 @@
   %+  expect-eq
     !>(`[%limited %modules *run-stats])
   !>((clay-result multi-fs req))
+::
+::  +|  Revision And Content Identity (unit 10.3)
+::
+::
+++  cid
+  ::  a Clay source id as the provenance record renders it
+  |=  pax=path
+  ^-  @t
+  (spat `path`[(scot %p ~zod) %spec (scot `case`ud+1) pax])
+::
+++  test-clay-provenance
+  ::  the run records what it read: every module and the config, by
+  ::  where it came from and by the hash of what it contained
+  =/  j  +:(run-clay multi-fs (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
+  =/  lines=(list @t)
+    :~  'root spec'
+        (rap 3 ~['module helper ' (scot %ux (shax helper-mod)) ' ' (cid /src/helper/tla)])
+        (rap 3 ~['module spec ' (scot %ux (shax spec-mod)) ' ' (cid /src/spec/tla)])
+        (rap 3 ~['config ' (scot %ux (shax mc-cfg)) ' ' (cid /src/cfg/txt)])
+    ==
+  =/  want  (rap 3 (join '\0a' lines))
+  (expect-eq !>(`[%text want]) !>((~(get by artifacts.j) %sources)))
+::
+++  test-inline-provenance
+  ::  an inline bundle records the same shape and the same content
+  ::  hashes; only the id column differs
+  =/  ij
+    %-  run-inline
+    :_  256
+    (inline-req 'spec' ~[['spec' spec-mod] ['helper' helper-mod]] mc-cfg)
+  =/  lines=(list @t)
+    :~  'root spec'
+        (rap 3 ~['module helper ' (scot %ux (shax helper-mod)) ' inline/helper'])
+        (rap 3 ~['module spec ' (scot %ux (shax spec-mod)) ' inline/spec'])
+        (rap 3 ~['config ' (scot %ux (shax mc-cfg)) ' inline'])
+    ==
+  =/  want  (rap 3 (join '\0a' lines))
+  (expect-eq !>(`[%text want]) !>((~(get by artifacts.ij) %sources)))
+::
+++  test-provenance-omitted-not-silent
+  ::  it is engine metadata, so a limit that cannot hold it drops it
+  ::  with a warning instead of failing a sound run
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =.  max-artifact.limits.req  120
+  =/  j  +:(run-clay multi-fs req 256)
+  ;:  weld
+    (expect !>(!(~(has by artifacts.j) %sources)))
+    (expect-eq !>(`[%lus 402]) !>(?~(diags.j ~ `code.i.diags.j)))
+    (expect-eq !>(`%warning) !>(?~(diags.j ~ `severity.i.diags.j)))
+  ==
+::
+++  test-clay-one-revision
+  ::  the pin, not %live, governs: every read of a run names the same
+  ::  ship, desk, and revision, so a mid-run commit cannot split it
+  =/  refs  (read-refs multi-fs (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
+  ;:  weld
+    (expect !>(?=(^ refs)))
+    %-  expect
+    !>  %+  levy  refs
+        |=(r=source-ref &(=(ship.r ~zod) =(desk.r %spec) =(cas.r `case`ud+1)))
+  ==
+::
+++  test-parse-cache-is-content-keyed
+  ::  the parse cache keys on content, not on where the text came from:
+  ::  the same module text read twice parses once, and a cache hit can
+  ::  never cross content
+  =/  a  (parse-cached:mod spec-mod ~)
+  =/  b  (parse-cached:mod spec-mod cache.a)
+  =/  c  (parse-cached:mod helper-mod cache.b)
+  ;:  weld
+    (expect-eq !>(1) !>(~(wyt by cache.a)))
+    (expect-eq !>(1) !>(~(wyt by cache.b)))
+    (expect !>(=(res.a res.b)))
+    (expect-eq !>(2) !>(~(wyt by cache.c)))
+    (expect !>(!=(res.b res.c)))
+  ==
 --
