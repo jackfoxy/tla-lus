@@ -562,6 +562,9 @@
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
     ?:  ?=(%more -.r)
+      ::  live statistics at the slice boundary (deterministic, resumable): the
+      ::  public view reflects search progress, not just the final report
+      =.  stats.j  [gen.cur.r distinct.cur.r (lent queue.cur.r) depth.cur.r]
       =.  cont.j  (save-kont kk(cur cur.r))
       (more j pre)
     (finish-bfs j out.r nl.kk act.kk pre)

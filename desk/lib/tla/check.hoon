@@ -428,6 +428,7 @@
       gen=@ud
       distinct=@ud
       depth=@ud
+      outdeg=@ud   ::  max newly-distinct successors of any state (TLC max out-degree)
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -440,7 +441,7 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0]
+  [is ~ ~ ~ (lent is) 0 0 0]
 ::
 ++  con-hold
   ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
@@ -571,9 +572,13 @@
       [%deadlock gen.cur distinct.cur (lent t.q) depth.cur (trace-to seen.cur fp)]
     cur(queue t.q)
   =/  cost  (lent nexts)
+  =/  before  distinct.cur
   =/  rr
     (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp `st.vis)
   ?^  out.rr  [%done u.out.rr cur.rr]
+  ::  TLC out-degree sample: the number of newly-distinct successors this state
+  ::  produced (Worker.outDegree.addSample of unseenSuccessorStates)
+  =.  outdeg.cur.rr  (max outdeg.cur.rr (sub distinct.cur.rr before))
   $(cur cur.rr, spent (add spent cost))
 ::
 ++  explore
@@ -588,6 +593,18 @@
   |-  ^-  outcome
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)  out.r
+  $(cur cur.r)
+::
+++  explore-cursor
+  ::  run the search to completion in `budget`-sized slices and return the final
+  ::  cursor, exposing the statistics (max out-degree) the outcome omits. The
+  ::  result is independent of `budget` (the slice-boundary resume contract)
+  |=  [is=(list state) o=bfs-opts budget=@ud]
+  ^-  bfs-cursor
+  =/  cur  (bfs-init is)
+  |-  ^-  bfs-cursor
+  =/  r  (bfs-step o cur budget)
+  ?:  ?=(%done -.r)  cur.r
   $(cur cur.r)
 ::
 ++  trace-to
@@ -1153,5 +1170,19 @@
       %deadlock  =/  st  [gen.res distinct.res queued.res depth.res]  [[%violated [%deadlock ~] st] st]
       %error     [[%failed msg.res] *run-stats]
   ==
+::
+++  run-stats-full
+  ::  the final statistics of a safety search including the max out-degree that
+  ::  the wire run-stats does not carry, run in `budget`-sized slices (for
+  ::  statistics and pause/resume-equality differential tests)
+  |=  [spec=@t cfg=@t cap=@ud budget=@ud]
+  ^-  [gen=@ud distinct=@ud queued=@ud depth=@ud outdeg=@ud]
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  [0 0 0 0 0]
+  =*  c  p.sc
+  =/  o=bfs-opts
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
+  =/  cur  (explore-cursor is.c o budget)
+  [gen.cur distinct.cur (lent queue.cur) depth.cur outdeg.cur]
 --
 
