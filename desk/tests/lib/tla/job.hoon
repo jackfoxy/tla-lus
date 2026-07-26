@@ -97,6 +97,35 @@
 ::
 ++  mc-cfg    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ++  bare-cfg  'INIT Init\0aNEXT Next\0a'
+::  a spec with a state constraint (exercises the cursor's constraint pruning)
+++  con-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Bound == x =< 4
+  ====
+  '''
+++  con-cfg  'INIT Init\0aNEXT Next\0aCONSTRAINT Bound\0a'
+::  a symmetric spec (exercises the cursor's permutation group; cfg cord is
+::  single-quoted so the model-value set braces are literal)
+++  sym-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, TLC
+  CONSTANT P
+  VARIABLE x
+  Init == \E p \in P : x = p
+  Next == \E p \in P : x' = p
+  Perms == Permutations(P)
+  Inv == TRUE
+  ====
+  '''
+++  sym-cfg  'CONSTANT P = {a, b}\0aSYMMETRY Perms\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
 ++  undef-spec
   ::  Bar is undefined -> semantic error 4200 (generation phase)
@@ -431,6 +460,18 @@
 ::
 ++  test-pause-resume-every-boundary-safety
   (every-boundary (check-req cyc-spec mc-cfg) 1)
+::  the extended BFS cursor (Work Unit 7: state/action constraints, symmetry
+::  group, out-degree) must resume byte-identically at every slice boundary
+++  test-pause-resume-every-boundary-constraint
+  (every-boundary (check-req con-spec con-cfg) 1)
+++  test-pause-resume-every-boundary-symmetry
+  (every-boundary (check-req sym-spec sym-cfg) 1)
+::
+::  a search whose persisted cursor is under the noun-size bound completes
+::  normally (the limit is a defense-in-depth ceiling above max-states)
+++  test-noun-size-under-limit
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 1)
+  (expect-eq !>(%.y) !>(?=([%ok *] (need result.j))))
 ::
 ::  +|  Limits At The Point Of Growth
 ::

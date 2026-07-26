@@ -164,7 +164,7 @@
       [%liveness name=@t]
       [%assumption name=@t]
   ==
-+$  limit-kind  ?(%source %modules %states %depth %time %artifact)
++$  limit-kind  ?(%source %modules %states %depth %time %artifact %noun)
 +$  run-stats
   $:  generated=@ud
       distinct=@ud

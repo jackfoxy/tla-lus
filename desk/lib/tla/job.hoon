@@ -92,6 +92,10 @@
 ::  work units one Gall event may spend; engine configuration,
 ::  deliberately separate from the request's user-facing limits
 ++  default-budget  256
+::  the largest a persisted continuation (jammed BFS cursor) may grow before a
+::  search is stopped %limited — a defense-in-depth bound on the in-flight noun,
+::  above what max-states already implies, checked at each slice boundary
+++  max-noun-bytes  16.000.000
 ::
 ::  +|  Continuation Persistence
 ::
@@ -227,7 +231,16 @@
   ?^  result.j  [%stop ~ j]
   ?:  (time-exceeded j now)
     (finish j [%limited %time stats.j] ~)
-  =/  k=(unit kont)  ?~(cont.j ~ `(load-kont u.cont.j))
+  ::  a continuation jammed by an incompatible engine version (e.g. an older
+  ::  BFS-cursor shape) cannot be revived; fail the job with a restart notice
+  ::  rather than crash the agent event (Work Unit 7.7 migration contract)
+  =/  lr=(each (unit kont) tang)
+    ?~  cont.j  [%& ~]
+    =/  m  (mule |.((load-kont u.cont.j)))
+    ?:(?=(%& -.m) [%& `p.m] [%| p.m])
+  ?:  ?=(%| -.lr)
+    (finish j [%failed 'restarted: the in-flight state is from an incompatible engine version; resubmit'] ~)
+  =/  k=(unit kont)  p.lr
   =/  own=(unit stage)  ?~(k ~ (kont-stage u.k))
   ::  mid-stage resume: no entry events
   ?:  ?&(?=(^ own) =(u.own stage.j))
@@ -566,6 +579,10 @@
       ::  public view reflects search progress, not just the final report
       =.  stats.j  [gen.cur.r distinct.cur.r (lent queue.cur.r) depth.cur.r]
       =.  cont.j  (save-kont kk(cur cur.r))
+      ::  bound the persisted noun: a search whose cursor outgrows the limit is
+      ::  stopped %limited with the limiting resource, never carried unbounded
+      ?:  &(?=(^ cont.j) (gth (met 3 k.u.cont.j) max-noun-bytes))
+        (finish j [%limited %noun stats.j] pre)
       (more j pre)
     (finish-bfs j out.r nl.kk act.kk pre)
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
