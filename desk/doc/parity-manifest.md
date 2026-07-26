@@ -122,7 +122,16 @@ presence in the wire type.
 | check-opt-translate | tlc2 translate-before-check | job.hoon validate | (job tests) | absent | 8 | typed rejection at submit (P2-1); no stub translation |
 | check-opt-cfg | tlc2.TLC -config | job.hoon do-config (run-spec-of) + lib/config | gen-mc-tests (5) + gen-cfg-tests (34) + gen-cfg-val-tests (13) + job tests | partial | 5 | 5.5 done: `%config` runs the real pipeline (parse-cfg → validate-config against the WU3 graph → assemble-run-spec) in one bounded slice; the old cfg-word audit is gone, config diagnostics are typed CFG_*/TLC_CONFIG_* failures. Deep processConfigSpec SPECIFICATION-form, substitution/fairness codes, and multi-invariant checking remain (5.3c residue); cfg source override still typed-rejected |
 | src-inline | (n/a) | job.hoon %inline | gen-mc-tests (5) | partial | 7,10 | inline bundles run the real parse->config->search pipeline; multi-module resolution not yet wired into %check |
-| src-clay | util.FilenameToStream | mar/tla, job.hoon validate | (job tests) | absent | 10 | typed rejection at submit (P2-1); Clay resolver exists but Gall issues no reads |
+| src-clay | util.FilenameToStream | mar/tla, job.hoon validate | (job tests) | absent | 10 | umbrella: async Clay sources; per-behavior parity tracked by the src-clay-* rows below. Baseline: typed rejection at submit (P2-1); `clay-resolver` exists but is a dead synchronous `.^` read the agent never invokes (`tools/notes/plan2-unit10-clay-notes.md`) |
+| src-clay-async-load | modanalyzer.SpecObj async read loop | lib/job kont %source-load, lib/modules resolver-cursor, app on-arvo %warp/%writ | test-data/clay/multi (+), clay/miss (−) | absent | 10 | 10.1: `%await` outcome + `%source-load` cursor drives the lib/modules BFS from asynchronously loaded text; missing/parse-fail/mismatch produce the inline resolver's typed diagnostics at the %modules stage |
+| src-clay-path-canon | util.FilenameToStream/SimpleFilenameToStream name+root mapping | lib/source-path (canonicalize, module-path) | tests/lib/source-path accept/reject | absent | 10 | 10.2: ship/desk/case/root/search-root canonicalization; module name → lowercased `<name>.tla`; pinned case resolved once per run |
+| src-clay-escape | (Clay path semantics) | lib/source-path (escape guard) | in-root (+), `../secret`/absolute/dotted (−) | absent | 10 | 10.2: escape-free by construction — no `..`, absolute escape, empty/`$`/dotted segment, or out-of-root path; a bad path is a typed rejection naming the offending segment, never a silent skip |
+| src-clay-identity | Tool source revision/content pinning | lib/modules (loaded [ship desk case hash], hash-keyed parse cache), lib/job thread hash | same-content-parses-once (+), mid-run-commit-ignored (−) | absent | 10 | 10.3: every loaded module/config carries `[ship desk case hash]`; the pinned case governs all reads; content-hash parse cache keyed on hash so cache hits never cross content; provenance surfaced in the artifact |
+| src-clay-quota-req | TLCGlobals per-run bounds | lib/job limits during async load | under-bound accrual (+), max-source/max-modules cross (−) | absent | 10 | 10.4: `max-source`/`max-modules` enforced as bytes/modules accrue during async load (not only at submit) → `%limited %source`/`%modules` |
+| src-clay-quota-global | TLCGlobals/agent-level bounds | app/tla-lus state (concurrent jobs, retained bytes, in-flight source bytes) | within caps (+), cap crossed (−) | absent | 10 | 10.4: global quotas in agent state alongside per-request limits; enforced at the growth point, typed terminal naming the limiting resource |
+| src-clay-artifact-retain | (n/a) | app/tla-lus state retention+cleanup, on-peek artifact scry | reclaim-on-delete (+), over-policy-cleaned (−) | absent | 10 | 10.4: bounded retention policy (count/bytes/age) + cleanup path; deleting a terminal job frees its quota; terminal-gated artifact scry preserved |
+| src-clay-noun-size | (n/a) | lib/job %noun limit on %source-load cursor | bounded cursor jams (+), pathological fan-out (−) | partial | 10 | WU7.7 %noun caps the jammed continuation; 10.4 extends it to the `%source-load` cursor so a wide fan-out cannot grow unbounded jammed resolver state → `%limited %noun` |
+| src-clay-idempotency | (Gall delivery contract) | app/tla-lus pokes/arvo, lib/job engine | single-delivery baseline (+), dup/reordered delivery (−) | absent | 10 | 10.5: submit/wake/writ/cancel/delete/reconnect idempotent under repeated and reordered delivery; tracked jointly with the op-gall-* rows |
 | limit-max-source | (n/a) | job.hoon validate | (job tests) | parity | 2 | enforced at validate before work begins |
 | limit-max-modules | (n/a) | job.hoon validate | (job tests) | parity | 2 | enforced at validate |
 | limit-max-states | TLCGlobals | check.hoon bfs-step cap | (job tests) | parity | 1 | enforced as each state registers, inside the sliced search (P2-1) |
@@ -130,3 +139,19 @@ presence in the wire type.
 | limit-max-time | TLCGlobals runtime | job.hoon step entry | (job tests) | parity | 1 | checked on entry to every slice against the submit time (P2-1) |
 | limit-max-artifact | (n/a) | job.hoon finish-arts | (job tests) | parity | 2 | enforced before storing the report artifact |
 | allow-write | (n/a) | (unused) | (none) | absent | 13 | Clay write-back not implemented; flag ignored |
+
+## Gall agent mechanics
+
+Agent-side behaviors the Clay integration needs — pokes, Behn wakes, Clay
+`%writ` responses, watcher reconnect. Java is not the oracle; the Gall
+delivery contract is. `status` is the support level in the live agent
+(`app/tla-lus`). See `tools/notes/plan2-unit10-clay-notes.md`.
+
+| id | java-owner | hoon-owner | oracle-test | status | unit | rationale |
+|---|---|---|---|---|---|---|
+| op-gall-submit | (n/a) | app on-poke %submit | (job tests) | partial | 10 | duplicate *active* id already rejects; resubmit of a *terminal* id is undefined (10.5 picks reject-or-replace); a retried identical submit must not double-schedule |
+| op-gall-wake | (n/a) | app on-arvo [%job @ %step ~] | (job tests) | partial | 10 | wake of a deleted/terminal job is a no-op; a late/duplicate wake after completion must never resume a sealed job or re-emit a result (10.5) |
+| op-gall-writ | Arvo Clay %warp/%writ | app on-arvo (%warp/%writ handler) | test-data/clay + job tests | absent | 10 | no `%writ` handler yet; 10.1 adds tagged Clay reads and 10.5 the tag/generation guard (dup/out-of-order/stale/unknown `%writ` dropped) |
+| op-gall-cancel | (n/a) | app on-poke %cancel | (job tests) | partial | 10 | cancel of unknown/terminal is a no-op today; 10.5 extends it to seal a job mid-load |
+| op-gall-delete | (n/a) | app on-poke %delete-result | (job tests) | partial | 10 | delete requires terminal, a second delete is a no-op; 10.4 makes delete free the job's global quota |
+| op-gall-watch | (n/a) | app on-watch snapshot | (job tests) | partial | 10 | reconnect replays `snapshot` (terminal → terminal result, else stage+progress); 10.5 tests exact terminal replay (no partial-stage) and mid-run stage+progress against the load stage |

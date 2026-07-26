@@ -1,0 +1,15 @@
+DIFFERENTIAL EXPECTATION (unit 10 Clay/inline equivalence)
+
+root      spec
+modules   spec.tla         :: single-module, closes the graph with no reads
+cfg       cfg.txt          :: INIT/NEXT/INVARIANT
+op        %check %exhaustive
+
+A single-module spec (mod 3 counter): the async-load stage requests exactly
+one read (the root), receives text, closes the graph, and reaches the same
+module graph an inline bundle of `spec.tla` reaches. Result:
+
+  result     [%ok [3 3 0 3]]     :: generated distinct queued depth
+
+Provenance: mirrors the mc-corpus counter shape; verdict + run-stats equal
+the inline run over the identical text.
