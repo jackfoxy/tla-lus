@@ -524,6 +524,56 @@ state held `%clay` jobs written under the *new* bundle shape (a chimera
 that existed only mid-unit), which cannot clam through the frozen `%2`
 mold. No released `%2` state can contain one.
 
+## 10.7 Integrate, bound, document, close (done)
+
+### What closing actually required
+
+Task 1 (remove the `%clay` rejection) landed at 10.1. The work left was
+proving the claims and removing the last thing that contradicted them.
+
+- **Equivalence, measured.** `+equivalent` in `tests/lib/clay-load`
+  compares *every* observable of the two paths for the same text —
+  result, `run-stats`, diagnostics, and the artifact map minus the
+  provenance record — across a passing run, an invariant violation, a
+  deadlock, and a rejected config. Comparing verdicts alone would not
+  have caught a divergent report or a wrong trace.
+- **The dead resolver is gone.** `lib/modules` still carried
+  `clay-resolver`, a synchronous `.^` read no stage invoked (10.0
+  inventoried it). Now that the async loader exists, a library that reads
+  Clay in-line is not merely unused but wrong, so it was deleted and
+  **scaffold gate 7** was added: no scry anywhere in `desk/lib` or
+  `desk/sur`. That turns "no stage may read Clay" from a convention into
+  something the gate enforces. (The gate skips comment lines, so the
+  comment left where the resolver used to live may name the rune it
+  forbids.)
+- **Responsiveness** is two properties, tested separately: a run at
+  budget 1 interleaves load and check slices and ends where the unsliced
+  run ends, and a job paused on Clay is cancellable — cancel seals it, a
+  response arriving afterwards is not absorbed, and stepping the sealed
+  job changes nothing.
+
+### MVP acceptance (Phase B7)
+
+On the fake ship, over Clay:
+
+| fixture | result |
+|---|---|
+| `test-data/clay/multi` | `[%ok [5 4 0 4]]` — the frozen inline golden |
+| `test-data/clay/violation` | `[%violated [%invariant 'Inv'] [4 4 0 4]]` plus the full TLC counterexample report with per-state action spans |
+
+`generated` is 4, not 5, in the violation case: the violating state is
+counted distinct but never expanded (TLC's `doNext` order, unit 7.4).
+
+### Evidence
+
+- `tests/lib/clay-load` 35/35, `tests/lib/source-path` 18/18, full ship
+  suite `ok=%.y`, `validate.py --check` clean, scaffold gate PASS (now 10
+  gates).
+- Docs: `architecture.md` gained the async-load stage, its three
+  invariants, and the quota model; `compatibility.md` moved Clay out of
+  "still absent" and gained a close-out table of what a Clay run still is
+  not; `parity-manifest.md` `src-clay` umbrella → parity.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

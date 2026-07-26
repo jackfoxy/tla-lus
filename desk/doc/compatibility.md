@@ -364,11 +364,12 @@ Consequences:
   map differently: `generated` = transitions taken, `depth` = deepest
   transition index; `distinct`/`queued` stay 0.
 
-Still absent after P2-1 (tracked in `parity-manifest.md`): Clay sources
-(typed-rejected at submit), PlusCal translation and translate-before-check
-(typed-rejected), multi-module resolution inside `%check`, canonicalized
-search roots, content-hash caching, quotas, artifact retention. (The
-`%analyze` semantic/level/lint flags now run the real pipeline — unit 4.8.)
+Still absent after P2-1 (tracked in `parity-manifest.md`): PlusCal
+translation and translate-before-check (typed-rejected). (The `%analyze`
+semantic/level/lint flags run the real pipeline — unit 4.8. Clay sources,
+multi-module resolution inside `%check`, canonicalized search roots,
+content-hash caching, quotas, and artifact retention all landed in unit
+10 — see below.)
 
 ## Unit P2-10 — Gall + Clay integration
 
@@ -647,6 +648,39 @@ A pre-unit-10 `%clay` job cannot actually appear in a stored state — the
 bundle was typed-rejected at `validate` for the whole life of `%1` and
 `%2` — so the root-path-to-module-name conversion is frozen for the type,
 not for data anyone has. It converts `/die-hard/tla` to `die-hard`.
+
+### 10.7 Close: what a Clay run is, and what it still is not
+
+`%check`, `%analyze`, and `%simulate` run over `%clay` sources exactly as
+they run over an inline bundle. The equivalence is measured, not asserted:
+for the same texts, both paths produce the same **result**, `run-stats`,
+**diagnostics**, rendered **report**, and typed **counterexample** — a
+passing run, an invariant violation with its shortest trace, a deadlock,
+and a rejected config are each compared field by field. The only artifact
+that legitimately differs is the provenance record, and only in its id
+column (`inline/spec` vs `/~zod/tla-lus/287/…/spec/tla`).
+
+**Responsiveness.** A Clay run at budget 1 is a sequence of bounded slices
+that interleave loading and checking, and it ends where the unsliced run
+ends. A job paused on Clay is cancellable like any other: cancel seals it,
+a response arriving afterwards is not absorbed, and stepping the sealed job
+changes nothing. No Gall event ever blocks on a read — structurally, not by
+convention: the scaffold gate fails if any file under `desk/lib` or
+`desk/sur` contains a scry. The dead synchronous `clay-resolver` that
+unit 10.0 inventoried was deleted here.
+
+Still not done for Clay sources, each typed-rejected or documented rather
+than silently degraded:
+
+| Not supported | Behavior |
+|---|---|
+| Clay **write-back** (`allow-write`, `%write-translation`) | flag accepted and ignored (unit 13) |
+| cfg **source override** (`check-opts.cfg`) | typed rejection |
+| PlusCal translate-before-check | typed rejection |
+| remote-ship / cross-desk live subscriptions | out of scope; a run reads one pinned revision of one desk |
+| a watchdog for a `%writ` that never arrives | a job paused on Clay stays active (reads are answered synchronously when the path does not exist, and the pinned case is settled, so an unanswered read is a Clay bug) |
+| listing vendored standard modules in the provenance record | they are not read, and are fixed by the desk revision |
+| sharing parsed trees across stages | the loader parses each module once to extract references and discards the tree; a cross-stage cache would put syntax trees into the persisted continuation |
 
 ## Typed-rejected / unsupported public options — summary
 

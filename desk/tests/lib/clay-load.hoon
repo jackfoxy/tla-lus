@@ -635,5 +635,117 @@
     (expect !>(!(awaiting:job-lib job.r 99)))
     (expect !>(!(awaiting:job-lib done tag.i.rs)))
   ==
+::
+::  +|  Inline/Clay Equivalence And Responsiveness (unit 10.7)
+::
+::  The whole point of the unit: a Clay run must produce the run an
+::  inline bundle of the identical files produces — not merely the same
+::  verdict, but the same diagnostics, the same report, and the same
+::  counterexample. Only the provenance record may differ, and only in
+::  its id column.
+::
+++  inv-mod
+  ::  the invariant fails at x = 3, so the run yields a violation with a
+  ::  shortest trace
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Inv == x < 3
+  ====
+  '''
+::
+++  dead-mod
+  ::  no successor at x = 2: deadlock
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 2 /\ x' = x + 1
+  Inv == x < 9
+  ====
+  '''
+::
+++  equivalent
+  ::  every observable of the two runs, except the provenance artifact
+  ::  (whose id column names where the bytes came from, which is the one
+  ::  thing that legitimately differs)
+  |=  [text=@t cfg=@t]
+  ^-  tang
+  =/  f  (mk-fs ~[[/src/spec/tla text] [/src/cfg/txt cfg]])
+  =/  cj  +:(run-clay f (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
+  =/  ij  (run-inline (inline-req 'spec' ~[['spec' text]] cfg) 256)
+  ;:  weld
+    (expect-eq !>(result.ij) !>(result.cj))
+    (expect-eq !>(stats.ij) !>(stats.cj))
+    (expect-eq !>(diags.ij) !>(diags.cj))
+    (expect-eq !>((~(del by artifacts.ij) %sources)) !>((~(del by artifacts.cj) %sources)))
+  ==
+::
+++  test-equivalent-pass
+  (equivalent single-mod mc-cfg)
+::
+++  test-equivalent-violation
+  ::  verdict, statistics, the rendered report, and the typed trace
+  (equivalent inv-mod mc-cfg)
+::
+++  test-equivalent-deadlock
+  (equivalent dead-mod mc-cfg)
+::
+++  test-equivalent-config-error
+  ::  a config the checker rejects fails identically through both paths
+  (equivalent single-mod 'INIT Init\0aNEXT Next\0aINVARIANT Nope\0a')
+::
+++  test-clay-violation-trace
+  ::  the counterexample a Clay run produces is the real one
+  =/  f  (mk-fs ~[[/src/spec/tla inv-mod] [/src/cfg/txt mc-cfg]])
+  =/  j  +:(run-clay f (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
+  =/  tr  (~(got by artifacts.j) %trace)
+  ?>  ?=(%trace -.tr)
+  ;:  weld
+    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4]]) !>(result.j))
+    (expect-eq !>(%safety) !>(kind.trace.tr))
+    ::  x = 0, 1, 2, 3 — the shortest path to the violation
+    (expect-eq !>(4) !>((lent states.trace.tr)))
+  ==
+::
+++  test-clay-interleaves-and-stays-sliced
+  ::  a Clay run at budget 1 is still a sequence of bounded slices: the
+  ::  load pauses on reads, the search resumes after them, and the run
+  ::  ends where the unsliced one ends
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =/  slow  (run-clay multi-fs req 1)
+  =/  fast  (run-clay multi-fs req 256)
+  ;:  weld
+    (expect !>((gth (count-clay multi-fs req 1) (count-clay multi-fs req 256))))
+    (expect-eq !>(result:+.slow) !>(result:+.fast))
+    (expect-eq !>(artifacts:+.slow) !>(artifacts:+.fast))
+  ==
+::
+++  test-clay-cancellable-mid-load
+  ::  a job paused on Clay is sealed by cancel like any other, and a
+  ::  response arriving afterwards cannot revive it
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =/  r  (step:job-lib (init:job-lib req t0) 256 t0)
+  ?>  ?=(%await -.r)
+  =/  rs  `(list read-request)`reads.r
+  ?>  ?=(^ rs)
+  =/  sealed  (cancel:job-lib job.r)
+  =/  after   (deliver:job-lib sealed (answers multi-fs rs))
+  =/  step2   (step:job-lib after 256 t0)
+  ?>  ?=(%stop -.step2)
+  ;:  weld
+    (expect-eq !>(`[%cancelled ~]) !>(result.sealed))
+    (expect-eq !>(%terminal) !>(stage.sealed))
+    ::  the sealed job holds no reads, and stepping it changes nothing
+    (expect !>(!(awaiting:job-lib sealed tag.i.rs)))
+    (expect-eq !>(%stop) !>(-.step2))
+    (expect-eq !>(sealed) !>(job.step2))
+  ==
 
 --

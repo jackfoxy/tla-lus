@@ -20,6 +20,8 @@ syntax.hoon    SANY parser: operator stack, junctions, …   ── unit 4
    │
 modules.hoon   EXTENDS/INSTANCE resolution, std modules,   ── unit 5
 stdmods.hoon   dependency-first sem-order, parse cache
+source-path.hoon  the only constructor of a source-ref:   ── unit 10.2
+               canonical, escape-free, pinned-revision paths
    │
 semantic.hoon  semantic graph: name resolution, arities,   ── units 6–7
                builtin table, per-def levels (0/1/2/3)
@@ -43,8 +45,9 @@ check.hoon     safety BFS on semantic nodes: ordered         ── unit 7 (B6)
                FP64 identity, shortest traces, out-degree;
 crc.hoon       liveness (stuttering lasso), seeded simulation
    │
-job.hoon       resumable stage engine: init → step → …,      ── units 1, 7
-               jammed continuation, typed %limited limits
+job.hoon       resumable stage engine: init → step → …,      ── units 1, 7, 10
+               jammed continuation, typed %limited limits,
+               asynchronous %modules source load, quotas
 ```
 
 The Work Unit 6–7 core lives under `lib/`. Safety state generation runs
@@ -57,6 +60,54 @@ Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as
 `test-pause-resume-identical`), and a job persisted across a restart resumes to
 the identical result.
+
+### Asynchronous source load (unit 10)
+
+Purity is what forces sources to arrive asynchronously: a stage that read
+Clay would be a function of the event it ran in, not of the job noun. So
+no library reads Clay at all — the scaffold gate checks that `desk/lib`
+and `desk/sur` contain no scry — and a `%clay` bundle instead plans a
+`%modules` stage that *names* the files it needs:
+
+```
+   %modules ──▶ %await [read-request …]        the kernel names files
+       ▲                    │
+       │                    ▼
+       │            app/tla-lus: %warp ─▶ Clay
+       │                    │
+       └──── +deliver ◀── %writ                the agent brings bytes back
+                  │
+                  ▼
+   graph closed ──▶ %src ──▶ %parse ──▶ %config ──▶ %explore
+```
+
+The `%load` cursor holds the BFS queue, the reads in flight (by tag), the
+delivered-but-unabsorbed inbox, and the byte/module accounting; it jams
+and revives like any other continuation, so a run paused waiting on Clay
+resumes byte-identically. Resolution mirrors the inline resolver exactly,
+so a Clay run reaches the module graph — and the verdict, report, and
+counterexample — an inline bundle of the same files reaches.
+
+Three invariants hold it together:
+
+- **Escape-free by construction.** A `source-ref` exists only if
+  `source-path` built it, which requires canonical segments, a path under
+  a declared search root, and a revision already pinned to a number.
+- **One revision per run.** The agent resolves the requested case at
+  submit, so a commit mid-run cannot split the source set.
+- **Bounded everywhere.** Source bytes and module count accrue as reads
+  arrive; the load cursor shares the search cursor's noun bound; reads per
+  slice have their own budget.
+
+### Quota model (unit 10.4)
+
+A request's `limits` bound one job. A `gquota` bounds the ship: concurrent
+active jobs, retained artifact bytes, and in-flight source bytes, checked
+at submit with each rejection naming its resource. Every figure is derived
+from the jobs map rather than carried as a counter, so the accounting
+cannot drift and deleting a job frees its quota by construction. Over the
+retention bound, the oldest terminal jobs give up their artifact bodies —
+never their results — and say so in their own diagnostics.
 
 ## Gall shell (`app/tla-lus.hoon`)
 

@@ -117,26 +117,12 @@
   ?~  txt  ~
   `[[%inline name] u.txt]
 ::
-++  clay-resolver
-  ::  read <root-path>/<name>.tla via the %tla mark; pure within an
-  ::  event. Clay path segments cannot carry case, so files are stored
-  ::  under the lowercased module name; the declared-name check in
-  ::  +resolve still validates the requested (case-sensitive) name.
-  |=  [our=ship =desk cas=case roots=(list path)]
-  ^-  resolver
-  |=  name=module-name
-  ^-  (unit source-text)
-  =/  seg  `@ta`(crip (cass (trip name)))
-  =/  try  roots
-  |-  ^-  (unit source-text)
-  ?~  try  ~
-  =/  pax=path
-    (weld i.try `path`~[seg %tla])
-  =/  full=path
-    [(scot %p our) desk (scot cas) pax]
-  ?.  .^(? %cu full)
-    $(try t.try)
-  `[[%clay our desk cas pax] .^(@t %cx full)]
+::  (a synchronous Clay resolver lived here until unit 10.7. It read
+::  `<root>/<name>.tla` with `.^` inside whatever event called it, and no
+::  stage ever invoked it. Clay sources are loaded asynchronously now —
+::  lib/job's %modules stage names the files it needs and pauses — so a
+::  library that reads Clay in-line is not just unused but wrong, and the
+::  scaffold gate checks that none reappears.)
 ::
 ::  +|  Resolution
 ::

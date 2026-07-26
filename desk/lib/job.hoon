@@ -163,10 +163,10 @@
 ::  Clay reads one slice may request, bounding a wide dependency fan-out
 ::  independently of the work budget
 ++  default-load-budget  8
-::  the largest a persisted continuation (jammed BFS or source-load cursor) may
-::  grow before a run is stopped %limited — a defense-in-depth bound on the
-::  in-flight noun, above what max-states already implies, checked at each slice
-::  boundary
+::  the largest a persisted continuation (jammed BFS or source-load cursor)
+::  may grow before a run is stopped %limited — a defense-in-depth bound on
+::  the in-flight noun, above what max-states already implies, checked at
+::  each slice boundary
 ++  max-noun-bytes  16.000.000
 ::  agent-wide bounds, across all jobs. A request's own `limits` bound one job;
 ::  these bound the ship, so one caller cannot starve it by submitting many

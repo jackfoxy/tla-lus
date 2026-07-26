@@ -64,15 +64,28 @@ done
 [ "$MIGCHAIN" -eq 1 ] && pass "on-load migrates %0 -> %1 -> %2 -> %3 (lib/migrate)" \
   || fail "missing migration chain in on-load"
 
-echo "== gate 7: fixture size bound =="
+echo "== gate 7: no synchronous Clay read in a stage =="
+# the pure pipeline may not touch Clay: every external read is a
+# read-request the agent performs (unit 10.1). Only app/ (and the
+# caller-side generators) may scry.
+# (comment lines are not code: a `::` line may name the rune it forbids)
+sync_reads() {
+  grep -rn '\.\^' "$DESK/lib" "$DESK/sur" --include='*.hoon' 2>/dev/null \
+    | grep -vE ':[0-9]+: *::'
+}
+SYNC_HITS=$(sync_reads | wc -l)
+[ "$SYNC_HITS" -eq 0 ] && pass "no scry in desk/lib or desk/sur (all source access is async)" \
+  || { fail "$SYNC_HITS synchronous read(s) in a library:"; sync_reads | sed 's/^/    /'; }
+
+echo "== gate 8: fixture size bound =="
 BIG=$(find "$DESK/test-data" -type f -size +100k 2>/dev/null | wc -l)
 [ "$BIG" -eq 0 ] && pass "no fixture over 100 KB" || { fail "$BIG oversized fixture(s):"; \
   find "$DESK/test-data" -type f -size +100k -printf '    %s %p\n'; }
 
-echo "== gate 8: desk manifest =="
+echo "== gate 9: desk manifest =="
 [ -f "$DESK/desk.bill" ] && pass "desk.bill present" || fail "no desk.bill"
 
-echo "== gate 9: parity ledger well-formed =="
+echo "== gate 10: parity ledger well-formed =="
 if python3 "$REPO/tools/check-parity.py" --check >/tmp/tla-parity.log 2>&1; then
   LEDGER=$(grep -m1 'parity ledger:' /tmp/tla-parity.log)
   OWED=$(grep -m1 'still owed' /tmp/tla-parity.log)
