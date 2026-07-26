@@ -163,10 +163,122 @@
 ::  Clay reads one slice may request, bounding a wide dependency fan-out
 ::  independently of the work budget
 ++  default-load-budget  8
-::  the largest a persisted continuation (jammed BFS cursor) may grow before a
-::  search is stopped %limited — a defense-in-depth bound on the in-flight noun,
-::  above what max-states already implies, checked at each slice boundary
+::  the largest a persisted continuation (jammed BFS or source-load cursor) may
+::  grow before a run is stopped %limited — a defense-in-depth bound on the
+::  in-flight noun, above what max-states already implies, checked at each slice
+::  boundary
 ++  max-noun-bytes  16.000.000
+::  agent-wide bounds, across all jobs. A request's own `limits` bound one job;
+::  these bound the ship, so one caller cannot starve it by submitting many
+::  small jobs or by never collecting its results. Engine configuration, like
+::  default-budget — not caller-visible
++$  gquota
+  $:  max-jobs=@ud       ::  concurrent active jobs
+      max-retained=@ud   ::  stored artifact bytes, all jobs
+      max-inflight=@ud   ::  source bytes active jobs may hold
+  ==
+++  default-quota
+  ^-  gquota
+  [max-jobs=8 max-retained=8.000.000 max-inflight=4.000.000]
+::
+::  +|  Agent-Wide Quotas And Retention
+::
+::  Every figure below is derived from the jobs map rather than carried as a
+::  counter, so the accounting cannot drift from what is actually stored and a
+::  deleted job frees its quota by construction.
+::
+++  artifact-bytes
+  ::  one job's stored artifacts, as a noun
+  |=  j=job-2
+  ^-  @ud
+  ?:  =(~ artifacts.j)  0
+  (met 3 (jam artifacts.j))
+::
+++  source-charge
+  ::  what one request holds against the in-flight source bound: an inline
+  ::  bundle is exactly its bytes; a Clay job has not read its sources yet, so
+  ::  it reserves the most it is allowed to read
+  |=  req=request
+  ^-  @ud
+  =/  s  src.req
+  ?-    -.s
+      %clay  max-source.limits.req
+      %inline
+    =/  b
+      %+  roll  ~(val by modules.s)
+      |=([t=@t a=@ud] (add a (met 3 t)))
+    (add b ?~(cfg.s 0 (met 3 u.cfg.s)))
+  ==
+::
+++  active-count
+  |=  js=(map req-id job-2)
+  ^-  @ud
+  %+  roll  ~(val by js)
+  |=([j=job-2 a=@ud] ?:(?=(^ result.j) a +(a)))
+::
+++  retained-bytes
+  |=  js=(map req-id job-2)
+  ^-  @ud
+  %+  roll  ~(val by js)
+  |=([j=job-2 a=@ud] (add a (artifact-bytes j)))
+::
+++  inflight-source
+  |=  js=(map req-id job-2)
+  ^-  @ud
+  %+  roll  ~(val by js)
+  |=([j=job-2 a=@ud] ?:(?=(^ result.j) a (add a (source-charge request.j))))
+::
+++  quota-reject
+  ::  the agent-wide gate a new job must pass on top of +validate. Each bound
+  ::  names the resource it protects; nothing is silently queued behind a full
+  ::  store
+  |=  [js=(map req-id job-2) q=gquota req=request]
+  ^-  (unit @t)
+  ?:  (gte (active-count js) max-jobs.q)
+    `'global limit: too many active jobs'
+  ?:  (gte (retained-bytes js) max-retained.q)
+    `'global limit: retained artifact bytes; delete a result first'
+  ?:  (gth (add (inflight-source js) (source-charge req)) max-inflight.q)
+    `'global limit: in-flight source bytes'
+  ~
+::
+++  reclaim
+  ::  artifact retention: over the bound, the oldest terminal jobs give up
+  ::  their artifact bodies first. The job, its result, its statistics, and its
+  ::  diagnostics stay — only the bulk goes, and a warning on the job records
+  ::  it, so a later artifact scry that misses is explained rather than blank.
+  ::  An active job is never touched
+  |=  [js=(map req-id job-2) cap=@ud]
+  ^-  (map req-id job-2)
+  ?:  (lte (retained-bytes js) cap)  js
+  =/  cands
+    ^-  (list [id=req-id j=job-2])
+    %+  sort
+      ^-  (list [id=req-id j=job-2])
+      %+  skim  ~(tap by js)
+      |=  [id=req-id j=job-2]
+      &(?=(^ result.j) !=(~ artifacts.j))
+    |=  [a=[id=req-id j=job-2] b=[id=req-id j=job-2]]
+    ?:  =(started.j.a started.j.b)  (aor id.a id.b)
+    (lth started.j.a started.j.b)
+  |-  ^-  (map req-id job-2)
+  ?~  cands  js
+  ?:  (lte (retained-bytes js) cap)  js
+  =/  dg=diagnostic
+    :*  [%lus 403]  %warning  %terminal
+        'artifacts reclaimed: the agent-wide retention bound was reached'
+        ~  ~
+    ==
+  =/  jr  j.i.cands
+  =.  jr  jr(artifacts ~, diags (snoc diags.jr dg))
+  $(js (~(put by js) id.i.cands jr), cands t.cands)
+::
+++  noun-over
+  ::  has a persisted continuation outgrown the in-flight noun bound?
+  |=  [c=(unit [%1 k=@]) cap=@ud]
+  ^-  ?
+  ?~  c  |
+  (gth (met 3 k.u.c) cap)
 ::
 ::  +|  Continuation Persistence
 ::
@@ -760,6 +872,10 @@
   =/  reads  (weld reads.dr reads.am)
   ?^  pend.c
     =.  cont.j  (save-kont [%load c])
+    ::  a pathological dependency fan-out cannot grow an unbounded jammed
+    ::  resolver state, exactly as a search cursor cannot
+    ?:  (noun-over cont.j max-noun-bytes)
+      (finish j [%limited %noun stats.j] pre)
     (await j reads pre)
   ::  the graph is closed
   ?:  &(?=(^ cfg-path.c) ?=(~ cfg.c))
@@ -1079,7 +1195,7 @@
       =.  cont.j  (save-kont kk(cur cur.r))
       ::  bound the persisted noun: a search whose cursor outgrows the limit is
       ::  stopped %limited with the limiting resource, never carried unbounded
-      ?:  &(?=(^ cont.j) (gth (met 3 k.u.cont.j) max-noun-bytes))
+      ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
     (finish-bfs j out.r nl.kk act.kk pre)

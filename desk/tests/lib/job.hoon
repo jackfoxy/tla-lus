@@ -746,4 +746,124 @@
     (expect-eq !>(stage.mid) !>(stage.pub))
     (expect-eq !>(progress.mid) !>(progress.pub))
   ==
+::
+::  +|  Agent-Wide Quotas And Retention (unit 10.4)
+::
+::  Every figure is derived from the jobs map, so a deleted job frees its
+::  quota by construction and the accounting cannot drift from the store.
+::
+++  small-quota
+  ^-  gquota:job-lib
+  [max-jobs=2 max-retained=400 max-inflight=1.000]
+::
+++  active-job
+  |=  start=@da
+  ^-  jb
+  (init:job-lib (check-req cyc-spec mc-cfg) start)
+::
+++  done-job
+  ::  a terminal job holding `n` bytes of report artifact
+  |=  [start=@da n=@ud]
+  ^-  jb
+  =/  j  (active-job start)
+  =.  result.j     `[%ok *run-stats]
+  =.  stage.j      %terminal
+  =.  artifacts.j  (~(put by artifacts.j) %report [%text (fil 3 n 'x')])
+  j
+::
+++  jmap
+  |=  l=(list [req-id jb])
+  ^-  (map req-id jb)
+  (malt l)
+::
+++  test-quota-active-jobs
+  ::  a job past the concurrency bound is refused, naming the bound;
+  ::  terminal jobs do not count against it
+  =/  js  (jmap ~[[~.a (active-job t0)] [~.b (active-job t0)]])
+  =/  fin  (jmap ~[[~.a (done-job t0 0)] [~.b (done-job t0 0)]])
+  ;:  weld
+    (expect-eq !>(2) !>((active-count:job-lib js)))
+    (expect-eq !>(0) !>((active-count:job-lib fin)))
+    %+  expect-eq
+      !>(`'global limit: too many active jobs')
+    !>((quota-reject:job-lib js small-quota (check-req cyc-spec mc-cfg)))
+    %+  expect-eq
+      !>(~)
+    !>((quota-reject:job-lib fin small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-quota-retained-bytes
+  ::  a full artifact store refuses new work rather than growing
+  =/  js  (jmap ~[[~.a (done-job t0 500)]])
+  ;:  weld
+    (expect !>((gth (retained-bytes:job-lib js) 400)))
+    %+  expect-eq
+      !>(`'global limit: retained artifact bytes; delete a result first')
+    !>((quota-reject:job-lib js small-quota (check-req cyc-spec mc-cfg)))
+    ::  deleting the job frees the quota, with no counter to update
+    %+  expect-eq
+      !>(~)
+    !>((quota-reject:job-lib (~(del by js) ~.a) small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-quota-inflight-source
+  ::  an active job holds source bytes: an inline bundle exactly what it
+  ::  carries, a Clay job the most it is allowed to read (it has not read
+  ::  anything yet). A terminal job holds none
+  =/  cr  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =.  max-source.limits.cr  1.000
+  =/  clay-js  (jmap ~[[~.a (init:job-lib cr t0)]])
+  =/  inline-js  (jmap ~[[~.a (active-job t0)]])
+  =/  bundle-bytes  (source-charge:job-lib (check-req cyc-spec mc-cfg))
+  ;:  weld
+    (expect-eq !>(1.000) !>((inflight-source:job-lib clay-js)))
+    (expect-eq !>(bundle-bytes) !>((inflight-source:job-lib inline-js)))
+    (expect-eq !>(0) !>((inflight-source:job-lib (jmap ~[[~.a (done-job t0 0)]]))))
+    %+  expect-eq
+      !>(`'global limit: in-flight source bytes')
+    !>((quota-reject:job-lib clay-js small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-reclaim-oldest-first
+  ::  over the bound, the oldest terminal job gives up its artifacts and
+  ::  says so; the result and statistics stay
+  =/  js
+    %-  jmap
+    :~  [~.old (done-job t0 300)]
+        [~.new (done-job (add t0 ~h1) 300)]
+    ==
+  =/  out  (reclaim:job-lib js 400)
+  =/  old  (~(got by out) ~.old)
+  =/  new  (~(got by out) ~.new)
+  ;:  weld
+    (expect-eq !>(~) !>(artifacts.old))
+    (expect !>((~(has by artifacts.new) %report)))
+    (expect-eq !>(`[%ok *run-stats]) !>(result.old))
+    (expect-eq !>(`[%lus 403]) !>(?~(diags.old ~ `code.i.diags.old)))
+    (expect-eq !>(`%warning) !>(?~(diags.old ~ `severity.i.diags.old)))
+  ==
+::
+++  test-reclaim-spares-active-jobs
+  ::  an in-flight job's artifacts are never reclaimed under it
+  =/  live  (active-job t0)
+  =.  artifacts.live  (~(put by artifacts.live) %report [%text (fil 3 500 'x')])
+  =/  out  (reclaim:job-lib (jmap ~[[~.a live]]) 100)
+  ;:  weld
+    (expect !>((~(has by artifacts:(~(got by out) ~.a)) %report)))
+    (expect-eq !>(~) !>(diags:(~(got by out) ~.a)))
+  ==
+::
+++  test-reclaim-under-bound-is-identity
+  =/  js  (jmap ~[[~.a (done-job t0 10)]])
+  (expect-eq !>(js) !>((reclaim:job-lib js 400)))
+::
+++  test-noun-bound
+  ::  the in-flight noun bound the search and load cursors share
+  =/  small  (save-kont:job-lib [%parse ~['a'] ~])
+  ;:  weld
+    (expect-eq !>(%.n) !>((noun-over:job-lib ~ 10)))
+    (expect-eq !>(%.n) !>((noun-over:job-lib small 1.000)))
+    (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
+  ==
+
 --

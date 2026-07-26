@@ -509,6 +509,60 @@ and discards the tree, and `%parse` re-parses the root through
 trees needs a cache that survives across stages, which would put syntax
 trees into the persisted continuation.
 
+### 10.4 Quotas, retention, and noun size — at parity
+
+A request's own `limits` bound one job; a new `gquota` bounds the ship, so
+one caller cannot starve it with many small jobs or by never collecting
+results. Engine configuration, like `default-budget` — not caller-visible.
+
+| Bound | Default | Enforced |
+|---|---|---|
+| concurrent active jobs | 8 | at submit, typed rejection |
+| retained artifact bytes | 8 MB | at submit (rejection) + reclaimed when a job finishes |
+| in-flight source bytes | 4 MB | at submit, typed rejection |
+
+Every figure is **derived from the jobs map** rather than carried as a
+counter, so the accounting cannot drift from what is actually stored and a
+deleted job frees its quota by construction. An active Clay job reserves
+its declared `max-source` (it has not read its sources yet); an inline
+bundle holds exactly the bytes it carries; a terminal job holds none.
+
+Rejections name the resource:
+
+| Message |
+|---|
+| `global limit: too many active jobs` |
+| `global limit: retained artifact bytes; delete a result first` |
+| `global limit: in-flight source bytes` |
+
+**Retention.** Over the bound, the oldest terminal jobs (by submit time,
+ties by id) give up their artifact *bodies* first. The job, its result, its
+statistics, and its diagnostics stay, and a `[%lus 403]` warning is
+recorded on the job — so an artifact scry that later misses is explained
+rather than blank. Active jobs are never touched, and the terminal-gated
+artifact scry is unchanged. Reclamation runs when a job finishes, not on
+every slice.
+
+**Per-request limits during the load** (10.1) are unchanged and already at
+the growth point: source bytes and module count accrue as reads *arrive*,
+not only at submit, so a growing set crosses into `%limited %source` /
+`%limited %modules` mid-load.
+
+**Noun size.** The Work Unit 7.7 bound on the jammed continuation is now a
+shared predicate applied to the `%load` cursor as well, so a pathological
+dependency fan-out cannot grow an unbounded jammed resolver state →
+`%limited %noun`.
+
+Known limits of this design, recorded rather than hidden:
+
+- A global bound is reported through the frozen `limit-kind`/rejection
+  text, so a caller sees *which resource*, not whether the bound was its
+  own or the ship's. Distinguishing them needs a wire change.
+- `retained-bytes` measures the jammed size of a job's artifact map, while
+  the per-request `max-artifact` measures the report's own text bytes. The
+  two answer different questions (stored noun vs. produced document) and
+  are documented rather than unified.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

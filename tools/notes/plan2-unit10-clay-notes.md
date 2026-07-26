@@ -366,6 +366,63 @@ No in-scope Gall/Clay behavior is left unclassified.
   screen. Print a marker (`'MARKER-A'`) before the run and read only the
   output after it.
 
+## 10.4 Quotas, retention, cleanup, and noun size (done)
+
+### What landed
+
+- **`gquota`** in `lib/job` (`max-jobs` 8, `max-retained` 8 MB,
+  `max-inflight` 4 MB) plus `+default-quota`, with `+quota-reject` as the
+  agent-wide gate a new job must pass on top of `+validate`. The agent
+  calls it in `on-poke %submit`.
+- **Derived accounting**: `+active-count`, `+retained-bytes`,
+  `+inflight-source`, `+artifact-bytes`, `+source-charge`. No counters in
+  agent state.
+- **`+reclaim`**: over the retention bound, the oldest terminal jobs give
+  up their artifact bodies first, keeping result/stats/diags and gaining a
+  `[%lus 403]` warning. The agent runs it (`+retain`) only when a job
+  becomes terminal.
+- **`+noun-over`**: the WU7.7 in-flight noun bound, factored out and
+  applied to the `%load` cursor as well as the search cursor.
+
+### Decisions
+
+- **Derived, not counted.** All three global figures are computed from the
+  jobs map on demand. A counter in agent state would need a migration
+  (10.6), a decrement on every path that removes a job, and would drift
+  the first time one of those paths was missed. Deriving makes "deleting a
+  terminal job frees its quota" true by construction rather than by
+  remembering to write it. The cost is an O(jobs) scan at submit and at
+  completion, which is bounded by `max-jobs` — the very thing being
+  enforced.
+- **Reclaim bodies, not jobs.** Evicting whole terminal jobs would make a
+  caller's result vanish before it read it. Dropping only the artifact
+  bodies keeps every result queryable and reclaims the bulk. The
+  `[%lus 403]` warning means a later artifact scry that misses is
+  explained by the job's own diagnostics — the alternative (a silently
+  empty scry) is indistinguishable from "never existed".
+- **A Clay job reserves `max-source`.** Its actual bytes live inside the
+  jammed cursor and would have to be cued to be measured. Reserving the
+  declared bound is the honest conservative charge, and it is exactly what
+  the job is permitted to consume.
+- **Two different byte measures**, documented rather than unified:
+  `retained-bytes` is the jammed size of a job's artifact map;
+  per-request `max-artifact` is the report's own text bytes.
+- Task 2 (`max-source`/`max-modules` during async load) already landed in
+  10.1 at the growth point, with tests; the ledger row moved to parity
+  here rather than being re-implemented.
+
+### Evidence
+
+- `tests/lib/job.hoon` +7: the three bound rejections (with a small quota
+  so the caps are reachable in a test), terminal jobs not counting against
+  concurrency, deletion freeing the bound, oldest-first reclamation with
+  its warning, active jobs spared, under-bound identity, and the shared
+  noun predicate.
+- `tests/app/tla-lus.hoon` +3: submitting past the concurrency bound is
+  rejected and creates no job; a cancelled job frees the bound; a deleted
+  one frees it too.
+- Full ship suite `ok=%.y`.
+
 ## Done (10.0)
 
 - `src-clay` split into nine granular ledger rows + umbrella; six `op-gall-*`

@@ -341,4 +341,56 @@
 ::
 ++  test-scry-unknown-path
   (expect-eq !>([~ ~]) !>((~(on-peek agent bol) /x/nonsense)))
+::
+::  +|  Agent-Wide Quotas (unit 10.4)
+::
+::
+++  submit-n
+  ::  n distinct submits, returning the cards of the last one
+  |=  [ag=agent:gall n=@ud]
+  ^-  [(list card) agent:gall]
+  =/  caz  *(list card)
+  =/  i  0
+  |-  ^-  [(list card) agent:gall]
+  ?:  =(i n)  [caz ag]
+  =^  caz2  ag  (do-poke ag [%submit (scot %ud i) demo-req])
+  $(i +(i), caz caz2, ag ag)
+::
+++  test-submit-past-active-bound-rejected
+  ::  the concurrency bound is enforced at submit, naming the resource,
+  ::  and no job is created for the refused request
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (submit-n ag max-jobs:default-quota:job-lib)
+  =^  caz   ag  (do-poke ag [%submit ~.over demo-req])
+  ;:  weld
+    (expect-eq !>(1) !>((lent caz)))
+    %+  expect-eq
+      !>([%rejected ~.over 'global limit: too many active jobs'])
+    !>((fact-update (snag 0 caz)))
+    (expect-eq !>(*(unit job)) !>((scry-job ag ~.over)))
+  ==
+::
+++  test-finished-job-frees-the-bound
+  ::  a job that reaches a result stops counting against concurrency
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (submit-n ag max-jobs:default-quota:job-lib)
+  =^  caz1  ag  (do-poke ag [%cancel ~.0])
+  =^  caz   ag  (do-poke ag [%submit ~.next demo-req])
+  ;:  weld
+    (expect-eq !>(2) !>((lent caz)))
+    (expect-eq !>([%ack ~.next]) !>((fact-update (snag 0 caz))))
+  ==
+::
+++  test-delete-frees-the-bound
+  ::  deleting a terminal job frees its quota with no counter to update
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (submit-n ag max-jobs:default-quota:job-lib)
+  =^  caz1  ag  (do-poke ag [%cancel ~.0])
+  =^  caz2  ag  (do-poke ag [%delete-result ~.0])
+  =^  caz   ag  (do-poke ag [%submit ~.next demo-req])
+  ;:  weld
+    (expect-eq !>([%deleted ~.0]) !>((fact-update (snag 0 caz2))))
+    (expect-eq !>([%ack ~.next]) !>((fact-update (snag 0 caz))))
+  ==
+
 --

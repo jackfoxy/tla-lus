@@ -115,6 +115,14 @@
   ^-  ?
   ?=(^ result.j)
 ::
+++  retain
+  ::  a job that just finished may have pushed the artifact store over
+  ::  its bound; reclaim only then, so the scan is not paid every slice
+  |=  [j=job-2:job-lib js=(map req-id job-2:job-lib)]
+  ^-  (map req-id job-2:job-lib)
+  ?.  (terminal j)  js
+  (reclaim:job-lib js max-retained:default-quota:job-lib)
+::
 ++  advance
   ::  Fan out a step's events and schedule what comes next: another
   ::  bounded step, nothing (terminal), or the Clay reads the job is
@@ -180,6 +188,14 @@
     ?^  bad
       :_  this
       [(fact id.act [%rejected id.act u.bad]) ~]
+    ::  the agent-wide bounds, on top of the request's own limits
+    =/  full
+      %^  quota-reject:job-lib  jobs.state
+        default-quota:job-lib
+      request.act
+    ?^  full
+      :_  this
+      [(fact id.act [%rejected id.act u.full]) ~]
     =/  pin  (pin-case request.act)
     ?:  ?=(%| -.pin)
       :_  this
@@ -275,6 +291,7 @@
     =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
     =/  adv  (advance id res now.bowl)
     =.  jobs.state  (~(put by jobs.state) id +.adv)
+    =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
   ::
       [%job @ %load @ ~]
@@ -292,6 +309,7 @@
     =/  res  (step:job-lib j default-budget:job-lib now.bowl)
     =/  adv  (advance id res now.bowl)
     =.  jobs.state  (~(put by jobs.state) id +.adv)
+    =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
   ==
 ::
