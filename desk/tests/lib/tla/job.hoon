@@ -126,6 +126,30 @@
   ====
   '''
 ++  sym-cfg  'CONSTANT P = {a, b}\0aSYMMETRY Perms\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::  a helper module imported by the root spec (multi-module MVP acceptance)
+++  helper-mod
+  ^~
+  '''
+  ---- MODULE helper ----
+  EXTENDS Naturals
+  Lim == 4
+  ====
+  '''
+++  multi-spec
+  ::  the root EXTENDS a user helper module (a two-module bundle); the checked
+  ::  predicates are root-local — evaluating an operator imported from another
+  ::  *user* module is a documented unit-6 residue (only own + INSTANCE defs are
+  ::  in the evaluation defmap)
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, helper
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 4
+  ====
+  '''
 ::
 ++  undef-spec
   ::  Bar is undefined -> semantic error 4200 (generation phase)
@@ -466,6 +490,17 @@
   (every-boundary (check-req con-spec con-cfg) 1)
 ++  test-pause-resume-every-boundary-symmetry
   (every-boundary (check-req sym-spec sym-cfg) 1)
+::  MVP acceptance: a multi-module inline %check (the root spec EXTENDS a user
+::  helper module) is parsed, resolved, and generated as a two-module bundle and
+::  runs end to end to a safety verdict matching tlc2.TLC
+++  test-multi-module-check
+  =/  req=request
+    :*  [%check [| ~ [%exhaustive &]]]
+        [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
+        lim  |
+    ==
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
 ::
 ::  a search whose persisted cursor is under the noun-size bound completes
 ::  normally (the limit is a defense-in-depth ceiling above max-states)

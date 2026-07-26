@@ -244,21 +244,59 @@ Remaining unit-3 increments (in plan order):
   unused `weights` slot) remains an interim device inside the generator;
   an IR-native @-context replaces it.
 
-## Unit 10 — Safety model checking
+## Unit 7 (B6) — Safety model checking parity
 
-Deterministic single-worker BFS matches `tlc2.TLC` on the curated cases
-(`gen-mc-tests`, 5 cases incl. liveness). Not yet ported (tracked; each is an
-`absent`/`partial` row in `parity-manifest.md`):
+Work Unit 7 rebuilt the single-worker safety checker to `tlc2.TLC` parity over
+the Work Unit 3 semantic graph and the Work Unit 6 evaluator. Oracle:
+`tools/oracle/SafetyDump.java` (`tools/gen-safety-tests`, 16 cases) plus the
+byte-exact `gen-mc-tests` corpus (7 cases). **Closed** (the earlier unit-10
+limitations below are now at parity, tested):
 
-- **Real FP64 fingerprints.** State identity uses the canonical
-  sorted `var = render(value)` string, not the `FP64` 64-bit fingerprint.
-  Agrees on the curated specs; the raw *generated* count can differ from TLC
-  for specs whose enumeration order TLC computes differently.
-- **State/action constraints, `SPECIFICATION` form** (Init `/\` `[][Next]_v`),
-  **multiple invariants/properties, symmetry reduction, coverage counters,
-  assumptions, and implied-init/action** checks are absent.
-- **Checkpoint slices** — the queue/visited-set/predecessor data are not yet
-  persisted in bounded slices (one capped `run-check` per event; see unit 13).
+- **Canonical FP64 fingerprints** (7.1): state identity is `FP64` (index 0) over
+  the Work Unit 6.8 `fp-input` bytes in declaration variable order, matching
+  `TLCState.fingerPrint`; no rendered text is a key. `FPSet` membership /
+  first-seen / distinct semantics ported.
+- **Assumptions** (7.2): every `ASSUME` is checked before the search — false →
+  EC 2104, non-boolean/eval-error → EC 2105.
+- **Multiple invariants, state/action constraints, deadlock flag** (7.3):
+  invariants checked in declaration order (first violated by name); `CONSTRAINT`
+  / `ACTION_CONSTRAINT` prune before enqueue; deadlock honors the effective
+  `CHECK_DEADLOCK` flag; TLC's put-then-check-then-enqueue order (so the
+  states-left-on-queue count matches).
+- **Shortest traces** (7.4): predecessor-walk shortest counterexamples; the
+  behavior-invariant, deadlock, and initial-state (length-1, the distinct EC
+  2107 message) traces byte-match TLC; max out-degree tracked (7.6).
+- **Symmetry reduction** (7.5): orbit-representative fingerprints over a
+  `Permutations(S)` group; symmetric states collapse; symmetry + a temporal
+  property is a typed rejection.
+- **Bounded resumable slices** (7.7): the full extended cursor persists as a
+  jammed continuation and resumes byte-identically at every slice boundary;
+  state/depth/time/artifact/noun-size limits are typed `%limited`; an
+  incompatible continuation fails with a restart notice.
+
+**Residue** (tracked as `partial`/`absent` rows, dependencies noted):
+
+- **Per-leaf-action trace labels and `TLC_COVERAGE_INIT/NEXT` counters** — both
+  need `Tool.getActions`' decomposition of `Next` through top-level `\/` and
+  `\E` (per-disjunct spans). The port uses one uniform `<Next …>` label, correct
+  for a single-leaf `Next` (every mc case); a branching multi-variable trace is
+  tested by its statistics, not a byte trace.
+- **Multi-variable `/\` state rendering** in declaration order pairs with the
+  above (needed together for a branching multi-var trace).
+- **Out-degree min/mean/95th-percentile** distribution (needs the bucket
+  histogram); only the maximum is ported.
+- **`SPECIFICATION`-form config** (Init `/\` `[][Next]_v`), **implied-init /
+  implied-action** properties, **axiom-marked** assumptions, **unions of
+  `Permutations`**, and the node-eval **`x \in S` initial-assignment** form.
+- **Evaluating an operator imported from another *user* module** (`EXTENDS
+  helper` where the checked predicate calls `helper`'s def) — the evaluation
+  defmap holds only own + INSTANCE-imported def bodies, not EXTENDS-inherited
+  ones (a unit-6 residue; multi-module bundles parse/resolve/generate, and the
+  MVP test checks a two-module bundle with root-local predicates).
+- **EC 2107 vs 2110** collapse: the wire `violation` carries no EC, so an
+  initial-state and a behavior invariant violation are both `%invariant name`.
+- **Checkpoint-to-disk byte format** is unit 9; unit 7 persists cursors as
+  jammed continuations, not TLC checkpoint files.
 
 ## Unit 11 — Liveness / temporal checking
 

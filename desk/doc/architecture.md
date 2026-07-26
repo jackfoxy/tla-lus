@@ -24,13 +24,34 @@ stdmods.hoon   dependency-first sem-order, parse cache
 semantic.hoon  semantic graph: name resolution, arities,   ── units 6–7
                builtin table, per-def levels (0/1/2/3)
    │
-eval.hoon      canonical TLC values + constant evaluation   ── unit 9  (vs REPL)
+config.hoon    TLC .cfg parse + config-vs-graph validation  ── unit 5 (B4)
+               + typed run-spec (vs ConfigDump/FastTool)
    │
-check.hoon     state generation, BFS safety + fingerprints, ── units 10–12
+tlc/value.hoon      canonical TLC values (equality, order,  ── unit 6 (B5)
+                    render, FP64 input bytes)
+tlc/node-eval.hoon  semantic-node evaluator + action solver ── unit 6
+                    (init/next-states, pred-bool)
+tlc/fingerprint.hoon  FP64 fingerprints, FPSet, symmetry     ── unit 7.1/7.5
+                      orbit canonicalization
+   │
+eval.hoon      canonical TLC values + constant evaluation   ── unit 9  (vs REPL;
+               (value mold aliased by tlc/value)               retired on the
+                                                                safety path)
+   │
+check.hoon     safety BFS on semantic nodes: ordered         ── unit 7 (B6)
+               invariants, constraints, deadlock, symmetry,
+               FP64 identity, shortest traces, out-degree;
 crc.hoon       liveness (stuttering lasso), seeded simulation
    │
-job.hoon       resumable stage engine: init → step → …      ── units 2, 13
+job.hoon       resumable stage engine: init → step → …,      ── units 1, 7
+               jammed continuation, typed %limited limits
 ```
+
+The Work Unit 6–7 core lives under `lib/tla/tlc/`. Safety state generation runs
+on the Work Unit 3 semantic graph through `tlc/node-eval` (the retired CST
+solver in `eval.hoon`/`check.hoon` survives only for simulation and the liveness
+state-predicate scan); state identity is the `tlc/fingerprint` FP64 orbit
+representative, never rendered text.
 
 Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as
