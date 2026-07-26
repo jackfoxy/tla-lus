@@ -83,6 +83,86 @@
   ?~  v  $(order t.order)
   $(order t.order, acc (fp-bytes acc (fp-input:vl u.v)))
 ::
+::  Symmetry reduction (Work Unit 7.5): a state's fingerprint is taken over its
+::  orbit representative — the lexicographically smallest state reachable by
+::  applying every permutation in the symmetry group, matching
+::  TLCStateMut.fingerPrint. A permutation renames model values.
+::
+++  permute
+  ::  rename the model values of a value under `pm` (identity elsewhere); the
+  ::  recursion is hand-rolled (a wet turn over the value mold fuse-loops)
+  |=  [pm=(map @t @t) v=value:vl]
+  ^-  value:vl
+  ?-  -.v
+    %bool   v
+    %int    v
+    %intv   v
+    %str    v
+    %model  [%model (~(gut by pm) p.v p.v)]
+    %set    [%set (permute-list pm p.v)]
+    %seq    [%seq (permute-list pm p.v)]
+    %rec    [%rec (permute-fields pm p.v)]
+    %fcn    [%fcn (permute-pairs pm p.v)]
+  ==
+++  permute-list
+  |=  [pm=(map @t @t) l=(list value:vl)]
+  ^-  (list value:vl)
+  ?~  l  ~
+  [(permute pm i.l) $(l t.l)]
+++  permute-fields
+  |=  [pm=(map @t @t) l=(list [k=@t v=value:vl])]
+  ^-  (list [k=@t v=value:vl])
+  ?~  l  ~
+  [[k.i.l (permute pm v.i.l)] $(l t.l)]
+++  permute-pairs
+  |=  [pm=(map @t @t) l=(list [d=value:vl r=value:vl])]
+  ^-  (list [d=value:vl r=value:vl])
+  ?~  l  ~
+  [[(permute pm d.i.l) (permute pm r.i.l)] $(l t.l)]
+::  the state permuted by `pm`, each value re-normalized (a model rename can
+::  reorder a set or function)
+++  permute-state
+  |=  [pm=(map @t @t) order=(list @t) st=(map @t value:vl)]
+  ^-  (map @t value:vl)
+  =|  out=(map @t value:vl)
+  |-  ^-  (map @t value:vl)
+  ?~  order  out
+  =/  v  (~(get by st) i.order)
+  ?~  v  $(order t.order)
+  $(order t.order, out (~(put by out) i.order (normalize:vl (permute pm u.v))))
+::  strict lexicographic order over states, variables in declaration order
+++  state-lth
+  |=  [a=(map @t value:vl) b=(map @t value:vl) order=(list @t)]
+  ^-  ?
+  ?~  order  |
+  =/  va  (~(get by a) i.order)
+  =/  vb  (~(get by b) i.order)
+  ?~  va  ?~(vb $(order t.order) &)
+  ?~  vb  |
+  ?:  (vlth:vl u.va u.vb)  &
+  ?:  (vlth:vl u.vb u.va)  |
+  $(order t.order)
+::  the orbit representative: the lex-smallest permuted state (identity when
+::  the symmetry group is empty)
+++  canonicalize
+  |=  [perms=(list (map @t @t)) order=(list @t) st=(map @t value:vl)]
+  ^-  (map @t value:vl)
+  ?~  perms  st
+  =/  best  (permute-state i.perms order st)
+  =/  ps  t.perms
+  |-  ^-  (map @t value:vl)
+  ?~  ps  best
+  =/  cand  (permute-state i.ps order st)
+  =?  best  (state-lth cand best order)  cand
+  $(ps t.ps)
+::  the fingerprint of a state's orbit representative, plus the representative
+::  itself (stored so the visited set and traces use it consistently)
+++  orbit-fp
+  |=  [perms=(list (map @t @t)) order=(list @t) st=(map @t value:vl)]
+  ^-  [fp=fp canon=(map @t value:vl)]
+  =/  canon  (canonicalize perms order st)
+  [(state-fp order canon) canon]
+::
 ::  FPSet observable semantics (FPSet.put / FPSet.contains; memory model).
 ::
 ++  fs-empty  ^-(fp-set ~)

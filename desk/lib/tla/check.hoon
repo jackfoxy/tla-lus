@@ -309,6 +309,63 @@
   ?.  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~
   `(leaf-text k)
 ::
+++  elems  elems:ev
+::
+++  perms-of
+  ::  every permutation (ordering) of a list of distinct names
+  |=  l=(list @t)
+  ^-  (list (list @t))
+  ?~  l  ~[~]
+  %-  zing
+  %+  turn  `(list @t)`l
+  |=  x=@t
+  =/  rest  (skip `(list @t)`l |=(y=@t =(y x)))
+  %+  turn  (perms-of rest)
+  |=(p=(list @t) `(list @t)`[x p])
+::
+++  all-perms
+  ::  the symmetry group as name-to-name bijections over the model values
+  |=  names=(list @t)
+  ^-  (list (map @t @t))
+  %+  turn  (perms-of names)
+  |=  perm=(list @t)
+  ^-  (map @t @t)
+  =|  m=(map @t @t)
+  =/  ns  names
+  |-  ^-  (map @t @t)
+  ?~  ns  m
+  ?~  perm  m
+  $(ns t.ns, perm t.perm, m (~(put by m) i.ns i.perm))
+::
+++  model-names
+  ::  the model-value names of a set value (empty for a non-model set)
+  |=  v=value
+  ^-  (list @t)
+  ?.  ?=(%set -.v)  ~
+  %+  murn  p.v
+  |=(e=value ?:(?=(%model -.e) `p.e ~))
+::
+++  symmetry-perms
+  ::  the permutation group for the SYMMETRY operator, recognizing
+  ::  Permutations(S) over a config model-value set S (a union of Permutations
+  ::  and non-constant argument sets are a documented residue). ~ = no symmetry.
+  |=  [tree=node sym=(unit @t) consts=(map @t value)]
+  ^-  (list (map @t @t))
+  ?~  sym  ~
+  =/  body  (body-of-def tree u.sym)
+  ?~  body  ~
+  =/  b  u.body
+  ?.  (is-kind b %n-opapplication)  ~
+  =/  kids  (kids-of b)
+  ?.  (gte (lent kids) 2)  ~
+  ?.  =('Permutations' (genid-name (snag 0 kids)))  ~
+  =/  args  (elems (snag 1 kids))
+  ?~  args  ~
+  ?.  (is-kind i.args %n-generalid)  ~
+  =/  sv  (~(get by consts) (genid-name i.args))
+  ?~  sv  ~
+  (all-perms (model-names u.sv))
+::
 ++  cfg-names
   ::  the INIT/NEXT/first-INVARIANT/first-PROPERTY names from a .cfg via
   ::  the real config parser (unit 5); ~ when the cfg is malformed. Full
@@ -349,6 +406,7 @@
       acons=(list sem:sem-lib)                 ::  action constraints
       vars=(set @t)
       order=(list @t)   ::  vars in TLC declaration order (FP64 byte order)
+      perms=(list (map @t @t))   ::  symmetry group (empty = no symmetry)
       defs=(map @t sem-def:sem-lib)
       consts=(map @t value)
       deadlock=?     ::  report deadlocked states as violations
@@ -442,7 +500,11 @@
   ::  the in-model path: dedup, depth bound, enqueue, ordered invariant check
   |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t e=eenv:ne]
   ^-  [out=(unit outcome) cur=bfs-cursor]
-  =/  fp  (fingerprint order.o st)
+  ::  the state's identity is its symmetry-orbit representative (7.5); with no
+  ::  symmetry group `canon` is `st` and `fp` is the plain FP64 state fingerprint
+  =/  ob   (orbit-fp:fp perms.o order.o st)
+  =/  fp   (@t fp.ob)   ::  worn @t for the existing @t-keyed seen/queue molds
+  =/  cst  canon.ob
   ?:  (~(has by seen.cur) fp)  [~ cur]
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
     [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
@@ -451,8 +513,11 @@
   ::  enqueued (fixing the states-left-on-queue count)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
-  =.  seen.cur      (~(put by seen.cur) fp [d pred st])
-  =/  iv  (first-violated invs.o st e)
+  =.  seen.cur      (~(put by seen.cur) fp [d pred cst])
+  ::  the invariant is checked on the orbit representative (sound for the
+  ::  symmetry-invariant predicates TLC requires; identical to `st` when there
+  ::  is no symmetry group)
+  =/  iv  (first-violated invs.o cst e)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
     :_  cur
@@ -896,6 +961,7 @@
       consts=(map @t value)
       vars=(set @t)
       order=(list @t)                        ::  vars in declaration order
+      perms=(list (map @t @t))               ::  symmetry group (SYMMETRY)
       asmz=(list sem-thm:sem-lib)            ::  module ASSUME bodies
       nsb=sem:sem-lib                        ::  Next body
       invs=(list [name=@t body=sem:sem-lib])  ::  invariants (declaration order)
@@ -941,8 +1007,13 @@
   =/  cons   (resolve-bodies defs constraints.ca)
   =/  acons  (resolve-bodies defs action-constraints.ca)
   =/  ddl    !=(%false deadlock.ca)
+  =/  perms  (symmetry-perms tree symmetry.ca consts)
+  ::  symmetry with a temporal property is an unsafe combination (WU8 owns
+  ::  liveness under symmetry); TLC rejects it, so we do too
+  ?:  &(?=(^ perms) ?=(^ pp))
+    [%| 'unsupported: symmetry with a temporal property (unit 8)']
   :-  %&
-  :*  p.ir  defs  consts  vars  order  assumes.u.mo  u.nsb
+  :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  u.nsb
       invs  cons  acons  ddl  pp  tree
       ?~(nb '' (next-span-label u.nb modn))
   ==
@@ -989,7 +1060,7 @@
   ?^  pp.c
     =/  prop-body  (body-of-def tree.c u.pp.c)
     ?~  prop-body  ~['No property def']
-    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
     =/  g  (build-graph is.c o)
     =/  lr  (check-live u.prop-body u.pp.c g)
     ?:  ok.lr
@@ -1002,7 +1073,7 @@
       (counts-lines gen.g distinct.g 0 depth.g)
     ==
   ::  safety: an INVARIANT
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c 0 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
   (render-outcome (explore is.c o) nl.c)
 ::
 ++  render-outcome
@@ -1066,14 +1137,14 @@
   ?^  pp.c
     =/  prop  (body-of-def tree.c u.pp.c)
     ?~  prop  [[%failed 'no property definition'] *run-stats]
-    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c defs.c consts.c | 0 0]
+    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
     =/  g   (build-graph is.c o)
     =/  st  [gen.g distinct.g 0 depth.g]
     =/  lr  (check-live u.prop u.pp.c g)
     ?:  ok.lr  [[%ok st] st]
     [[%violated [%property u.pp.c] st] st]
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c defs.c consts.c ddl.c cap 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
   =/  res  (explore is.c o)
   ?-    -.res
       %ok        =/  st  [gen.res distinct.res queued.res depth.res]  [[%ok st] st]

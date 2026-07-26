@@ -508,6 +508,11 @@
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
   =/  ae  (check-assumes:check assumes.u.mo (make-env:ne defs consts vars))
   ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
+  ::  symmetry group (SYMMETRY); combined with a temporal property it is an
+  ::  unsafe combination TLC rejects (WU8 owns liveness under symmetry)
+  =/  perms  (symmetry-perms:check tree symmetry.rs consts)
+  ?:  &(?=(^ perms) ?=(^ pp))
+    (finish j [%failed 'unsupported: symmetry with a temporal property (unit 8)'] pre)
   =/  isb  (sem-body:check defs u.in)
   =/  nsb  (sem-body:check defs u.nx)
   ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
@@ -530,7 +535,7 @@
         [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
       pre
     =/  o=bfs-opts:check
-      [u.nsb ~ ~ ~ vars order defs consts | max-states.lims max-depth.lims]
+      [u.nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  kind.up  inner.up  u.pp  nl  act
@@ -541,7 +546,7 @@
   ::  the effective deadlock flag (CLI flag AND the cfg CHECK_DEADLOCK flag,
   ::  matching TLC's `deadlock && getCheckDeadlock()`)
   =/  o=bfs-opts:check
-    :*  u.nsb  invs  cons  acons  vars  order  defs  consts
+    :*  u.nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
     ==
   =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
