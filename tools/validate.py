@@ -38,25 +38,25 @@ ORACLE = REPO / "tools/oracle"
 #   oracle-only  goldens are captured from the pin but nothing in Hoon
 #                compares against them yet (the Hoon owner is still absent)
 GENERATORS = [
-    ("gen-lexer-tests.py",  "pass",        "Lexer (boundary + syntax corpus)",   "desk/tests/lib/tla/lexer/*.hoon"),
-    ("gen-parser-tests.py", "pass",        "Parser (syntax corpus accept/reject)", "desk/tests/lib/tla/corpus-*.hoon"),
-    ("gen-parse-err-tests.py", "pass",     "Parse-error diagnostics (PErrors text)", "desk/tests/lib/tla/parse-err.hoon"),
-    ("gen-bnf-manifest.py", "pass",        "BNF grammar productions",            "desk/tests/lib/tla/bnf.hoon"),
-    ("gen-modres-tests.py", "pass",        "Module resolution graphs",           "desk/tests/lib/tla/modres.hoon"),
-    ("gen-sem-tests.py",    "pass",        "Semantic graph + levels",            "desk/tests/lib/tla/sem.hoon"),
-    ("gen-eval-tests.py",   "pass",        "Constant evaluation (TLC REPL)",     "desk/tests/lib/tla/eval.hoon"),
-    ("gen-mc-tests.py",     "pass",        "Safety + liveness model checking",   "desk/tests/lib/tla/mc.hoon"),
-    ("gen-stdmods.py",      "pass",        "Vendored StandardModules",           "desk/lib/tla/stdmods.hoon"),
+    ("gen-lexer-tests.py",  "pass",        "Lexer (boundary + syntax corpus)",   "desk/tests/lib/lexer/*.hoon"),
+    ("gen-parser-tests.py", "pass",        "Parser (syntax corpus accept/reject)", "desk/tests/lib/corpus-*.hoon"),
+    ("gen-parse-err-tests.py", "pass",     "Parse-error diagnostics (PErrors text)", "desk/tests/lib/parse-err.hoon"),
+    ("gen-bnf-manifest.py", "pass",        "BNF grammar productions",            "desk/tests/lib/bnf.hoon"),
+    ("gen-modres-tests.py", "pass",        "Module resolution graphs",           "desk/tests/lib/modres.hoon"),
+    ("gen-sem-tests.py",    "pass",        "Semantic graph + levels",            "desk/tests/lib/sem.hoon"),
+    ("gen-eval-tests.py",   "pass",        "Constant evaluation (TLC REPL)",     "desk/tests/lib/eval.hoon"),
+    ("gen-mc-tests.py",     "pass",        "Safety + liveness model checking",   "desk/tests/lib/mc.hoon"),
+    ("gen-stdmods.py",      "pass",        "Vendored StandardModules",           "desk/lib/stdmods.hoon"),
     ("gen-pcal-tests.py",   "oracle-only", "PlusCal translation goldens",        "(no Hoon translator yet — unit 8)"),
-    ("gen-cfg-tests.py",    "pass",        "TLC .cfg parse (ModelConfig)",       "desk/tests/lib/tla/cfg.hoon"),
-    ("gen-cfg-val-tests.py", "pass",        "Config-vs-graph validation (SpecProcessor)", "desk/tests/lib/tla/cfg-val.hoon"),
+    ("gen-cfg-tests.py",    "pass",        "TLC .cfg parse (ModelConfig)",       "desk/tests/lib/cfg.hoon"),
+    ("gen-cfg-val-tests.py", "pass",        "Config-vs-graph validation (SpecProcessor)", "desk/tests/lib/cfg-val.hoon"),
     ("gen-core-eval-tests.py", "oracle-only", "Core value/evaluation (Tool.eval)", "(no semantic-node evaluator yet — unit 6.5)"),
     ("gen-safety-tests.py",  "oracle-only", "Single-worker safety (tlc2.TLC/ModelChecker)", "(no FP64/safety comparator yet — unit 7.1+)"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically
 TRACKED = ["desk/test-data", "desk/tests", "desk/doc/tla-bnf.md",
-           "desk/lib/tla/stdmods.hoon", EVIDENCE]
+           "desk/lib/stdmods.hoon", EVIDENCE]
 
 
 def sh(args, **kw):

@@ -1,12 +1,12 @@
 /-  *tla-lus
 /+  default-agent, dbug
-/=  job-lib  /lib/tla/job
-/=  mig      /lib/tla/migrate
+/=  job-lib  /lib/job
+/=  mig      /lib/migrate
 |%
   ::  %tla-lus: Headless TLA+ Toolchain Agent
   ::
   ::  Frozen request/update nouns from /sur/tla-lus over the resumable
-  ::  continuation kernel in /lib/tla/job (unit P2-1). Jobs advance in
+  ::  continuation kernel in /lib/job (unit P2-1). Jobs advance in
   ::  Behn-driven steps of at most default-budget work units; each
   ::  step's events fan out as facts on /jobs and /job/<id>. Scries
   ::  expose the public $job projection, never internal cursors.

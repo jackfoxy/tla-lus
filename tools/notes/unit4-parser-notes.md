@@ -1,6 +1,6 @@
 # Unit 4 Working Notes: SANY Syntactic Analyzer Port
 
-Working reference for implementing `lib/tla/syntax.hoon` + `lib/tla/ast.hoon`.
+Working reference for implementing `lib/syntax.hoon` + `lib/ast.hoon`.
 Source of truth: `javacc/tla+.jj` and `src/tla2sany/parser/*` at the pinned
 commit (port-map §1). Read targeted slices of tla+.jj by the line numbers
 below rather than the whole file.
@@ -19,12 +19,12 @@ below rather than the whole file.
 - Kind names: N_* from SyntaxTreeConstants kebab-cased (n-module,
   n-operatordefinition, ...); token kinds same names as unit-3 TokenDump.
 - Plan: tools/gen-parser-tests.py mirroring gen-lexer-tests.py: corpus
-  cases -> goldens -> generated shards tests/lib/tla/syntax/*.hoon
+  cases -> goldens -> generated shards tests/lib/syntax/*.hoon
   comparing `(dump:syntax input)` wain vs golden.
 
 ## Hoon-side design
 
-- `lib/tla/ast.hoon`: syntax tree mold (needs `$+` annotation, zuse-408):
+- `lib/ast.hoon`: syntax tree mold (needs `$+` annotation, zuse-408):
   ```
   +$  syntax-node
     $+  syntax-node

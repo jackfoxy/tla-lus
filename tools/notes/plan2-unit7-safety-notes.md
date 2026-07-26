@@ -104,7 +104,7 @@ FPSet encodings.
 
 ## Frozen baseline (pre-7.1 check.hoon)
 
-The current safety search (`desk/lib/tla/check.hoon`, post-6.9) already runs on
+The current safety search (`desk/lib/check.hoon`, post-6.9) already runs on
 Work Unit 3 semantic nodes via `node-eval` (`init-states`/`next-states`/
 `pred-bool`), NOT the CST. What 7.1+ must still replace/add:
 
@@ -120,7 +120,7 @@ Work Unit 3 semantic nodes via `node-eval` (`init-states`/`next-states`/
   beyond the Next-body span label. 7.4 formalizes `pred-store`.
 - **stats:** generated/distinct/depth only (outdegree, queued-at-report,
   coverage absent).
-- The five `gen-mc-tests` goldens (`tests/lib/tla/mc`, verdict+trace+counts)
+- The five `gen-mc-tests` goldens (`tests/lib/mc`, verdict+trace+counts)
   stay green as the smoke suite; the `safety/` corpus is the parity target they
   cannot express.
 

@@ -10,8 +10,8 @@ no %cfg Clay mark, so the corpus stores it as A.txt).
 
 Until the semantic-node evaluator lands (subunit 6.5), this is oracle-only: it
 only refreshes golden-eval.txt. The existing REPL corpus (gen-eval-tests /
-tests/lib/tla/eval, 37 cases) stays the unchanged smoke suite. Once
-lib/tla/tlc exposes a semantic-node evaluator this emits a differential shard.
+tests/lib/eval, 37 cases) stays the unchanged smoke suite. Once
+lib/tlc exposes a semantic-node evaluator this emits a differential shard.
 Never edit generated files.
 """
 import shutil

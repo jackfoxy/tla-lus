@@ -1,18 +1,18 @@
 # TLA+ Grammar (`%tla-lus` native parser)
 
-The grammar accepted by `lib/tla/syntax.hoon`, traceable production by
+The grammar accepted by `lib/syntax.hoon`, traceable production by
 production to `javacc/tla+.jj` at the pinned upstream commit
 (doc/port-map.md §1). Validated by the full upstream syntax-conformance
 corpus (261 accept/reject cases) against the SANY parse tree.
 
 Drift protection: every `### G-...` heading below must match an entry in
-`grammar-manifest:syntax` (lib/tla/syntax.hoon); the generated test
-`tests/lib/tla/bnf.hoon` (tools/gen-bnf-manifest.py) fails on any
+`grammar-manifest:syntax` (lib/syntax.hoon); the generated test
+`tests/lib/bnf.hoon` (tools/gen-bnf-manifest.py) fails on any
 mismatch in either direction.
 
 ## Lexical conventions
 
-Tokens come from `lib/tla/lexer.hoon` (unit 3; tla+.jj lexical states,
+Tokens come from `lib/lexer.hoon` (unit 3; tla+.jj lexical states,
 lines 939-1402): identifiers (CASE0-CASEN incl. `@`, `W_`-style names,
 number sets `ℕ ℤ ℝ`), `\b/\o/\h` and decimal numbers, strings with
 `\n \t \r \f \\ \"` escapes, nested `(* *)` and `\*` comments, module
@@ -230,7 +230,7 @@ Synonyms (Operators.java:240-308; alternate spelling -> canonical):
 
 EBNF; terminal token kinds in lowercase, productions capitalized.
 `Source:` gives the tla+.jj line of the corresponding production;
-`Hoon:` the owning arm in lib/tla/syntax.hoon.
+`Hoon:` the owning arm in lib/syntax.hoon.
 
 ### G-module
 `Module ::= BeginModule Extends Body EndModule`

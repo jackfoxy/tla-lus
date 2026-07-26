@@ -34,7 +34,7 @@ else
 fi
 
 echo "== gate 3: no GUI / tla2tex / Java code or deps =="
-# only vendored StandardModule *text* (lib/tla/stdmods.hoon) and docs may
+# only vendored StandardModule *text* (lib/stdmods.hoon) and docs may
 # mention these names; no Java sources or build deps may live in the desk
 if find "$DESK" -name '*.java' -o -name '*.jar' -o -name '*.class' | grep -q .; then
   fail "Java artifacts present in desk"
@@ -47,7 +47,7 @@ CODE_HITS=$(grep -rilE 'tla2tex|import java|javax\.' "$DESK" --include='*.hoon' 
   || fail "$CODE_HITS Hoon file(s) reference GUI/tla2tex"
 
 echo "== gate 4: license / provenance =="
-grep -qiE 'MIT' "$DESK/lib/tla/stdmods.hoon" && pass "StandardModules carry MIT provenance" \
+grep -qiE 'MIT' "$DESK/lib/stdmods.hoon" && pass "StandardModules carry MIT provenance" \
   || fail "stdmods.hoon missing MIT provenance header"
 grep -qiE 'MIT' "$DESK/doc/compatibility.md" "$DESK/../README.md" 2>/dev/null \
   && pass "license noted in docs" || fail "license not noted in docs"
@@ -58,7 +58,7 @@ echo "== gate 5: kelvin compatibility =="
 
 echo "== gate 6: state migration =="
 grep -q 'jobs-0-to-1' "$DESK/app/tla-lus.hoon" && grep -q 'jobs-1-to-2' "$DESK/app/tla-lus.hoon" \
-  && pass "on-load migrates %0 -> %1 -> %2 (lib/tla/migrate)" || fail "missing migration chain in on-load"
+  && pass "on-load migrates %0 -> %1 -> %2 (lib/migrate)" || fail "missing migration chain in on-load"
 
 echo "== gate 7: fixture size bound =="
 BIG=$(find "$DESK/test-data" -type f -size +100k 2>/dev/null | wc -l)

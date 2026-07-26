@@ -11,7 +11,7 @@ here is a deliberate, documented divergence rather than a latent bug.
 |---|---|
 | Oracle pin (SANY/PlusCal/TLC) | `tlaplus@4ba7d8811` (MIT) |
 | Example/fixture pins | `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6` (MIT) |
-| Agent state version | `%1` (migrates from `%0`; `lib/tla/migrate`) |
+| Agent state version | `%1` (migrates from `%0`; `lib/migrate`) |
 | Kelvin | `sys.kelvin` = `[%zuse 411 410 409 408]` |
 | Scaffold gate | `tools/scaffold-gate.sh` (9 gates) + `-test /=tla-lus=/tests ~` — proves scaffold hygiene, not parity |
 | Parity ledger | `desk/doc/parity-manifest.md`, checked by `tools/check-parity.py` (65 rows, 35 still owed) |
@@ -21,7 +21,7 @@ here is a deliberate, documented divergence rather than a latent bug.
 The desk contains **no** GUI, Toolbox, `tla2tex`, or Java code or
 dependencies; the Java `tla2tools.jar` is used only to build the differential
 goldens and is never shipped or called at runtime. The only vendored upstream
-text is the MIT `StandardModules` (`lib/tla/stdmods.hoon`, with its provenance
+text is the MIT `StandardModules` (`lib/stdmods.hoon`, with its provenance
 header). Everything the scaffold gate audits — pin, golden reproducibility,
 no-GUI/no-Java, MIT provenance, kelvin, `%0→%1` migration, bounded fixture
 sizes, the desk manifest, and a well-formed parity ledger — is checked by
@@ -136,7 +136,7 @@ suppression, warning-to-error elevation, and the suppressed/as-errors
 overlap rejection) matching SANY's `filterVisibleMessages`/
 `reportMessages`. Because those controls are report-time and invisible
 to the `Errors` channel, their evidence is Hoon unit tests
-(`tests/lib/tla/lvl`) rather than SemDump goldens.
+(`tests/lib/lvl`) rather than SemDump goldens.
 
 Unit 4 is complete. The `%analyze` request runs the real Work Unit 3+4
 pipeline (4.8): a `%semantic` stage calls `analyze-graph`, splitting the
@@ -327,7 +327,7 @@ termination, violation discovery), *not* as a byte-for-byte oracle:
 
 ## Unit P2-1 — Resumable job kernel (supersedes the unit-13 stub engine)
 
-The job engine (`lib/tla/job`) is now a budgeted continuation kernel: one
+The job engine (`lib/job`) is now a budgeted continuation kernel: one
 Gall event spends at most `default-budget` work units (states registered or
 generated, transitions, or modules parsed) and persists a versioned, jammed
 continuation (`$kont %1`) inside the `%2` job noun. Pause/resume at **every**
@@ -342,7 +342,7 @@ Consequences:
   work having run.
 - **Per-event slicing.** The safety search, liveness graph build, liveness
   property scan, and seeded simulation all run behind persisted cursors
-  (`bfs-cursor`, `sim-cursor` in `lib/tla/check`). The simulation cursor
+  (`bfs-cursor`, `sim-cursor` in `lib/check`). The simulation cursor
   saves the raw RNG sample, so slicing cannot change the random choices.
   Two enumeration atoms remain un-sliceable until B5's enumeration cursors:
   solving the Init predicate (one `+gen` call at `%config`) and generating

@@ -5,7 +5,7 @@ Arvo effects) and a thin **Gall shell** that schedules, persists, authorizes,
 and publishes. Every heavy computation is a pure function of a noun; the shell
 only decides *when* to run a bounded slice and *what* to do with its output.
 
-## Pure pipeline (`lib/tla/`)
+## Pure pipeline (`lib/`)
 
 The libraries form a dependency stack, each a port of a Java stage validated
 against it (see `port-map.md` for the Java-to-Hoon traceability and tests):
@@ -47,7 +47,7 @@ job.hoon       resumable stage engine: init → step → …,      ── units 
                jammed continuation, typed %limited limits
 ```
 
-The Work Unit 6–7 core lives under `lib/tla/tlc/`. Safety state generation runs
+The Work Unit 6–7 core lives under `lib/`. Safety state generation runs
 on the Work Unit 3 semantic graph through `tlc/node-eval` (the retired CST
 solver in `eval.hoon`/`check.hoon` survives only for simulation and the liveness
 state-predicate scan); state identity is the `tlc/fingerprint` FP64 orbit

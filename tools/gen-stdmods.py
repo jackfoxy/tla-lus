@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embed tla2sany/StandardModules/*.tla into lib/tla/stdmods.hoon.
+"""Embed tla2sany/StandardModules/*.tla into lib/stdmods.hoon.
 
 Source: pinned tlaplus commit (doc/port-map.md section 1), MIT license.
 Never edit the generated file.
@@ -7,7 +7,7 @@ Never edit the generated file.
 from pathlib import Path
 
 SRC = Path("/mnt/mars/gitrepos/tlaplus/tlatools/org.lamport.tlatools/src/tla2sany/StandardModules")
-OUT = Path("/mnt/mars/gitrepos/tla-lus/desk/lib/tla/stdmods.hoon")
+OUT = Path("/mnt/mars/gitrepos/tla-lus/desk/lib/stdmods.hoon")
 
 
 def hcord(s: str) -> str:

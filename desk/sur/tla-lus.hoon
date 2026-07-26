@@ -2,11 +2,11 @@
   ::  %tla-lus Shared Wire Nouns
   ::
   ::  Frozen by work unit 2. Public poke/update/scry nouns and the shared
-  ::  compiler-interface types every /lib/tla library builds on. Lexical
+  ::  compiler-interface types every /lib library builds on. Lexical
   ::  and semantic vocabularies (token kinds, node kinds) stay open @tas
   ::  tags; units 3-6 fill them without changing these shells.
   ::
-  ::  Deterministic ordering contracts (comparators in /lib/tla/diagnostics):
+  ::  Deterministic ordering contracts (comparators in /lib/diagnostics):
   ::    diagnostics  global (at=~) first, then by source name, span,
   ::                 code family, code number, message
   ::    modules      dependency order, ties by name (unit 5)

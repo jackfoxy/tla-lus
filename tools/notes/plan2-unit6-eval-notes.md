@@ -80,7 +80,7 @@ subclasses; `tlc2.tool.impl.Tool` (`eval`, `getInitStates`/`getNextStates`,
 ## Baseline (current state before B5)
 
 - 37 CST/REPL constant-expression cases (`gen-eval-tests`,
-  `tests/lib/tla/eval`) — kept unchanged as the Phase-B smoke suite
+  `tests/lib/eval`) — kept unchanged as the Phase-B smoke suite
   (`tlc-eval-cst`).
 - Approved difference: lexicographic string order vs TLC's UniqueString order
   (`tlc-value-order`).
@@ -91,7 +91,7 @@ subclasses; `tlc2.tool.impl.Tool` (`eval`, `getInitStates`/`getNextStates`,
 
 ## 6.1 landed — canonical value layer (2026-07-20)
 
-`desk/lib/tla/tlc/value.hoon`: the canonical value interface the evaluator/
+`desk/lib/value.hoon`: the canonical value interface the evaluator/
 enumerator/fingerprint encoder build on. Molds **alias** eval.hoon's proven
 mold (`+$ value value:ev`, tuples = the `%seq` member, a vpair's image field
 is `r`) — a freshly-defined `$+`-recursive `$%` overflows the zuse-408 mold
@@ -143,7 +143,7 @@ core. Consequences (now settled):
   **differential EvalDump path** (values → text) once 6.5 wires the evaluator.
 - value.hoon itself is verified correct by **direct dojo evaluation** (equal
   same-kind + cross-representation, render, compare) and a 1-op render smoke
-  test (`tests/lib/tla/value`).
+  test (`tests/lib/value`).
 
 ## 6.2 in progress — composite access (2026-07-21)
 
@@ -303,11 +303,11 @@ whole thing resumable when 6.5 fuses these with the semantic-node evaluator.
 
 ## 6.5 landed 2026-07-21 — semantic-node evaluator (retires CST eval)
 
-New `desk/lib/tla/tlc/node-eval.hoon`: a dispatcher over the WU3 `sem` graph
+New `desk/lib/node-eval.hoon`: a dispatcher over the WU3 `sem` graph
 producing values via the 6.1-6.4 core. Imports `v` (value) and `sm`
 (semantic, for `sem` types + `generate`). All 37 REPL baseline cases pass
-through it (`tests/lib/tla/node-eval.hoon`, adapted from the CST test), plus
-14 probe cases (`tests/lib/tla/neval-probe.hoon`).
+through it (`tests/lib/node-eval.hoon`, adapted from the CST test), plus
+14 probe cases (`tests/lib/neval-probe.hoon`).
 
 - **Context** = two maps, NOT a tagged union (unioning recursive `value` +
   `sem-def` risks the mold hang): `eenv=[vals=(map @t value) ops=(map @t
@@ -352,7 +352,7 @@ through it (`tests/lib/tla/node-eval.hoon`, adapted from the CST test), plus
 node-eval.hoon `eenv` gained `s0`/`s1` states + `primed`/`enabled` control
 bits (the EvalControl subset). `+$ state (map @t value)` keyed by variable
 identity (name); absence = unassigned = a typed read failure. All 8
-state/prime/UNCHANGED cases green (`tests/lib/tla/neval-state.hoon`), full
+state/prime/UNCHANGED cases green (`tests/lib/neval-state.hoon`), full
 suite unaffected.
 
 - **Variable resolution** (`lookup-var`, wired into `eval-apply`'s
@@ -383,7 +383,7 @@ residue).
 
 node-eval.hoon gained the semantic-node action solver (`solve` + friends) —
 the replacement for check.hoon's ad-hoc CST `gen`. All 6 cases green
-(`tests/lib/tla/neval-action.hoon`); full suite unaffected. `eenv` gained
+(`tests/lib/neval-action.hoon`); full suite unaffected. `eenv` gained
 `vars=(set @t)` (declared VARIABLE names, from `vars-of`) so assignment is
 decided by variable IDENTITY, never rendered names. `+$ sres = (each (list
 state) eval-err)`.
@@ -429,7 +429,7 @@ folds into FP64 (the INPUT contract; WU7 owns the hash). Reproduces
 `Value.fingerPrint` Extend order from the pinned tree: a KIND tag byte then
 components, `Extend(int)`=4 bytes LITTLE-ENDIAN, `Extend(byte/char)`=1 byte,
 `Extend(String)`=chars; value NORMALIZED first. 13-case differential green
-(`tests/lib/tla/neval-fp.hoon`); full suite unaffected.
+(`tests/lib/neval-fp.hoon`); full suite unaffected.
 
 - **Kind bytes** (tlc2 ValueConstants): BOOL 0, INT 1, STRING 3, SETENUM 5,
   FCNRCD 9, MODEL 22. **Cross-representation collapse** (the key insight):
@@ -492,7 +492,7 @@ Production SAFETY and LIVENESS-BUILD model checking now runs on the Work Unit
   cores (value.hoon aliases eval's), so node-eval's solve output drops straight
   into the BFS. Verified: node-eval reproduces the mc corpus constructs
   (`(x+1)%4` wrap, `~a` boolean-not assignment, disjunction branch order) —
-  `tests/lib/tla/neval-mc.hoon`.
+  `tests/lib/neval-mc.hoon`.
 
 RESIDUE (documented, on CST): **simulation** (`sim-init`/`sim-step`/
 `simulate-spec`, jammed `sim-opts` = CST) and the **liveness property scan**

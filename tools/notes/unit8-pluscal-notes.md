@@ -19,21 +19,21 @@ Java sources (pinned commit), in pipeline order:
 
 | Stage | Java | Lines | Hoon owner (planned) |
 |---|---|---|---|
-| Tokenize algorithm + expressions | `pcal/Tokenize.java` | 1644 | `lib/tla/pcal/tokenize.hoon` |
-| Parse to PlusCal AST | `pcal/ParseAlgorithm.java` | 4456 | `lib/tla/pcal/parse.hoon` |
-| AST node types + `toString()` | `pcal/AST.java` | 1047 | `lib/tla/pcal/ast.hoon` |
-| Symbol table | `pcal/PcalSymTab.java` | 727 | `lib/tla/pcal/symtab.hoon` |
+| Tokenize algorithm + expressions | `pcal/Tokenize.java` | 1644 | `lib/pcal/tokenize.hoon` |
+| Parse to PlusCal AST | `pcal/ParseAlgorithm.java` | 4456 | `lib/pcal/parse.hoon` |
+| AST node types + `toString()` | `pcal/AST.java` | 1047 | `lib/pcal/ast.hoon` |
+| Symbol table | `pcal/PcalSymTab.java` | 727 | `lib/pcal/symtab.hoon` |
 | Fix identifiers | `pcal/PcalFixIDs.java` | 599 | folded into parse/translate |
-| Explode labels / control flow | `pcal/PcalTranslate.java` | 1501 | `lib/tla/pcal/translate.hoon` |
-| Generate TLA+ text | `pcal/PcalTLAGen.java` | 4392 | `lib/tla/pcal/tlagen.hoon` |
-| Checksums, BEGIN/END, options | `pcal/trans.java`, `Validator.java` | 2021+ | `lib/tla/pcal/driver.hoon` |
+| Explode labels / control flow | `pcal/PcalTranslate.java` | 1501 | `lib/pcal/translate.hoon` |
+| Generate TLA+ text | `pcal/PcalTLAGen.java` | 4392 | `lib/pcal/tlagen.hoon` |
+| Checksums, BEGIN/END, options | `pcal/trans.java`, `Validator.java` | 2021+ | `lib/pcal/driver.hoon` |
 
 ## Checksums (VERIFIED)
 
 `Validator.checksum(s)` = `Long.toHexString(new CRC32().update(s.getBytes()).getValue())`
 — reflected CRC-32 (poly `0xEDB88320`), lowercase hex, no leading zeros, no
-`0x` (so `""` → `"0"`). Ported and differential-tested in `lib/tla/crc.hoon`
-(`tests/lib/tla/crc.hoon`, 7 vectors from `tools/oracle/CrcVec.java`).
+`0x` (so `""` → `"0"`). Ported and differential-tested in `lib/crc.hoon`
+(`tests/lib/crc.hoon`, 7 vectors from `tools/oracle/CrcVec.java`).
 
 - `chksum(tla)` = CRC-32 of the translation lines **strictly between** the
   BEGIN and END TRANSLATION lines, **concatenated with no separators**
@@ -75,7 +75,7 @@ emitted.
 
 ## Decomposition / order of increments
 
-1. **CRC-32 checksum primitive** — DONE (`lib/tla/crc.hoon`, tested).
+1. **CRC-32 checksum primitive** — DONE (`lib/crc.hoon`, tested).
 2. Oracle harness + corpus + goldens — DONE (`gen-pcal-tests.py`, `counter`,
    `twovars`).
 3. PlusCal AST molds (`ast.hoon`) + `toString()` serialization → match

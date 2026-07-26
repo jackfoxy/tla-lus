@@ -4,7 +4,7 @@
 ::  selects translate, analyze, or check.
 ::
 /-  *tla-lus
-/=  job-lib  /lib/tla/job
+/=  job-lib  /lib/job
 :-  %say
 |=  [* [id=@ta kind=?(%translate %analyze %check) ~] ~]
 :-  %tla-lus-action

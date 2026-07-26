@@ -62,7 +62,7 @@ Broader `tlaplus-Examples` coverage and bounded performance models
 
 ## Fuzzing
 
-`tests/lib/tla/fuzz.hoon` drives the lexer and parser with seeded random
+`tests/lib/fuzz.hoon` drives the lexer and parser with seeded random
 inputs and asserts they never crash — they must return a clean accept/reject,
 never bail. Any reduced mismatch discovered by fuzzing is saved as a
 regression fixture under the appropriate `test-data/` corpus so it becomes a

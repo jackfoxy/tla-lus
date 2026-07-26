@@ -6,7 +6,7 @@ oracle `tlaplus@4ba7d8811289fb8e95dac4d5e554c05216ba3100`.
 ## Frozen baseline
 
 Pre-existing uncommitted increment (audited, preserved): level machinery in
-`desk/lib/tla/semantic.hoon` (+1777 lines: `lres` constraint algebra,
+`desk/lib/semantic.hoon` (+1777 lines: `lres` constraint algebra,
 `l-x`/`l-args`/`l-def`/`l-substin`/`l-inst`/`l-lint`, builtin max-level
 tables), `SemDump.java` switched to full settings (semantic + levels +
 lint, no PlusCal validation), and 16 fixture families
@@ -77,7 +77,7 @@ apsubst`. Everything else (48) green as of this baseline.
   `desk/doc/evidence-counts.md` regenerated (sem 31 → 56).
 - `python3 tools/check-parity.py --check` — ledger well-formed, 70 rows,
   0 unclassified.
-- Focused suite `-test /=tla-lus=/tests/lib/tla/sem ~` on tla-zod:
+- Focused suite `-test /=tla-lus=/tests/lib/sem ~` on tla-zod:
   48/56, red = exactly the 8 named cases.
 - Full suite `-test /=tla-lus=/tests ~` on tla-zod: `ok=%.n` with the
   failure set exactly `{apsubst lvlcdot lvlinsth lvlinstm lvlinstp lvlqtb
@@ -106,7 +106,7 @@ The projection went from oracle-only to byte-compared: `dump-sem` now
 appends the LEVELS section and `gen-sem-tests.py` compares tree + DIAGS
 + LEVELS as one wain per case. Focused suite 48/56; the red set is
 exactly the 8 named 4.2–4.6 cases from the 4.0 matrix (no new reds).
-Algebra unit suite `tests/lib/tla/lvl.hoon` 10/10.
+Algebra unit suite `tests/lib/lvl.hoon` 10/10.
 
 What landed beyond the frozen 4.0 machinery:
 
@@ -157,7 +157,7 @@ Subunit handoff:
 ```text
 Subunit: 4.1
 Java owner and entry method: SetOfLevelConstraints/SetOfArgLevelConstraints put+putAll, ArgLevelParam/ParamAndPosition, LevelNode collection fields; SemDump.lvlLine projection
-Current Hoon owner: lib/tla/semantic.hoon (lc-*/ac-* algebra, lres/oplev/denv, l-deps, LEVELS renderer in l-module-core)
+Current Hoon owner: lib/semantic.hoon (lc-*/ac-* algebra, lres/oplev/denv, l-deps, LEVELS renderer in l-module-core)
 Smallest failing parity case: none for 4.1; next failing cases are lvlqtb/lvltmp (4.2)
 New or changed nouns: lres/oplev += all/nlp/lbz; lenv += mlevs; denv; $SubstIn op name carries module
 Diagnostic/result expected: no diagnostic changes; LEVELS section byte-equality
@@ -200,7 +200,7 @@ Subunit handoff:
 ```text
 Subunit: 4.2
 Java owner and entry method: LevelNode/FormalParamNode.levelCheck (uninitialized -1), first-order OpApplNode/OpDefNode.levelCheck, BuiltInOperators tables; SemDump.esc
-Current Hoon owner: lib/tla/semantic.hoon (sbind used flag, l-apply-def usage marking, render-sem binder lines, esc-msg)
+Current Hoon owner: lib/semantic.hoon (sbind used flag, l-apply-def usage marking, render-sem binder lines, esc-msg)
 Smallest failing parity case: none for 4.2; next failing cases are hoparam's doubly-higher-order remapping fixture (4.3, to be added) and recfcn (4.4)
 New or changed nouns: sbind += used=? (all construction sites default |; l-apply-def rewrites)
 Diagnostic/result expected: bound/ubound L-1 vs L0 in the tree; backslash-escaped DIAGS text
@@ -265,7 +265,7 @@ Subunit handoff:
 ```text
 Subunit: 4.3
 Java owner and entry method: OpApplNode.levelCheck call-site blocks (alp-driven lc/ac, alp remapping, non-Leibniz rule 758-773); Generator selector 4270/4271; OpDefNode.match 4271
-Current Hoon owner: lib/tla/semantic.hoon (l-apply-def par-idx/arg-lres/arg-sem + four new blocks; g-opappl expectation-aware argument walk; ref-arity; sym.parg)
+Current Hoon owner: lib/semantic.hoon (l-apply-def par-idx/arg-lres/arg-sem + four new blocks; g-opappl expectation-aware argument walk; ref-arity; sym.parg)
 Smallest failing parity case: none for 4.3; next failing cases are recfcn (4.4) and lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
 New or changed nouns: sym += parg=(list @ud) (16 construction sites, real arities only from lhs-params)
 Diagnostic/result expected: 4270/4271/4273 codes, spans, message text; alp/alc/lc/nlp projection entries
@@ -314,7 +314,7 @@ Subunit handoff:
 ```text
 Subunit: 4.4
 Java owner and entry method: ModuleNode.levelCheck recursive-section loop, OpDefNode seeded fields, Generator.processFunction ($RecursiveFcnSpec), OpApplNode $FcnApply
-Current Hoon owner: lib/tla/semantic.hoon (rec-seed, l-module-core it1/raise/it2, g-fcn-body, g-x %n-fcnappl)
+Current Hoon owner: lib/semantic.hoon (rec-seed, l-module-core it1/raise/it2, g-fcn-body, g-x %n-fcnappl)
 Smallest failing parity case: none for 4.4; next failing cases are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
 New or changed nouns: none (generation-side changes only)
 Diagnostic/result expected: $RecursiveFcnSpec tree shape incl. ubound self-binder; recursion projections
@@ -361,7 +361,7 @@ Subunit handoff:
 ```text
 Subunit: 4.5
 Java owner and entry method: OpApplNode.levelCheck ArgMaxLevels-driven 4205, AssumeNode.levelCheck 4206, the 4310-4315 specials (already green)
-Current Hoon owner: lib/tla/semantic.hoon (builtin-maxl tables, l-apply-def dsarg/dstmp/dsquant/dsrng, l-module-core assume check)
+Current Hoon owner: lib/semantic.hoon (builtin-maxl tables, l-apply-def dsarg/dstmp/dsquant/dsrng, l-module-core assume check)
 Smallest failing parity case: none for 4.5; remaining reds are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
 New or changed nouns: none (fixtures only)
 Diagnostic/result expected: boundary 4205s/4206s with exact spans and message levels
@@ -432,7 +432,7 @@ VARIABLE, so extending Naturals etc. adds nothing.
 
 **Configuration gate** (`+validate-target`, plan task 6): a pure
 each-typed accept/reject by target name and required maximum level for
-the later TLC configuration unit; three `tests/lib/tla/lvl` unit tests
+the later TLC configuration unit; three `tests/lib/lvl` unit tests
 (accept at/below max, level reject, unknown target).
 
 Subunit handoff:
@@ -440,7 +440,7 @@ Subunit handoff:
 ```text
 Subunit: 4.6
 Java owner and entry method: InstanceNode.levelCheck (three subst passes + getSubLCSet/getSubALCSet/getSubALPSet), SubstInNode/APSubstInNode.levelCheck, Subst.paramSet/getSubLCSet, Generator constructSubst/processSubst
-Current Hoon owner: lib/tla/semantic.hoon (g-instance ordered + OpArg + APSubstIn, l-inst three passes + ilc, l-module-core %i/ilc, mlev alc/alp, build-ctx extends-of, ext-decls, own-decls, validate-target)
+Current Hoon owner: lib/semantic.hoon (g-instance ordered + OpArg + APSubstIn, l-inst three passes + ilc, l-module-core %i/ilc, mlev alc/alp, build-ctx extends-of, ext-decls, own-decls, validate-target)
 Smallest failing parity case: none — full suite ok=%.y
 New or changed nouns: mlev += alc/alp; l-inst returns [ds lc]; g-instance returns [defs thms inst ds]; validate-target
 Diagnostic/result expected: 4244/4245/4246/4247 codes+spans+text; oparg/apsubstin tree shapes; module-line getSubLCSet lc
@@ -467,7 +467,7 @@ ship suite ok=%.y (825 OK). Manifest row `linter` -> parity.
   only). Both are Errors-channel observable, so they are ordinary
   differential fixtures.
 - **Driver-level lint-options** (`+apply-lint-options`, tested in
-  `tests/lib/tla/lvl`): a `lint-options` mold with two code sets
+  `tests/lib/lvl`): a `lint-options` mold with two code sets
   (`suppressed`, `as-errors`). Mirrors SANY's driver exactly:
   `filterVisibleMessages` drops suppressed codes; `reportMessages`
   elevates as-errors codes from `%warning` to `%error` preserving
@@ -485,7 +485,7 @@ Subunit handoff:
 ```text
 Subunit: 4.7
 Java owner and entry method: linter.Linter.lintRecords; SANY.filterVisibleMessages/reportMessages/isMessageElevated + the suppressed/as-errors overlap guard
-Current Hoon owner: lib/tla/semantic.hoon (l-lint, collect-records, built-from-decls, lint-options, apply-lint-options, lint-warnings)
+Current Hoon owner: lib/semantic.hoon (l-lint, collect-records, built-from-decls, lint-options, apply-lint-options, lint-warnings)
 Smallest failing parity case: none — full suite ok=%.y
 New or changed nouns: lint-options [suppressed=(set @ud) as-errors=(set @ud)]; apply-lint-options -> (each (list sdiag) @t); lint-warnings
 Diagnostic/result expected: 4802 nested/multi-field warnings; suppression/elevation/overlap-reject via unit tests
@@ -528,7 +528,7 @@ clean, all nine scaffold gates PASS.
   (like a capped run-check), so no `$kont` member was added. Pause/resume
   is identical at every boundary — `every-boundary` tests over clean,
   lint, and semantic-error analyze requests all pass.
-- **Tests** (`tests/lib/tla/job`): clean -> %ok no diags; undefined op ->
+- **Tests** (`tests/lib/job`): clean -> %ok no diags; undefined op ->
   %failed + 4200 at %semantic; non-constant ASSUME -> %failed + 4206 at
   %level; level-flag-off suppresses the 4206; record collision -> %ok +
   4802 warning at %lint; lint-flag-off suppresses it;
@@ -546,8 +546,8 @@ wing does NOT narrow it for later `i.errs.r` access — bind a local copy
 ## Unit 4 closeout
 
 All eight subunits (4.0–4.8) done. `desk/test-data/sem` is 73 cases,
-`tests/lib/tla/lvl` is 19 (algebra + validate-target + lint-options),
-`tests/lib/tla/job` covers the analyze pipeline. Manifest rows now
+`tests/lib/lvl` is 19 (algebra + validate-target + lint-options),
+`tests/lib/job` covers the analyze pipeline. Manifest rows now
 parity: level-constraints, level-basic, level-higher-order,
 level-recursion, level-node-rules, level-substitution, linter,
 op-analyze. Remaining owed rows are other units (PlusCal, Clay, TLC

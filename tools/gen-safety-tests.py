@@ -11,9 +11,9 @@ optional action coverage, and the shortest counterexample trace with per-state
 action labels and FP64 fingerprints. Timings, worker ids, and disk layout are
 excluded.
 
-Until Work Unit 7.1+ grows lib/tla/tlc/{fingerprint,state,safety,trace}.hoon
+Until Work Unit 7.1+ grows lib/{fingerprint,state,safety,trace}.hoon
 and check.hoon consumes them, this is ORACLE-ONLY: it only refreshes out.txt.
-The five gen-mc-tests goldens (tests/lib/tla/mc, verdict+trace+counts) stay the
+The five gen-mc-tests goldens (tests/lib/mc, verdict+trace+counts) stay the
 green smoke suite; this corpus is the parity target those five cannot express
 (fingerprints, EC categories, multiple invariants/constraints, symmetry,
 coverage, outdegree, initial-state and diamond traces). Never edit generated

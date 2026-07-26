@@ -1,8 +1,8 @@
 /-  *tla-lus
 /+  *test
 /=  agent    /app/tla-lus
-/=  job-lib  /lib/tla/job
-/=  mig      /lib/tla/migrate
+/=  job-lib  /lib/job
+/=  mig      /lib/migrate
 |%
   ::  Agent-Level Tests For %tla-lus
   ::

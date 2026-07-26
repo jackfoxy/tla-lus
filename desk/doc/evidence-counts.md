@@ -7,18 +7,18 @@ them yet; those cases prove nothing about parity until a comparator lands.
 
 | Generator | Cases | Comparator | Area | Hoon owner |
 |---|---|---|---|---|
-| `gen-lexer-tests.py` | 270 | pass | Lexer (boundary + syntax corpus) | `desk/tests/lib/tla/lexer/*.hoon` |
-| `gen-parser-tests.py` | 249 | pass | Parser (syntax corpus accept/reject) | `desk/tests/lib/tla/corpus-*.hoon` |
-| `gen-parse-err-tests.py` | 34 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/tla/parse-err.hoon` |
-| `gen-bnf-manifest.py` | 35 | pass | BNF grammar productions | `desk/tests/lib/tla/bnf.hoon` |
-| `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/tla/modres.hoon` |
-| `gen-sem-tests.py` | 73 | pass | Semantic graph + levels | `desk/tests/lib/tla/sem.hoon` |
-| `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/tla/eval.hoon` |
-| `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/tla/mc.hoon` |
-| `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/tla/stdmods.hoon` |
+| `gen-lexer-tests.py` | 270 | pass | Lexer (boundary + syntax corpus) | `desk/tests/lib/lexer/*.hoon` |
+| `gen-parser-tests.py` | 249 | pass | Parser (syntax corpus accept/reject) | `desk/tests/lib/corpus-*.hoon` |
+| `gen-parse-err-tests.py` | 34 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/parse-err.hoon` |
+| `gen-bnf-manifest.py` | 35 | pass | BNF grammar productions | `desk/tests/lib/bnf.hoon` |
+| `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/modres.hoon` |
+| `gen-sem-tests.py` | 73 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
+| `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/eval.hoon` |
+| `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
+| `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
-| `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/tla/cfg.hoon` |
-| `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/tla/cfg-val.hoon` |
+| `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/cfg.hoon` |
+| `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/cfg-val.hoon` |
 | `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 

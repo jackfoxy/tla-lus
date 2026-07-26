@@ -118,9 +118,9 @@ unvalidated key may return `%ok`.
 
 ## 5.1 + 5.2 landed (2026-07-20)
 
-`lib/tla/config.hoon` ports ModelConfig.parse/parseValue + the CONSTANT
+`lib/config.hoon` ports ModelConfig.parse/parseValue + the CONSTANT
 machinery; `dump-cfg` renders the ConfigDump projection. gen-cfg-tests emits
-`desk/tests/lib/tla/cfg.hoon` (34/34 green), flipped to `pass`; full suite
+`desk/tests/lib/cfg.hoon` (34/34 green), flipped to `pass`; full suite
 `ok=%.y`. `cfg-lex-parse`+`cfg-constants` → parity.
 
 - Tokens compared by IMAGE (as Java `tt.image.equals`); only NUMBER/STRING
@@ -130,7 +130,7 @@ machinery; `dump-cfg` renders the ConfigDump projection. gen-cfg-tests emits
   `cfg-value` (5 members, isomorphic to eval's proven `value`) OVERFLOWED the
   zuse-408 mold compiler (thousands of `[24 42]`/`[29 15]` frames on the cycle,
   the "recover: dig: over" signature) — even the exact eval recipe. Aliasing
-  the already-compiled `value:eval` (via `/= eval /lib/tla/eval`) avoids
+  the already-compiled `value:eval` (via `/= eval /lib/eval`) avoids
   defining a second recursive mold. cfg produces `%int`(≥0)/`%str`/`%bool`/
   `%model`/`%set`; render-value is a `?+` over those five.
 - HOON GOTCHAS hit: 4+-digit decimals need dot grouping (`5.003`); `:(cat 3 …)`
@@ -222,7 +222,7 @@ and gates on level. Port `validate-config [sem-module cfg-ast]`:
   message using the def's `at` span rendered "line L, col C to line L, col C
   of module M". (validate-target with maxlvl for temporal handles the level
   gate; the 2272 message wording is config-specific.)
-Then flip gen-cfg-val-tests to `pass` + emit `desk/tests/lib/tla/cfg-val.hoon`.
+Then flip gen-cfg-val-tests to `pass` + emit `desk/tests/lib/cfg-val.hoon`.
 Deeper SPECIFICATION-form processConfigSpec unfolding, substitution codes
 (2223/2224/2225/2281), and 2242 arity-inconsistent are 5.3c residue.
 
@@ -232,7 +232,7 @@ Deeper SPECIFICATION-form processConfigSpec unfolding, substitution codes
 [sem-module cfg-ast]` (validate then project) + `run-spec-of [root src cfg]`.
 Mode = spec-form xor init/next-form; sections keep multiplicity+order;
 `deadlock=!=(%false deadlock.cfg-ast)`. Hand-written unit tests
-`tests/lib/tla/cfg-runspec.hoon` (6/6). The run-spec is an internal noun, so
+`tests/lib/cfg-runspec.hoon` (6/6). The run-spec is an internal noun, so
 it is unit-tested, not differential. 2257/2259/2237 (property/fairness gates,
 trivial spec) are 5.3c/WU11 residue (need deep processConfigSpec).
 
@@ -246,7 +246,7 @@ konts off the run-spec's names. Config diagnostics are typed TLC failures via
 The honest reader is deleted: `job.hoon` lost `cfg-audit`/`cfg-known`;
 `check.hoon` lost `cfg-value`/`cfg-tokens`/`sto`/`fell`/`sub-comments`/
 `skip-line`, and `check`/`simulate-spec`/`run-check`/`has-property` read names
-via the new `cfg-names` / `parse-cfg`. Both libs import `lib/tla/config`
+via the new `cfg-names` / `parse-cfg`. Both libs import `lib/config`
 (no cycle). The `%inline` source carries the full `modules` map, so `%config`
 generates the graph with no prior `%semantic` stage. Four config-honesty job
 tests rewritten to faithful behavior (5006 / repeated-invariant-ok / 2231 /

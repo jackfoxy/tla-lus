@@ -9,7 +9,7 @@ golden.tla and the .cfg as golden-cfg.txt, and records the two checksums.
 
 The Hoon translator is not yet ported (unit 8 is multi-increment; see
 tools/notes/unit8-pluscal-notes.md), so this only refreshes goldens. Once
-lib/tla/pcal/* exists this will also emit a differential shard comparing the
+lib/pcal/* exists this will also emit a differential shard comparing the
 Hoon translation + checksums against these goldens. Never edit generated files.
 """
 import re
