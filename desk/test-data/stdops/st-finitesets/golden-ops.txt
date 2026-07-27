@@ -1,0 +1,29 @@
+BINDINGS
+FiniteSets!Cardinality/1|override:MethodValue
+FiniteSets!IsFiniteSet/1|override:MethodValue
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+Card IntValue 3
+CardDup IntValue 2
+CardEmpty IntValue 0
+CardInterval IntValue 10
+CardNat ! EC2181 EvalException: Attempted to compute cardinality of the value Nat
+CardNotSet ! EC2181 EvalException: Attempted to compute cardinality of the value 3
+CardSubset IntValue 8
+CardUnion IntValue 3
+Fin BoolValue TRUE
+FinEmpty BoolValue TRUE
+FinNat BoolValue FALSE

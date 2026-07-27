@@ -1,0 +1,59 @@
+BINDINGS
+Bags!BagCardinality/1|override:MethodValue
+Bags!BagIn/2|override:MethodValue
+Bags!BagOfAll/2|override:MethodValue
+Bags!BagToSet/1|override:MethodValue
+Bags!BagUnion/1|override:MethodValue
+Bags!CopiesIn/2|override:MethodValue
+Bags!EmptyBag/0|override:MethodValue
+Bags!IsABag/1|override:MethodValue
+Bags!SetToBag/1|override:MethodValue
+Bags!SubBag/1|body
+Bags!\ominus/2|override:MethodValue
+Bags!\oplus/2|override:MethodValue
+Bags!\sqsubseteq/2|override:MethodValue
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+TLC!:>/2|override:MethodValue
+TLC!@@/2|override:MethodValue
+TLC!Any/0|override:MethodValue
+TLC!Assert/2|override:MethodValue
+TLC!JavaTime/0|override:MethodValue
+TLC!Permutations/1|override:MethodValue
+TLC!Print/2|override:MethodValue
+TLC!PrintT/1|override:MethodValue
+TLC!RandomElement/1|override:MethodValue
+TLC!SortSeq/2|override:MethodValue
+TLC!TLCEval/1|override:EvaluatingValue
+TLC!TLCGet/1|override:EvaluatingValue
+TLC!TLCSet/2|override:MethodValue
+TLC!ToString/1|override:MethodValue
+EVAL
+B FcnRcdValue <<1, 1>>
+BUnion FcnRcdValue <<1, 1>>
+CardB IntValue 2
+Copies IntValue 1
+CopiesMissing IntValue 0
+Cup FcnRcdValue <<2, 2>>
+Diff FcnRcdValue <<1, 1>>
+Empty FcnRcdValue <<>>
+InB BoolValue TRUE
+IsB BoolValue TRUE
+NotB BoolValue FALSE
+NotInB BoolValue FALSE
+OfAll FcnRcdValue (2 :> 1 @@ 3 :> 1)
+SqSub BoolValue TRUE
+Subs SetEnumValue {<<>>, <<1>>, (2 :> 1), <<1, 1>>}
+ToSet SetEnumValue {1, 2}

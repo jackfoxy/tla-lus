@@ -1,0 +1,50 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+TLC!:>/2|override:MethodValue
+TLC!@@/2|override:MethodValue
+TLC!Any/0|override:MethodValue
+TLC!Assert/2|override:MethodValue
+TLC!JavaTime/0|override:MethodValue
+TLC!Permutations/1|override:MethodValue
+TLC!Print/2|override:MethodValue
+TLC!PrintT/1|override:MethodValue
+TLC!RandomElement/1|override:MethodValue
+TLC!SortSeq/2|override:MethodValue
+TLC!TLCEval/1|override:EvaluatingValue
+TLC!TLCGet/1|override:EvaluatingValue
+TLC!TLCSet/2|override:MethodValue
+TLC!ToString/1|override:MethodValue
+EVAL
+Comb FcnRcdValue <<"a", "b">>
+CombLeft FcnRcdValue <<"a">>
+Ok BoolValue TRUE
+Perms SetEnumValue {(a :> a @@ b :> b), (a :> b @@ b :> a)}
+Pr IntValue 7
+PrT BoolValue TRUE
+Single FcnRcdValue <<"a">>
+Sort TupleValue <<1, 2, 3>>
+SortEmpty TupleValue <<>>
+Str StringValue "42"
+StrSeq StringValue "<<1, \"a\">>"
+StrSet StringValue "{1, 2}"

@@ -682,6 +682,63 @@ than silently degraded:
 | listing vendored standard modules in the provenance record | they are not read, and are fixed by the desk revision |
 | sharing parsed trees across stages | the loader parses each module once to extract references and discards the tree; a cross-stage cache would put syntax trees into the persisted continuation |
 
+## Unit 6C (C1) — StandardModule operators
+
+Baseline recorded by subunit C1.0 (inventory only; no behavior changed). The
+authoritative, generated list of every reachable operator and its
+classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
+required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
+lands with C1.8.
+
+**What evaluates today.** Seventeen operators, dispatched by bare name with no
+module or arity qualification: `+ - * ^ \div % < > \leq \geq ..` (Naturals),
+unary `-` (Integers), `\o Len Head Tail Append` (Sequences), `Cardinality`
+(FiniteSets). `Permutations` is recognized separately by the SYMMETRY setup,
+from the syntax tree, not through any registry.
+
+**What is typed-unsupported.** Everything else a spec can reach, including
+`Nat`, `Int`, `Seq`, `SubSeq`, `SelectSeq`, `IsFiniteSet`, every `Bags`
+operator, and every `TLC` operator (`:>`, `@@`, `Assert`, `ToString`,
+`SortSeq`, `Print`, `PrintT`, `TLCGet`, `TLCSet`). A StandardModule operator
+with no native implementation returns a typed unsupported failure naming the
+operator — it never returns a plausible value.
+
+**Definitions imported through `EXTENDS` cannot be evaluated** (unit-7
+finding), so a StandardModule operator that TLC does *not* override — the
+pin has exactly one reachable case, `Bags!SubBag` — has no working path
+either. C1.1 fixes both.
+
+**Four arithmetic results are wrong, not merely missing** (C1.2 owns them;
+regression fixtures `st-arith-errors`, `st-integers` are already frozen):
+
+| expression | this port | pinned TLC |
+|---|---|---|
+| `(-7) \div 2` | `3` (`abs/abs`) | `-4` (floor division) |
+| `(-7) % 3` | `1` (`abs%abs`) | `2` (non-negative remainder) |
+| `5 % 0`, `5 % (-2)` | generic failure | EC 2169, "The second argument of % should be a positive number" |
+| `2147483647 + 1` | `2147483648` | EC 2178 overflow — TLC integers are 32-bit, and a literal ≥ 2^31 fails the whole load |
+
+Error categories in general are approximate: the port does not yet emit the
+`TLC_MODULE_*` codes (2169, 2176, 2178, 2179, 2180, 2181, 2182, 2183, 2184,
+2266, 2283) the pin raises. They are pinned per operator in
+`desk/test-data/stdops/*/golden-ops.txt`.
+
+**Excluded surfaces** (typed unsupported, by design): `TLCExt`, `Json`,
+`Toolbox`, `RealTime`, `Reals`, and the `_*` trace-expression modules;
+`TLC!JavaTime` (wall clock) and `TLC!Any` (universal value);
+`Randomization` and `TLC!RandomElement` (unit 9 owns TLC's RNG). Java methods
+that no StandardModule declares — `Sequences!Cons/Insert/SelectInSeq`, the
+`Integers` class's duplicate arithmetic, `Strings`, `AnySet`,
+`TransitiveClosure` — are unreachable in TLC too.
+
+**String order (family 5)** remains the approved difference described under
+*Unit 9 — Constant evaluation*. C1.0 froze the oracle baseline in
+`desk/test-data/stdops/st-string-order/golden-ops.txt`, which shows the
+divergence is wider than string sets alone: it also fixes record field order,
+`CHOOSE` over a string set, model-value order, and — through
+`ModelValue.fingerPrint` — state fingerprint bytes whenever a model value is
+in a state. Subunit C1.7 decides reproduce-vs-approve on measured evidence.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

@@ -1,0 +1,44 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+TLC!:>/2|override:MethodValue
+TLC!@@/2|override:MethodValue
+TLC!Any/0|override:MethodValue
+TLC!Assert/2|override:MethodValue
+TLC!JavaTime/0|override:MethodValue
+TLC!Permutations/1|override:MethodValue
+TLC!Print/2|override:MethodValue
+TLC!PrintT/1|override:MethodValue
+TLC!RandomElement/1|override:MethodValue
+TLC!SortSeq/2|override:MethodValue
+TLC!TLCEval/1|override:EvaluatingValue
+TLC!TLCGet/1|override:EvaluatingValue
+TLC!TLCSet/2|override:MethodValue
+TLC!ToString/1|override:MethodValue
+EVAL
+AnyV UserValue ANY
+AssertFalse ! EC2132 EvalException: The first argument of Assert evaluated to FALSE; the second argument was: "boom"
+CombNotFcn ! EC2169 EvalException: The first argument of @@ should be a function, but instead it is: 1
+PermsNotSet ! EC2176 EvalException: Applying Permutations to the following value, which is not a finite set: 3
+SortNotBool ! EC2169 EvalException: The second argument of SortSeq should be a boolean function, but instead it is: 2
+SortNotSeq ! EC2169 EvalException: The first argument of SortSeq should be a natural number, but instead it is: {1, 2}

@@ -1,0 +1,41 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+EVAL
+Ap TupleValue <<1, 2, 3, 4>>
+Cat TupleValue <<1, 2, 3, 9, 8>>
+CatEmpty TupleValue <<1, 2, 3>>
+FcnLen IntValue 3
+FcnSeq FcnRcdValue <<1, 4, 9>>
+H IntValue 1
+L IntValue 3
+LEmpty IntValue 0
+S TupleValue <<1, 2, 3>>
+Sel TupleValue <<2, 3>>
+SelNone TupleValue <<>>
+SeqMem BoolValue TRUE
+SeqNotMem BoolValue FALSE
+SeqSet UserValue Seq({1})
+Sub TupleValue <<2, 3>>
+SubEmpty TupleValue <<>>
+T TupleValue <<2, 3>>

@@ -1,0 +1,34 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+EVAL
+AppendNotSeq ! EC2182 EvalException: Evaluating an expression of the form Append(s, v) when s is not a sequence: {1}
+CatNotSeq ! EC2182 EvalException: Evaluating an expression of the form t \o s when s is not a sequence: {2}
+HeadEmpty ! EC2184 EvalException: Attempted to apply Head to the empty sequence.
+LenNotSeq ! EC2283 EvalException: The argument of Len should be a sequence, but instead it is: {1, 2}
+LenString IntValue 3
+SelNotBool ! EC2169 EvalException: The second argument of SelectSeq should be a boolean-valued operator, but instead it is: <Operator LAMBDA>
+SeqNotSet UserValue Seq(3)
+SubOutHigh ! EC2183 EvalException: The third argument of SubSeq must be in the domain of its first argument: <<1, 2>> , but instead it is 5
+SubOutLow ! EC2183 EvalException: The second argument of SubSeq must be in the domain of its first argument: <<1, 2>> , but instead it is 0
+TailEmpty ! EC2184 EvalException: Attempted to apply Tail to the empty sequence.
