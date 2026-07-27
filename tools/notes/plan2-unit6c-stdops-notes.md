@@ -308,7 +308,42 @@ TLA+/Hoon gotchas:
 - A list narrowed by `?~` must be widened (`=/ els=(list value:v) u.t`)
   before a loop's own `?~`, or the branch is `mint-vain`.
 
-## 10. Gotchas hit in C1.0
+## 10. C1.4 — FiniteSets and Bags
+
+FiniteSets: both operators are `node-op`s, because their argument is a SET.
+Evaluating it as a *value* would force it; evaluating it as a lazy domain
+lets the infinite descriptors answer:
+
+- `IsFiniteSet(Nat) = FALSE`, `Cardinality(Nat)` = EC 2181.
+- A finite lazy set (`SUBSET S`, `UNION S`) is counted through the 6.3
+  cursor, so the budget and the dedup are the ones already tested.
+- `as-sexp` wraps *any* value as `[%set v]`, so both node-ops re-check
+  `set-like` and report the pin's own wording for a non-set (EC 2181 for
+  Cardinality, `Attempted to check if the integer 3 is a finite set.` for
+  IsFiniteSet).
+
+Bags: every operator starts from `to-fcn-pairs` (`Value.toFcnRcd`: function,
+tuple, or record) and compares domain points with `equal`, never a rendering.
+Quirks of the pin that are reproduced, not corrected:
+
+- messages name the infix operators `(+)` and `(-)`, not `\oplus`/`\ominus`;
+- `SetToBag`'s failure message says **BagToSet** (a copy-paste upstream);
+- `IsABag` of a non-function is FALSE, not an error (MAK 02/23/2018);
+- `BagUnion` normalizes its set first, so `BagUnion({b, b}) = b`.
+
+`BagOfAll` takes an operator argument, so it is the second `node-op`
+(alongside `SelectSeq`).
+
+`TLC!:>` and `TLC!@@` landed here, ahead of C1.5, because a bag literal is
+written with them.
+
+Rendering facts the fixtures exposed (both now matched):
+
+- `FcnRcdValue.toString` **parenthesizes** the `(d :> v @@ …)` form;
+- a one-point function with domain `{1}` renders as a tuple (`<<2>>`), since
+  the tuple form is chosen by a contiguous 1..n domain, not by size.
+
+## 11. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.

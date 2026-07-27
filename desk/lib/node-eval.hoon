@@ -675,6 +675,9 @@
   ::  applied by the same evaluator, under the same recursion budget
   |=  [tag=@tas n=sem-apply:sm e=eenv]
   ^-  eres
+  ?:  ?=(%bag-of-all tag)     (eval-bag-of-all n e)
+  ?:  ?=(%cardinality tag)    (eval-cardinality n e)
+  ?:  ?=(%is-finite-set tag)  (eval-is-finite n e)
   ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
   ?.  ?=([* * ~] args.n)
     [%| 0 'SelectSeq expects two arguments.']
@@ -701,6 +704,94 @@
     $(els t.els)
   ?:  ?=(%| -.keep)  keep
   [%& [%seq p.keep]]
+::
+++  eval-cardinality
+  ::  FiniteSets!Cardinality. The argument is evaluated as a lazy DOMAIN, so
+  ::  an infinite descriptor (Nat, Int, Seq) is answered with tlc2's EC 2181
+  ::  instead of being forced, and a finite lazy set (SUBSET S, [D -> R]) is
+  ::  counted through the 6.3 cursor under its budget
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* ~] args.n)  [%| 0 'Cardinality expects one argument.']
+  =/  dom  (eval-domain i.args.n e)
+  ?:  ?=(%| -.dom)  (cardinality-error i.args.n e)
+  ::  an ordinary value wrapped as a domain is only a set if it looks like
+  ::  one; tlc2 reports the value, not an enumeration failure
+  ?:  ?&(?=(%set -.p.dom) !(set-like:v s.p.dom))
+    [%| (card-err (crip (render:v s.p.dom)))]
+  ?:  (infinite:v p.dom)
+    [%| (card-err (crip (sexp-name:v p.dom)))]
+  =/  f  (force:v p.dom)
+  ?:  ?=(%| -.f)  f
+  [%& [%int (sun:si (lent (set-elems:v p.f)))]]
+::
+++  cardinality-error
+  ::  the argument is not a set at all: name it the way tlc2 does (its
+  ::  value, not the enumeration failure)
+  |=  [n=sem:sm e=eenv]
+  ^-  eres
+  =/  vv  (eval n e)
+  ?:  ?=(%| -.vv)  vv
+  [%| (card-err (crip (render:v p.vv)))]
+::
+++  card-err
+  ::  EC 2181
+  |=  what=@t
+  ^-  eval-err:v
+  [2.181 (rap 3 ~['Attempted to compute cardinality of the value\0a' what])]
+::
+++  eval-is-finite
+  ::  FiniteSets!IsFiniteSet — false for the infinite descriptors, true for
+  ::  any other set, and an error for a non-set (tlc2's Value.isFinite fails
+  ::  on an atom)
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* ~] args.n)  [%| 0 'IsFiniteSet expects one argument.']
+  =/  dom  (eval-domain i.args.n e)
+  ?:  ?&(?=(%& -.dom) !?&(?=(%set -.p.dom) !(set-like:v s.p.dom)))
+    [%& [%bool !(infinite:v p.dom)]]
+  =/  vv  (eval i.args.n e)
+  ?:  ?=(%| -.vv)  vv
+  :-  %|
+  :-  0
+  %^  rap  3  'Attempted to check if the integer '
+  ~[(crip (render:v p.vv)) ' is a finite set.']
+::
+++  eval-bag-of-all
+  ::  Bags!BagOfAll(F(_), b): apply the operator to each domain point,
+  ::  summing the counts of results that collide
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* * ~] args.n)  [%| 0 'BagOfAll expects two arguments.']
+  =/  od  (resolve-oparg i.args.n e)
+  ?~  od
+    :-  %|
+    :-  2.266
+    %^  rap  3  'The first argument of BagOfAll should be an operator, '
+    ~['but instead it is:\0a<Operator ' (oparg-name i.args.n) '>']
+  =/  bv  (eval i.t.args.n e)
+  ?:  ?=(%| -.bv)  bv
+  =/  ps  (to-fcn-pairs:v p.bv)
+  ?~  ps
+    :-  %|
+    %^  arg-error:so  2.169  2
+    ['BagOfAll' 'function with a finite domain' | p.bv]
+  =|  acc=(list vpair:v)
+  =/  l=(list vpair:v)  u.ps
+  |-  ^-  eres
+  ?~  l  [%& (normalize:v [%fcn (flop acc)])]
+  =/  r  (apply-def u.od ~[d.i.l] e)
+  ?:  ?=(%| -.r)  r
+  =/  hit  (skim acc |=(pr=vpair:v (equal:v d.pr p.r)))
+  ?~  hit  $(l t.l, acc [[p.r r.i.l] acc])
+  =/  n2
+    ?:  ?&(?=(%int -.r.i.hit) ?=(%int -.r.i.l))
+      `value:v`[%int (sum:si p.r.i.hit p.r.i.l)]
+    r.i.l
+  %=  $
+    l    t.l
+    acc  [[p.r n2] (skip acc |=(pr=vpair:v (equal:v d.pr p.r)))]
+  ==
 ::
 ++  op-arg-error
   ::  EC 2169 for an operator argument: tlc2 renders the OpValue, which has

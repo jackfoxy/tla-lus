@@ -136,6 +136,17 @@
     %set   ~
   ==
 ::
+++  to-fcn-pairs
+  ::  tlc2's Value.toFcnRcd: a function is one, and so are a tuple (domain
+  ::  1..n) and a record (string domain). Bags are exactly these values
+  |=  v=value
+  ^-  (unit (list vpair))
+  ?+  -.v  ~
+    %fcn  `p.v
+    %seq  `(fcn-pairs v)
+    %rec  `(turn p.v |=(f=vfield `vpair`[[%str k.f] v.f]))
+  ==
+::
 ++  to-tuple
   ::  tlc2's Value.toTuple: a tuple is a sequence, and so is a function whose
   ::  domain is exactly 1..n (its values in index order). Anything else is
@@ -401,11 +412,14 @@
   ?:  (levy ps |=(pr=vpair ?=(%str -.d.pr)))
     =/  fs  (turn ps |=(pr=vpair `vfield`[?>(?=(%str -.d.pr) p.d.pr) r.pr]))
     "[{(join-commas (turn (sort-fields fs) render-field))}]"
+  ::  tlc2 parenthesizes this form: `(2 :> 1 @@ 3 :> 1)`
   =/  sorted  (sort ps |=([x=vpair y=vpair] (vlth d.x d.y)))
-  %+  roll  sorted
-  |=  [pr=vpair acc=tape]
-  =/  piece  "{(render d.pr)} :> {(render r.pr)}"
-  ?~(acc piece "{acc} @@ {piece}")
+  =/  body
+    %+  roll  sorted
+    |=  [pr=vpair acc=tape]
+    =/  piece  "{(render d.pr)} :> {(render r.pr)}"
+    ?~(acc piece "{acc} @@ {piece}")
+  "({body})"
 ::
 ++  contiguous
   ::  domain is exactly 1..n in order
@@ -840,6 +854,23 @@
   |=  s=value
   ^-  tape
   ;:(weld "Seq(" (render s) ")")
+::
+++  sexp-name
+  ::  how tlc2 renders a lazy set that has no value form (the infinite
+  ::  UserValues); "" for the ordinary constructions, which do have one
+  |=  x=sexp
+  ^-  tape
+  ?+  -.x  ""
+    %nats  "Nat"
+    %ints  "Int"
+    %seqs  (seqs-name s.x)
+  ==
+::
+++  infinite
+  ::  the descriptors tlc2 reports as not finite (UserObj.isFinite false)
+  |=  x=sexp
+  ^-  ?
+  ?=(?(%nats %ints %seqs) -.x)
 ::
 ++  non-enumerable
   ::  tlc2 refuses to enumerate an infinite UserObj set (isFinite false):

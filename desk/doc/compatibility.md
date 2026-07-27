@@ -690,14 +690,22 @@ classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
 required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
 lands with C1.8.
 
-**What evaluates today** (C1.1-C1.3). Twenty-three operator keys, resolved by
+**What evaluates today** (C1.1-C1.4). Thirty-eight operator keys, resolved by
 `[module operator arity]` as tlc2 binds a Java method — never by bare name:
 `Naturals!{+ - * ^ \div % < > \leq \geq ..}` and unary minus at arity 1;
 all eight declared `Sequences` operators (`\o Len Head Tail Append SubSeq
-SelectSeq Seq`); `FiniteSets!Cardinality`; and the three non-enumerable set
-descriptors `Nat`, `Int`, and `Seq(S)`. `Permutations` is still recognized
-separately by the SYMMETRY setup, from the syntax tree; C1.5 moves it into the
-registry.
+SelectSeq Seq`); both `FiniteSets` operators; every overridden `Bags`
+operator; `TLC!{:> @@}`; and the three non-enumerable set descriptors `Nat`,
+`Int`, and `Seq(S)`. The rest of the `TLC` module (`Assert`, `ToString`,
+`SortSeq`, `Print`/`PrintT`, `Permutations`) is C1.5's; `Permutations` is
+still recognized separately by the SYMMETRY setup, from the syntax tree.
+
+`Cardinality` and `IsFiniteSet` take their argument as a lazy *set*, so
+`IsFiniteSet(Nat)` is FALSE and `Cardinality(Nat)` is EC 2181 — the infinite
+descriptors answer rather than being forced. Bag operators accept exactly what
+`Value.toFcnRcd` accepts (a function, a tuple, or a record), and their
+diagnostics reproduce the pin's text including its quirks: the infix operators
+are named `(+)` and `(-)`, and `SetToBag` reports itself as `BagToSet`.
 
 A sequence argument is accepted exactly where TLC accepts one — a tuple, or a
 function whose domain is exactly 1..n (`Value.toTuple`) — and the string forms

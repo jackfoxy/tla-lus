@@ -121,9 +121,29 @@
     [['Sequences' 'Tail' 1] [| 0 |=(a=(list value:v) (seq-tail a))]]
     [['Sequences' 'Append' 2] [| 0 |=(a=(list value:v) (seq-append a))]]
     [['Sequences' 'SubSeq' 3] [| 0 |=(a=(list value:v) (sub-seq a))]]
-    ::  FiniteSets
-    [['FiniteSets' 'Cardinality' 1] [| 0 |=(a=(list value:v) (cardinality a))]]
+    ::  Bags (C1.4). The pin's messages name the infix operators as `(+)`
+    ::  and `(-)`, and SetToBag reports itself as `BagToSet` — both are the
+    ::  pinned text, reproduced rather than corrected
+    [['Bags' 'EmptyBag' 0] [| 0 |=(a=(list value:v) empty-bag)]]
+    [['Bags' 'IsABag' 1] [| 0 |=(a=(list value:v) (is-a-bag a))]]
+    [['Bags' 'BagCardinality' 1] [| 0 |=(a=(list value:v) (bag-card a))]]
+    [['Bags' 'BagIn' 2] [| 0 |=(a=(list value:v) (bag-in a))]]
+    [['Bags' 'CopiesIn' 2] [| 0 |=(a=(list value:v) (copies-in a))]]
+    [['Bags' '\\oplus' 2] [| 0 |=(a=(list value:v) (bag-cup a))]]
+    [['Bags' '\\ominus' 2] [| 0 |=(a=(list value:v) (bag-diff a))]]
+    [['Bags' '\\sqsubseteq' 2] [| 0 |=(a=(list value:v) (sq-subseteq a))]]
+    [['Bags' 'BagUnion' 1] [| 0 |=(a=(list value:v) (bag-union a))]]
+    [['Bags' 'BagToSet' 1] [| 0 |=(a=(list value:v) (bag-to-set a))]]
+    [['Bags' 'SetToBag' 1] [| 0 |=(a=(list value:v) (set-to-bag a))]]
+    ::  TLC's two function constructors (C1.5's module, landed here because
+    ::  a bag literal is written with them)
+    [['TLC' ':>' 2] [| 0 |=(a=(list value:v) (make-fcn a))]]
+    [['TLC' '@@' 2] [| 0 |=(a=(list value:v) (combine-fcn a))]]
   ==
+::
+::  FiniteSets!Cardinality and !IsFiniteSet are `node-op`s, not rows: their
+::  argument is a SET, so it is evaluated as a lazy domain (a descriptor like
+::  Nat must answer rather than be forced into a value).
 ::
 ::  +|  Diagnostics
 ::
@@ -292,6 +312,9 @@
   |=  k=op-key
   ^-  (unit @tas)
   ?:  =(k ['Sequences' 'SelectSeq' 2])  `%select-seq
+  ?:  =(k ['Bags' 'BagOfAll' 2])  `%bag-of-all
+  ?:  =(k ['FiniteSets' 'Cardinality' 1])  `%cardinality
+  ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `%is-finite-set
   ~
 ::
 ++  dotdot
@@ -439,10 +462,251 @@
   %+  roll  (flop els)
   |=([e=value:v acc=@t] ?:(?=(%str -.e) (cat 3 p.e acc) acc))
 ::
-++  cardinality
+++  wrong-value-error
+  ::  EC 2176: "Applying <op> to the following value,\nwhich is not <what>:
+  ::  \n<v>"
+  |=  [op=@t what=@t got=value:v]
+  ^-  eval-err:v
+  :-  2.176
+  %^  rap  3  'Applying '
+  :~  op  ' to the following value,\0awhich is not '  what  ':\0a'
+      (crip (render:v got))
+  ==
+::
+++  make-fcn
+  ::  TLC!:> — the one-point function [x \in {d} |-> e]
   |=  as=(list value:v)
   ^-  eres
-  ?.  ?=([* ~] as)  [%| 0 'Cardinality expects one argument.']
-  ?.  (set-like:v i.as)  [%| 0 'Cardinality expects a set.']
-  [%& [%int (sun:si (lent (set-elems:v (normalize:v i.as))))]]
+  ?.  ?=([* * ~] as)  [%| 0 ':> expects two arguments.']
+  [%& [%fcn ~[[i.as i.t.as]]]]
+::
+++  combine-fcn
+  ::  TLC!@@ — merge two functions; the LEFT operand wins a collision
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 '@@ expects two arguments.']
+  =/  pa  (to-fcn-pairs:v i.as)
+  ?~  pa  [%| (arg-error 2.169 1 '@@' 'function' | i.as)]
+  =/  pb  (to-fcn-pairs:v i.t.as)
+  ?~  pb  [%| (arg-error 2.169 2 '@@' 'function' | i.t.as)]
+  =/  extra
+    %+  skim  u.pb
+    |=(pr=vpair:v ?=(~ (bag-lookup d.pr u.pa)))
+  [%& (normalize:v [%fcn (weld u.pa extra)])]
+::
+::  +|  Bags (subunit C1.4)
+::
+::  A bag is tlc2's FcnRcdValue with positive integer counts, so every
+::  operator starts from `to-fcn-pairs` (Value.toFcnRcd) and compares domain
+::  points by value equality, never by rendering.
+::
+++  empty-bag  ^-(eres [%& [%fcn ~]])
+::
+++  bag-of
+  |=  x=value:v
+  ^-  (unit (list vpair:v))
+  (to-fcn-pairs:v x)
+::
+++  positive-count
+  |=  x=value:v
+  ^-  ?
+  &(?=(%int -.x) (slth:v --0 p.x))
+::
+++  bag-lookup
+  ::  the count of `e` in the bag's pairs, by value equality
+  |=  [e=value:v ps=(list vpair:v)]
+  ^-  (unit value:v)
+  ?~  ps  ~
+  ?:  (equal:v e d.i.ps)  `r.i.ps
+  $(ps t.ps)
+::
+++  is-a-bag
+  ::  MAK 02/23/2018: a non-function is FALSE, not an error
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'IsABag expects one argument.']
+  =/  ps  (bag-of i.as)
+  ?~  ps  [%& [%bool |]]
+  [%& [%bool (levy u.ps |=(pr=vpair:v (positive-count r.pr)))]]
+::
+++  bag-card
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'BagCardinality expects one argument.']
+  =/  ps  (bag-of i.as)
+  ?~  ps
+    [%| (wrong-value-error 'BagCardinality' 'a function with a finite domain' i.as)]
+  =|  n=@s
+  =/  l  u.ps
+  |-  ^-  eres
+  ?~  l  [%& [%int n]]
+  ?.  (positive-count r.i.l)
+    [%| (wrong-value-error 'BagCardinality' 'a bag' i.as)]
+  ?>  ?=(%int -.r.i.l)
+  $(l t.l, n (sum:si n p.r.i.l))
+::
+++  bag-in
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'BagIn expects two arguments.']
+  =/  ps  (bag-of i.t.as)
+  ?~  ps  [%| (arg-error 2.169 2 'BagIn' 'bag' | i.t.as)]
+  =/  hit  (bag-lookup i.as u.ps)
+  ?~  hit  [%& [%bool |]]
+  ?.  ?=(%int -.u.hit)  [%| (arg-error 2.169 2 'BagIn' 'bag' | i.t.as)]
+  [%& [%bool (slth:v --0 p.u.hit)]]
+::
+++  copies-in
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'CopiesIn expects two arguments.']
+  =/  ps  (bag-of i.t.as)
+  ?~  ps  [%| (arg-error 2.169 2 'CopiesIn' 'bag' | i.t.as)]
+  =/  hit  (bag-lookup i.as u.ps)
+  ?~  hit  [%& [%int --0]]
+  ?.  ?=(%int -.u.hit)  [%| (arg-error 2.169 2 'CopiesIn' 'bag' | i.t.as)]
+  [%& u.hit]
+::
+++  both-bags
+  ::  the two operands of an infix bag operator, with the pin's operator
+  ::  spelling in the diagnostic
+  |=  [op=@t as=(list value:v) need-bag=?]
+  ^-  (each [a=(list vpair:v) b=(list vpair:v)] eval-err:v)
+  ?.  ?=([* * ~] as)
+    [%| 0 (rap 3 ~[op ' expects two arguments.'])]
+  =/  pa  (bag-of i.as)
+  =/  pb  (bag-of i.t.as)
+  ?~  pa  [%| (arg-error 2.169 1 op 'bag' | i.as)]
+  ?~  pb  [%| (arg-error 2.169 2 op 'bag' | i.t.as)]
+  ?.  ?|  !need-bag
+          &((levy u.pa |=(p=vpair:v (positive-count r.p))))
+      ==
+    [%| (arg-error 2.169 1 op 'bag' | i.as)]
+  ?.  ?|  !need-bag
+          &((levy u.pb |=(p=vpair:v (positive-count r.p))))
+      ==
+    [%| (arg-error 2.169 2 op 'bag' | i.t.as)]
+  [%& u.pa u.pb]
+::
+++  bag-cup
+  ::  b1 (+) b2: counts add; the pin names this operator `(+)`
+  |=  as=(list value:v)
+  ^-  eres
+  =/  ab  (both-bags '(+)' as &)
+  ?:  ?=(%| -.ab)  ab
+  =/  out
+    =/  l  a.p.ab
+    =|  acc=(list vpair:v)
+    |-  ^-  (list vpair:v)
+    ?~  l  (flop acc)
+    =/  other  (bag-lookup d.i.l b.p.ab)
+    =/  n
+      ?~  other  r.i.l
+      ?:  ?&(?=(%int -.r.i.l) ?=(%int -.u.other))
+        `value:v`[%int (sum:si p.r.i.l p.u.other)]
+      r.i.l
+    $(l t.l, acc [[d.i.l n] acc])
+  =/  extra
+    %+  skim  b.p.ab
+    |=(pr=vpair:v ?=(~ (bag-lookup d.pr a.p.ab)))
+  [%& (normalize:v [%fcn (weld out extra)])]
+::
+++  bag-diff
+  ::  b1 (-) b2: counts subtract, non-positive results drop out
+  |=  as=(list value:v)
+  ^-  eres
+  =/  ab  (both-bags '(-)' as |)
+  ?:  ?=(%| -.ab)  ab
+  =/  out
+    =/  l  a.p.ab
+    =|  acc=(list vpair:v)
+    |-  ^-  (list vpair:v)
+    ?~  l  (flop acc)
+    ?.  ?=(%int -.r.i.l)  $(l t.l)
+    =/  other  (bag-lookup d.i.l b.p.ab)
+    =/  n
+      ?~  other  p.r.i.l
+      ?:  ?=(%int -.u.other)  (dif:si p.r.i.l p.u.other)
+      p.r.i.l
+    ?.  (slth:v --0 n)  $(l t.l)
+    $(l t.l, acc [[d.i.l [%int n]] acc])
+  [%& (normalize:v [%fcn out])]
+::
+++  sq-subseteq
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 '\\sqsubseteq expects two arguments.']
+  =/  pa  (bag-of i.as)
+  ?~  pa
+    [%| (wrong-value-error '\\sqsubseteq' 'a function with a finite domain' i.as)]
+  =/  pb  (bag-of i.t.as)
+  ?~  pb
+    [%| (wrong-value-error '\\sqsubseteq' 'a function with a finite domain' i.t.as)]
+  =/  l  u.pa
+  |-  ^-  eres
+  ?~  l  [%& [%bool &]]
+  ?.  ?=(%int -.r.i.l)  $(l t.l)
+  =/  other  (bag-lookup d.i.l u.pb)
+  =/  n
+    ?~  other  p.r.i.l
+    ?:  ?=(%int -.u.other)  (dif:si p.r.i.l p.u.other)
+    p.r.i.l
+  ?:  (slth:v --0 n)  [%& [%bool |]]
+  $(l t.l)
+::
+++  bag-to-set
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'BagToSet expects one argument.']
+  =/  ps  (bag-of i.as)
+  ?~  ps
+    [%| (wrong-value-error 'BagToSet' 'a function with a finite domain' i.as)]
+  [%& (normalize:v [%set (turn u.ps |=(pr=vpair:v d.pr))])]
+::
+++  set-to-bag
+  ::  the pin's message really does say BagToSet here (a copy-paste in
+  ::  tlc2.module.Bags); the text is reproduced, not corrected
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SetToBag expects one argument.']
+  ?.  (set-like:v i.as)
+    [%| (wrong-value-error 'BagToSet' 'a function with a finite domain' i.as)]
+  =/  es  (set-elems:v (normalize:v i.as))
+  [%& (normalize:v [%fcn (turn es |=(e=value:v `vpair:v`[e [%int --1]]))])]
+::
+++  bag-union
+  ::  BagUnion(S): S a finite set of bags; identical bags collapse, since
+  ::  the set is normalized first (MAK 02/20/2018)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'BagUnion expects one argument.']
+  ?.  (set-like:v i.as)
+    [%| (wrong-value-error 'BagUnion' 'a finite enumerable set' i.as)]
+  =/  es  (set-elems:v (normalize:v i.as))
+  ?~  es  empty-bag
+  ?~  t.es  [%& i.es]
+  =|  acc=(list vpair:v)
+  ::  widen: `es` is narrowed to a two-or-more list by the guards above
+  =/  l=(list value:v)  es
+  |-  ^-  eres
+  ?~  l  [%& (normalize:v [%fcn (flop acc)])]
+  =/  ps  (bag-of i.l)
+  ?~  ps
+    [%| 2.177 (rap 3 ~['Attempted to apply BagUnion to the following set, whose\0aelement is not a bag:\0a' (crip (render:v i.as))])]
+  =/  merged
+    =/  m  u.ps
+    =/  a  acc
+    |-  ^-  (list vpair:v)
+    ?~  m  a
+    =/  hit  (bag-lookup d.i.m a)
+    ?~  hit  $(m t.m, a [i.m a])
+    =/  n
+      ?:  ?&(?=(%int -.r.i.m) ?=(%int -.u.hit))
+        `value:v`[%int (sum:si p.r.i.m p.u.hit)]
+      r.i.m
+    %=  $
+      m  t.m
+      a  [[d.i.m n] (skip a |=(pr=vpair:v (equal:v d.pr d.i.m)))]
+    ==
+  $(l t.l, acc merged)
 --
