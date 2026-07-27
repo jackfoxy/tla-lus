@@ -832,7 +832,68 @@
   ?~  rt  ~
   =/  fc  (full-ctx tree.u.rt ctxs)
   =/  dv  (l-deps root sem-order.g ctxs mods.g)
-  `(level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
+  =/  mo  (level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
+  =.  defs.mo  (stamp-origin root defs.mo)
+  `mo(imports (ext-defs root sem-order.g ctxs mods.g))
+::
+++  stamp-origin
+  ::  record the defining module on each definition (unit 6C.1). Explicit
+  ::  loop: a wet +turn over the recursive sem-def mold fuse-loops here
+  |=  [mod=@t ds=(list sem-def)]
+  ^-  (list sem-def)
+  =|  out=(list sem-def)
+  |-  ^-  (list sem-def)
+  ?~  ds  (flop out)
+  $(ds t.ds, out [i.ds(origin mod) out])
+::
+++  ext-reach
+  ::  the modules the root reaches through EXTENDS, transitively, in the
+  ::  graph's dependency-first order and without the root. INSTANCE-only
+  ::  modules are excluded: their definitions are visible solely through
+  ::  the instance's substituted (and possibly prefixed) copies, which
+  ::  +gen-module already places in the root's own defs
+  |=  [root=@t order=(list @t) mods=(map @t loaded:modules)]
+  ^-  (list @t)
+  ::  one reverse sweep suffices: in a dependency-first order every module
+  ::  that extends M precedes M when the list is walked backwards
+  =/  reach
+    =/  rev  (flop order)
+    =/  acc=(set @t)  (silt ~[root])
+    |-  ^-  (set @t)
+    ?~  rev  acc
+    ?.  (~(has in acc) i.rev)  $(rev t.rev)
+    =/  ld  (~(get by mods) i.rev)
+    ?~  ld  $(rev t.rev)
+    $(rev t.rev, acc (~(gas in acc) (extends-of tree.u.ld)))
+  %+  skim  order
+  |=(nm=@t &(!=(nm root) (~(has in reach) nm)))
+::
+++  ext-defs
+  ::  every definition the root inherits through EXTENDS, generated from
+  ::  its own module's tree so spans stay in that module's coordinates and
+  ::  carrying the defining module as its origin. Dependency-first, first
+  ::  definer wins (Sequences re-exports Naturals' `+`, but the operator
+  ::  belongs to Naturals — the module tlc2 binds its override through).
+  ::  LOCAL definitions are not exported and are skipped. These are not
+  ::  level-checked: evaluation consumes bodies, not level metadata
+  |=  [root=@t order=(list @t) ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (list sem-def)
+  =/  ms  (ext-reach root order mods)
+  =|  seen=(set @t)
+  =|  out=(list sem-def)
+  |-  ^-  (list sem-def)
+  ?~  ms  (flop out)
+  =/  ld  (~(get by mods) i.ms)
+  ?~  ld  $(ms t.ms)
+  =/  fc  (full-ctx tree.u.ld ctxs)
+  =/  m   (gen-module tree.u.ld fc ctxs mods)
+  =/  ds  (stamp-origin i.ms defs.m)
+  =/  acc
+    |-  ^-  [seen=(set @t) out=(list sem-def)]
+    ?~  ds  [seen out]
+    ?:  |(local.i.ds (~(has in seen) name.i.ds))  $(ds t.ds)
+    $(ds t.ds, seen (~(put in seen) name.i.ds), out [i.ds out])
+  $(ms t.ms, seen seen.acc, out out.acc)
 ::
 ++  analyze-graph
   ::  the analyze pipeline's entry (unit 4.8): resolve, generate, level
@@ -932,6 +993,11 @@
       at=sspan
       params=(list spar)
       body=(unit sem)
+      ::  the module that defines this operator (unit 6C.1). Empty for a
+      ::  LET or otherwise module-less definition. The evaluator keys the
+      ::  StandardModule override registry by it, exactly as tlc2 binds a
+      ::  Java method to the module that declares the operator
+      origin=@t
   ==
 +$  sem-module
   $:  name=@t
@@ -952,6 +1018,13 @@
       ::  whether the level-check pass ran (SANY skips it when semantic
       ::  generation reported errors; the dump then prints L-1)
       lchecked=?
+      ::  definitions reachable through EXTENDS, each carrying the module
+      ::  that defines it, dependency-first with the first definer winning
+      ::  (unit 6C.1). SANY's ModuleNode.getOpDefs() exposes them the same
+      ::  way; they are NOT part of the dump projection (which lists a
+      ::  module's own definitions, matching SemDump), only of the
+      ::  evaluation environment
+      imports=(list sem-def)
   ==
 ::  generator output: ~ when SANY's Generator returns null (the node
 ::  vanishes from the graph), plus diagnostics in report order
@@ -1780,7 +1853,7 @@
     =/  gb  (g-fcn-body u c)
     :-  :-  ~
         :*  %sdef  name.u.dsg  0  local.u.dsg  (fcn-level u c)
-            (span-of:ast u)  ~  r.gb
+            (span-of:ast u)  ~  r.gb  ''
         ==
     ds.gb
   ?~  kids  [~ ~]
@@ -1795,7 +1868,7 @@
     `spar`[pn par (subtree-names-has body pn) (span-of:ast pnode)]
   :-  :-  ~
       :*  %sdef  name.u.dsg  arity.s.u.dsg  local.u.dsg
-          (expr-level body c2)  (span-of:ast u)  sps  r.gb
+          (expr-level body c2)  (span-of:ast u)  sps  r.gb  ''
       ==
   ds.gb
 ::
@@ -2024,6 +2097,7 @@
           (span-of:ast u)
           params.base
           `subw
+          ''
       ==
     $(bus t.bus, out [wrapped out], ds (weld ds ds.gd))
   ::  named theorems/assumptions import as theorem definitions with the
@@ -2192,7 +2266,7 @@
         %+  turn  `(list [@t sym])`rsyms
         |=  [nm=@t s=sym]
         ^-  sem-def
-        [%sdef nm arity.s | 0 (span-of:ast u) ~ ~]
+        [%sdef nm arity.s | 0 (span-of:ast u) ~ ~ '']
       %=  $
         us       t.us
         secopen  &
@@ -2271,6 +2345,7 @@
       ds.wk
       secs.wk
       |
+      ~
   ==
 ::
 ::  +|  Level Checking (unit 4: LevelNode/OpDefNode/OpApplNode.levelCheck)

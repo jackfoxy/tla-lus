@@ -1,6 +1,7 @@
 /-  *tla-lus
 /=  v   /lib/value
 /=  sm  /lib/semantic
+/=  so  /lib/stdops
 ::  Semantic-node expression evaluator (PORT-COMPLETION-PLAN-2 unit 6.5).
 ::
 ::  A dispatcher over the Work Unit 3 typed semantic graph (`sem` nodes) that
@@ -10,10 +11,13 @@
 ::  from stable graph identities. Set-consuming positions (\in, \subseteq, the
 ::  bounded binders) go through `eval-domain` so the 6.3 lazy enumerators are
 ::  not bypassed; a set used as a plain value is forced. StandardModule
-::  arithmetic/order/sequence operators (`+`, `<`, `..`, `\o`, `Len`, …) are
-::  UserDefinedOpKind with no evaluable body, so a native table supplies them
-::  (family 4 overrides proper remain deferred; an unknown one is a typed
-::  unsupported failure, never a wrong value).
+::  operators (`+`, `<`, `..`, `\o`, `Len`, …) resolve through the unit-6C
+::  override registry in `lib/stdops`, keyed by [module name arity] exactly
+::  as tlc2 binds a Java method to the module that declares the operator: an
+::  override beats the vendored TLA+ body (`Naturals.tla` defines `a+b ==
+::  {a, b}`), and a StandardModule operator with neither an override nor an
+::  explicit body-evaluable classification is a typed unsupported failure,
+::  never a wrong value.
 ::
 |%
 ::  +|  Evaluation Context
@@ -43,6 +47,10 @@
       ::  declared VARIABLE names — the assignable identities the action
       ::  solver (WU6.7) and ENABLED distinguish from constants/operators
       vars=(set @t)
+      ::  the StandardModule override registry, built once per environment
+      ::  (unit 6C.1); rebuilding the table inside an evaluation loop would
+      ::  cost a map construction per operator application
+      ov=senv:so
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -83,16 +91,6 @@
 ::
 ++  default-fuel  10.000
 ::
-++  native-set
-  ::  StandardModule operators supplied natively in Phase B (family 4 proper
-  ::  is deferred). Anything else reached as a bodyless op is unsupported.
-  ^-  (set @t)
-  %-  silt
-  ^-  (list @t)
-  :~  '+'  '-'  '*'  '^'  '\\div'  '%'  '<'  '>'  '\\leq'  '\\geq'
-      '..'  '\\o'  'Len'  'Head'  'Tail'  'Append'  'Cardinality'
-  ==
-::
 ::  +|  Top-Level Dispatch
 ::
 ++  eval
@@ -110,7 +108,13 @@
   |=  n=sem-lit:sm
   ^-  eres
   ?-  kind.n
-    %num  [%& [%int (sun:si (rash val.n dem))]]
+      %num
+    ::  tlc2 integers are 32-bit: a larger numeral is EC 2265, which fails
+    ::  the whole run there and this expression here (unit 6C.2)
+    =/  x  (sun:si (rash val.n dem))
+    ?.  (in-range:so x)
+      [%| 2.265 (rap 3 ~['TLC can\'t handle a number this big.\0a' val.n])]
+    [%& [%int x]]
     %str  [%& [%str val.n]]
     %dec  [%| 0 'decimal (Real) literals are unsupported.']
   ==
@@ -198,7 +202,13 @@
   ?:  |(=(nm '\\times') =(nm '$CartesianProd'))  (prod-sexp args.n e)
   ?:  =(nm '$SetOfFcns')  (fcns-sexp args.n e)
   ?:  =(nm '$SetOfRcds')  (rcds-sexp args.n e)
-  (as-sexp (eval n e))
+  ::  a StandardModule set operator (Nat, Int) denotes an infinite set: it
+  ::  has a lazy descriptor here, though it is not a value (unit 6C.2)
+  =/  d  (~(get by ops.e) nm)
+  ?~  d  (as-sexp (eval n e))
+  =/  sd  (set-descriptor:so [origin.u.d nm (lent args.n)])
+  ?~  sd  (as-sexp (eval n e))
+  [%& u.sd]
 ::
 ++  as-sexp
   ::  wrap an evaluated set value as a sexp; a non-set is non-enumerable
@@ -620,23 +630,49 @@
 ::  +|  User-Defined Operators And LET
 ::
 ++  eval-user
+  ::  resolution order, mirroring SpecProcessor: a Java override bound to
+  ::  the defining module wins; otherwise the definition's own body is
+  ::  evaluated — but only for a user module, or for the few StandardModule
+  ::  operators the pin leaves un-overridden (`body-ok:so`), because a
+  ::  vendored standard body is a dummy
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
   =/  nm  name.op.n
   =/  d   (~(get by ops.e) nm)
   ?~  d
-    ?:  (~(has in native-set) nm)
-      =/  as  (eval-args args.n e)
-      ?:(?=(%| -.as) as (eval-native nm p.as e))
-    [%| 0 (rap 3 ~['undefined or unsupported operator: ' nm])]
-  ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
+    [%| 0 (rap 3 ~['undefined operator: ' nm])]
   =/  def  u.d
+  =/  key=op-key:so  [origin.def nm (lent args.n)]
+  =/  ov  (lookup:so ov.e key)
+  ?^  ov
+    =/  as  (eval-args args.n e)
+    ?:  ?=(%| -.as)  as
+    (gate.u.ov p.as)
+  ?:  ?&  (is-standard:so ov.e origin.def)
+          !(body-allowed:so ov.e origin.def nm)
+      ==
+    [%| (unsupported:so key)]
+  ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
   ?~  body.def  [%| 0 (rap 3 ~['operator has no evaluable body: ' nm])]
   ?.  =((lent params.def) (lent args.n))
     [%| 0 (rap 3 ~['wrong number of arguments to ' nm])]
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  e2
   (eval u.body.def p.e2(fuel (dec fuel.e)))
+::
+++  binding-of
+  ::  what an operator resolves to, mirroring the oracle's BINDINGS
+  ::  projection (ModuleOpDump): a Java override, its TLA+ body, or nothing
+  |=  [e=eenv nm=@t ar=@ud]
+  ^-  ?(%override %body %none)
+  =/  d  (~(get by ops.e) nm)
+  ?~  d  %none
+  ?^  (lookup:so ov.e [origin.u.d nm ar])  %override
+  ?:  ?&  (is-standard:so ov.e origin.u.d)
+          !(body-allowed:so ov.e origin.u.d nm)
+      ==
+    %none
+  ?~(body.u.d %none %body)
 ::
 ++  bind-params
   |=  [e=eenv ps=(list spar:sm) as=(list sem:sm)]
@@ -671,67 +707,6 @@
     ?~  lets.n  e(ops os)
     $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
   (eval u.body.n e2)
-::
-::  +|  Native StandardModule Operators
-::
-++  eval-native
-  |=  [nm=@t as=(list value:v) e=eenv]
-  ^-  eres
-  ?:  =(nm '..')
-    ?.  ?=([* * ~] as)  [%| 0 '.. expects two arguments.']
-    ?.  &(?=(%int -.i.as) ?=(%int -.i.t.as))  [%| 0 'non-integer interval bound.']
-    [%& [%intv p.i.as p.i.t.as]]
-  ?:  =(nm '\\o')
-    ?.  ?=([* * ~] as)  [%| 0 '\\o expects two arguments.']
-    ?.  &(?=(%seq -.i.as) ?=(%seq -.i.t.as))  [%| 0 '\\o expects two sequences.']
-    [%& [%seq (weld p.i.as p.i.t.as)]]
-  ?:  =(nm 'Len')
-    ?.  ?=([* ~] as)  [%| 0 'Len expects one argument.']
-    ?.  ?=(%seq -.i.as)  [%| 0 'Len expects a sequence.']
-    [%& [%int (sun:si (lent p.i.as))]]
-  ?:  =(nm 'Head')
-    ?.  ?=([* ~] as)  [%| 0 'Head expects one argument.']
-    ?.  ?=(%seq -.i.as)  [%| 0 'Head expects a sequence.']
-    ?~  p.i.as  [%| 0 'Head of the empty sequence.']
-    [%& i.p.i.as]
-  ?:  =(nm 'Tail')
-    ?.  ?=([* ~] as)  [%| 0 'Tail expects one argument.']
-    ?.  ?=(%seq -.i.as)  [%| 0 'Tail expects a sequence.']
-    ?~  p.i.as  [%| 0 'Tail of the empty sequence.']
-    [%& [%seq t.p.i.as]]
-  ?:  =(nm 'Append')
-    ?.  ?=([* * ~] as)  [%| 0 'Append expects two arguments.']
-    ?.  ?=(%seq -.i.as)  [%| 0 'Append expects a sequence.']
-    [%& [%seq (snoc p.i.as i.t.as)]]
-  ?:  =(nm 'Cardinality')
-    ?.  ?=([* ~] as)  [%| 0 'Cardinality expects one argument.']
-    ?.  (set-like:v i.as)  [%| 0 'Cardinality expects a set.']
-    [%& [%int (sun:si (lent (set-elems:v (normalize:v i.as))))]]
-  ::  unary minus: `-` applied to a single integer
-  ?:  &(=(nm '-') ?=([* ~] as))
-    ?.  ?=(%int -.i.as)  [%| 0 'unary minus of a non-integer.']
-    [%& [%int (dif:si --0 p.i.as)]]
-  ::  binary integer operators
-  ?.  ?=([* * ~] as)  [%| 0 (rap 3 ~['unsupported native operator or arity: ' nm])]
-  ?.  &(?=(%int -.i.as) ?=(%int -.i.t.as))
-    [%| 0 (rap 3 ~['non-integer argument to ' nm])]
-  =/  x  p.i.as
-  =/  y  p.i.t.as
-  ?:  =(nm '+')  [%& [%int (sum:si x y)]]
-  ?:  =(nm '-')  [%& [%int (dif:si x y)]]
-  ?:  =(nm '*')  [%& [%int (pro:si x y)]]
-  ?:  =(nm '^')  [%& [%int (sun:si (pow (abs:si x) (abs:si y)))]]
-  ?:  =(nm '\\div')
-    ?:  =(y --0)  [%| 0 'division by zero.']
-    [%& [%int (sun:si (div (abs:si x) (abs:si y)))]]
-  ?:  =(nm '%')
-    ?:  =(y --0)  [%| 0 'modulo by zero.']
-    [%& [%int (sun:si (mod (abs:si x) (abs:si y)))]]
-  ?:  =(nm '<')      [%& [%bool (slth:v x y)]]
-  ?:  =(nm '>')      [%& [%bool (slth:v y x)]]
-  ?:  =(nm '\\leq')  [%& [%bool !(slth:v y x)]]
-  ?:  =(nm '\\geq')  [%& [%bool !(slth:v x y)]]
-  [%| 0 (rap 3 ~['unsupported native operator: ' nm])]
 ::
 ::  +|  Action Solving (WU6.7): initial and successor state streams
 ::
@@ -932,9 +907,17 @@
 ::  +|  Test / Driver Entrypoints
 ::
 ++  defmap-of
+  ::  the operators visible inside a module: everything inherited through
+  ::  EXTENDS first, then the module's own definitions, so a local
+  ::  definition shadows an imported one of the same name (unit 6C.1)
   |=  m=sem-module:sm
   ^-  (map @t sem-def:sm)
-  =|  acc=(map @t sem-def:sm)
+  =/  acc
+    =|  acc=(map @t sem-def:sm)
+    =/  is  imports.m
+    |-  ^-  (map @t sem-def:sm)
+    ?~  is  acc
+    $(is t.is, acc (~(put by acc) name.i.is i.is))
   |-  ^-  (map @t sem-def:sm)
   ?~  defs.m  acc
   $(defs.m t.defs.m, acc (~(put by acc) name.i.defs.m i.defs.m))
@@ -950,6 +933,16 @@
   ?~  body.u.d  [%| 0 'definition has no body.']
   (eval u.body.u.d (base-env u.mo ~ ~))
 ::
+++  binding-in
+  ::  what `nm` applied to `ar` arguments resolves to inside module `root`
+  ::  — the Hoon side of the oracle's BINDINGS projection (ModuleOpDump),
+  ::  so registry-vs-body resolution is differentially checkable
+  |=  [root=@t src=(map @t @t) nm=@t ar=@ud]
+  ^-  ?(%override %body %none %nograph)
+  =/  mo  (generate:sm root src)
+  ?~  mo  %nograph
+  (binding-of (base-env u.mo ~ ~) nm ar)
+::
 ++  vars-of
   |=  mo=sem-module:sm
   ^-  (set @t)
@@ -959,7 +952,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo)]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) make-senv:so]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -1013,7 +1006,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars]
+  [consts defs ~ default-fuel ~ ~ | | vars make-senv:so]
 ::
 ++  init-states
   ::  the complete initial-state stream for an Init BODY under a prebuilt env

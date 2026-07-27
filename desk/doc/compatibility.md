@@ -690,38 +690,63 @@ classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
 required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
 lands with C1.8.
 
-**What evaluates today.** Seventeen operators, dispatched by bare name with no
-module or arity qualification: `+ - * ^ \div % < > \leq \geq ..` (Naturals),
-unary `-` (Integers), `\o Len Head Tail Append` (Sequences), `Cardinality`
-(FiniteSets). `Permutations` is recognized separately by the SYMMETRY setup,
-from the syntax tree, not through any registry.
+**What evaluates today** (C1.1-C1.2). Eighteen registry rows plus the two
+set descriptors, resolved by
+`[module operator arity]` as tlc2 binds a Java method — never by bare name:
+`Naturals!{+ - * ^ \div % < > \leq \geq ..}`, unary minus at arity 1,
+`Sequences!{\o Len Head Tail Append}`, and `FiniteSets!Cardinality`.
+`Permutations` is still recognized separately by the SYMMETRY setup, from the
+syntax tree; C1.5 moves it into the registry.
+
+**Resolution order** matches `SpecProcessor`: an override beats the
+definition's TLA+ body, and only then is a body evaluated. This is not a
+preference — the vendored `Naturals.tla` defines `a+b == {a, b}` and
+`Nat == { }` as deliberate dummies for tools to override, so evaluating a
+standard body TLC overrides would silently produce garbage.
 
 **What is typed-unsupported.** Everything else a spec can reach, including
 `Nat`, `Int`, `Seq`, `SubSeq`, `SelectSeq`, `IsFiniteSet`, every `Bags`
 operator, and every `TLC` operator (`:>`, `@@`, `Assert`, `ToString`,
-`SortSeq`, `Print`, `PrintT`, `TLCGet`, `TLCSet`). A StandardModule operator
-with no native implementation returns a typed unsupported failure naming the
-operator — it never returns a plausible value.
+`SortSeq`, `Print`, `PrintT`, `TLCGet`, `TLCSet`). The failure names itself —
+`unsupported StandardModule operator: Naturals!Nat/0` — and never returns a
+value.
 
-**Definitions imported through `EXTENDS` cannot be evaluated** (unit-7
-finding), so a StandardModule operator that TLC does *not* override — the
-pin has exactly one reachable case, `Bags!SubBag` — has no working path
-either. C1.1 fixes both.
+**Definitions imported through `EXTENDS` now evaluate** (C1.1, closing the
+unit-7 finding). A module's inherited definitions are generated from their own
+module and layered under its own, so a local definition shadows an imported
+one. The single StandardModule operator the pin does *not* override,
+`Bags!SubBag`, therefore binds to its vendored body; evaluating it still needs
+recursive functions and multi-binder set constructors (unit-6.5 residue).
 
-**Four arithmetic results are wrong, not merely missing** (C1.2 owns them;
-regression fixtures `st-arith-errors`, `st-integers` are already frozen):
+**Arithmetic is at the pin's semantics** (C1.2). `\div` floors (Java's `q--`
+correction, so `(-7) \div 2 = -4`), `%` requires a **positive** divisor and
+returns a non-negative remainder (`(-7) % 3 = 2`), `^` follows `Expt`, and
+TLC's integers are 32-bit — `+ - * ^` raise EC 2178
+(`Overflow when computing 2147483647+1`) and a numeral above 2^31-1 raises
+EC 2265 (`TLC can't handle a number this big.`), which in TLC fails the whole
+run and here fails the expression that contains it. `\div` by zero is EC 2179,
+`0^0` is EC 2180, and a negative exponent or non-positive `%` divisor is
+EC 2169 with the pin's operand text.
 
-| expression | this port | pinned TLC |
-|---|---|---|
-| `(-7) \div 2` | `3` (`abs/abs`) | `-4` (floor division) |
-| `(-7) % 3` | `1` (`abs%abs`) | `2` (non-negative remainder) |
-| `5 % 0`, `5 % (-2)` | generic failure | EC 2169, "The second argument of % should be a positive number" |
-| `2147483647 + 1` | `2147483648` | EC 2178 overflow — TLC integers are 32-bit, and a literal ≥ 2^31 fails the whole load |
+`Nat` and `Int` are **non-enumerable set descriptors**, as they are in TLC
+(infinite `UserValue`s whose `member` is structural): `3 \in Nat`,
+`(-1) \in Nat`, `1..3 \subseteq Nat` all answer, quantifying over them is a
+typed failure rather than a hang, and a non-integer membership test raises
+EC 2158 with the pin's message.
 
-Error categories in general are approximate: the port does not yet emit the
-`TLC_MODULE_*` codes (2169, 2176, 2178, 2179, 2180, 2181, 2182, 2183, 2184,
-2266, 2283) the pin raises. They are pinned per operator in
+Error codes for the implemented operators are the pin's (2154, 2158, 2169,
+2178, 2179, 2180, 2265, 2266); the operators C1.3-C1.5 still owe carry their
+own codes (2176, 2181, 2182, 2183, 2184, 2283), pinned per operator in
 `desk/test-data/stdops/*/golden-ops.txt`.
+
+Differences that remain in this area, all failures rather than wrong values:
+
+| case | TLC | here |
+|---|---|---|
+| `Nat`/`Int` in a value position (`Expr == Nat`, `Cardinality(Nat)`) | a `UserValue` rendering `Nat`; `Cardinality(Nat)` is EC 2181 | typed rejection `unsupported StandardModule operator: Naturals!Nat/0` — there is no UserValue kind |
+| `S \cap Nat`, `S \cup Int` | evaluated lazily | rejected: set algebra takes value operands, and the infinite sets are descriptors |
+| quantifying over `Nat` | a long non-enumerable-quantifier-bound message naming the bound | `Attempted to enumerate the non-enumerable set Nat.` |
+| a non-integer argument to `+ - * ^ \div %` | fails inside the Java `MethodValue` cast, naming the method signature | the same EC (2154) with a normalized message: `The second argument of + should be an integer, but instead it is:` |
 
 **Excluded surfaces** (typed unsupported, by design): `TLCExt`, `Json`,
 `Toolbox`, `RealTime`, `Reals`, and the `_*` trace-expression modules;

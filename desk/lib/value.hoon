@@ -340,7 +340,8 @@
     %int    (render-int p.v)
     %str    :(weld (trip '"') (esc-str p.v) (trip '"'))
     %model  (trip p.v)
-    %intv   "{(render-int lo.v)}..{(render-int hi.v)}"
+    ::  tlc2's IntervalValue renders an empty interval as the empty set
+    %intv   ?:((slth hi.v lo.v) (trip '{}') "{(render-int lo.v)}..{(render-int hi.v)}")
       %seq
     "<<{(join-commas (turn p.v render))}>>"
       %set
@@ -684,6 +685,11 @@
       [%fcns dom=value rng=value]        ::  [D -> R]
       [%rcds fs=(list [k=@t s=value])]   ::  [a: S, b: T, ...]
       [%subset s=value]                  ::  SUBSET S
+      ::  the infinite StandardModule sets (unit 6C.2). tlc2 represents them
+      ::  as UserValues whose `member` is structural and whose `isFinite` is
+      ::  false: membership and \subseteq work, enumeration does not
+      [%nats ~]                          ::  Naturals!Nat
+      [%ints ~]                          ::  Integers!Int
   ==
 ::  one enumeration step: an element, or exhaustion
 +$  estep  $%  [%item v=value]  [%done ~]  ==
@@ -802,7 +808,19 @@
     =/  r  (elemsof-e s.x)
     ?:  ?=(%| -.r)  r
     [%& %subset p.r 0 ~ |]
+  ::
+    %nats  [%| (non-enumerable 'Nat')]
+    %ints  [%| (non-enumerable 'Int')]
   ==
+::
+++  non-enumerable
+  ::  tlc2 refuses to enumerate an infinite UserObj set (isFinite false):
+  ::  membership and \subseteq are answered structurally, quantification
+  ::  and materialization are errors
+  |=  nm=@t
+  ^-  eval-err
+  :-  0
+  (rap 3 ~['Attempted to enumerate the non-enumerable set ' nm '.'])
 ::
 ::  +|  Stepping The Cursor
 ::
@@ -991,6 +1009,7 @@
   ::  emptiness by one bounded step — never materializes the domain
   |=  x=sexp
   ^-  (each ? eval-err)
+  ?:  ?=(?(%nats %ints) -.x)  [%& |]
   =/  rc  (enum x)
   ?:  ?=(%| -.rc)  rc
   =/  st  (enum-next p.rc)
@@ -1036,7 +1055,30 @@
       %subset
     ?.  (set-like e)  [%& |]
     [%& (levy (set-elems e) |=(el=value (memb el s.x)))]
+  ::
+    %nats  (int-set-member e 'Nat')
+    %ints  (int-set-member e 'Int')
   ==
+::
+++  int-set-member
+  ::  membership in Nat / Int, mirroring tlc2.module.Naturals.member: an
+  ::  integer decides structurally, an untyped model value is not a member,
+  ::  a typed model value and any other kind are errors
+  |=  [e=value nm=@t]
+  ^-  (each ? eval-err)
+  ?:  ?=(%int -.e)
+    [%& ?:(=(nm 'Int') & !(slth p.e --0))]
+  ?:  ?=(%model -.e)
+    ?.  =(0 (mv-type p.e))
+      :-  %|
+      :-  0
+      %^  rap  3  'Attempted to check if the typed model value '
+      ~[p.e ' is an element of\0a' nm]
+    [%& |]
+  :-  %|
+  :-  2.158
+  %^  rap  3  'Attempted to check if the value:\0a'
+  ~[(crip (render e)) '\0ais an element of ' nm '.']
 ::
 ::  +|  Binders, Quantifiers, CHOOSE, Constructors, Control (unit 6.4)
 ::

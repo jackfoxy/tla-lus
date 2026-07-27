@@ -109,6 +109,56 @@ def sh(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
 
 
+def hoon_registry() -> tuple:
+    """The keys desk/lib/stdops.hoon claims: the override table, the
+    set-denoting operators (Nat, Int — lazy descriptors rather than values),
+    and the operators it allows to evaluate their vendored TLA+ body."""
+    text = (REPO / "desk/lib/stdops.hoon").read_text()
+    table = text.split("++  registry")[1].split("--")[0]
+    reg = set()
+    for m in re.finditer(r"\[\['([^']+)' '((?:[^'\\]|\\.)+)' (\d+)\]", table):
+        reg.add((m.group(1), m.group(2).replace("\\\\", "\\"), int(m.group(3))))
+    descriptors = text.split("++  set-descriptor")[1].split("--")[0]
+    for m in re.finditer(r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)", descriptors):
+        reg.add((m.group(1), m.group(2), int(m.group(3))))
+    bodies = set()
+    body_block = text.split("++  body-ok")[1].split("++")[0]
+    for m in re.finditer(r"\['([^']+)' '([^']+)'\]", body_block):
+        bodies.add((m.group(1), m.group(2)))
+    return reg, bodies
+
+
+def check_registry(rows: list) -> list:
+    """The C1.0 inventory binds the C1.1 implementation: every override row
+    must be an operator the pin really declares and classifies `required`,
+    and the body-evaluable set must be exactly the pin's un-overridden
+    (`body`) operators — otherwise a StandardModule dummy body could be
+    evaluated as if it were the behavior."""
+    reg, bodies = hoon_registry()
+    known = {(r[0], r[1], int(r[2])): r[8] for r in rows}
+    problems = []
+    for k in sorted(reg):
+        cls = known.get(k)
+        if cls is None:
+            # unary minus: the pin declares `-.` in Integers, the generator
+            # names the node `-`; accept the same name at another arity
+            if any(m == k[0] and n == k[1] for (m, n, _a) in known):
+                continue
+            problems.append(f"registry row {k[0]}!{k[1]}/{k[2]} is not a "
+                            f"declared operator at the pin")
+        elif cls != "required":
+            problems.append(f"registry row {k[0]}!{k[1]}/{k[2]} is classified "
+                            f"{cls}, not required")
+    want_bodies = {(r[0], r[1]) for r in rows if r[8] == "body"}
+    for k in sorted(want_bodies - bodies):
+        problems.append(f"{k[0]}!{k[1]} is classified body but stdops.hoon "
+                        f"does not allow its body to evaluate")
+    for k in sorted(bodies - want_bodies):
+        problems.append(f"stdops.hoon body-evaluates {k[0]}!{k[1]}, which the "
+                        f"pin overrides (its vendored body is a dummy)")
+    return problems
+
+
 def check_module_classes() -> list:
     """Every operator-bearing tlc2/module class must be in the dump's list."""
     listed = set(re.findall(r'"tlc2\.module\.(\w+)"',
@@ -272,6 +322,13 @@ def main() -> int:
     if unclassified:
         for r in unclassified:
             print(f"UNCLASSIFIED {r[0]}!{r[1]}/{r[2]}", file=sys.stderr)
+        return 1
+    problems = check_registry(rows)
+    reg, _bodies = hoon_registry()
+    print(f"{len(reg)} registry rows implemented in desk/lib/stdops.hoon")
+    if problems:
+        for p in problems:
+            print(f"REGISTRY {p}", file=sys.stderr)
         return 1
     print(f"TOTAL {n}")
     return 0

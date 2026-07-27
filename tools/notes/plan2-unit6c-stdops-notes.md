@@ -177,7 +177,103 @@ reflection/classpath discovery; the observable annotation semantics ride on
 `approved-difference` but now cite `st-string-order` and name C1.7 as the
 decision point. `check-parity.py --check` clean.
 
-## 7. Gotchas hit in C1.0
+## 7. C1.1 — registry mechanism and imported-definition evaluation
+
+Shape (`desk/lib/stdops.hoon`):
+
+- `op-key = [module=@t name=@t arity=@ud]`, `op-impl = [lazy level gate]`,
+  `registry = (map op-key op-impl)`.
+- `senv = [reg stds bodies]` is built **once per environment**
+  (`make-senv`, called from `base-env`/`make-env`) and carried on `eenv.ov`.
+  A constant arm is re-evaluated at every reference in Hoon, so calling
+  `registry` inside the evaluator would build a ~20-entry map per operator
+  application inside the BFS loop.
+- `stds` = the vendored StandardModule names (`~(key by standard-modules)`),
+  `bodies` = the pin's un-overridden operators (`Bags!SubBag`, `Bags!Sum`).
+
+Resolution in `eval-user`, mirroring `SpecProcessor`:
+
+1. registry hit on `[origin.def name arity]` → evaluate arguments, call gate;
+2. else if the origin is a StandardModule and not body-allowed → typed
+   rejection `unsupported StandardModule operator: <mod>!<op>/<arity>`;
+3. else evaluate the definition's body (user modules and body-allowed rows);
+4. no definition at all → `undefined operator: <name>`.
+
+Step 2 is the load-bearing one: without it, merging inherited definitions
+into the environment would make `Nat` evaluate to `{}` and `1 + 2` to
+`{1, 2}` — the vendored dummies.
+
+Origin tracking (`desk/lib/semantic.hoon`):
+
+- `sem-def` gained `origin=@t`; `sem-module` gained `imports=(list sem-def)`.
+  Neither is rendered, so the SemDump goldens are untouched (verified).
+- `ext-reach` computes the EXTENDS closure with **one reverse sweep** of the
+  dependency-first `sem-order` (in that order every module that extends M
+  precedes M when walked backwards). INSTANCE-only modules are excluded —
+  their definitions are visible only as the substituted (possibly prefixed)
+  copies `gen-module` already puts in the root's own defs.
+- `ext-defs` generates each inherited module from its own tree (spans stay in
+  that module's coordinates), skips LOCAL definitions, stamps the origin, and
+  keeps the first definer (Sequences re-exports Naturals' `+`, but the
+  operator belongs to Naturals — the module tlc2 binds the override through).
+  Imports are not level-checked: evaluation consumes bodies.
+- `defmap-of` layers imports first, own definitions second, so a root
+  definition shadows an imported one for free.
+
+Anti-drift: `gen-stdops-tests.py` parses `stdops.hoon` and fails unless every
+registry key is an operator the pin declares **and** classifies `required`,
+and the body-evaluable set equals exactly the inventory's `body` rows. The
+C1.0 inventory therefore binds the C1.1 implementation.
+
+Cost: `generate` now runs `gen-module` for every extended module. A `Bags`
+test case takes ~7 s (Bags EXTENDS TLC and instances Naturals). The checker
+generates once per run, so this lands in setup, not in the BFS; if test
+runtime becomes a problem the fix is a per-module generated-graph cache keyed
+by content hash (the parse cache already is).
+
+C1.1 gotchas:
+
+- `^$` inside a `=/` whose own `|-` has already closed resolves to the
+  **gate's** `$`, not the enclosing loop (`-find.ms`); use plain `$`.
+- A double-quoted Hoon tape interpolates `{…}`, so `"Cardinality({1})"` in a
+  test spec is a type error — write `Cardinality(1..3)`.
+- `expect-eq` compares types too: a `@tas` sample does not nest with
+  `?(%override %body %none %nograph)`; type the expectation as the union.
+
+## 8. C1.2 — Naturals and Integers
+
+Semantics taken straight from the pinned Java:
+
+| operator | rule |
+|---|---|
+| `\div` | `q = fra(x, y)` (truncates toward zero), then `q--` when `q < 0` and `q * y /= x` |
+| `%` | divisor must be **positive** (EC 2169), remainder `rem(x, y)` lifted by `y` when negative |
+| `^` | negative exponent → EC 2169 "natural number"; `0^0` → EC 2180; range check per multiplication |
+| `+ - * ^` | 32-bit range; EC 2178 `Overflow when computing <a><op><b>` |
+| unary `-` | only `-2147483648` overflows; the pin's message is the literal `--2147483648` |
+| numeral literal | above 2^31-1 → EC 2265 (fails the whole run in TLC, the expression here) |
+| `<` `>` `\leq` `\geq` | explicit checks → EC 2266 ("an integer") |
+| `+ - * \div % ^` on a non-integer | the pin fails in the `MethodValue` cast (EC 2154) naming the Java signature; normalized here |
+
+`Nat`/`Int` are **not values**. tlc2 represents them as infinite `UserValue`s
+whose `member` is structural and whose `isFinite` is false. Here they are new
+`sexp` variants `%nats`/`%ints`:
+
+- `sexp` is the flat, non-recursive lazy-set union, so extending it is safe;
+  extending the recursive `value` union is the documented mold hazard.
+- `set-member` mirrors `Naturals.member`: an integer decides, an untyped model
+  value is not a member, a typed model value and any other kind are errors
+  (EC 2158 with the pin's message).
+- `set-empty` answers without enumerating; `enum` returns a typed
+  non-enumerable failure, so `\A x \in Nat : …` fails instead of hanging.
+- `eval-domain` reaches them through `set-descriptor:stdops`, keyed by the
+  same `[module name arity]`; the registry itself stays value-only, so a
+  value position (`Expr == Nat`, `Cardinality(Nat)`) is a typed rejection.
+
+Side finding: an empty interval must render `{}` (`IntervalValue.toString`),
+which the port was printing as `5..1`.
+
+## 9. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.
