@@ -163,12 +163,10 @@ Constant TLA+ expressions evaluate to canonical values matching the TLC REPL
 (`tlc2.REPL`) across the corpus. One deliberate divergence:
 
 - **String ordering.** TLC orders `StringValue`s by their internal
-  `UniqueString` id — the order strings were first interned during the run —
-  which is not lexicographic and not reproducible without replicating the
-  interning table. Strings (and record fields, and string-set elements) are
-  ordered **lexicographically** here. This agrees with the oracle on ordinary
-  string sets (e.g. `{"a", "b"}`) but can differ on adversarial cases such as
-  `{"bb", "a", "ab"}`.
+  `UniqueString` id; this port orders lexicographically. The divergence was
+  measured and approved at subunit C1.7 — see *Unit 6C (C1.7) — string and
+  model-value order* below for the evidence, the full consequence list, and
+  what a result can and cannot be read to mean.
 
 Not yet ported (later unit-9 increments): `.cfg` config parsing (keywords,
 constant/model-value assignments, `SPECIFICATION`/`INIT`/`NEXT`, invariants,
@@ -190,6 +188,59 @@ modules only for now):
   (`$SubstIn`, `APSubstIn`), proof/theorem/assume expression bodies, and
   subexpression `!`-navigation are not yet translated into the semantic
   graph (they parse correctly at unit 4).
+
+## Unit 6C (C1.7) — string and model-value order (family 5)
+
+`StringValue.compareTo` and `ModelValue.compareTo` in tlc2 compare the
+`UniqueString` **tok**: the position at which the string was first interned
+during that run. `ModelValue.fingerPrint` folds the tok as well. This port has
+no intern table — strings are atoms — and orders **lexicographically**.
+
+**The measurement** (`tools/oracle/InternDump.java`, evidence regenerated into
+`desk/test-data/stdops/intern-order.txt`):
+
+- The intern table starts empty; SANY then interns **399 strings** for a
+  10-line fixture before the module's own lexemes are reached — 112
+  syntax-tree kind names (`N_*`), 49 internal operator names and sentinels
+  (`$…`, `nullODN`, `LAMBDA`), and the builtin operator table — and the TLC
+  phase adds 12 more (`beginLine`, `_action`, the config's model values, …).
+- Each driver is deterministic, **but different drivers disagree**. The same
+  fixture, same jar, same JVM: a `FastTool` alone renders `Longer` as
+  `{"aa", "ab", "b", "z"}`, while SANY-then-`FastTool` renders
+  `{"ab", "b", "z", "aa"}` — and `CHOOSE x \in MS : TRUE` returns `zz` under
+  the first driver and `aa` under the second.
+
+So the order is a property of the *run*, not of the specification.
+Reproducing it would mean mirroring every interning call site inside SANY and
+TLC **and** fixing which Java entry point runs — a permanent coupling to
+tool-internal execution order, for behavior TLA+ itself does not define.
+The divergence is therefore approved, and this port's order is the same on
+every run, machine, and pipeline.
+
+**What differs**, all fixed by `tests/lib/strorder`:
+
+| surface | tlc2 | here |
+|---|---|---|
+| element order of a string set | interning order (`{"bb", "a", "ab"}`) | lexicographic (`{"a", "ab", "bb"}`) |
+| `CHOOSE` over a string or model-value set | the first interned element | the lexicographically smallest |
+| record field order in a rendering, and `DOMAIN` of a record | interning order | lexicographic |
+| element order of a model-value set | interning/config order | lexicographic |
+| `SortSeq` with a comparator over strings | follows `compareTo` | follows the lexicographic order |
+| `ModelValue.fingerPrint` | folds the tok | folds the name (injective, not byte-identical) |
+| symmetry orbit representative | lex-smallest by `compareTo` | lex-smallest by this port's total value order |
+
+**What does not differ**: membership, equality, cardinality, deduplication,
+and every verdict that does not depend on *which* element of an unordered set
+is looked at first. Distinct-state counts under symmetry match, because the
+orbit is the same set however its representative is chosen — only the stored
+representative's fingerprint bytes may differ.
+
+**What a result means.** A trace, a counterexample, or a rendered value from
+this port lists set elements in lexicographic order; TLC would list the same
+elements in its own run-dependent order. Where a spec's *outcome* depends on
+which element `CHOOSE` picks from a string or model-value set, the two tools
+may report different witnesses — as two TLC drivers already do — and neither
+answer is more correct: TLA+ leaves it unspecified.
 
 ## Unit P2-3 — Typed semantic graph (increment 3a)
 

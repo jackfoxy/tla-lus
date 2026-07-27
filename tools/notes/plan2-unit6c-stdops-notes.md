@@ -414,7 +414,42 @@ Properties now tested (`tests/lib/regprop`):
   its argument list;
 - unclaimed operators stay typed rejections.
 
-## 13. Gotchas hit in C1.0
+## 13. C1.7 — family 5, measured and decided
+
+`tools/oracle/InternDump.java`: three-phase intern dump (BASELINE / SANY /
+TOOL) plus a `--values` mode printing the `tok` behind every value.
+
+Measurement on `st-string-order` (10 lines):
+
+- BASELINE 0 — the table is empty before the spec is read, so nothing depends
+  on JVM startup or class-loading noise.
+- SANY interns **399**: 112 `N_*` syntax-tree kind names, 49 internal
+  operator names and sentinels (`$…`, `nullODN`, `LAMBDA`), and the builtin
+  operator table, then the module's own lexemes in source order.
+- TOOL adds 12 (`beginLine`, `_action`, the config's model values, …).
+
+The decisive fact: **each driver is deterministic, but drivers disagree.**
+Same fixture, jar, and JVM —
+
+| definition | FastTool alone | SANY, then FastTool |
+|---|---|---|
+| `Longer` | `{"aa", "ab", "b", "z"}` | `{"ab", "b", "z", "aa"}` |
+| `Models` | `{zz, aa, mm}` | `{aa, zz, mm}` |
+| `ChModel` (a CHOOSE) | `zz` | `aa` |
+
+So the order is a property of the run, not of the spec, and "reproduce the
+interning order" is not even well defined without also fixing which Java
+entry point runs. **Decision: approve the divergence.** Lexicographic order
+is deterministic per spec and independent of the pipeline.
+
+Evidence is regenerated into `desk/test-data/stdops/intern-order.txt` (both
+drivers side by side, byte-reproducible). `tests/lib/strorder` fixes the
+boundary: agreement cases, the adversarial sets, `CHOOSE`, record fields and
+`DOMAIN`, model values, and the invariants that do not move (membership,
+equality, cardinality, dedup). `compatibility.md` carries the surface-by-
+surface table and the statement of what a result means.
+
+## 14. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.
