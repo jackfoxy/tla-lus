@@ -139,6 +139,15 @@
     ::  a bag literal is written with them)
     [['TLC' ':>' 2] [| 0 |=(a=(list value:v) (make-fcn a))]]
     [['TLC' '@@' 2] [| 0 |=(a=(list value:v) (combine-fcn a))]]
+    ::  TLC (C1.5). The side-effecting and engine-state operators are typed
+    ::  rejections that name what they would need, never silent no-ops
+    [['TLC' 'Assert' 2] [| 0 |=(a=(list value:v) (assert-op a))]]
+    [['TLC' 'ToString' 1] [| 0 |=(a=(list value:v) (to-string a))]]
+    [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
+    [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
+    [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
+    [['TLC' 'TLCGet' 1] [| 0 |=(a=(list value:v) (tlc-get a))]]
+    [['TLC' 'TLCSet' 2] [| 0 |=(a=(list value:v) (tlc-set a))]]
   ==
 ::
 ::  FiniteSets!Cardinality and !IsFiniteSet are `node-op`s, not rows: their
@@ -315,6 +324,7 @@
   ?:  =(k ['Bags' 'BagOfAll' 2])  `%bag-of-all
   ?:  =(k ['FiniteSets' 'Cardinality' 1])  `%cardinality
   ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `%is-finite-set
+  ?:  =(k ['TLC' 'SortSeq' 2])  `%sort-seq
   ~
 ::
 ++  dotdot
@@ -709,4 +719,113 @@
       a  [[d.i.m n] (skip a |=(pr=vpair:v (equal:v d.pr d.i.m)))]
     ==
   $(l t.l, acc merged)
+::  +|  TLC Module (subunit C1.5)
+::
+++  assert-op
+  ::  TLC!Assert: TRUE passes through, anything else is EC 2132 naming the
+  ::  second argument
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'Assert expects two arguments.']
+  ?:  ?&(?=(%bool -.i.as) p.i.as)  [%& i.as]
+  :-  %|
+  :-  2.132
+  %^  rap  3  'The first argument of Assert evaluated to FALSE; '
+  ~['the second argument was: ' (crip (render:v i.t.as))]
+::
+++  to-string
+  ::  TLC!ToString: the canonical rendering, as a string value
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'ToString expects one argument.']
+  [%& [%str (crip (render:v i.as))]]
+::
+++  permutations
+  ::  TLC!Permutations(S): every bijection of a finite set onto itself, as
+  ::  functions. The empty set has one permutation, the empty function
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'Permutations expects one argument.']
+  ?.  (set-like:v i.as)
+    [%| (wrong-value-error 'Permutations' 'a finite set' i.as)]
+  =/  es  (set-elems:v (normalize:v i.as))
+  :-  %&
+  %-  normalize:v
+  :-  %set
+  %+  turn  (orderings es)
+  |=  perm=(list value:v)
+  ^-  value:v
+  [%fcn (zip-pairs es perm)]
+::
+++  zip-pairs
+  |=  [ds=(list value:v) rs=(list value:v)]
+  ^-  (list vpair:v)
+  ?~  ds  ~
+  ?~  rs  ~
+  [[i.ds i.rs] $(ds t.ds, rs t.rs)]
+::
+++  orderings
+  ::  every ordering of a list, in a deterministic order
+  |=  vs=(list value:v)
+  ^-  (list (list value:v))
+  ?~  vs  ~[~]
+  %-  zing
+  %+  turn  `(list value:v)`vs
+  |=  x=value:v
+  =/  rest  (skip `(list value:v)`vs |=(y=value:v (equal:v x y)))
+  %+  turn  ^$(vs rest)
+  |=(r=(list value:v) [x r])
+::
+++  print-op
+  ::  TLC!Print / TLC!PrintT write to TLC's console. Gall owns effects here
+  ::  and the evaluation path has no output channel yet, so this is a typed
+  ::  rejection naming what is missing — never a silent no-op that returns
+  ::  the value (plan-2 invariant 8)
+  |=  [nm=@t as=(list value:v)]
+  ^-  eres
+  :-  %|
+  :-  0
+  %^  rap  3  'unsupported StandardModule operator: TLC!'
+  ~[nm '; it writes to the TLC console and this engine has no output channel']
+::
+++  tlc-get-keys
+  ::  the named TLCGet values the pin defines (tlc2.module.TLCGetSet)
+  ^-  (set @t)
+  %-  silt
+  ^-  (list @t)
+  :~  'diameter'  'distinct'  'queue'  'duration'  'generated'  'level'
+      'config'  'spec'  'coverage'  'action'  'install'  'id'  'behavior'
+      'all'  'all:named'  'mode'  'deadlock'  'seed'  'fingerprint'
+      'worker'  'traces'  'depth'  'aril'  'sched'  'revision'  'stats'
+      'exit'  'pause'
+  ==
+::
+++  tlc-get
+  ::  TLCGet(k): a key the pin does not define is EC 2145, exactly as there;
+  ::  a defined key would report engine state the evaluator cannot reach, so
+  ::  it is a typed rejection naming the key rather than a plausible number
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'TLCGet expects one argument.']
+  ?:  ?=(%int -.i.as)
+    [%| 2.145 (rap 3 ~['TLCGet(' (crip (render:v i.as)) ') was undefined.'])]
+  ?.  ?=(%str -.i.as)
+    [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
+  ?.  (~(has in tlc-get-keys) p.i.as)
+    [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
+  :-  %|
+  :-  0
+  %^  rap  3  'unsupported StandardModule operator: TLC!TLCGet; the key '
+  ~[p.i.as ' reports engine state the evaluator cannot reach']
+::
+++  tlc-set
+  ::  TLCSet(k, v) mutates engine state: a typed rejection, never a silent
+  ::  TRUE
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'TLCSet expects two arguments.']
+  :-  %|
+  :-  0
+  %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet; '
+  ~['it mutates engine state, which this evaluator does not own']
 --

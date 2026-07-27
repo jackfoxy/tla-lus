@@ -91,8 +91,8 @@ TLC|PrintT|1|public|TLC.PrintT|Value|-|GENERAL|required|typed engine output chan
 TLC|RandomElement|1|public|TLC.RandomElement|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|deferred|TLC RandomGenerator parity is unit 9
 TLC|SortSeq|2|public|TLC.SortSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|order-sensitive; pinned after the family-5 decision (C1.5/C1.7)
 TLC|TLCEval|1|public|TLCEval.tlcEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCEval,minLevel=0,warn=false)|-|deferred|needs the Evaluation/laziness contract (C1.6)
-TLC|TLCGet|1|public|TLCGetSet.TLCGetEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCGet,minLevel=1,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR,TLC_MODULE_TLCGET_UNDEFINED|deferred|engine run statistics; supported keys decided in C1.5
-TLC|TLCSet|2|public|TLCGetSet.TLCSet|Value,Value|TLAPlusOperator(TLC!TLCSet,minLevel=0,warn=false)|GENERAL,TLC_MODULE_ARGUMENT_ERROR|deferred|engine run statistics; supported keys decided in C1.5
+TLC|TLCGet|1|public|TLCGetSet.TLCGetEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCGet,minLevel=1,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR,TLC_MODULE_TLCGET_UNDEFINED|required|C1.5 implements the key taxonomy and EC 2145; an engine-state read is a typed rejection naming the key
+TLC|TLCSet|2|public|TLCGetSet.TLCSet|Value,Value|TLAPlusOperator(TLC!TLCSet,minLevel=0,warn=false)|GENERAL,TLC_MODULE_ARGUMENT_ERROR|required|C1.5 implements the rejection; it mutates engine state the evaluator does not own
 TLC|ToString|1|public|TLC.ToString|Value|-|-|required|canonical rendering already owned by value.hoon (C1.5)
 TLCExt|AssertEq|2|public|-|-|-|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
 TLCExt|AssertError|2|public|TLCExt.assertError|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!AssertError,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)

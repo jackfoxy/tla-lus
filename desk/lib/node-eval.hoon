@@ -678,6 +678,7 @@
   ?:  ?=(%bag-of-all tag)     (eval-bag-of-all n e)
   ?:  ?=(%cardinality tag)    (eval-cardinality n e)
   ?:  ?=(%is-finite-set tag)  (eval-is-finite n e)
+  ?:  ?=(%sort-seq tag)       (eval-sort-seq n e)
   ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
   ?.  ?=([* * ~] args.n)
     [%| 0 'SelectSeq expects two arguments.']
@@ -792,6 +793,46 @@
     l    t.l
     acc  [[p.r n2] (skip acc |=(pr=vpair:v (equal:v d.pr p.r)))]
   ==
+::
+++  eval-sort-seq
+  ::  TLC!SortSeq(s, cmp): tlc2's insertion sort, with the comparator applied
+  ::  by the evaluator (an operator argument). The first-argument message
+  ::  really does say "natural number" in the pin
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* * ~] args.n)  [%| 0 'SortSeq expects two arguments.']
+  =/  sv  (eval i.args.n e)
+  ?:  ?=(%| -.sv)  sv
+  =/  t  (to-tuple:v p.sv)
+  ?~  t  [%| (arg-error:so 2.169 1 'SortSeq' 'natural number' | p.sv)]
+  ?~  u.t  [%& [%seq ~]]
+  =/  od  (resolve-oparg i.t.args.n e)
+  ?~  od  [%| (op-arg-error 'SortSeq' 'operator' i.t.args.n)]
+  ::  insert each element into the sorted prefix, exactly as tlc2 does, so
+  ::  equal elements keep their relative order
+  =/  els=(list value:v)  u.t
+  =|  acc=(list value:v)
+  |-  ^-  eres
+  ?~  els  [%& [%seq acc]]
+  =/  ins  (sort-insert u.od i.els acc e)
+  ?:  ?=(%| -.ins)  ins
+  $(els t.els, acc p.ins)
+::
+++  sort-insert
+  ::  place `x` in the already-sorted `done`, walking back while the
+  ::  comparator says the new element precedes the one before it
+  |=  [d=sem-def:sm x=value:v done=(list value:v) e=eenv]
+  ^-  (each (list value:v) eval-err:v)
+  =|  head=(list value:v)
+  =/  rest  (flop done)
+  |-  ^-  (each (list value:v) eval-err:v)
+  ?~  rest  [%& [x head]]
+  =/  r  (apply-def d ~[x i.rest] e)
+  ?:  ?=(%| -.r)  r
+  ?.  ?=(%bool -.p.r)
+    [%| 2.169 'The second argument of SortSeq should be a boolean function, but instead it is:\0a<Operator>']
+  ?.  p.p.r  [%& (weld (flop rest) [x head])]
+  $(rest t.rest, head [i.rest head])
 ::
 ++  op-arg-error
   ::  EC 2169 for an operator argument: tlc2 renders the OpValue, which has

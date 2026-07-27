@@ -1143,7 +1143,9 @@
   ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
   ::  symmetry group (SYMMETRY); combined with a temporal property it is an
   ::  unsafe combination TLC rejects (WU8 owns liveness under symmetry)
-  =/  perms  (symmetry-perms:check tree symmetry.rs consts)
+  =/  pr  (symmetry-perms:check defs consts vars symmetry.rs)
+  ?:  ?=(%| -.pr)  (finish j [%failed p.pr] pre)
+  =/  perms  p.pr
   ?:  &(?=(^ perms) ?=(^ pp))
     (finish j [%failed 'unsupported: symmetry with a temporal property (unit 8)'] pre)
   =/  isb  (sem-body:check defs u.in)

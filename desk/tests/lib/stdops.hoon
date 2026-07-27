@@ -95,12 +95,13 @@
   (val (one "EXTENDS Naturals" ~["Expr == 1 + 2"]) 'Expr' "3")
 ::
 ++  test-unimplemented-operator-names-itself
-  ::  a declared-but-unimplemented StandardModule operator (the TLC module is
-  ::  C1.5's) names itself rather than evaluating its vendored body
+  ::  a declared-but-unimplemented StandardModule operator names itself
+  ::  rather than evaluating its vendored body. TLCEval is C1.6's (it needs
+  ::  the Evaluation/laziness contract)
   %-  val
-  :+  (one "EXTENDS TLC" ~["Expr == ToString(1)"])
+  :+  (one "EXTENDS Integers, TLC" ~["Expr == TLCEval(1)"])
     'Expr'
-  "ERR: unsupported StandardModule operator: TLC!ToString/1"
+  "ERR: unsupported StandardModule operator: TLC!TLCEval/1"
 ::
 ::  +|  Body-Evaluable Standard Operators
 ::
@@ -155,7 +156,8 @@
 ::
 ++  test-registry-row-count
   ::  a drift alarm: the count changes only when a subunit adds operators
-  ::  (C1.1 seeded 18, C1.3 added SubSeq, C1.4 added 11 Bags rows and the two
-  ::  TLC function constructors, and moved Cardinality to a node-op)
-  (expect-eq !>(31) !>(~(wyt by registry:so)))
+  ::  (C1.1 seeded 18, C1.3 added SubSeq, C1.4 added 11 Bags rows plus the
+  ::  two TLC function constructors and moved Cardinality to a node-op,
+  ::  C1.5 added the seven remaining TLC value-shaped rows)
+  (expect-eq !>(38) !>(~(wyt by registry:so)))
 --

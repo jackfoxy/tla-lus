@@ -311,60 +311,45 @@
 ::
 ++  elems  elems:ev
 ::
-++  perms-of
-  ::  every permutation (ordering) of a list of distinct names
-  |=  l=(list @t)
-  ^-  (list (list @t))
-  ?~  l  ~[~]
-  %-  zing
-  %+  turn  `(list @t)`l
-  |=  x=@t
-  =/  rest  (skip `(list @t)`l |=(y=@t =(y x)))
-  %+  turn  (perms-of rest)
-  |=(p=(list @t) `(list @t)`[x p])
-::
-++  all-perms
-  ::  the symmetry group as name-to-name bijections over the model values
-  |=  names=(list @t)
-  ^-  (list (map @t @t))
-  %+  turn  (perms-of names)
-  |=  perm=(list @t)
-  ^-  (map @t @t)
-  =|  m=(map @t @t)
-  =/  ns  names
-  |-  ^-  (map @t @t)
-  ?~  ns  m
-  ?~  perm  m
-  $(ns t.ns, perm t.perm, m (~(put by m) i.ns i.perm))
-::
-++  model-names
-  ::  the model-value names of a set value (empty for a non-model set)
+++  perms-of-value
+  ::  a set of functions over model values, as the name-to-name bijections
+  ::  the orbit machinery uses (unit 6C.5). ~ when a function is not a
+  ::  model-value permutation
   |=  v=value
-  ^-  (list @t)
+  ^-  (unit (list (map @t @t)))
   ?.  ?=(%set -.v)  ~
-  %+  murn  p.v
-  |=(e=value ?:(?=(%model -.e) `p.e ~))
+  =|  out=(list (map @t @t))
+  =/  fs  p.v
+  |-  ^-  (unit (list (map @t @t)))
+  ?~  fs  `(flop out)
+  ?.  ?=(%fcn -.i.fs)  ~
+  =/  one
+    =|  m=(map @t @t)
+    =/  ps  p.i.fs
+    |-  ^-  (unit (map @t @t))
+    ?~  ps  `m
+    ?.  ?&(?=(%model -.d.i.ps) ?=(%model -.r.i.ps))  ~
+    $(ps t.ps, m (~(put by m) p.d.i.ps p.r.i.ps))
+  ?~  one  ~
+  $(fs t.fs, out [u.one out])
 ::
 ++  symmetry-perms
-  ::  the permutation group for the SYMMETRY operator, recognizing
-  ::  Permutations(S) over a config model-value set S (a union of Permutations
-  ::  and non-constant argument sets are a documented residue). ~ = no symmetry.
-  |=  [tree=node sym=(unit @t) consts=(map @t value)]
-  ^-  (list (map @t @t))
-  ?~  sym  ~
-  =/  body  (body-of-def tree u.sym)
-  ?~  body  ~
-  =/  b  u.body
-  ?.  (is-kind b %n-opapplication)  ~
-  =/  kids  (kids-of b)
-  ?.  (gte (lent kids) 2)  ~
-  ?.  =('Permutations' (genid-name (snag 0 kids)))  ~
-  =/  args  (elems (snag 1 kids))
-  ?~  args  ~
-  ?.  (is-kind i.args %n-generalid)  ~
-  =/  sv  (~(get by consts) (genid-name i.args))
-  ?~  sv  ~
-  (all-perms (model-names u.sv))
+  ::  the permutation group for the SYMMETRY operator. The definition is
+  ::  EVALUATED (so `Permutations` is the registry override, one
+  ::  implementation shared with every other caller) and its value read as
+  ::  model-value bijections; a definition that does not denote such a set
+  ::  is a typed rejection rather than a silent loss of reduction
+  |=  [defs=(map @t sem-def:sem-lib) consts=(map @t value) vars=(set @t) sym=(unit @t)]
+  ^-  (each (list (map @t @t)) @t)
+  ?~  sym  [%& ~]
+  =/  b  (sem-body defs u.sym)
+  ?~  b  [%| (rap 3 ~['SYMMETRY operator is not defined: ' u.sym])]
+  =/  r  (eval:ne u.b (make-env:ne defs consts vars))
+  ?:  ?=(%| -.r)  [%| msg.p.r]
+  =/  ps  (perms-of-value p.r)
+  ?~  ps
+    [%| (rap 3 ~['SYMMETRY ' u.sym ' is not a set of model-value permutations'])]
+  [%& u.ps]
 ::
 ++  cfg-names
   ::  the INIT/NEXT/first-INVARIANT/first-PROPERTY names from a .cfg via
@@ -1024,7 +1009,9 @@
   =/  cons   (resolve-bodies defs constraints.ca)
   =/  acons  (resolve-bodies defs action-constraints.ca)
   =/  ddl    !=(%false deadlock.ca)
-  =/  perms  (symmetry-perms tree symmetry.ca consts)
+  =/  pr  (symmetry-perms defs consts vars symmetry.ca)
+  ?:  ?=(%| -.pr)  [%| p.pr]
+  =/  perms  p.pr
   ::  symmetry with a temporal property is an unsafe combination (WU8 owns
   ::  liveness under symmetry); TLC rejects it, so we do too
   ?:  &(?=(^ perms) ?=(^ pp))

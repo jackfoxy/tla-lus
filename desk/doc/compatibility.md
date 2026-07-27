@@ -690,15 +690,21 @@ classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
 required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
 lands with C1.8.
 
-**What evaluates today** (C1.1-C1.4). Thirty-eight operator keys, resolved by
+**What evaluates today** (C1.1-C1.5). Forty-six operator keys, resolved by
 `[module operator arity]` as tlc2 binds a Java method — never by bare name:
 `Naturals!{+ - * ^ \div % < > \leq \geq ..}` and unary minus at arity 1;
 all eight declared `Sequences` operators (`\o Len Head Tail Append SubSeq
 SelectSeq Seq`); both `FiniteSets` operators; every overridden `Bags`
-operator; `TLC!{:> @@}`; and the three non-enumerable set descriptors `Nat`,
-`Int`, and `Seq(S)`. The rest of the `TLC` module (`Assert`, `ToString`,
-`SortSeq`, `Print`/`PrintT`, `Permutations`) is C1.5's; `Permutations` is
-still recognized separately by the SYMMETRY setup, from the syntax tree.
+operator; the `TLC` module's pure operators (`:>`, `@@`, `Assert`,
+`ToString`, `Permutations`, `SortSeq`); and the three non-enumerable set
+descriptors `Nat`, `Int`, and `Seq(S)`. SYMMETRY evaluates its definition
+through the same registry, so `Permutations` has one implementation.
+
+`Print`, `PrintT`, `TLCGet`, and `TLCSet` are **typed rejections that name
+what is missing**, never silent no-ops: the first two write to TLC's console
+and this engine has no output channel on the evaluation path; the last two
+read and mutate engine state the evaluator does not own. `TLCGet` still
+reproduces the pin's EC 2145 for a key TLC itself does not define.
 
 `Cardinality` and `IsFiniteSet` take their argument as a lazy *set*, so
 `IsFiniteSet(Nat)` is FALSE and `Cardinality(Nat)` is EC 2181 — the infinite

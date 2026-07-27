@@ -343,7 +343,39 @@ Rendering facts the fixtures exposed (both now matched):
 - a one-point function with domain `{1}` renders as a tuple (`<<2>>`), since
   the tuple form is chosen by a contiguous 1..n domain, not by size.
 
-## 11. Gotchas hit in C1.0
+## 11. C1.5 — the TLC module
+
+Pure operators: `Assert` (EC 2132), `ToString`, `Permutations`, `SortSeq`
+(tlc2's insertion sort — stable for equal elements — with the comparator
+applied by the evaluator, so a third `node-op`), plus `:>`/`@@` from C1.4.
+
+**SYMMETRY now evaluates rather than pattern-matches.** `check.hoon`'s
+`symmetry-perms` read `Permutations(S)` out of the CST and looked S up in the
+config map; it now evaluates the SYMMETRY definition in the ordinary
+environment and reads the resulting set of functions as model-value
+bijections (`perms-of-value`). Consequences:
+
+- the registry's `Permutations` is the single implementation;
+- a SYMMETRY definition that is not a set of model-value permutations is a
+  typed rejection, where it used to silently mean "no symmetry";
+- `job.hoon`'s `do-config` follows the same path.
+
+Side effects and engine state are typed rejections that say what is missing:
+
+- `Print`/`PrintT` — the evaluation path returns a value, not events, and
+  Gall owns effects; a no-op returning the value is exactly what plan-2
+  invariant 8 forbids. An engine output channel is the residue.
+- `TLCGet` — the pin's **EC 2145** for a key `TLCGetSet` does not define (and
+  for an integer register), and a named rejection for a key it does define,
+  since the evaluator cannot reach run statistics.
+- `TLCSet` — rejected; it mutates engine state.
+
+The anti-drift cross-check earned its keep here: `TLCGet`/`TLCSet` were
+classified `deferred` at C1.0 while the registry now claims them. They were
+reclassified `required` (with the plan's own wording) rather than relaxing
+the check.
+
+## 12. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.
