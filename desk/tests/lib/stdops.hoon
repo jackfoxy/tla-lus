@@ -85,19 +85,23 @@
     'Expr'
   "ERR: unsupported StandardModule operator: Naturals!Nat/0"
 ::
-++  test-nat-binding-none
-  (bind (one "EXTENDS Naturals" ~["Expr == Nat"]) 'Nat' 0 %none)
+++  test-nat-binding-override
+  ::  C1.2 implements Nat as a set descriptor, so it binds to an override
+  ::  (its value position is still a typed rejection — see tests/lib/arith)
+  (bind (one "EXTENDS Naturals" ~["Expr == Nat"]) 'Nat' 0 %override)
 ::
 ++  test-plus-is-not-its-dummy-body
   ::  `a+b == {a, b}` in Naturals.tla; the override must win
   (val (one "EXTENDS Naturals" ~["Expr == 1 + 2"]) 'Expr' "3")
 ::
-++  test-subseq-unsupported-named
-  ::  a declared-but-unimplemented Sequences operator names itself
+++  test-unimplemented-operator-names-itself
+  ::  a declared-but-unimplemented StandardModule operator (FiniteSets is
+  ::  C1.4's) names itself rather than evaluating its vendored body
   %-  val
-  :+  (one "EXTENDS Sequences" ~["Expr == SubSeq(<<1, 2>>, 1, 1)"])
+  ::  `..` comes from Naturals, which FiniteSets does not re-export
+  :+  (one "EXTENDS Integers, FiniteSets" ~["Expr == IsFiniteSet(1..2)"])
     'Expr'
-  "ERR: unsupported StandardModule operator: Sequences!SubSeq/3"
+  "ERR: unsupported StandardModule operator: FiniteSets!IsFiniteSet/1"
 ::
 ::  +|  Body-Evaluable Standard Operators
 ::
@@ -151,5 +155,7 @@
   (expect-eq !>(*(list op-key:so)) !>(missing))
 ::
 ++  test-registry-row-count
-  (expect-eq !>(18) !>(~(wyt by registry:so)))
+  ::  a drift alarm: the count changes only when a subunit adds operators
+  ::  (C1.1 seeded 18, C1.2 added none, C1.3 added SubSeq)
+  (expect-eq !>(19) !>(~(wyt by registry:so)))
 --

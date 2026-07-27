@@ -206,7 +206,12 @@
   ::  has a lazy descriptor here, though it is not a value (unit 6C.2)
   =/  d  (~(get by ops.e) nm)
   ?~  d  (as-sexp (eval n e))
-  =/  sd  (set-descriptor:so [origin.u.d nm (lent args.n)])
+  =/  key=op-key:so  [origin.u.d nm (lent args.n)]
+  ?.  (is-descriptor:so key)  (as-sexp (eval n e))
+  ::  Seq(S) carries its range, so the arguments are evaluated first
+  =/  as  (eval-args args.n e)
+  ?:  ?=(%| -.as)  as
+  =/  sd  (set-descriptor:so key p.as)
   ?~  sd  (as-sexp (eval n e))
   [%& u.sd]
 ::
@@ -648,6 +653,9 @@
     =/  as  (eval-args args.n e)
     ?:  ?=(%| -.as)  as
     (gate.u.ov p.as)
+  ::  an override that needs the evaluator itself (an operator argument)
+  =/  nop  (node-op:so key)
+  ?^  nop  (eval-node-op u.nop n e)
   ?:  ?&  (is-standard:so ov.e origin.def)
           !(body-allowed:so ov.e origin.def nm)
       ==
@@ -660,6 +668,61 @@
   ?:  ?=(%| -.e2)  e2
   (eval u.body.def p.e2(fuel (dec fuel.e)))
 ::
+++  eval-node-op
+  ::  StandardModule overrides that take an operator argument. tlc2 receives
+  ::  an OpValue and applies it per element; here the operator argument is
+  ::  resolved through the ordinary operator-valued-parameter path and
+  ::  applied by the same evaluator, under the same recursion budget
+  |=  [tag=@tas n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
+  ?.  ?=([* * ~] args.n)
+    [%| 0 'SelectSeq expects two arguments.']
+  =/  sv  (eval i.args.n e)
+  ?:  ?=(%| -.sv)  sv
+  =/  t  (to-tuple:v p.sv)
+  ?~  t  [%| (arg-error:so 2.169 1 'SelectSeq' 'sequence' | p.sv)]
+  ::  an empty sequence is answered before the operator is even examined
+  ?~  u.t  [%& [%seq ~]]
+  =/  od  (resolve-oparg i.t.args.n e)
+  ?~  od  [%| (op-arg-error 'SelectSeq' 'operator' i.t.args.n)]
+  =/  keep
+    ::  widen: `u.t` is narrowed to a non-empty list, which would make the
+    ::  loop's `?~` vain
+    =/  els=(list value:v)  u.t
+    =|  acc=(list value:v)
+    |-  ^-  (each (list value:v) eval-err:v)
+    ?~  els  [%& (flop acc)]
+    =/  r  (apply-def u.od ~[i.els] e)
+    ?:  ?=(%| -.r)  r
+    ?.  ?=(%bool -.p.r)
+      [%| (op-arg-error 'SelectSeq' 'boolean-valued operator' i.t.args.n)]
+    ?:  p.p.r  $(els t.els, acc [i.els acc])
+    $(els t.els)
+  ?:  ?=(%| -.keep)  keep
+  [%& [%seq p.keep]]
+::
+++  op-arg-error
+  ::  EC 2169 for an operator argument: tlc2 renders the OpValue, which has
+  ::  no value counterpart here, so the operator is named as `<Operator X>`
+  |=  [op=@t what=@t arg=sem:sm]
+  ^-  eval-err:v
+  =/  nm  =/(n (oparg-name arg) ?:(=('' n) 'LAMBDA' n))
+  :-  2.169
+  %^  rap  3  'The second argument of '
+  ~[op ' should be a ' what ', but instead it is:\0a<Operator ' nm '>']
+::
+++  apply-def
+  ::  apply an operator definition to already-evaluated arguments
+  |=  [d=sem-def:sm vs=(list value:v) e=eenv]
+  ^-  eres
+  ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
+  ?~  body.d  [%| 0 (rap 3 ~['operator has no evaluable body: ' name.d])]
+  ?.  =((lent params.d) (lent vs))
+    [%| 0 (rap 3 ~['wrong number of arguments to ' name.d])]
+  =/  names  (turn params.d |=(p=spar:sm name.p))
+  (eval u.body.d (bind-vals e(fuel (dec fuel.e)) names vs))
+::
 ++  binding-of
   ::  what an operator resolves to, mirroring the oracle's BINDINGS
   ::  projection (ModuleOpDump): a Java override, its TLA+ body, or nothing
@@ -667,7 +730,10 @@
   ^-  ?(%override %body %none)
   =/  d  (~(get by ops.e) nm)
   ?~  d  %none
-  ?^  (lookup:so ov.e [origin.u.d nm ar])  %override
+  =/  key=op-key:so  [origin.u.d nm ar]
+  ?^  (lookup:so ov.e key)  %override
+  ?^  (node-op:so key)  %override
+  ?:  (is-descriptor:so key)  %override
   ?:  ?&  (is-standard:so ov.e origin.u.d)
           !(body-allowed:so ov.e origin.u.d nm)
       ==
@@ -690,12 +756,24 @@
   ?:  ?=(%| -.av)  av
   $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
 ::
+++  oparg-name
+  ::  the operator an argument names. A bare reference to an operator of
+  ::  nonzero arity is generated as SANY's OpArgNode — the reserved `$OpArg`
+  ::  apply whose `ubound` carries the referenced name (lib/semantic
+  ::  +oparg-of); a nullary reference is the name itself
+  |=  n=sem:sm
+  ^-  @t
+  ?.  ?=(%apply -.n)  ''
+  ?.  =('$OpArg' name.op.n)  name.op.n
+  ?~(ubound.n '' name.i.ubound.n)
+::
 ++  resolve-oparg
   ::  an operator passed as an argument: a bare reference to a known op
   |=  [n=sem:sm e=eenv]
   ^-  (unit sem-def:sm)
-  ?.  ?=(%apply -.n)  ~
-  (~(get by ops.e) name.op.n)
+  =/  nm  (oparg-name n)
+  ?:  =('' nm)  ~
+  (~(get by ops.e) nm)
 ::
 ++  eval-letin
   |=  [n=sem-letin:sm e=eenv]

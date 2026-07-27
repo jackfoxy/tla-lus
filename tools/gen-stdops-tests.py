@@ -118,8 +118,9 @@ def hoon_registry() -> tuple:
     reg = set()
     for m in re.finditer(r"\[\['([^']+)' '((?:[^'\\]|\\.)+)' (\d+)\]", table):
         reg.add((m.group(1), m.group(2).replace("\\\\", "\\"), int(m.group(3))))
-    descriptors = text.split("++  set-descriptor")[1].split("--")[0]
-    for m in re.finditer(r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)", descriptors):
+    # the set-denoting operators (Nat, Int, Seq) and the ones the evaluator
+    # runs itself (SelectSeq) are claimed by key comparison, not by a table row
+    for m in re.finditer(r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)", text):
         reg.add((m.group(1), m.group(2), int(m.group(3))))
     bodies = set()
     body_block = text.split("++  body-ok")[1].split("++")[0]

@@ -690,13 +690,20 @@ classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
 required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
 lands with C1.8.
 
-**What evaluates today** (C1.1-C1.2). Eighteen registry rows plus the two
-set descriptors, resolved by
+**What evaluates today** (C1.1-C1.3). Twenty-three operator keys, resolved by
 `[module operator arity]` as tlc2 binds a Java method — never by bare name:
-`Naturals!{+ - * ^ \div % < > \leq \geq ..}`, unary minus at arity 1,
-`Sequences!{\o Len Head Tail Append}`, and `FiniteSets!Cardinality`.
-`Permutations` is still recognized separately by the SYMMETRY setup, from the
-syntax tree; C1.5 moves it into the registry.
+`Naturals!{+ - * ^ \div % < > \leq \geq ..}` and unary minus at arity 1;
+all eight declared `Sequences` operators (`\o Len Head Tail Append SubSeq
+SelectSeq Seq`); `FiniteSets!Cardinality`; and the three non-enumerable set
+descriptors `Nat`, `Int`, and `Seq(S)`. `Permutations` is still recognized
+separately by the SYMMETRY setup, from the syntax tree; C1.5 moves it into the
+registry.
+
+A sequence argument is accepted exactly where TLC accepts one — a tuple, or a
+function whose domain is exactly 1..n (`Value.toTuple`) — and the string forms
+of `Len`, `Tail`, `SubSeq`, and `\o` behave as the pin does. `SelectSeq` takes
+an operator argument, so the evaluator applies it directly under the same
+recursion budget, resolving the argument through SANY's `$OpArg` encoding.
 
 **Resolution order** matches `SpecProcessor`: an override beats the
 definition's TLA+ body, and only then is a body evaluated. This is not a
@@ -744,7 +751,7 @@ Differences that remain in this area, all failures rather than wrong values:
 | case | TLC | here |
 |---|---|---|
 | `Nat`/`Int` in a value position (`Expr == Nat`, `Cardinality(Nat)`) | a `UserValue` rendering `Nat`; `Cardinality(Nat)` is EC 2181 | typed rejection `unsupported StandardModule operator: Naturals!Nat/0` — there is no UserValue kind |
-| `S \cap Nat`, `S \cup Int` | evaluated lazily | rejected: set algebra takes value operands, and the infinite sets are descriptors |
+| `S \cap Nat`, `S \cup Int`, `Seq(Nat)` | evaluated lazily | rejected: set algebra and a descriptor's range take value operands, and the infinite sets are descriptors |
 | quantifying over `Nat` | a long non-enumerable-quantifier-bound message naming the bound | `Attempted to enumerate the non-enumerable set Nat.` |
 | a non-integer argument to `+ - * ^ \div %` | fails inside the Java `MethodValue` cast, naming the method signature | the same EC (2154) with a normalized message: `The second argument of + should be an integer, but instead it is:` |
 

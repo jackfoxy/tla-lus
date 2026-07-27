@@ -136,6 +136,25 @@
     %set   ~
   ==
 ::
+++  to-tuple
+  ::  tlc2's Value.toTuple: a tuple is a sequence, and so is a function whose
+  ::  domain is exactly 1..n (its values in index order). Anything else is
+  ::  not a sequence — the distinction every Sequences operator makes
+  |=  v=value
+  ^-  (unit (list value))
+  ?:  ?=(%seq -.v)  `p.v
+  ?.  ?=(%fcn -.v)  ~
+  =/  n  (normalize v)
+  ?.  ?=(%fcn -.n)  ~
+  =|  acc=(list value)
+  =/  ps  p.n
+  =/  i=@sd  --1
+  |-  ^-  (unit (list value))
+  ?~  ps  `(flop acc)
+  ?.  ?=(%int -.d.i.ps)  ~
+  ?.  =(p.d.i.ps i)  ~
+  $(ps t.ps, acc [r.i.ps acc], i (sum:si i --1))
+::
 ::  +|  Equality (total, cross-representation)
 ::
 ++  equal
@@ -685,11 +704,13 @@
       [%fcns dom=value rng=value]        ::  [D -> R]
       [%rcds fs=(list [k=@t s=value])]   ::  [a: S, b: T, ...]
       [%subset s=value]                  ::  SUBSET S
-      ::  the infinite StandardModule sets (unit 6C.2). tlc2 represents them
-      ::  as UserValues whose `member` is structural and whose `isFinite` is
-      ::  false: membership and \subseteq work, enumeration does not
+      ::  the infinite StandardModule sets (units 6C.2, 6C.3). tlc2
+      ::  represents them as UserValues whose `member` is structural and
+      ::  whose `isFinite` is false: membership and \subseteq work,
+      ::  enumeration does not
       [%nats ~]                          ::  Naturals!Nat
       [%ints ~]                          ::  Integers!Int
+      [%seqs s=value]                    ::  Sequences!Seq(S)
   ==
 ::  one enumeration step: an element, or exhaustion
 +$  estep  $%  [%item v=value]  [%done ~]  ==
@@ -811,7 +832,14 @@
   ::
     %nats  [%| (non-enumerable 'Nat')]
     %ints  [%| (non-enumerable 'Int')]
+    %seqs  [%| (non-enumerable (crip (seqs-name s.x)))]
   ==
+::
+++  seqs-name
+  ::  Sequences.toString for the unbounded case
+  |=  s=value
+  ^-  tape
+  ;:(weld "Seq(" (render s) ")")
 ::
 ++  non-enumerable
   ::  tlc2 refuses to enumerate an infinite UserObj set (isFinite false):
@@ -1009,7 +1037,8 @@
   ::  emptiness by one bounded step — never materializes the domain
   |=  x=sexp
   ^-  (each ? eval-err)
-  ?:  ?=(?(%nats %ints) -.x)  [%& |]
+  ::  the infinite sets are never empty (Seq(S) always contains <<>>)
+  ?:  ?=(?(%nats %ints %seqs) -.x)  [%& |]
   =/  rc  (enum x)
   ?:  ?=(%| -.rc)  rc
   =/  st  (enum-next p.rc)
@@ -1058,16 +1087,20 @@
   ::
     %nats  (int-set-member e 'Nat')
     %ints  (int-set-member e 'Int')
+  ::
+      %seqs
+    ::  tlc2.module.Sequences.member: a sequence whose every element is in
+    ::  the range; a non-sequence model value is not a member, anything
+    ::  else is an error
+    =/  tp  (to-tuple e)
+    ?~  tp  (not-a-member e (crip (seqs-name s.x)))
+    [%& (levy u.tp |=(el=value (memb el s.x)))]
   ==
 ::
-++  int-set-member
-  ::  membership in Nat / Int, mirroring tlc2.module.Naturals.member: an
-  ::  integer decides structurally, an untyped model value is not a member,
-  ::  a typed model value and any other kind are errors
+++  not-a-member
+  ::  the shared "is not even a candidate" branch of tlc2's UserObj.member
   |=  [e=value nm=@t]
   ^-  (each ? eval-err)
-  ?:  ?=(%int -.e)
-    [%& ?:(=(nm 'Int') & !(slth p.e --0))]
   ?:  ?=(%model -.e)
     ?.  =(0 (mv-type p.e))
       :-  %|
@@ -1079,6 +1112,16 @@
   :-  2.158
   %^  rap  3  'Attempted to check if the value:\0a'
   ~[(crip (render e)) '\0ais an element of ' nm '.']
+::
+++  int-set-member
+  ::  membership in Nat / Int, mirroring tlc2.module.Naturals.member: an
+  ::  integer decides structurally, an untyped model value is not a member,
+  ::  a typed model value and any other kind are errors
+  |=  [e=value nm=@t]
+  ^-  (each ? eval-err)
+  ?:  ?=(%int -.e)
+    [%& ?:(=(nm 'Int') & !(slth p.e --0))]
+  (not-a-member e nm)
 ::
 ::  +|  Binders, Quantifiers, CHOOSE, Constructors, Control (unit 6.4)
 ::

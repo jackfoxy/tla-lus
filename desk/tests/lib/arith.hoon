@@ -115,9 +115,9 @@
 ::
 ++  test-set-descriptor-keys
   ::  the two set-denoting standard operators, and nothing else
-  =/  nat  (set-descriptor:so ['Naturals' 'Nat' 0])
-  =/  int  (set-descriptor:so ['Integers' 'Int' 0])
-  =/  non  (set-descriptor:so ['Naturals' '+' 2])
+  =/  nat  (set-descriptor:so ['Naturals' 'Nat' 0] ~)
+  =/  int  (set-descriptor:so ['Integers' 'Int' 0] ~)
+  =/  non  (set-descriptor:so ['Naturals' '+' 2] ~)
   ;:  weld
     (expect-eq !>(&) !>(?=(^ nat)))
     (expect-eq !>(&) !>(?=(^ int)))

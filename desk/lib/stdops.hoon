@@ -120,6 +120,7 @@
     [['Sequences' 'Head' 1] [| 0 |=(a=(list value:v) (seq-head a))]]
     [['Sequences' 'Tail' 1] [| 0 |=(a=(list value:v) (seq-tail a))]]
     [['Sequences' 'Append' 2] [| 0 |=(a=(list value:v) (seq-append a))]]
+    [['Sequences' 'SubSeq' 3] [| 0 |=(a=(list value:v) (sub-seq a))]]
     ::  FiniteSets
     [['FiniteSets' 'Cardinality' 1] [| 0 |=(a=(list value:v) (cardinality a))]]
   ==
@@ -262,11 +263,35 @@
   ::  represents these as infinite UserValues; here they are lazy `sexp`
   ::  descriptors, so membership and \subseteq work while enumeration is a
   ::  typed non-enumerable failure. Used from a set-denoting position only —
-  ::  as a plain value they are still a typed rejection (no UserValue kind)
-  |=  k=op-key
+  ::  as a plain value they are still a typed rejection (no UserValue kind).
+  ::  Arguments arrive evaluated (Seq(S) carries its range)
+  |=  [k=op-key as=(list value:v)]
   ^-  (unit sexp:v)
   ?:  =(k ['Naturals' 'Nat' 0])  `[%nats ~]
   ?:  =(k ['Integers' 'Int' 0])  `[%ints ~]
+  ?:  =(k ['Sequences' 'Seq' 1])
+    ?~(as ~ `[%seqs i.as])
+  ~
+::
+++  is-descriptor
+  ::  whether the key denotes a set (so a set position evaluates arguments
+  ::  and builds a descriptor instead of a value)
+  |=  k=op-key
+  ^-  ?
+  ?|  =(k ['Naturals' 'Nat' 0])
+      =(k ['Integers' 'Int' 0])
+      =(k ['Sequences' 'Seq' 1])
+  ==
+::
+++  node-op
+  ::  StandardModule operators the evaluator itself must run, because an
+  ::  argument is an OPERATOR rather than a value (tlc2 passes an OpValue and
+  ::  applies it). The implementation lives in node-eval, where the semantic
+  ::  nodes, the environment, and the recursion budget are in scope; this
+  ::  table only claims the key so resolution stays in one place
+  |=  k=op-key
+  ^-  (unit @tas)
+  ?:  =(k ['Sequences' 'SelectSeq' 2])  `%select-seq
   ~
 ::
 ++  dotdot
@@ -276,42 +301,143 @@
   ?.  &(?=(%int -.i.as) ?=(%int -.i.t.as))  [%| 0 'non-integer interval bound.']
   [%& [%intv p.i.as p.i.t.as]]
 ::
+++  one-arg-error
+  ::  EC 2283: "The argument of <op> should be a <what>, but instead it is:
+  ::  \n<v>"
+  |=  [op=@t what=@t got=value:v]
+  ^-  eval-err:v
+  :-  2.283
+  %^  rap  3  'The argument of '
+  ~[op ' should be a ' what ', but instead it is:\0a' (crip (render:v got))]
+::
+++  empty-seq-error
+  ::  EC 2184
+  |=  op=@t
+  ^-  eval-err:v
+  [2.184 (rap 3 ~['Attempted to apply ' op ' to the empty sequence.'])]
+::
+++  evaluating-error
+  ::  EC 2182: "Evaluating an expression of the form <form> when s is not a
+  ::  <what>:\n<v>" — the shape Append and \o report
+  |=  [form=@t what=@t got=value:v]
+  ^-  eval-err:v
+  :-  2.182
+  %^  rap  3  'Evaluating an expression of the form '
+  :~  form  ' when s is not a '  what  ':\0a'  (crip (render:v got))
+  ==
+::
+++  not-in-domain
+  ::  EC 2183, with the pin's punctuation
+  |=  [i=@ud op=@t s=value:v got=value:v]
+  ^-  eval-err:v
+  :-  2.183
+  %^  rap  3  'The '
+  :~  (ordinal i)  ' argument of '  op
+      ' must be in the domain of its first argument:\0a'
+      (crip (render:v s))  '\0a, but instead it is\0a'
+      (crip (render:v got))
+  ==
+::
+++  as-seq
+  ::  the sequence view of a value (tuple, or a function with domain 1..n)
+  |=  x=value:v
+  ^-  (unit (list value:v))
+  (to-tuple:v x)
+::
+++  str-chars
+  ::  a string as its one-character values, so SubSeq can slice it
+  |=  c=@t
+  ^-  (list value:v)
+  (turn (trip c) |=(ch=@tD `value:v`[%str (crip ~[ch])]))
+::
 ++  concat
+  ::  tlc2.module.Sequences.Concat: strings concatenate, sequences append;
+  ::  the first non-sequence is reported as `s \o t`, the second as `t \o s`
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* * ~] as)  [%| 0 '\\o expects two arguments.']
-  ?.  &(?=(%seq -.i.as) ?=(%seq -.i.t.as))  [%| 0 '\\o expects two sequences.']
-  [%& [%seq (weld p.i.as p.i.t.as)]]
+  ?:  ?=(%str -.i.as)
+    ?.  ?=(%str -.i.t.as)
+      [%| (evaluating-error 't \\o s' 'string' i.t.as)]
+    [%& [%str (cat 3 p.i.as p.i.t.as)]]
+  =/  a  (as-seq i.as)
+  ?~  a  [%| (evaluating-error 's \\o t' 'sequence' i.as)]
+  =/  b  (as-seq i.t.as)
+  ?~  b  [%| (evaluating-error 't \\o s' 'sequence' i.t.as)]
+  [%& [%seq (weld u.a u.b)]]
 ::
 ++  seq-len
+  ::  a string has a length too (LL, 2013)
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'Len expects one argument.']
-  ?.  ?=(%seq -.i.as)  [%| 0 'Len expects a sequence.']
-  [%& [%int (sun:si (lent p.i.as))]]
+  ?:  ?=(%str -.i.as)  [%& [%int (sun:si (lent (trip p.i.as)))]]
+  =/  t  (as-seq i.as)
+  ?~  t  [%| (one-arg-error 'Len' 'sequence' i.as)]
+  [%& [%int (sun:si (lent u.t))]]
 ::
 ++  seq-head
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'Head expects one argument.']
-  ?.  ?=(%seq -.i.as)  [%| 0 'Head expects a sequence.']
-  ?~  p.i.as  [%| 0 'Head of the empty sequence.']
-  [%& i.p.i.as]
+  =/  t  (as-seq i.as)
+  ?~  t  [%| (one-arg-error 'Head' 'sequence' i.as)]
+  ?~  u.t  [%| (empty-seq-error 'Head')]
+  [%& i.u.t]
 ::
 ++  seq-tail
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'Tail expects one argument.']
-  ?.  ?=(%seq -.i.as)  [%| 0 'Tail expects a sequence.']
-  ?~  p.i.as  [%| 0 'Tail of the empty sequence.']
-  [%& [%seq t.p.i.as]]
+  ?:  ?=(%str -.i.as)
+    =/  cs  (trip p.i.as)
+    ?~  cs  [%| (empty-seq-error 'Tail')]
+    [%& [%str (crip t.cs)]]
+  =/  t  (as-seq i.as)
+  ?~  t  [%| (one-arg-error 'Tail' 'sequence' i.as)]
+  ?~  u.t  [%| (empty-seq-error 'Tail')]
+  [%& [%seq t.u.t]]
 ::
 ++  seq-append
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* * ~] as)  [%| 0 'Append expects two arguments.']
-  ?.  ?=(%seq -.i.as)  [%| 0 'Append expects a sequence.']
-  [%& [%seq (snoc p.i.as i.t.as)]]
+  =/  t  (as-seq i.as)
+  ?~  t  [%| (evaluating-error 'Append(s, v)' 'sequence' i.as)]
+  [%& [%seq (snoc u.t i.t.as)]]
+::
+++  sub-seq
+  ::  tlc2.module.Sequences.SubSeq, including its string form: beg > end is
+  ::  the empty result BEFORE any range check, then each bound must lie in
+  ::  the domain (EC 2183)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * * ~] as)  [%| 0 'SubSeq expects three arguments.']
+  =/  s  i.as
+  =/  m  i.t.as
+  =/  n  i.t.t.as
+  =/  str=?  ?=(%str -.s)
+  =/  t=(unit (list value:v))
+    ?:  ?=(%str -.s)  `(str-chars p.s)
+    (as-seq s)
+  ?~  t  [%| (arg-error 2.169 1 'SubSeq' 'sequence' | s)]
+  ?.  ?=(%int -.m)  [%| (arg-error 2.169 2 'SubSeq' 'natural number' | m)]
+  ?.  ?=(%int -.n)  [%| (arg-error 2.169 3 'SubSeq' 'natural number' | n)]
+  ?:  (slth:v p.n p.m)
+    [%& ?:(str [%str ''] [%seq ~])]
+  =/  ln  (sun:si (lent u.t))
+  ?:  |((slth:v p.m --1) (slth:v ln p.m))
+    [%| (not-in-domain 2 'SubSeq' s m)]
+  ?:  |((slth:v p.n --1) (slth:v ln p.n))
+    [%| (not-in-domain 3 'SubSeq' s n)]
+  =/  beg  (dec (abs:si p.m))
+  =/  cnt  (add 1 (sub (abs:si p.n) (abs:si p.m)))
+  =/  els  (scag cnt (slag beg u.t))
+  ?.  str  [%& [%seq els]]
+  :-  %&
+  :-  %str
+  %+  roll  (flop els)
+  |=([e=value:v acc=@t] ?:(?=(%str -.e) (cat 3 p.e acc) acc))
 ::
 ++  cardinality
   |=  as=(list value:v)

@@ -273,7 +273,42 @@ whose `member` is structural and whose `isFinite` is false. Here they are new
 Side finding: an empty interval must render `{}` (`IntervalValue.toString`),
 which the port was printing as `5..1`.
 
-## 9. Gotchas hit in C1.0
+## 9. C1.3 — Sequences
+
+Implemented: the eight operators `Sequences.tla` declares. `Cons`,
+`SelectInSeq`, and `Insert` remain unreachable (no declaration), and
+`Strings` has no StandardModule at all, so C1.3's "Strings" task was
+empty by the C1.0 inventory.
+
+- `to-tuple` (new in `lib/value`) ports `Value.toTuple`: a tuple, or a
+  function whose domain is exactly 1..n. Every Sequences operator goes
+  through it, so a function-shaped sequence is accepted exactly where TLC
+  accepts one.
+- String forms exist where the pin has them (`Len`, `Tail`, `SubSeq`, `\o`).
+  A mixed `"ab" \o <<1>>` is the pin's EC 2182 `t \o s … not a string`.
+- `SubSeq` answers empty for `beg > end` **before** the domain check, then
+  reports EC 2183 per bound (with the pin's `\n, but instead it is\n`).
+- `SelectSeq` needs an OPERATOR argument, which the value-shaped registry
+  gate cannot carry. Second table: `node-op` claims the key, `node-eval`'s
+  `eval-node-op` implements it. The argument arrives as SANY's `$OpArg`
+  apply (its `ubound` holds the referenced operator name), so
+  `resolve-oparg` now unwraps that encoding — which also fixes
+  operator-valued parameters generally (a 6.5 residue).
+- `Seq(S)` is the third descriptor (`%seqs`), with `Sequences.member`
+  semantics. `Seq(Nat)` is rejected: a descriptor's range is a value, and
+  the descriptors are deliberately not values.
+
+TLA+/Hoon gotchas:
+
+- `\o` binds tighter than `..`, so `<<1>> \o 1..2` is `(<<1>> \o 1) .. 2`.
+- An operator that cannot resolve (using `..` under a bare
+  `EXTENDS FiniteSets`, which does not re-export Naturals) degrades the
+  application's arity in the graph — a test asserting an arity in a message
+  must extend the module that declares every operator it uses.
+- A list narrowed by `?~` must be widened (`=/ els=(list value:v) u.t`)
+  before a loop's own `?~`, or the branch is `mint-vain`.
+
+## 10. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.
