@@ -93,9 +93,9 @@ CLASSIFY = {
     ("TLC", "ToString"):     ("required", "canonical rendering already owned by value.hoon (C1.5)"),
     ("TLC", "Print"):        ("required", "typed engine output channel, never a silent no-op (C1.5)"),
     ("TLC", "PrintT"):       ("required", "typed engine output channel, never a silent no-op (C1.5)"),
-    ("TLC", "TLCGet"):       ("required", "C1.5 implements the key taxonomy and EC 2145; an engine-state read is a typed rejection naming the key"),
+    ("TLC", "TLCGet"):       ("required", "C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an engine-state read is a typed rejection naming the key"),
     ("TLC", "TLCSet"):       ("required", "C1.5 implements the rejection; it mutates engine state the evaluator does not own"),
-    ("TLC", "TLCEval"):      ("deferred", "needs the Evaluation/laziness contract (C1.6)"),
+    ("TLC", "TLCEval"):      ("required", "the pin's one plain Evaluation override; C1.6 implements the lazy argument contract with it"),
     ("TLC", "RandomElement"): ("deferred", "TLC RandomGenerator parity is unit 9"),
     ("TLC", "JavaTime"):     ("excluded", "wall-clock nondeterminism"),
     ("TLC", "Any"):          ("excluded", "universal UserValue; no canonical representation"),
@@ -107,6 +107,47 @@ CLASSIFY = {
 
 def sh(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
+
+
+def hoon_contracts() -> dict:
+    """{(module, op, arity): (lazy, level)} as desk/lib/stdops.hoon records
+    it — from the registry rows and from the node-op table, which carries the
+    same two fields."""
+    text = (REPO / "desk/lib/stdops.hoon").read_text()
+    out = {}
+    table = text.split("++  registry")[1].split("::  +|  Diagnostics")[0]
+    for m in re.finditer(
+            r"\[\['([^']+)' '((?:[^'\\]|\\.)+)' (\d+)\]\s*\[([|&]) (\d+)", table):
+        key = (m.group(1), m.group(2).replace("\\\\", "\\"), int(m.group(3)))
+        out[key] = (m.group(4) == "&", int(m.group(5)))
+    nodes = text.split("++  node-op")[1].split("++  op-meta")[0]
+    for m in re.finditer(
+            r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)\s*`\[%[\w-]+ ([|&]) (\d+)\]", nodes):
+        out[(m.group(1), m.group(2), int(m.group(3)))] = (
+            m.group(4) == "&", int(m.group(5)))
+    return out
+
+
+def check_contracts(rows: list) -> list:
+    """tlc2 binds a plain method (all arguments evaluated) or an
+    `@Evaluation` method (which receives the unevaluated node) and may pin a
+    `minLevel`. Both facts are on the pinned method, so the port's own
+    `lazy`/`level` must equal them."""
+    want = {}
+    for r in rows:
+        ann = r[6]
+        lazy = ann.startswith("Evaluation(")
+        m = re.search(r"minLevel=(\d+)", ann)
+        want[(r[0], r[1], int(r[2]))] = (lazy, int(m.group(1)) if m else 0)
+    problems = []
+    for key, (lazy, level) in sorted(hoon_contracts().items()):
+        if key not in want:
+            continue
+        if (lazy, level) != want[key]:
+            problems.append(
+                f"{key[0]}!{key[1]}/{key[2]} declares lazy={lazy} level={level}, "
+                f"but the pin has lazy={want[key][0]} minLevel={want[key][1]}")
+    return problems
 
 
 def hoon_registry() -> tuple:
@@ -324,7 +365,7 @@ def main() -> int:
         for r in unclassified:
             print(f"UNCLASSIFIED {r[0]}!{r[1]}/{r[2]}", file=sys.stderr)
         return 1
-    problems = check_registry(rows)
+    problems = check_registry(rows) + check_contracts(rows)
     reg, _bodies = hoon_registry()
     print(f"{len(reg)} registry rows implemented in desk/lib/stdops.hoon")
     if problems:

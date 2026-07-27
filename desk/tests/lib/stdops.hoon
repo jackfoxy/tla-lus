@@ -96,12 +96,12 @@
 ::
 ++  test-unimplemented-operator-names-itself
   ::  a declared-but-unimplemented StandardModule operator names itself
-  ::  rather than evaluating its vendored body. TLCEval is C1.6's (it needs
-  ::  the Evaluation/laziness contract)
+  ::  rather than evaluating its vendored body. RandomElement is unit 9's
+  ::  (it needs TLC's RNG)
   %-  val
-  :+  (one "EXTENDS Integers, TLC" ~["Expr == TLCEval(1)"])
+  :+  (one "EXTENDS Integers, TLC" ~["Expr == RandomElement(1..2)"])
     'Expr'
-  "ERR: unsupported StandardModule operator: TLC!TLCEval/1"
+  "ERR: unsupported StandardModule operator: TLC!RandomElement/1"
 ::
 ::  +|  Body-Evaluable Standard Operators
 ::
@@ -158,6 +158,7 @@
   ::  a drift alarm: the count changes only when a subunit adds operators
   ::  (C1.1 seeded 18, C1.3 added SubSeq, C1.4 added 11 Bags rows plus the
   ::  two TLC function constructors and moved Cardinality to a node-op,
-  ::  C1.5 added the seven remaining TLC value-shaped rows)
-  (expect-eq !>(38) !>(~(wyt by registry:so)))
+  ::  C1.5 added the TLC value-shaped rows, C1.6 moved TLCGet to the
+  ::  node-op table because the pin evaluates it lazily)
+  (expect-eq !>(37) !>(~(wyt by registry:so)))
 --

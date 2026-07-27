@@ -141,8 +141,9 @@
     (expect-eq !>(%override) !>((binding-in:ne 'A' src 'SortSeq' 2)))
     (expect-eq !>(%override) !>((binding-in:ne 'A' src 'Print' 2)))
     (expect-eq !>(%override) !>((binding-in:ne 'A' src 'TLCGet' 1)))
-    ::  still C1.6's / unit 9's
-    (expect-eq !>(%none) !>((binding-in:ne 'A' src 'TLCEval' 1)))
+    ::  C1.6 implements the Evaluation contract with TLCEval
+    (expect-eq !>(%override) !>((binding-in:ne 'A' src 'TLCEval' 1)))
+    ::  unit 9 owns TLC's RNG
     (expect-eq !>(%none) !>((binding-in:ne 'A' src 'RandomElement' 1)))
   ==
 --

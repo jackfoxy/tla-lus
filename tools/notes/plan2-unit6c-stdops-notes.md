@@ -375,7 +375,46 @@ classified `deferred` at C1.0 while the registry now claims them. They were
 reclassified `required` (with the plan's own wording) rather than relaxing
 the check.
 
-## 12. Gotchas hit in C1.0
+## 12. C1.6 — argument contract, laziness, minLevel
+
+tlc2 binds an override one of two ways, and the port records which:
+
+| binding | arguments | in the port |
+|---|---|---|
+| plain `MethodValue` | evaluated before the method runs | a registry row (`lazy = |`) |
+| `@Evaluation` method | the unevaluated node, plus context and states | a node-op (`lazy = &`) |
+
+Both facts (`lazy`, `level` = `minLevel`) live on `op-meta` and are checked by
+`gen-stdops-tests.py` against the inventory's annotation column, so they
+cannot drift from the pinned methods. That check found two things at once:
+
+- `TLCEval` was still classified `deferred` though it is implementable — it
+  is now the worked example of the lazy path (it evaluates its argument node
+  itself);
+- **`TLCGet` is `@Evaluation`-annotated at minLevel 1**, not the plain method
+  C1.5 assumed; it moved to the node-op table and evaluates its key before
+  answering with EC 2145 or a named rejection.
+
+`minLevel` is carried but not observable here: TLC uses it to keep a
+state-level override out of `processConstantDefns`, and this engine has no
+constant-folding pass. Recorded as residue rather than faked.
+
+Properties now tested (`tests/lib/regprop`):
+
+- laziness is reserved for `@Evaluation` operators;
+- an unreferenced user-operator parameter is never evaluated
+  (`Ignore(1 \div 0)` succeeds);
+- argument errors compare as **code + operator + position**, not the pin's
+  volatile Java-signature text (EC 2154 for the cast path, EC 2266 where
+  tlc2 checks explicitly);
+- shadowing works from the root *and* from a module imported by EXTENDS, and
+  the same name at another arity is a different operator;
+- no key is reachable by a bare name (another module misses);
+- every gate rejects a wrong arity — this surfaced `EmptyBag`, which ignored
+  its argument list;
+- unclaimed operators stay typed rejections.
+
+## 13. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.

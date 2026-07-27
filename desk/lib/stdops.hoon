@@ -124,7 +124,7 @@
     ::  Bags (C1.4). The pin's messages name the infix operators as `(+)`
     ::  and `(-)`, and SetToBag reports itself as `BagToSet` — both are the
     ::  pinned text, reproduced rather than corrected
-    [['Bags' 'EmptyBag' 0] [| 0 |=(a=(list value:v) empty-bag)]]
+    [['Bags' 'EmptyBag' 0] [| 0 |=(a=(list value:v) (empty-bag a))]]
     [['Bags' 'IsABag' 1] [| 0 |=(a=(list value:v) (is-a-bag a))]]
     [['Bags' 'BagCardinality' 1] [| 0 |=(a=(list value:v) (bag-card a))]]
     [['Bags' 'BagIn' 2] [| 0 |=(a=(list value:v) (bag-in a))]]
@@ -146,7 +146,6 @@
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
     [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
     [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
-    [['TLC' 'TLCGet' 1] [| 0 |=(a=(list value:v) (tlc-get a))]]
     [['TLC' 'TLCSet' 2] [| 0 |=(a=(list value:v) (tlc-set a))]]
   ==
 ::
@@ -313,19 +312,43 @@
   ==
 ::
 ++  node-op
-  ::  StandardModule operators the evaluator itself must run, because an
-  ::  argument is an OPERATOR rather than a value (tlc2 passes an OpValue and
-  ::  applies it). The implementation lives in node-eval, where the semantic
-  ::  nodes, the environment, and the recursion budget are in scope; this
-  ::  table only claims the key so resolution stays in one place
+  ::  StandardModule operators the evaluator itself must run, because the
+  ::  override needs something a value cannot carry: an OPERATOR argument
+  ::  (tlc2 passes an OpValue and applies it), a lazy SET argument, or — for
+  ::  the pin's `@Evaluation` overrides — the unevaluated node itself. The
+  ::  implementation lives in node-eval, where the semantic nodes, the
+  ::  environment, and the recursion budget are in scope; this table claims
+  ::  the key and carries the same metadata a registry row does, so the
+  ::  argument contract is recorded for every implemented operator
   |=  k=op-key
-  ^-  (unit @tas)
-  ?:  =(k ['Sequences' 'SelectSeq' 2])  `%select-seq
-  ?:  =(k ['Bags' 'BagOfAll' 2])  `%bag-of-all
-  ?:  =(k ['FiniteSets' 'Cardinality' 1])  `%cardinality
-  ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `%is-finite-set
-  ?:  =(k ['TLC' 'SortSeq' 2])  `%sort-seq
+  ^-  (unit [tag=@tas lazy=? level=@ud])
+  ?:  =(k ['Sequences' 'SelectSeq' 2])     `[%select-seq | 0]
+  ?:  =(k ['Bags' 'BagOfAll' 2])           `[%bag-of-all | 0]
+  ?:  =(k ['FiniteSets' 'Cardinality' 1])  `[%cardinality | 0]
+  ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `[%is-finite-set | 0]
+  ?:  =(k ['TLC' 'SortSeq' 2])             `[%sort-seq | 0]
+  ::  the one `@Evaluation` override in scope: tlc2 hands it the node, the
+  ::  context, and the states, and it decides what to evaluate
+  ?:  =(k ['TLC' 'TLCEval' 1])             `[%tlc-eval & 0]
+  ::  TLCGet is `@Evaluation`-annotated too, at minLevel 1 (it is state-level,
+  ::  so TLC never constant-folds it); the datum is carried and checked even
+  ::  though this engine has no constant-folding pass
+  ?:  =(k ['TLC' 'TLCGet' 1])              `[%tlc-get & 1]
   ~
+::
+++  op-meta
+  ::  the argument contract of an implemented operator: `lazy` is true only
+  ::  where the pin uses an `@Evaluation` override (which receives the
+  ::  unevaluated node); `level` is its `minLevel`. Both are checked against
+  ::  the generated inventory by tools/gen-stdops-tests.py, so they cannot
+  ::  drift from the annotations on the pinned methods
+  |=  k=op-key
+  ^-  (unit [lazy=? level=@ud])
+  =/  n  (node-op k)
+  ?^  n  `[lazy.u.n level.u.n]
+  =/  r  (~(get by registry) k)
+  ?~  r  ~
+  `[lazy.u.r level.u.r]
 ::
 ++  dotdot
   |=  as=(list value:v)
@@ -510,7 +533,11 @@
 ::  operator starts from `to-fcn-pairs` (Value.toFcnRcd) and compares domain
 ::  points by value equality, never by rendering.
 ::
-++  empty-bag  ^-(eres [%& [%fcn ~]])
+++  empty-bag
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=(~ as)  [%| 0 'EmptyBag expects no arguments.']
+  [%& [%fcn ~]]
 ::
 ++  bag-of
   |=  x=value:v
@@ -693,7 +720,7 @@
   ?.  (set-like:v i.as)
     [%| (wrong-value-error 'BagUnion' 'a finite enumerable set' i.as)]
   =/  es  (set-elems:v (normalize:v i.as))
-  ?~  es  empty-bag
+  ?~  es  (empty-bag ~)
   ?~  t.es  [%& i.es]
   =|  acc=(list vpair:v)
   ::  widen: `es` is narrowed to a two-or-more list by the guards above

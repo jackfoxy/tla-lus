@@ -690,7 +690,7 @@ classification is `desk/test-data/stdops/inventory.txt` (131 surfaces: 44
 required, 2 body-evaluated, 7 deferred, 78 excluded); the full support matrix
 lands with C1.8.
 
-**What evaluates today** (C1.1-C1.5). Forty-six operator keys, resolved by
+**What evaluates today** (C1.1-C1.6). Forty-seven operator keys, resolved by
 `[module operator arity]` as tlc2 binds a Java method — never by bare name:
 `Naturals!{+ - * ^ \div % < > \leq \geq ..}` and unary minus at arity 1;
 all eight declared `Sequences` operators (`\o Len Head Tail Append SubSeq
@@ -705,6 +705,15 @@ what is missing**, never silent no-ops: the first two write to TLC's console
 and this engine has no output channel on the evaluation path; the last two
 read and mutate engine state the evaluator does not own. `TLCGet` still
 reproduces the pin's EC 2145 for a key TLC itself does not define.
+
+Each override records the pin's **argument contract**: a plain `MethodValue`
+receives evaluated arguments, while an `@Evaluation` method receives the
+unevaluated node (`TLCEval` and `TLCGet` here) and may pin a `minLevel`.
+`minLevel` is carried but not yet observable: TLC uses it to keep a
+state-level override out of its constant-folding pass, and this engine has no
+such pass. An argument-type failure keeps the pin's error code and names the
+operator and argument position; the pin's own message names the Java method
+signature, which is normalized away.
 
 `Cardinality` and `IsFiniteSet` take their argument as a lazy *set*, so
 `IsFiniteSet(Nat)` is FALSE and `Cardinality(Nat)` is EC 2181 — the infinite

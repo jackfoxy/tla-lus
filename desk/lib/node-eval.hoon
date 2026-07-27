@@ -655,7 +655,7 @@
     (gate.u.ov p.as)
   ::  an override that needs the evaluator itself (an operator argument)
   =/  nop  (node-op:so key)
-  ?^  nop  (eval-node-op u.nop n e)
+  ?^  nop  (eval-node-op tag.u.nop n e)
   ?:  ?&  (is-standard:so ov.e origin.def)
           !(body-allowed:so ov.e origin.def nm)
       ==
@@ -679,6 +679,8 @@
   ?:  ?=(%cardinality tag)    (eval-cardinality n e)
   ?:  ?=(%is-finite-set tag)  (eval-is-finite n e)
   ?:  ?=(%sort-seq tag)       (eval-sort-seq n e)
+  ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e)
+  ?:  ?=(%tlc-get tag)        (eval-tlc-get n e)
   ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
   ?.  ?=([* * ~] args.n)
     [%| 0 'SelectSeq expects two arguments.']
@@ -793,6 +795,27 @@
     l    t.l
     acc  [[p.r n2] (skip acc |=(pr=vpair:v (equal:v d.pr p.r)))]
   ==
+::
+++  eval-tlc-eval
+  ::  TLC!TLCEval(e) — the pin's `@Evaluation` override: it receives the
+  ::  unevaluated node and evaluates it itself (there it defeats TLC's
+  ::  caching; here it is the lazy argument contract in one operator)
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* ~] args.n)  [%| 0 'TLCEval expects one argument.']
+  (eval i.args.n e)
+::
+++  eval-tlc-get
+  ::  TLC!TLCGet — also an `@Evaluation` override in the pin, so it receives
+  ::  the node and evaluates the key itself. The answer is tlc2's EC 2145 for
+  ::  a key TLC does not define, and a typed rejection naming a key it does
+  ::  (this evaluator cannot reach engine state)
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* ~] args.n)  [%| 0 'TLCGet expects one argument.']
+  =/  k  (eval i.args.n e)
+  ?:  ?=(%| -.k)  k
+  (tlc-get:so ~[p.k])
 ::
 ++  eval-sort-seq
   ::  TLC!SortSeq(s, cmp): tlc2's insertion sort, with the comparator applied
