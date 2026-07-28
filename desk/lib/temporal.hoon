@@ -597,10 +597,69 @@
   ?~  t.t  `i.t
   `[%conj t]
 ::
+::  +|  makeBinary
+::
+++  take-le
+  ::  hand-rolled scag over the recursive live-expr mold
+  |=  [n=@ud l=(list live-expr)]
+  ^-  (list live-expr)
+  ?:  =(0 n)  ~
+  ?~  l  ~
+  [i.l $(n (dec n), l t.l)]
+::
+++  drop-le
+  ::  hand-rolled slag over the recursive live-expr mold
+  |=  [n=@ud l=(list live-expr)]
+  ^-  (list live-expr)
+  ?:  =(0 n)  l
+  ?~  l  l
+  $(n (dec n), l t.l)
+::
+++  make-binary
+  ::  LiveExprNode.makeBinary: balance every conjunction/disjunction into a
+  ::  binary tree (tableau 'triple' construction needs binary junctions), the
+  ::  unary operators/leaves pass through recursing their bodies. There are no
+  ::  LNActions in a tf at this point (they were excluded when classifying).
+  |=  x=live-expr
+  ^-  live-expr
+  ?-  -.x
+    %bool     x
+    %state    x
+    %enabled  x
+    %act      x
+    %neg      x(b (make-binary b.x))
+    %next     x(b (make-binary b.x))
+    %all      x(b (make-binary b.x))
+    %even     x(b (make-binary b.x))
+    %conj     (binary-junction & cs.x)
+    %disj     (binary-junction | ds.x)
+  ==
+::
+++  binary-junction
+  ::  balance a junction's child list into a binary tree of two-child nodes,
+  ::  mirroring LNConj/LNDisj.makeBinary (split at count/2, recurse each half);
+  ::  a single child collapses to its own binary form
+  |=  [conj=? l=(list live-expr)]
+  ^-  live-expr
+  =/  n  (lent l)
+  ?:  =(0 n)  ?:(conj [%bool &] [%bool |])
+  ?:  =(1 n)  (make-binary ?~(l [%bool &] i.l))
+  =/  mid  (div n 2)
+  =/  lb  (binary-junction conj (take-le mid l))
+  =/  rb  (binary-junction conj (drop-le mid l))
+  ?:(conj [%conj ~[lb rb]] [%disj ~[lb rb]])
+::
+++  make-binary-unit
+  |=  x=(unit live-expr)
+  ^-  (unit live-expr)
+  ?~(x ~ `(make-binary u.x))
+::
 ::  +|  extractPromises + addToBin
 ::
 ++  extract-promises
-  ::  the <>-subformulas (le-even nodes) in the closure of `x`, deduplicated
+  ::  the <>-subformulas (le-even nodes) in the closure of `x`, deduplicated.
+  ::  Faithful to LiveExprNode.extractPromises: fed the make-binary'd tf, so the
+  ::  child-list recursion below is the binary body(0)/body(1) traversal
   |=  x=(unit live-expr)
   ^-  (list live-expr)
   ?~  x  ~
@@ -755,8 +814,11 @@
       cstate   bin.rs
       acc      [[idx.ra idx.rs idx.re] acc]
     ==
-  :*  tf.g
-      (extract-promises tf.g)
+  ::  the tableau formula is made binary (as TLC does before TBGraph and
+  ::  extractPromises); promises come from that binary form
+  =/  tf1  (make-binary-unit tf.g)
+  :*  tf1
+      (extract-promises tf1)
       cs.fold
       ca.fold
       pems.fold
