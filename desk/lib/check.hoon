@@ -1284,6 +1284,26 @@
     [u.b $(ps t.ps)]
   (render-counts:tp (normalize:tp pbods fair.c))
 ::
+++  live-struct-full
+  ::  the full structural projection (unit 8.1.3): the LivenessStruct output
+  ::  minus the TABLEAU node count, i.e. the OrderOfSolution.toString rendering
+  ::  for each OrderOfSolution alongside the counts
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  cr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.cr)  ~['Error: config']
+  =/  pbods=(list sem:sem-lib)
+    =/  ps  properties.p.cr
+    |-  ^-  (list sem:sem-lib)
+    ?~  ps  ~
+    =/  b  (sem-body defs.c i.ps)
+    ?~  b  $(ps t.ps)
+    [u.b $(ps t.ps)]
+  (render-struct:tp (normalize:tp pbods fair.c) (module-name-of tree.c))
+::
 ++  live-struct-raw
   ::  the same count projection as +live-struct, but skipping search-ctx's
   ::  symmetry-with-temporal rejection so the normalization of a symmetry+
@@ -1311,6 +1331,32 @@
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
   (render-counts:tp (normalize:tp pbods fair.p.rt))
+::
+++  live-struct-full-raw
+  ::  the full structural projection via the raw path (unit 8.1.3), for the
+  ::  symmetry-live corpus case that search-ctx typed-rejects
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  pr  (parse:syntax spec)
+  ?:  ?=(%| -.pr)  ~['Error: parse error']
+  =/  tree  p.pr
+  =/  cr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.cr)  ~['Error: config']
+  =/  ca  p.cr
+  =/  modn  (module-name-of tree)
+  =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
+  ?~  mo  ~['Error: semantic error']
+  =/  defs  (defmap-of:ne u.mo)
+  =/  rt  (resolve-targets ca defs)
+  ?:  ?=(%| -.rt)  ~[(cat 3 'Error: ' p.rt)]
+  =/  pbods=(list sem:sem-lib)
+    =/  ps  properties.ca
+    |-  ^-  (list sem:sem-lib)
+    ?~  ps  ~
+    =/  b  (sem-body defs i.ps)
+    ?~  b  $(ps t.ps)
+    [u.b $(ps t.ps)]
+  (render-struct:tp (normalize:tp pbods fair.p.rt) modn)
 ::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines

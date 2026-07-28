@@ -9,7 +9,8 @@
 ::  is a named `+$` with a constant-head record and EVERY recursion over it is
 ::  hand-rolled (never turn/roll/flop/snoc — the wet gates fuse-loop the mold).
 /-  *tla-lus
-/=  sm  /lib/semantic
+/=  sm      /lib/semantic
+/=  config  /lib/config
 |%
 ::  +|  Live-expression tree (LN* analogue)
 ::
@@ -855,4 +856,183 @@
       ==
     $(oss t.oss, i +(i), acc (weld (flop block) acc))
   [hd rows]
+::
+::  +|  Full structural projection (matches OrderOfSolution.toString)
+::
+++  nl  `tape`~[`@tD`10]
+::
+++  loc-leaf
+  ::  a LNState/LNAction/LNStateEnabled leaf renders as the ExprNode's
+  ::  toString = its Location span (Location.toString), the module its root
+  |=  [modn=@t s=sem:sm]
+  ^-  tape
+  (trip (loc-str:config modn (sspan-of s)))
+::
+++  snag-le
+  |=  [i=@ud l=(list live-expr)]
+  ^-  live-expr
+  ?~  l  [%bool &]
+  ?:  =(0 i)  i.l
+  $(i (dec i), l t.l)
+::
+++  snag-pem
+  |=  [i=@ud l=(list pem)]
+  ^-  pem
+  ?~  l  [~ ~ ~]
+  ?:  =(0 i)  i.l
+  $(i (dec i), l t.l)
+::
+++  pem-empty
+  |=  p=pem
+  ^-  ?
+  &(?=(~ ae-action.p) ?=(~ ae-state.p) ?=(~ ea-action.p))
+::
+++  render-expr
+  ::  LiveExprNode.toString(sb, padding): the padded rendering. `pad` is the
+  ::  current indentation prefix; junctions add "    ", the temporal unaries "  "
+  |=  [modn=@t x=live-expr pad=tape]
+  ^-  tape
+  ?-  -.x
+    %bool     ?:(b.x "TRUE" "FALSE")
+    %state    (loc-leaf modn p.x)
+    %neg      (weld "-" (render-expr modn b.x (weld pad " ")))
+    %next     (weld "()" (render-expr modn b.x (weld pad "  ")))
+    %all      (weld "[]" (render-expr modn b.x (weld pad "  ")))
+    %even     (weld "<>" (render-expr modn b.x (weld pad "  ")))
+  ::
+      %act
+    ?~  sub.x  (loc-leaf modn a.x)
+    %-  zing
+    :~  ?:(box.x "[" "<")  (loc-leaf modn a.x)
+        ?:(box.x "]_" ">_")  (loc-leaf modn u.sub.x)
+    ==
+  ::
+      %enabled
+    ?~  sub.x  (weld "ENABLED " (loc-leaf modn p.x))
+    %-  zing
+    :~  "ENABLED "  ?:(box.x "[" "<")  (loc-leaf modn p.x)
+        ?:(box.x "]_" ">_")  (loc-leaf modn u.sub.x)
+    ==
+  ::
+    %conj     (render-junction modn "/\\ (" cs.x pad)
+    %disj     (render-junction modn "\\/ (" ds.x pad)
+  ==
+::
+++  render-junction
+  ::  LNConj/LNDisj.toString: each child as `OP (body)`, children after the
+  ::  first prefixed with `pad`, a newline between (not after the last); the
+  ::  child body is padded `pad + "    "`
+  |=  [modn=@t opn=tape l=(list live-expr) pad=tape]
+  ^-  tape
+  =/  pad1  (weld pad "    ")
+  =/  n     (lent l)
+  =/  i     0
+  =|  acc=tape
+  |-  ^-  tape
+  ?~  l  acc
+  =/  piece
+    %-  zing
+    :~  ?:(=(0 i) "" pad)
+        opn
+        (render-expr modn i.l pad1)
+        ")"
+        ?:(=(+(i) n) "" nl)
+    ==
+  $(l t.l, i +(i), acc (weld acc piece))
+::
+++  pem-loop
+  ::  one of PEM.toString's three loops (EAAction/AEState/AEAction): each index
+  ::  renders `OP <bin[idx]>` newline-terminated, the very first entry across
+  ::  the whole pem omitting the leading `pad`
+  |=  $:  modn=@t  opn=tape  idxs=(list @ud)
+          bin=(list live-expr)  pad=tape  pad1=tape  first=?
+      ==
+  ^-  [tape ?]
+  ?~  idxs  ["" first]
+  =/  line
+    %-  zing
+    :~  ?:(first "" pad)  opn  (render-expr modn (snag-le i.idxs bin) pad1)  nl
+    ==
+  =/  rest  $(idxs t.idxs, first |)
+  [(weld line -.rest) +.rest]
+::
+++  render-pem
+  ::  PossibleErrorModel.toString: EAAction (/\ <>[]) then AEState (/\ []<>)
+  ::  then AEAction (/\ []<>), each newline-terminated, over the shared bins
+  |=  [modn=@t p=pem cs=(list live-expr) ca=(list live-expr) pad=tape]
+  ^-  tape
+  =/  pad1  (weld pad "       ")
+  =/  r1  (pem-loop modn "/\\ <>[]" ea-action.p ca pad pad1 &)
+  =/  r2  (pem-loop modn "/\\ []<>" ae-state.p cs pad pad1 +.r1)
+  =/  r3  (pem-loop modn "/\\ []<>" ae-action.p ca pad pad1 +.r2)
+  :(weld -.r1 -.r2 -.r3)
+::
+++  render-oos
+  ::  OrderOfSolution.toString(sb): the tableau formula (if any) conjoined with
+  ::  the pems; a lone empty pem under a tableau renders just the tf
+  |=  [modn=@t o=oos]
+  ^-  tape
+  =/  plen  (lent pems.o)
+  ?:  ?&(?=(^ tf.o) =(1 plen) (pem-empty (snag-pem 0 pems.o)))
+    (render-expr modn u.tf.o "   ")
+  =/  head=tape
+    ?~  tf.o  ""
+    (zing ~["/\\ " (render-expr modn u.tf.o "   ") nl "/\\ "])
+  =/  pad=tape  ?~(tf.o "" "   ")
+  ?:  =(1 plen)
+    (weld head (render-pem modn (snag-pem 0 pems.o) check-state.o check-action.o pad))
+  =/  pad1  (weld pad "   ")
+  =/  acc
+    ;:  weld
+      head  "\\/ "
+      (render-pem modn (snag-pem 0 pems.o) check-state.o check-action.o pad1)
+    ==
+  =/  i  1
+  |-  ^-  tape
+  ?:  =(i plen)  acc
+  =/  piece
+    %+  weld  (weld pad "\\/ ")
+    (render-pem modn (snag-pem i pems.o) check-state.o check-action.o pad1)
+  $(i +(i), acc (weld acc piece))
+::
+++  to-lines
+  ::  split a rendered tape into wain lines on newline, dropping the trailing
+  ::  empty produced by a final newline (hand-rolled; zuse lore is out of scope)
+  |=  t=tape
+  ^-  wain
+  =|  cur=tape
+  =|  acc=(list @t)
+  |-  ^-  wain
+  ?~  t
+    ?~(cur (flop acc) (flop [(crip (flop cur)) acc]))
+  ?:  =(10 i.t)
+    $(t t.t, cur ~, acc [(crip (flop cur)) acc])
+  $(t t.t, cur [i.t cur])
+::
+++  render-struct
+  ::  the full LivenessStruct projection minus the TABLEAU node count (unit
+  ::  8.2): LIVESTRUCT / OOS n / per-OOS counts + the TF…ENDTF rendering
+  |=  [oss=(list oos) modn=@t]
+  ^-  wain
+  =/  hd=@t  (crip "OOS {(scow %ud (lent oss))}")
+  =/  body
+    =/  i  0
+    =|  acc=(list @t)
+    |-  ^-  (list @t)
+    ?~  oss  (flop acc)
+    =/  o  i.oss
+    =/  block=(list @t)
+      ;:  weld
+        :~  (crip "--- {(scow %ud i)} ---")
+            (crip "PROMISES {(scow %ud (lent promises.o))}")
+            (crip "CHECKSTATE {(scow %ud (lent check-state.o))}")
+            (crip "CHECKACTION {(scow %ud (lent check-action.o))}")
+            (crip "PEMS {(scow %ud (lent pems.o))}")
+            'TF'
+        ==
+        (to-lines (render-oos modn o))
+        `wain`~['ENDTF']
+      ==
+    $(oss t.oss, i +(i), acc (weld (flop block) acc))
+  `wain`['LIVESTRUCT' hd body]
 --
