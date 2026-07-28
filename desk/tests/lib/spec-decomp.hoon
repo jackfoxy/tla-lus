@@ -1,0 +1,52 @@
+::  SPECIFICATION decomposition (SpecProcessor.processConfigSpec port, WU5.3c/8.1):
+::  a SPECIFICATION `Init /\ [][Next]_v /\ Fairness` resolves to the same Init and
+::  Next the INIT/NEXT config keys give, and its WF_/SF_ conjuncts are extracted
+::  as the fairness list the liveness engine (unit 8) consumes.
+/+  *test
+/=  check  /lib/check
+|%
+++  mod-safety
+  '''
+  ---- MODULE A ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 3
+  Spec == Init /\ [][Next]_x
+  Inv == x < 3
+  ====
+  '''
+::
+::  A SPECIFICATION run and the equivalent INIT/NEXT run must be byte-identical:
+::  the decomposition recovers the same initial predicate and next-state action.
+++  test-spec-mode-matches-init-next
+  =/  a  (check:check mod-safety 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
+  =/  b  (check:check mod-safety 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a')
+  (expect-eq !>(b) !>(a))
+::
+::  A fairness conjunct in the SPECIFICATION is extracted (getTemporals): the
+::  decomposition yields exactly one WF_ fairness node.
+++  mod-fair
+  '''
+  ---- MODULE A ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Inc == x < 2 /\ x' = x + 1
+  Next == Inc \/ (x = 2 /\ x' = 2)
+  Spec == Init /\ [][Next]_x /\ WF_x(Inc)
+  Inv == x < 3
+  ====
+  '''
+::
+++  test-fairness-conjunct-extracted
+  =/  sc  (search-ctx:check mod-fair 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
+  ?:  ?=(%| -.sc)  (expect-eq !>(`@t`'ok') !>(p.sc))
+  (expect-eq !>(1) !>((lent fair.p.sc)))
+::
+::  No fairness in an INIT/NEXT run: the fairness list is empty.
+++  test-init-next-has-no-fairness
+  =/  sc  (search-ctx:check mod-safety 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a')
+  ?:  ?=(%| -.sc)  (expect-eq !>(`@t`'ok') !>(p.sc))
+  (expect-eq !>(0) !>((lent fair.p.sc)))
+--

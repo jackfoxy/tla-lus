@@ -972,9 +972,163 @@
       acons=(list sem:sem-lib)                ::  action constraints
       ddl=?                                   ::  check deadlock (cfg flag)
       pp=(unit @t)                           ::  property name (liveness)
+      fair=(list sem:sem-lib)                ::  fairness conjuncts (WF_/SF_/
+                                             ::  []temporal) from a SPECIFICATION
+                                             ::  decomposition (SpecProcessor
+                                             ::  getTemporals); empty in
+                                             ::  INIT/NEXT mode (unit 5.3c/8.1)
       tree=node
       nl=@t                                  ::  Next span label
   ==
+::
+++  sem-lvl
+  ::  the level of an IR node (apply/letin/atref carry it; a literal is
+  ::  constant-level, nullodn has none)
+  |=  s=sem:sem-lib
+  ^-  @ud
+  ?-  -.s
+    %apply    lvl.s
+    %letin    lvl.s
+    %atref    lvl.s
+    %lit      0
+    %nullodn  0
+  ==
+::
+++  weld-sem
+  ::  hand-rolled weld over the recursive `sem` mold (wet weld fuse-loops it)
+  |=  [a=(list sem:sem-lib) b=(list sem:sem-lib)]
+  ^-  (list sem:sem-lib)
+  ?~  a  b
+  [i.a $(a t.a)]
+::
+++  rev-sem
+  ::  hand-rolled reverse over the recursive `sem` mold (wet flop fuse-loops it)
+  |=  l=(list sem:sem-lib)
+  ^-  (list sem:sem-lib)
+  =|  acc=(list sem:sem-lib)
+  |-  ^-  (list sem:sem-lib)
+  ?~  l  acc
+  $(l t.l, acc [i.l acc])
+::
+++  max-lvl
+  ::  hand-rolled max level over IR nodes (wet roll fuse-loops the mold)
+  |=  l=(list sem:sem-lib)
+  ^-  @ud
+  =|  m=@ud
+  |-  ^-  @ud
+  ?~  l  m
+  $(l t.l, m (max m (sem-lvl i.l)))
+::
+++  resolve-ref
+  ::  resolve an arity-0 user-operator reference to its body; leave any other
+  ::  node unchanged (TLC's nextPred wraps the `Next` reference and getNextStates
+  ::  expands it — our solver takes the resolved body)
+  |=  [s=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ^-  (unit sem:sem-lib)
+  ?.  ?=(%apply -.s)  `s
+  ?.  &(?=(%user-op kind.op.s) =(~ args.s))  `s
+  =/  d  (~(get by defs) name.op.s)
+  ?~  d  ~
+  body.u.d
+::
+++  conjoin-inits
+  ::  the initial predicate is the conjunction of the SPECIFICATION's
+  ::  init conjuncts (TLC's initPredVec); a single conjunct passes through
+  |=  [l=(list sem:sem-lib) sp=(unit span)]
+  ^-  (unit sem:sem-lib)
+  ?~  l  ~
+  ?~  t.l  `i.l
+  `[%apply ['$ConjList' %builtin] (max-lvl l) sp ~ ~ l]
+::
+++  decompose-spec
+  ::  port of SpecProcessor.processConfigSpec: structurally decompose a
+  ::  SPECIFICATION body into its init conjuncts, its next-state action, and
+  ::  its fairness/temporal conjuncts. A worklist (never `turn`/`roll` over the
+  ::  recursive `sem` mold) processes conjuncts depth-first in source order.
+  ::  Out of scope for the corpus and deferred: INSTANCE substitution, LazyValue
+  ::  parameter inlining, the subscript-variable-coverage warning.
+  |=  [body=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ^-  $:  inits=(list sem:sem-lib)
+          next=(unit sem:sem-lib)
+          fair=(list sem:sem-lib)
+          err=(unit @t)
+      ==
+  =/  work=(list sem:sem-lib)  ~[body]
+  =|  inits=(list sem:sem-lib)
+  =|  fair=(list sem:sem-lib)
+  =/  next=(unit sem:sem-lib)  ~
+  |-  ^-  [(list sem:sem-lib) (unit sem:sem-lib) (list sem:sem-lib) (unit @t)]
+  ?~  work  [(rev-sem inits) next (rev-sem fair) ~]
+  =/  p     i.work
+  =/  rest  t.work
+  ?.  ?=(%apply -.p)
+    ?:  ?=(%letin -.p)
+      ?~  body.p  $(work rest)
+      $(work [u.body.p rest])
+    ::  a literal/atref conjunct: route by level
+    =/  l  (sem-lvl p)
+    ?:  (lte l 1)  $(work rest, inits [p inits])
+    ?:  =(3 l)     $(work rest, fair [p fair])
+    [inits next fair `'cannot handle this conjunct in the SPECIFICATION']
+  =/  op  name.op.p
+  ?:  &(?=(%user-op kind.op.p) =(~ args.p))
+    ::  arity-0 user operator: expand its body (init if state-level, else recurse)
+    =/  d  (~(get by defs) op)
+    ?~  d  $(work rest)
+    ?~  body.u.d  $(work rest)
+    ?:  =(1 (sem-lvl u.body.u.d))
+      $(work rest, inits [u.body.u.d inits])
+    $(work [u.body.u.d rest])
+  ?:  |(=(op '$ConjList') =(op '\\land'))
+    $(work (weld-sem args.p rest))
+  ?:  =(op '$Nop')
+    ?~  args.p  $(work rest)
+    $(work [i.args.p rest])
+  ?:  =(op '[]')
+    =/  arg  ?~(args.p p i.args.p)
+    ?:  &(?=(%apply -.arg) =('$SquareAct' name.op.arg))
+      ::  [][A]_v: the next-state relation is A (the first SquareAct argument)
+      ?^  next  [inits next fair `'the SPECIFICATION has more than one next-state relation']
+      ?~  args.arg  [inits next fair `'malformed [A]_v in the SPECIFICATION']
+      $(work rest, next `i.args.arg)
+    ?:  (lte (sem-lvl arg) 1)
+      [inits next fair `'TLC cannot handle a [] of a state predicate in the SPECIFICATION']
+    $(work rest, fair [p fair])
+  ::  any other conjunct: route by level
+  =/  l  (sem-lvl p)
+  ?:  (lte l 1)  $(work rest, inits [p inits])
+  ?:  =(3 l)     $(work rest, fair [p fair])
+  [inits next fair `'cannot handle this conjunct in the SPECIFICATION']
+::
+++  resolve-targets
+  ::  resolve the Init body, Next body, fairness conjuncts, and the Next
+  ::  operator name from either INIT/NEXT config keys or a SPECIFICATION
+  |=  [ca=cfg-ast:config defs=(map @t sem-def:sem-lib)]
+  ^-  (each [init=sem:sem-lib next=sem:sem-lib fair=(list sem:sem-lib) nname=(unit @t)] @t)
+  =/  in  init.ca
+  =/  nx  next.ca
+  ?:  &(?=(^ in) ?=(^ nx))
+    =/  isb  (sem-body defs u.in)
+    =/  nsb  (sem-body defs u.nx)
+    ?~  isb  [%| 'no Init definition']
+    ?~  nsb  [%| 'no Next definition']
+    [%& u.isb u.nsb ~ `u.nx]
+  ?~  spec.ca  [%| 'no INIT/NEXT or SPECIFICATION in config']
+  =/  sb  (sem-body defs u.spec.ca)
+  ?~  sb  [%| 'no specification definition']
+  =/  d  (decompose-spec u.sb defs)
+  ?^  err.d  [%| u.err.d]
+  ?~  next.d  [%| 'the SPECIFICATION has no next-state relation']
+  =/  isb  (conjoin-inits inits.d (sem-span:config u.sb))
+  ?~  isb  [%| 'the SPECIFICATION has no initial predicate']
+  =/  nsb  (resolve-ref u.next.d defs)
+  ?~  nsb  [%| 'the next-state relation is undefined']
+  ::  the Next span label uses the operator name when the action is a
+  ::  user-op reference (as in [][Next]_v)
+  =/  nname=(unit @t)
+    =/  n  u.next.d
+    ?:(&(?=(%apply -.n) ?=(%user-op kind.op.n)) `name.op.n ~)
+  [%& u.isb u.nsb fair.d nname]
 ::
 ++  search-ctx
   ::  parse, generate the WU3 graph, resolve config targets, solve the
@@ -989,22 +1143,20 @@
   =/  cr  (parse-cfg:config cfg)
   ?:  ?=(%| -.cr)  [%| 'config error']
   =/  ca  p.cr
-  =/  in  init.ca
-  =/  nx  next.ca
-  ?~  in  [%| 'no INIT in config']
-  ?~  nx  [%| 'no NEXT in config']
   =/  pp  ?~(properties.ca ~ `i.properties.ca)
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
-  =/  isb  (sem-body defs u.in)
-  =/  nsb  (sem-body defs u.nx)
-  ?~  isb  [%| 'no Init definition']
-  ?~  nsb  [%| 'no Next definition']
+  ::  resolve Init/Next (and fairness) from INIT/NEXT keys or a SPECIFICATION
+  =/  rt  (resolve-targets ca defs)
+  ?:  ?=(%| -.rt)  [%| p.rt]
+  =/  isb   init.p.rt
+  =/  nsb   next.p.rt
+  =/  fair  fair.p.rt
   =/  consts  (const-map cfg)
-  =/  nb  (body-of-def tree u.nx)
-  =/  ir  (init-states:ne u.isb (make-env:ne defs consts vars))
+  =/  nb  ?~(nname.p.rt ~ (body-of-def tree u.nname.p.rt))
+  =/  ir  (init-states:ne isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
   =/  cons   (resolve-bodies defs constraints.ca)
@@ -1018,8 +1170,8 @@
   ?:  &(?=(^ perms) ?=(^ pp))
     [%| 'unsupported: symmetry with a temporal property (unit 8)']
   :-  %&
-  :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  u.nsb
-      invs  cons  acons  ddl  pp  tree
+  :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
+      invs  cons  acons  ddl  pp  fair  tree
       ?~(nb '' (next-span-label u.nb modn))
   ==
 ::
