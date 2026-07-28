@@ -236,3 +236,118 @@ Corpus (13 cases): `diamond-stutter`, `box-state`, `boxdiamond-stutter`,
 (oracle-only in `tools/validate.py` until 8.1). Run the generator twice and diff
 the tree — the corpus uses no `TLC!JavaTime`-style irreproducible surface, but
 the twice-and-diff discipline is the project rule.
+
+---
+
+# 8.1 — Temporal-property normalization to live expressions
+
+**Status: oracle target frozen; `lib/temporal.hoon` port pending.**
+
+## The 8.1 structural oracle (the parity target)
+
+`tools/oracle/LivenessStruct.java` drives `FastTool` (SANY + SpecProcessor, so
+SPECIFICATION fairness and PROPERTY temporals are resolved) then
+`Liveness.processLiveness(tool, true)` and, per `OrderOfSolution`, projects:
+
+```
+LIVESTRUCT
+OOS <count>
+--- <i> ---
+PROMISES <n>          getPromises().length (LNEven[], the <>-promises)
+CHECKSTATE <n>        getCheckState().length ([]<>S state bin)
+CHECKACTION <n>       getCheckAction().length (union of []<>A and <>[]A action bin)
+PEMS <n>              getPems().length (disjuncts sharing this tf)
+TABLEAU <node-count>  getTableau().size() (built here; the graph is unit 8.2)
+TF
+<OrderOfSolution.toString()>   the padded rendering of the tableau formula + pems
+ENDTF
+```
+
+Captured per case as `desk/test-data/liveness/<case>/struct.txt`, byte-stable
+across runs (verified: generate twice, diff the tree). `box-state` yields
+`OOS 0` (the `[]state`→invariant routing — no temporal solution). `temporal.hoon`
+plus its renderer must reproduce this projection.
+
+**Leaf rendering fact:** `OrderOfSolution.toString()` renders `LNState`/
+`LNAction`/`LNStateEnabled` leaves as the underlying semantic `ExprNode`, whose
+`toString` is its **`Location`** (`line L, col C to line L2, col C2 of module M`)
+— *not* the expression text. This is deterministic per fixture (the `.tla` is
+fixed) and is exactly the `Location.toString` format already reproduced
+elsewhere (WU4 level `2272`). So the Hoon leaves render from `at=sspan`, and the
+live-expr structure is span-identified, not text-identified.
+
+## astToLive: semantic node → live-expr (the port spec)
+
+`Liveness.astToLive` (`Liveness.java:49-178`) + `astToLiveAppl`
+(`Liveness.java:180+`). The **leaf decision is level-driven**, and WU3/WU4
+already stamp `lvl` on every `sem` node — so the Hoon port reads `lvl`, it does
+NOT re-derive levels:
+
+- `lvl == 0` (constant): `tool.eval` the expression to a boolean → `LNBool`
+  (TRUE/FALSE). The only case needing the evaluator; node-eval supplies it.
+- `lvl == 1` (state): `LNStateAST` — a state-predicate leaf.
+- `lvl == 2` (action): `LNAction` — an action-predicate leaf.
+- `lvl == 3` (temporal): recurse via the op dispatch; a leaf here is a
+  `TLC_LIVE_CANNOT_HANDLE_FORMULA` reject.
+
+Op dispatch (`astToLiveAppl`, keyed on the `sem` op name; WU3 builtin names in
+`semantic.hoon` `builtin-ops`):
+
+- `\land` / `$ConjList` → `LNConj`; `\lor` / `$DisjList` → `LNDisj`.
+- `\lnot` / `\neg` → `LNNeg` (temporal arg) else fall through to a leaf.
+- `=>` (implies) → `LNDisj(LNNeg(a), b)` (temporal) else leaf. Material
+  implication; TLC has no logical-implication live node.
+- `'` (prime) → `LNAction` leaf. `$AngleAct` `<A>_e` → `LNAction(A, sub=e)`.
+- `[]` → `LNAll`; `<>` → `LNEven`.
+- `$WF` `WF_e(A)` → `LNAll(LNEven(LNDisj(LNNeg(ENABLED<A>_e), <A>_e)))`
+  = `[]<>(¬ENABLED<A>_e ∨ <A>_e)`. Args order = [e A] (subscript first).
+- `$SF` `SF_e(A)` → `LNDisj(LNEven(LNAll(LNNeg(ENABLED<A>_e))), LNAll(LNEven(<A>_e)))`
+  = `<>[]¬ENABLED<A>_e ∨ []<><A>_e`.
+- `~>` (and `-+->`) `P ~> Q` → `LNAll(LNDisj(LNNeg(P), LNEven(Q)))`
+  = `[](¬P ∨ <>Q)`.
+- `$IfThenElse` → conditional expansion; `$BoundedExists`/`$BoundedForall` at
+  temporal level → `LNDisj`/`LNConj` over the enumerated domain (needs node-eval
+  enumeration; NOT hit by the corpus — the corpus's only `\E` sits *inside* a
+  state-pred leaf and is therefore opaque to astToLive).
+- `LetIn` → translate the body; `SubstIn` → translate under the substitution;
+  `Label` → translate the labelled body.
+
+These expansions are directly visible in the frozen `struct.txt` goldens (e.g.
+`wf-pass` TF shows `[]<>(¬ENABLED ∨ <A>)`; `sf-pass` shows the SF split into two
+pem disjuncts; `leadsto-*` shows `<>(P ∧ []¬Q)` after negation+DNF).
+
+## parseLiveness + processLiveness (the decomposition spec)
+
+`parseLiveness` (`Liveness.java:576`): build `livespec` = conj of the fairness
+`Action`s (`tool.getTemporals()`), and negate the properties
+(`tool.getImpliedTemporals()`) — one property → `LNNeg`, many → `LNDisj` of
+`LNNeg`s — then conjoin. Counterexample form is `livespec ∧ ¬livecheck`.
+
+`processLiveness` (`Liveness.java:664`): `tagExpr(1)` (leaf tags for equality),
+then `simplify().toDNF()` (pushes negation to the atoms). Split the DNF into
+disjuncts; per disjunct `classifyExpr` sorts conjuncts into `OSExprPem`:
+`<>[]A`→AEAction, `[]<>A`→EAAction, `<>[]S`→AEState, and the rest→`tfs` (the
+tableau formula). Lump disjuncts with syntactically-equal `tf` into one
+`OrderOfSolution`; per OOS, `tf.makeBinary()` → `TBGraph` (8.2) +
+`extractPromises` (the `<>`-promises); the pems become index arrays into the
+shared `checkState`/`checkAction` bins.
+
+## Required Hoon interfaces (frozen for 8.2/8.3 to build against)
+
+- `live-expr`: the LN* tree. **Recursive-mold hazard** — this is precisely the
+  zuse-408 fuse-loop surface. Use the obelisk `$+ name` recipe: every node a
+  named `+$` with a constant-head `$: %tag ... ==` record; hand-roll every
+  recursion over it (no `turn`/`roll`/`zing` — the C1.8 `bail: meme` lesson).
+  Leaves (`%state`/`%act`/`%enabled`) carry a `sem` node + its `sspan`; `sem`
+  is external to the cycle so it rides as an opaque leaf field.
+- `oos`: `[tableau=(unit tb-graph) promises=(list live-expr) check-state=(list
+  live-expr) check-action=(list live-expr) pems=(list pem)]`; `tableau` is `~`
+  until 8.2 fills it.
+- `pem`: `[ae-action=(list @ud) ae-state=(list @ud) ea-action=(list @ud)]`
+  (indices into the OOS bins, exactly Java's `PossibleErrorModel`).
+- `+render-struct`: emits the `LIVESTRUCT` projection above for the differential.
+
+Migration note (8.1 task 5): the `<>P`/`[]<>P`/`[]P` first-increment cases route
+through `temporal.hoon` producing the same `live-expr`/`oos` a general property
+would; the old `+unwrap-prop` recognizer stays only until 8.5 makes the general
+path pass them.

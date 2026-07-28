@@ -1,0 +1,11 @@
+LIVESTRUCT
+OOS 1
+--- 0 ---
+PROMISES 0
+CHECKSTATE 0
+CHECKACTION 0
+PEMS 1
+TABLEAU 1
+TF
+[]-line 7, col 12 to line 7, col 16 of module A
+ENDTF

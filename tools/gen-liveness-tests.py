@@ -39,9 +39,17 @@ def golden(case: Path) -> None:
         tdp = Path(td)
         shutil.copy(case / "A.tla", tdp / "A.tla")
         shutil.copy(case / "A.txt", tdp / "A.cfg")
+        # out.txt: the run projection (verdict, lasso, loop target, class)
         r = subprocess.run(["java", "-cp", DUMP_CP, "LivenessDump", "A"] + opts,
                            cwd=td, capture_output=True, text=True, timeout=180)
-    (case / "out.txt").write_text(r.stdout)
+        (case / "out.txt").write_text(r.stdout)
+        # struct.txt: the normalization projection (OrderOfSolution decomposition
+        # — the live-expression / oos / pem parity target for lib/temporal.hoon,
+        # unit 8.1). Independent of the extra tlc args (options do not affect the
+        # temporal normalization), so LivenessStruct takes no opts.
+        s = subprocess.run(["java", "-cp", DUMP_CP, "LivenessStruct", "A"],
+                           cwd=td, capture_output=True, text=True, timeout=180)
+        (case / "struct.txt").write_text(s.stdout)
 
 
 def main() -> None:
