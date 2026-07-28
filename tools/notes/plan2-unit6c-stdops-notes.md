@@ -449,7 +449,41 @@ boundary: agreement cases, the adversarial sets, `CHOOSE`, record fields and
 equality, cardinality, dedup). `compatibility.md` carries the surface-by-
 surface table and the statement of what a result means.
 
-## 14. Gotchas hit in C1.0
+## 14. C1.8 — the differential comparator, and what it cost
+
+`gen-stdops-tests.py` now emits `desk/tests/lib/stdops-diff.hoon`: every
+arity-0 definition of the corpus, evaluated through the registry
+(`project-defs` in `check.hoon`, one graph generation per case) and compared
+against the oracle's own projection — **91 definitions byte for byte**,
+kinds and error codes included. Deliberate differences are named in each
+arm's skip list with a reason (tabulated in `compatibility.md`), so a new
+divergence cannot appear silently. `validate.py` flips the generator to
+`pass`: compared cases 785 → 796.
+
+Three problems it exposed, all fixed:
+
+1. **The retired CST renderer dropped set elements.** `project-defs` first
+   rendered with `render:ev`; `Permutations({1, 2})` printed
+   `{<<2, 1>>}` although `Cardinality` of the same value was 2. Rendering now
+   goes through the value core (`render:vl`). Worth remembering: two
+   renderers existed, and only one is canonical.
+2. **`orderings` blew the loom.** Written with the wet list gates
+   (`turn`/`skip`/`zing`) over the recursive `value` mold, it filled memory
+   on a *two-element* set — the fuse-loop hazard shows up as `bail: meme`,
+   not as a type error. Hand-rolled like the other value-list walks.
+3. **The corpus was unaffordable.** `ext-defs` generated full IR — bodies
+   included — for every extended StandardModule, and nine cases in one event
+   exhausted the loom. It now synthesizes bodyless definitions from a
+   module's export context (enough for the registry key and for the typed
+   rejection) and generates bodies only for user modules and for the one
+   standard module the pin leaves partly un-overridden (`Bags`,
+   `+body-modules`).
+
+Debugging note: two apparent crashes were the dojo's own wedged input line,
+not the code. Confirm a failure with a committed one-arm test file before
+believing a dojo trace.
+
+## 15. Gotchas hit in C1.0
 
 - A `|` inside a code span in a manifest cell breaks `check-parity.py`'s row
   split (it splits the raw markdown row); escape it out of the text entirely.

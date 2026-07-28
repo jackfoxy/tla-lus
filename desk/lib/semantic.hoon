@@ -868,14 +868,40 @@
   %+  skim  order
   |=(nm=@t &(!=(nm root) (~(has in reach) nm)))
 ::
+++  body-modules
+  ::  StandardModules whose vendored bodies must actually be generated,
+  ::  because the pin leaves one of their operators un-overridden (see
+  ::  +body-ok in lib/stdops; tests/lib/stdops guards the two against drift).
+  ::  Every other standard module's bodies are the dummies TLC overrides —
+  ::  the evaluator must never use them, so generating them is wasted work
+  ::  and, across a corpus, wasted memory
+  ^-  (set @t)
+  (silt ~['Bags'])
+::
+++  ctx-defs
+  ::  the definitions a module exports, synthesized from its export context:
+  ::  names, arities, and the defining module, with no body. Enough for the
+  ::  override registry (which keys on module + name + arity) and for the
+  ::  typed rejection a bodyless StandardModule operator must produce
+  |=  [mod=@t c=ctx]
+  ^-  (list sem-def)
+  %+  turn
+    %+  sort  ~(tap by c)
+    |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b))
+  |=  [nm=@t s=sym]
+  ^-  sem-def
+  [%sdef nm arity.s | level.s ~ ~ ~ mod]
+::
 ++  ext-defs
-  ::  every definition the root inherits through EXTENDS, generated from
-  ::  its own module's tree so spans stay in that module's coordinates and
-  ::  carrying the defining module as its origin. Dependency-first, first
-  ::  definer wins (Sequences re-exports Naturals' `+`, but the operator
-  ::  belongs to Naturals — the module tlc2 binds its override through).
-  ::  LOCAL definitions are not exported and are skipped. These are not
-  ::  level-checked: evaluation consumes bodies, not level metadata
+  ::  every definition the root inherits through EXTENDS, carrying the
+  ::  defining module as its origin. Dependency-first, first definer wins
+  ::  (Sequences re-exports Naturals' `+`, but the operator belongs to
+  ::  Naturals — the module tlc2 binds its override through). A user module
+  ::  is generated from its own tree so its bodies are evaluable and spans
+  ::  stay in that module's coordinates; a StandardModule contributes names
+  ::  and arities only, unless the pin leaves one of its operators
+  ::  un-overridden. LOCAL definitions are not exported and are skipped.
+  ::  These are not level-checked: evaluation consumes bodies
   |=  [root=@t order=(list @t) ctxs=(map @t ctx) mods=(map @t loaded:modules)]
   ^-  (list sem-def)
   =/  ms  (ext-reach root order mods)
@@ -885,9 +911,12 @@
   ?~  ms  (flop out)
   =/  ld  (~(get by mods) i.ms)
   ?~  ld  $(ms t.ms)
-  =/  fc  (full-ctx tree.u.ld ctxs)
-  =/  m   (gen-module tree.u.ld fc ctxs mods)
-  =/  ds  (stamp-origin i.ms defs.m)
+  =/  std  (~(has by standard-modules:stdmods:modules) i.ms)
+  =/  ds
+    ?:  &(std !(~(has in body-modules) i.ms))
+      (ctx-defs i.ms (~(gut by ctxs) i.ms ~))
+    =/  fc  (full-ctx tree.u.ld ctxs)
+    (stamp-origin i.ms defs:(gen-module tree.u.ld fc ctxs mods))
   =/  acc
     |-  ^-  [seen=(set @t) out=(list sem-def)]
     ?~  ds  [seen out]

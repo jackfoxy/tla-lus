@@ -776,13 +776,11 @@
   ?.  (set-like:v i.as)
     [%| (wrong-value-error 'Permutations' 'a finite set' i.as)]
   =/  es  (set-elems:v (normalize:v i.as))
-  :-  %&
-  %-  normalize:v
-  :-  %set
-  %+  turn  (orderings es)
-  |=  perm=(list value:v)
-  ^-  value:v
-  [%fcn (zip-pairs es perm)]
+  =/  ps  (orderings es)
+  =|  fs=(list value:v)
+  |-  ^-  eres
+  ?~  ps  [%& (normalize:v [%set fs])]
+  $(ps t.ps, fs [[%fcn (zip-pairs es i.ps)] fs])
 ::
 ++  zip-pairs
   |=  [ds=(list value:v) rs=(list value:v)]
@@ -791,17 +789,36 @@
   ?~  rs  ~
   [[i.ds i.rs] $(ds t.ds, rs t.rs)]
 ::
+++  drop-eq
+  ::  the elements of `vs` that do not equal `x`
+  |=  [x=value:v vs=(list value:v)]
+  ^-  (list value:v)
+  =|  out=(list value:v)
+  |-  ^-  (list value:v)
+  ?~  vs  (flop out)
+  ?:  (equal:v x i.vs)  $(vs t.vs)
+  $(vs t.vs, out [i.vs out])
+::
 ++  orderings
-  ::  every ordering of a list, in a deterministic order
+  ::  every ordering of a list, deterministically. Hand-rolled on purpose:
+  ::  the wet list gates (turn/skip/zing) over the recursive `value` mold
+  ::  fuse-loop the zuse-408 mold compiler, which shows up as the loom
+  ::  filling rather than as a type error
   |=  vs=(list value:v)
   ^-  (list (list value:v))
   ?~  vs  ~[~]
-  %-  zing
-  %+  turn  `(list value:v)`vs
-  |=  x=value:v
-  =/  rest  (skip `(list value:v)`vs |=(y=value:v (equal:v x y)))
-  %+  turn  ^$(vs rest)
-  |=(r=(list value:v) [x r])
+  =|  out=(list (list value:v))
+  =/  l=(list value:v)  vs
+  |-  ^-  (list (list value:v))
+  ?~  l  out
+  =/  subs  ^$(vs (drop-eq i.l vs))
+  =/  o2
+    =/  ss  subs
+    =/  acc  out
+    |-  ^-  (list (list value:v))
+    ?~  ss  acc
+    $(ss t.ss, acc [[i.l i.ss] acc])
+  $(l t.l, out o2)
 ::
 ++  print-op
   ::  TLC!Print / TLC!PrintT write to TLC's console. Gall owns effects here

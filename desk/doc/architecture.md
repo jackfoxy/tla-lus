@@ -30,7 +30,10 @@ config.hoon    TLC .cfg parse + config-vs-graph validation  ── unit 5 (B4)
                + typed run-spec (vs ConfigDump/FastTool)
    │
 tlc/value.hoon      canonical TLC values (equality, order,  ── unit 6 (B5)
-                    render, FP64 input bytes)
+                    render, FP64 input bytes, lazy sets)
+tlc/stdops.hoon     StandardModule override registry keyed  ── unit 6C (C1)
+                    [module operator arity]; argument
+                    contract (lazy/minLevel) per operator
 tlc/node-eval.hoon  semantic-node evaluator + action solver ── unit 6
                     (init/next-states, pred-bool)
 tlc/fingerprint.hoon  FP64 fingerprints, FPSet, symmetry     ── unit 7.1/7.5
@@ -49,6 +52,20 @@ job.hoon       resumable stage engine: init → step → …,      ── units 
                jammed continuation, typed %limited limits,
                asynchronous %modules source load, quotas
 ```
+
+**StandardModule operators resolve through `lib/stdops`**, the Hoon
+equivalent of tlc2's override binding: the key is `[module operator arity]`,
+never a bare name, and an override beats the operator's vendored TLA+ body
+(those bodies are deliberate dummies TLC overrides). An operator with neither
+an override nor an explicit body classification is a typed rejection naming
+itself. Three properties are machine-checked against the pinned tree by
+`tools/gen-stdops-tests.py`: every registry key is an operator the pin
+declares and classifies required; the body-evaluable set equals the pin's
+un-overridden operators; and each operator's laziness and `minLevel` equal
+its pinned annotation. Operators needing more than evaluated values — an
+operator argument, a lazy set, or the unevaluated node of an `@Evaluation`
+override — are dispatched to `node-eval`, which owns the environment and the
+recursion budget.
 
 The Work Unit 6–7 core lives under `lib/`. Safety state generation runs
 on the Work Unit 3 semantic graph through `tlc/node-eval` (the retired CST

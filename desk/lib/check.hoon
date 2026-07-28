@@ -6,6 +6,7 @@
 /=  ne       /lib/node-eval
 /=  fp       /lib/fingerprint
 /=  sem-lib  /lib/semantic
+/=  vl       /lib/value
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
   ::
@@ -1034,6 +1035,65 @@
   ^-  (map @t value)
   =/  pr  (parse-cfg:config cfg)
   ?:(?=(%| -.pr) ~ (consts-of constants.p.pr))
+::
+++  kind-name
+  ::  the tlc2 value class a value corresponds to, the stable kind
+  ::  discriminator the oracle projection prints (unit 6C.8)
+  |=  x=value
+  ^-  tape
+  ?-  -.x
+    %bool   "BoolValue"
+    %int    "IntValue"
+    %str    "StringValue"
+    %model  "ModelValue"
+    %intv   "IntervalValue"
+    %set    "SetEnumValue"
+    %seq    "TupleValue"
+    %rec    "RecordValue"
+    %fcn    "FcnRcdValue"
+  ==
+::
+++  project-defs
+  ::  every arity-0 definition of a module, sorted by name and evaluated once
+  ::  under the config's constant assignments, in the oracle's projection
+  ::  form: "<name> <kind> <canonical value>" or "<name> ! EC<code> <message>".
+  ::  Newlines in a diagnostic become spaces, exactly as ModuleOpDump's
+  ::  projection collapses them. `skip` names the definitions this port
+  ::  deliberately answers differently (unit 6C.8's differential comparator);
+  ::  the graph is generated ONCE for the whole case
+  |=  [spec=@t cfg=@t skip=(list @t)]
+  ^-  (list tape)
+  =/  mo  (generate:sem-lib 'A' (malt ~[['A' spec]]))
+  ?~  mo  ~["! no semantic graph"]
+  =/  defs  (defmap-of:ne u.mo)
+  =/  e  (make-env:ne defs (const-map cfg) (vars-of:ne u.mo))
+  =/  skipped  (silt skip)
+  =/  names
+    %+  sort
+      %+  murn  defs.u.mo
+      |=  d=sem-def:sem-lib
+      ^-  (unit @t)
+      ?:  |(!=(0 arity.d) (~(has in skipped) name.d))  ~
+      ?~(body.d ~ `name.d)
+    aor
+  %+  turn  names
+  |=  nm=@t
+  ^-  tape
+  =/  d  (~(get by defs) nm)
+  ?~  d  :(weld (trip nm) " ! no definition")
+  ?~  body.u.d  :(weld (trip nm) " ! no body")
+  =/  r  (eval:ne u.body.u.d e)
+  ?:  ?=(%& -.r)
+    :(weld (trip nm) " " (kind-name p.r) " " (render:vl p.r))
+  ;:  weld
+    (trip nm)  " ! EC"  (a-co:co code.p.r)  " "  (flat-msg msg.p.r)
+  ==
+::
+++  flat-msg
+  ::  a diagnostic on one line, as the oracle projection prints it
+  |=  m=@t
+  ^-  tape
+  (turn (trip m) |=(c=@tD ?:(=(c 10) ' ' c)))
 ::
 ++  check-assumes
   ::  TLC Tool.checkAssumptions, run before the search: every module ASSUME

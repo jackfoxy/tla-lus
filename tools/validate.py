@@ -52,7 +52,7 @@ GENERATORS = [
     ("gen-cfg-val-tests.py", "pass",        "Config-vs-graph validation (SpecProcessor)", "desk/tests/lib/cfg-val.hoon"),
     ("gen-core-eval-tests.py", "oracle-only", "Core value/evaluation (Tool.eval)", "(no semantic-node evaluator yet — unit 6.5)"),
     ("gen-safety-tests.py",  "oracle-only", "Single-worker safety (tlc2.TLC/ModelChecker)", "(no FP64/safety comparator yet — unit 7.1+)"),
-    ("gen-stdops-tests.py",  "oracle-only", "StandardModule overrides (tlc2.module registry)", "(no override registry yet — unit 6C.1)"),
+    ("gen-stdops-tests.py",  "pass",        "StandardModule overrides (tlc2.module registry)", "desk/tests/lib/stdops-diff.hoon"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically

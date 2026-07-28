@@ -815,10 +815,25 @@ EC 2169 with the pin's operand text.
 typed failure rather than a hang, and a non-integer membership test raises
 EC 2158 with the pin's message.
 
-Error codes for the implemented operators are the pin's (2154, 2158, 2169,
-2178, 2179, 2180, 2265, 2266); the operators C1.3-C1.5 still owe carry their
-own codes (2176, 2181, 2182, 2183, 2184, 2283), pinned per operator in
-`desk/test-data/stdops/*/golden-ops.txt`.
+Error codes are the pin's throughout (2132, 2145, 2154, 2158, 2169, 2176,
+2178, 2179, 2180, 2181, 2182, 2183, 2184, 2265, 2266, 2283).
+
+**This is checked, not asserted.** `tests/lib/stdops-diff` (generated) runs
+every arity-0 definition of the fixture corpus through the registry and
+compares it against the pinned oracle's own projection — **91 definitions,
+byte for byte**. A definition this port deliberately answers differently is
+named in that arm's skip list with its reason, so a new divergence cannot
+appear silently. The complete list of deliberate skips:
+
+| definition | why |
+|---|---|
+| `Nat`, `Int`, `Seq(S)` in a value position | non-enumerable descriptors here, `UserValue`s at the pin |
+| any `SelectSeq`/`SortSeq`/`BagOfAll` with a `LAMBDA` argument | LAMBDA is not in the semantic graph yet (unit-3 residue) |
+| `1 + "a"` | the pin's message names the Java method signature; normalized here |
+| `Bags!SubBag` applied | its vendored body needs recursive functions and multi-binder set constructors (unit-6.5 residue) |
+| `Print`, `PrintT`, `Any` | typed rejections here (no output channel; `Any` excluded) |
+| the whole `st-string-order` case | family 5, measured and approved (above) |
+| the whole `st-big-literal` case | the pin fails the entire load on a numeral above 2^31-1; here the expression containing it fails |
 
 Differences that remain in this area, all failures rather than wrong values:
 
