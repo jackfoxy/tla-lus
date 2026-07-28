@@ -3,6 +3,7 @@
 ::  the TABLEAU node count (unit 8.2). Driven through check.hoon's live-struct.
 /+  *test
 /=  check  /lib/check
+/=  tp     /lib/temporal
 |%
 ++  exp1
   ::  the expected count projection for a single OrderOfSolution
@@ -15,6 +16,11 @@
       (crip "CHECKACTION {(scow %ud ca)}")
       (crip "PEMS {(scow %ud pm)}")
   ==
+::
+::  a state-predicate leaf with a distinct span (column c), and its <>-promise,
+::  for the make-binary / extract-promises unit tests
+++  stp  |=(c=@ud `live-expr:tp`[%state [%lit %num '0' `[[1 c] [1 +(c)]]]])
+++  evp  |=(c=@ud `live-expr:tp`[%even (stp c)])
 ::
 ++  cfg-in-next  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  cfg-spec     'SPECIFICATION Spec\0aPROPERTY Live\0a'
@@ -229,4 +235,34 @@
   %+  expect-eq
     !>((exp1 0 0 2 1))
   !>((live-struct-raw:check mod-symmetry-live cfg-symmetry))
+::
+::  makeBinary balances an n-ary conjunction into two-child nodes
+++  test-make-binary-shape
+  =/  a  (stp 1)
+  =/  b  (stp 2)
+  =/  c  (stp 3)
+  %+  expect-eq
+    !>(`live-expr:tp`[%conj ~[a [%conj ~[b c]]]])
+  !>((make-binary:tp `live-expr:tp`[%conj ~[a b c]]))
+::
+::  makeBinary is idempotent on the already-binary result
+++  test-make-binary-idempotent
+  =/  x   `live-expr:tp`[%disj ~[(stp 1) (stp 2) (stp 3) (stp 4)]]
+  =/  mb  (make-binary:tp x)
+  (expect-eq !>(mb) !>((make-binary:tp mb)))
+::
+::  P ~> Q normalizes to <>(P /\ []-Q): exactly one promise
+++  test-promises-leadsto
+  =/  f  `live-expr:tp`[%even [%conj ~[(stp 1) [%all [%neg (stp 2)]]]]]
+  (expect-eq !>(`@ud`1) !>((lent (extract-promises:tp (make-binary-unit:tp `f)))))
+::
+::  a nested <> contributes its own promise: <>(<>P \/ Q) -> two promises
+++  test-promises-nested
+  =/  f  `live-expr:tp`[%even [%disj ~[(evp 1) (stp 2)]]]
+  (expect-eq !>(`@ud`2) !>((lent (extract-promises:tp (make-binary-unit:tp `f)))))
+::
+::  duplicate <> subformulas (same span) dedup to one promise
+++  test-promises-dedup
+  =/  f  `live-expr:tp`[%conj ~[(evp 1) (evp 1) (evp 2)]]
+  (expect-eq !>(`@ud`2) !>((lent (extract-promises:tp (make-binary-unit:tp `f)))))
 --
