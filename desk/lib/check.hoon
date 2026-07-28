@@ -6,6 +6,7 @@
 /=  ne       /lib/node-eval
 /=  fp       /lib/fingerprint
 /=  sem-lib  /lib/semantic
+/=  tp       /lib/temporal
 /=  vl       /lib/value
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
@@ -1261,6 +1262,55 @@
   ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]
   ?.  p.r  `[2.104 'An assumption is false.']
   $(asmz t.asmz)
+::
+++  live-struct
+  ::  the temporal-normalization count projection (unit 8.1) for a spec+cfg,
+  ::  matching LivenessStruct's OOS/promises/checkState/checkAction/pems counts
+  ::  (the TABLEAU node count is unit 8.2). Resolves the PROPERTY bodies and the
+  ::  SPECIFICATION fairness conjuncts, then runs temporal.hoon's normalize.
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  cr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.cr)  ~['Error: config']
+  =/  pbods=(list sem:sem-lib)
+    =/  ps  properties.p.cr
+    |-  ^-  (list sem:sem-lib)
+    ?~  ps  ~
+    =/  b  (sem-body defs.c i.ps)
+    ?~  b  $(ps t.ps)
+    [u.b $(ps t.ps)]
+  (render-counts:tp (normalize:tp pbods fair.c))
+::
+++  live-struct-raw
+  ::  the same count projection as +live-struct, but skipping search-ctx's
+  ::  symmetry-with-temporal rejection so the normalization of a symmetry+
+  ::  liveness spec (the corpus symmetry-live case) is still exercised. Only
+  ::  the property/fairness normalization is driven — no init solve or search.
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  pr  (parse:syntax spec)
+  ?:  ?=(%| -.pr)  ~['Error: parse error']
+  =/  tree  p.pr
+  =/  cr  (parse-cfg:config cfg)
+  ?:  ?=(%| -.cr)  ~['Error: config']
+  =/  ca  p.cr
+  =/  modn  (module-name-of tree)
+  =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
+  ?~  mo  ~['Error: semantic error']
+  =/  defs  (defmap-of:ne u.mo)
+  =/  rt  (resolve-targets ca defs)
+  ?:  ?=(%| -.rt)  ~[(cat 3 'Error: ' p.rt)]
+  =/  pbods=(list sem:sem-lib)
+    =/  ps  properties.ca
+    |-  ^-  (list sem:sem-lib)
+    ?~  ps  ~
+    =/  b  (sem-body defs i.ps)
+    ?~  b  $(ps t.ps)
+    [u.b $(ps t.ps)]
+  (render-counts:tp (normalize:tp pbods fair.p.rt))
 ::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines
