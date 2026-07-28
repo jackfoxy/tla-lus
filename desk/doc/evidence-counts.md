@@ -22,7 +22,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 | `gen-stdops-tests.py` | 11 | pass | StandardModule overrides (tlc2.module registry) | `desk/tests/lib/stdops-diff.hoon` |
+| `gen-liveness-tests.py` | 13 | oracle-only | Single-worker liveness (tlc2.TLC/LiveCheck) | `(no temporal/tableau/liveness comparator yet — unit 8.1+)` |
 
-Compared cases: **796**.  Oracle-only cases: **27**.
+Compared cases: **796**.  Oracle-only cases: **40**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

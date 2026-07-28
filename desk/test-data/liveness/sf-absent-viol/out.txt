@@ -1,0 +1,21 @@
+LIVENESS
+VERDICT violated-property
+EC 2116
+STAT generated 5
+STAT distinct 3
+STAT queue 0
+STAT depth 3
+CLASS back-to-state
+LOOP 1
+TRACE 3
+STATE 1 0xd0ba3e880dcdd983
+LABEL <Initial predicate>
+x = 0
+ENDSTATE
+STATE 2 0xf67893cfa654c4b3
+LABEL <Ay line 5, col 7 to line 5, col 21 of module A>
+x = 1
+ENDSTATE
+STATE 1 -1
+LABEL Back to state
+ENDSTATE

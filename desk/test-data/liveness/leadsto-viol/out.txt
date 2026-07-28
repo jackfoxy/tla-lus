@@ -1,0 +1,17 @@
+LIVENESS
+VERDICT violated-property
+EC 2116
+STAT generated 4
+STAT distinct 2
+STAT queue 0
+STAT depth 2
+CLASS stuttering
+LOOP 1
+TRACE 2
+STATE 1 0xd0ba3e880dcdd983
+LABEL <Initial predicate>
+x = 0
+ENDSTATE
+STATE 2 -1
+LABEL Stuttering
+ENDSTATE

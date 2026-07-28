@@ -53,6 +53,7 @@ GENERATORS = [
     ("gen-core-eval-tests.py", "oracle-only", "Core value/evaluation (Tool.eval)", "(no semantic-node evaluator yet — unit 6.5)"),
     ("gen-safety-tests.py",  "oracle-only", "Single-worker safety (tlc2.TLC/ModelChecker)", "(no FP64/safety comparator yet — unit 7.1+)"),
     ("gen-stdops-tests.py",  "pass",        "StandardModule overrides (tlc2.module registry)", "desk/tests/lib/stdops-diff.hoon"),
+    ("gen-liveness-tests.py", "oracle-only", "Single-worker liveness (tlc2.TLC/LiveCheck)", "(no temporal/tableau/liveness comparator yet — unit 8.1+)"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically
