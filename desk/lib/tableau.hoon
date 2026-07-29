@@ -154,17 +154,20 @@
   |=  [terms=par alphas=(list triple) betas=(list triple)]
   ^-  (list par)
   ?.  (locally-consistent terms)  ~
-  ::  alpha expansion (MP fig 5.1): []p -> p,()[]p ; p/\q -> p,q
+  ::  alpha expansion (MP fig 5.1): []p -> p,()[]p ; p/\q -> p,q — to a
+  ::  fixpoint. Walk the GROWING term list by index (appends land at the tail),
+  ::  so an alpha child that is itself an alpha formula ([] introduced by a /\,
+  ::  say) is expanded in turn; a single pass over a snapshot would drop it.
   =/  t1=par
-    =/  cur  terms
+    =/  i  0
     |-  ^-  par
-    ?~  cur  terms
-    =/  ln  i.cur
+    ?:  =(i (lent terms))  terms
+    =/  ln  (snag-le i terms)
     =/  ks=(unit [k1=live-expr k2=live-expr])
       ?:  ?=(%all -.ln)   `[b.ln (nxt ln)]
       ?:  ?=(%conj -.ln)  `[(snag-le 0 cs.ln) (snag-le 1 cs.ln)]
       ~
-    ?~  ks  $(cur t.cur)
+    ?~  ks  $(i +(i))
     =/  m1  (par-member k1.u.ks terms)
     =/  m2  (par-member k2.u.ks terms)
     =.  terms
@@ -172,7 +175,7 @@
       ?:  &(m2 !m1)  (par-append terms k1.u.ks)
       ?:  |(m1 m2)   terms
       (par-append2 terms k1.u.ks k2.u.ks)
-    $(cur t.cur)
+    $(i +(i))
   ::  alpha^-1 expansion: if b and c present but not a, add a — to a fixpoint
   ::  (re-sweep while the term grows)
   =/  t2=par

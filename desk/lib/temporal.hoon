@@ -159,6 +159,13 @@
     %nullodn  ~
   ==
 ::
+++  letin-at
+  ::  a LET node with its span replaced by `a` (so a non-temporal LET leaf
+  ::  renders at its body's span, matching TLC, while keeping its bindings)
+  |=  [n=sem-letin:sm a=(unit span)]
+  ^-  sem:sm
+  n(at a)
+::
 ++  le-equal
   |=  [a=live-expr b=live-expr]
   ^-  ?
@@ -246,7 +253,14 @@
     ::  documented deferral, unit 8.1.6); a bodyless let is vacuously TRUE
     ?:  ?=(%letin -.s)
       ?~  body.s  [%& [%bool &]]
-      (ast u.body.s env)
+      ::  a non-temporal LET (level<=2) stays a leaf so its bindings evaluate
+      ::  under node-eval (eval-letin); the leaf renders at the body's span
+      ::  (matching TLC, which keeps the body node with its bindings resolved).
+      ::  Only a temporal-bodied LET unwraps to its body.
+      ?.  (lte (sem-lvl s) 2)  (ast u.body.s env)
+      =/  bat  (sspan-of u.body.s)
+      ?~  bat  (ast u.body.s env)
+      (leaf (letin-at s bat) env)
     (leaf s env)
   =/  op  name.op.s
   =/  as  args.s
