@@ -88,11 +88,37 @@ is the recursive-mold hazard handled the obelisk way (a named `$+` union of
 constant-head records, every recursion hand-rolled). `search-ctx:check` builds
 the `oos` for a liveness run and carries it on `sctx`; the molds and the
 `normalize` / `render-struct` interfaces are **frozen** for the tableau (8.2)
-and product/SCC (8.3) layers to build on. The verdict still comes from the
-first-increment recognizer until unit 8.5; nothing on the `oos` path touches
-the retired CST. Constant-level leaves are folded to `LNBool` through
-`node-eval`, so a non-boolean liveness leaf is a typed rejection rather than a
-silent pass.
+and product/SCC (8.3) layers to build on. Constant-level leaves are folded to
+`LNBool` through `node-eval`, so a non-boolean liveness leaf is a typed
+rejection rather than a silent pass.
+
+**The tableau → product → verdict → lasso stack** (units 8.2–8.6) builds on that
+frozen `oos`. `lib/tableau` (8.2) constructs the Manna–Pnueli particle tableau:
+`particleClosure` is an alpha/beta expansion under local consistency run to a
+**fixpoint** (the forward alpha sweep walks the growing term list, so a `[]`
+introduced by expanding a `/\` is itself expanded and its level≤1 body enters the
+particle's state predicates). `lib/liveness` `+build-product` (8.3) pairs each
+reachable state with the tableau nodes consistent with it (`isConsistent`,
+evaluated by `node-eval` — a non-temporal `LET` leaf keeps its bindings so
+`x = y` resolves); `+pem-accepting` (8.4) and `+labeled-product`/`+tarjan`/
+`+live-verdict` (8.5) give the `ok` / `violated-property` verdict over the SCCs.
+
+**The lasso layer** (8.6) turns a violated `oos` into the counterexample trace.
+`+find-lasso` selects the first violated `oos`; `+stutter-lasso` takes the
+shortest prefix (`+prefix-to-stutter` BFS) from an initial product node to an
+accepting stutter node, `+bts-lasso` the shortest real-edge cycle
+(`+shortest-cycle`) back to a prefix state (`+prefix-to-bts`), generalized to a
+loop target > 1. The **trace contract** is `lib/check` `+live-lasso-lines`, which
+renders the whole `LivenessDump` `out.txt`: `LIVENESS` / `VERDICT
+violated-property` / `EC 2116` / the four `STAT` lines (`generated`/`distinct`/
+`queue 0`/`depth`, from `+build-graph`) / `CLASS` (`stuttering` | `back-to-state`)
+/ `LOOP` (1-based loop target) / `TRACE` / the numbered `STATE` blocks (state 1 =
+`<Initial predicate>`, the fingerprint as `0x`+separatorless hex via `+fp-hex`,
+the `var = value` bindings, per-transition `getActions` labels) closed by the
+`STATE n -1` marker. The lone deviation is the **stutter-node selection** order
+vs TLC's DFS (unit 8.6.2); the verdict and product are unaffected. The
+first-increment no-fairness recognizer still serves the production verdict/trace
+until unit 8.9 retires it.
 
 Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as

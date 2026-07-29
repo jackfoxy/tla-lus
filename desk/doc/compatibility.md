@@ -409,6 +409,55 @@ increment no-fairness recognizer (Unit 11 above) until unit 8.5.
   decomposition is still exercised and matched. The warning-vs-reject choice is
   tracked by `tlc-live-diagnostics`.
 
+## Unit P2-8.2–8.6 — Tableau, product, SCC verdict, and lasso trace
+
+On the 8.1 normal form the liveness engine builds the particle **tableau**
+(`lib/tableau.hoon`, 8.2), the behavior-graph **product** (`lib/liveness.hoon`
+`+build-product`, 8.3), the `pem` **acceptance** + Tarjan **SCC verdict**
+(`+pem-accepting`/`+labeled-product`/`+tarjan`/`+live-verdict`, 8.4/8.5), and the
+**lasso trace** (`+find-lasso`/`+stutter-lasso`/`+bts-lasso`, rendered by
+`lib/check.hoon` `+live-lasso-lines`, 8.6). The verdict (`VERDICT ok` /
+`violated-property` EC 2116) and the full `LivenessDump` `out.txt` projection are
+differential-tested against the pinned oracle.
+
+**Lasso `out.txt` support matrix** (`tests/lib/liveness-lasso`, whole `out.txt`
+byte-for-byte — `LIVENESS`/`VERDICT`/`EC`/four `STAT` lines/`CLASS`/`LOOP`/`TRACE`/
+`STATE` blocks):
+
+- **Stuttering-at-init** (`CLASS stuttering`, `LOOP 1`): `diamond-stutter`,
+  `boxdiamond-stutter`, `diamond-const-false`, `multi-property`.
+- **Back-to-state** (`CLASS back-to-state`, real-edge cycle, per-action
+  `getActions` labels `<Next …>`/`<A …>`/`<Ay …>`): `back-to-state`, `wf-viol`,
+  `sf-absent-viol`.
+- **LET-bound leaf** stutter: `letin-prop` — the `<>(LET y == 1 IN x = y)` leaf
+  evaluates its binding (a non-temporal LET stays a whole-LET leaf; its rendered
+  span is the body's, matching TLC).
+- **General prefix** (`LOOP > 1`) is implemented (`+prefix-to-stutter`/
+  `+prefix-to-bts` BFS + `+shortest-cycle`); the corpus case that exercises it in
+  the trace is blocked only by the selection deviation below.
+
+**Approved / deferred differences** (row `tlc-live-lasso` = `approved-difference`;
+each names its owning unit):
+
+- **Stutter-node selection (owner 8.6.2).** When several accepting stutter points
+  exist the port takes the shortest-prefix one. TLC's DFS instead reports the
+  init-node stutter for `leadsto-viol` (port `LOOP 2` at the `(x=0, tableau P3,
+  non-init)` node vs TLC `LOOP 1`) and the **sink** stutter `x=2` for
+  `wf-absent-viol` (`LOOP 3`). In both the **verdict is correct and the product
+  count matches** — only the reported lasso differs — so both are excluded from
+  the lasso differential (their products stay in `tests/lib/liveness-product`).
+- **`box-state` → invariant engine (owner 8.9).** `[]P` as a temporal property
+  routes to the invariant/reachability path (EC 2110), reconciled in 8.9, not a
+  temporal lasso.
+- **`symmetry-live` (owner 8.7).** Symmetry + a temporal property is a production
+  typed-rejection where TLC warns and continues; exercised via the `-raw` path.
+- **`leadsto-pass` (fairness residue).** A passing `~>` under fairness still awaits
+  a follow-on; excluded from the product/lasso differentials.
+- **Production path unchanged (owner 8.9).** The first-increment no-fairness
+  recognizer (`check-live`/`render-live-trace`) still serves the production
+  verdict/trace; `+live-lasso-lines` is the differential surface until 8.9 retires
+  the recognizer.
+
 ## Unit 12 — Simulation, checkpointing, recovery
 
 Seeded simulation is tested as **engine properties** (reproducibility, bounded
