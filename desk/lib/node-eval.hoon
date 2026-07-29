@@ -1033,6 +1033,15 @@
     =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
     ?:  ?=(%| -.rv)  rv
     [%& ~[(~(put by part) u.as p.rv)]]
+  ::  an arity-0 user-op reference in action position (e.g. `Next == Inc \/ Dec`
+  ::  where `Inc == x < 3 /\ x' = x + 1`) is expanded to its body and solved —
+  ::  otherwise a primed variable in the body would be filtered as a boolean,
+  ::  yielding no successors. Parameterized action operators are a deferral.
+  ?:  ?&(?=(%user-op kind.op.n) ?=(~ args.n))
+    =/  d  (~(get by ops.e) nm)
+    ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e)
+    ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
+    (solve u.body.u.d mode cur part e(fuel (dec fuel.e)))
   (solve-filter n mode cur part e)
 ::
 ++  solve-filter
