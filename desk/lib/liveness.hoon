@@ -718,8 +718,8 @@
 ::
 ++  index-of-first
   ::  find the 1-based index of the first occurrence of `target` in `lst`, or 1
-  ::  if not found
-  |=  [target=pg-key lst=(list pg-key)]
+  ::  if not found (works with any noun type: pg-key, @t, etc.)
+  |=  [target=* lst=(list *)]
   ^-  @ud
   =/  idx  0
   |-  ^-  @ud
@@ -738,7 +738,7 @@
   =/  q=(list (list pg-key))
     (turn ~(tap in init-set) |=(k=pg-key ~[k]))
   =/  seen=(set pg-key)  init-set
-  =/  deepest  `~
+  =/  deepest=(unit (list pg-key))  ~
   |-  ^-  (unit (list pg-key))
   ?~  q  deepest
   =/  path  i.q
