@@ -580,25 +580,34 @@
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso
-  ::  a stuttering lasso when an initial node of the accepting SCC is *itself*
-  ::  an accepting single-node component (a stutter self-loop that satisfies the
-  ::  pem — e.g. an empty/AEState pem with no fairness forbidding the stutter):
-  ::  the state stutters there forever, so the prefix is that one state
+  ::  a stuttering lasso: the shortest path from an initial state to a state in
+  ::  the accepting SCC that is itself an accepting single-node component (has
+  ::  a stutter self-loop satisfying the pem). The prefix includes all states
+  ::  up to and including that stuttering state, and the loop target is the
+  ::  1-based index of the stuttering state within the prefix.
   |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
           nodes=(map pg-key pnode)  edges=(list pedge)
           init-set=(set pg-key)  eaa=(list @ud)
       ==
   ^-  (unit lasso)
-  ?~  scc  ~
-  =/  k  i.scc
-  ?.  (~(has in init-set) k)  $(scc t.scc)
-  ?.  (scc-accepting ~[k] pm promises nodes edges eaa)  $(scc t.scc)
-  `[~[fp.k] %stuttering 1]
+  =/  members  (silt scc)
+  =/  stutter-nodes
+    |-  ^-  (list pg-key)
+    ?~  scc  ~
+    ?:  (scc-accepting ~[i.scc] pm promises nodes edges eaa)
+      [i.scc $(scc t.scc)]
+    $(scc t.scc)
+  ?~  stutter-nodes  ~
+  =/  prefix  (prefix-to-stutter init-set members stutter-nodes nodes edges)
+  ?^  prefix
+    =/  pf  (turn u.prefix |=(k=pg-key fp.k))
+    `[pf %stuttering (lent pf)]
+  ~
 ::
 ++  bts-lasso
-  ::  a back-to-state lasso: the shortest cycle of real (non-self-loop)
-  ::  EAAction-holding edges from an initial node back to itself. The prefix is
-  ::  the cycle's distinct states and the loop returns to state 1.
+  ::  a back-to-state lasso: the shortest path from an initial state to the SCC,
+  ::  followed by the shortest cycle within the SCC back to some state in that path.
+  ::  The prefix is the combined path, and the loop returns to the appropriate index.
   |=  $:  scc=(list pg-key)  edges=(list pedge)
           init-set=(set pg-key)  eaa=(list @ud)
       ==
@@ -615,13 +624,19 @@
         ==
       acc
     (~(add ja acc) from.e to.e)
-  |-  ^-  (unit lasso)
-  ?~  scc  ~
-  =/  k  i.scc
-  ?.  (~(has in init-set) k)  $(scc t.scc)
-  =/  cyc  (shortest-cycle k radj)
-  ?^  cyc  `[(turn u.cyc |=(x=pg-key fp.x)) %back-to-state 1]
-  $(scc t.scc)
+  =/  prefix  (prefix-to-bts init-set members edges)
+  ?^  prefix
+    =/  pf  u.prefix
+    =/  last  (rear pf)
+    =/  cyc  (shortest-cycle last radj)
+    ?^  cyc
+      =/  cycle-fps  (turn u.cyc |=(x=pg-key fp.x))
+      =/  all-fps    (weld (turn (snip pf) |=(x=pg-key fp.x)) cycle-fps)
+      =/  loop-fp    fp.last
+      =/  loop-idx   (index-of-first loop-fp all-fps)
+      `[all-fps %back-to-state loop-idx]
+    ~
+  ~
 ::
 ++  shortest-cycle
   ::  the shortest cycle from `k` back to `k` in `radj` as a node path
@@ -641,4 +656,73 @@
   =.  seen  (~(gas in seen) fresh)
   =/  more  (turn fresh |=(w=pg-key (snoc path w)))
   $(q (weld t.q more))
+::
+++  get-loop-target
+  ::  find the 1-based index of the state that the cycle returns to. For a cycle
+  ::  [k1, k2, …, kn], returns to the index of k1 in the cycle. If k1 appears
+  ::  multiple times, returns the index of the first occurrence.
+  |=  [target=pg-key cycle-path=(list pg-key)]
+  ^-  @ud
+  =/  idx  0
+  |-  ^-  @ud
+  ?~  cycle-path  1
+  =.  idx  +(idx)
+  ?:(=(i.cycle-path target) idx $(cycle-path t.cycle-path))
+::
+++  prefix-to-stutter
+  ::  find the shortest path from any initial state to any stutter node (a state
+  ::  in the SCC with a self-loop). Uses BFS. Returns the path including both
+  ::  endpoints (initial state through stutter state), or ~ if no path exists.
+  |=  $:  init-set=(set pg-key)  members=(set pg-key)  stutter-nodes=(list pg-key)
+          nodes=(map pg-key pnode)  edges=(list pedge)
+      ==
+  ^-  (unit (list pg-key))
+  =/  stutter-set  (silt stutter-nodes)
+  =/  q=(list (list pg-key))
+    %-  turn  (turn ~(tap in init-set) |=(k=pg-key ~[k]))
+  =/  seen=(set pg-key)  init-set
+  |-  ^-  (unit (list pg-key))
+  ?~  q  ~
+  =/  path  i.q
+  =/  last  (rear path)
+  ?:  (~(has in stutter-set) last)  `path
+  =/  succs
+    %+  turn  (skim edges |=(e=pedge =(from.e last)))
+    |=(e=pedge to.e)
+  =/  fresh  (skim succs |=(k=pg-key !(~(has in seen) k)))
+  =.  seen  (~(gas in seen) fresh)
+  =/  more  (turn fresh |=(k=pg-key (snoc path k)))
+  $(q (weld t.q more))
+::
+++  prefix-to-bts
+  ::  find the shortest path from any initial state to any state in the SCC.
+  ::  Uses BFS. Returns the path or ~ if no path exists.
+  |=  [init-set=(set pg-key) members=(set pg-key) edges=(list pedge)]
+  ^-  (unit (list pg-key))
+  =/  q=(list (list pg-key))
+    %-  turn  (turn ~(tap in init-set) |=(k=pg-key ~[k]))
+  =/  seen=(set pg-key)  init-set
+  |-  ^-  (unit (list pg-key))
+  ?~  q  ~
+  =/  path  i.q
+  =/  last  (rear path)
+  ?:  (~(has in members) last)  `path
+  =/  succs
+    %+  turn  (skim edges |=(e=pedge =(from.e last)))
+    |=(e=pedge to.e)
+  =/  fresh  (skim succs |=(k=pg-key !(~(has in seen) k)))
+  =.  seen  (~(gas in seen) fresh)
+  =/  more  (turn fresh |=(k=pg-key (snoc path k)))
+  $(q (weld t.q more))
+::
+++  index-of-first
+  ::  find the 1-based index of the first occurrence of `target` in `lst`, or 1
+  ::  if not found
+  |=  [target=pg-key lst=(list pg-key)]
+  ^-  @ud
+  =/  idx  0
+  |-  ^-  @ud
+  ?~  lst  1
+  =.  idx  +(idx)
+  ?:(=(i.lst target) idx $(lst t.lst))
 --
