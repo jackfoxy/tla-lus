@@ -252,6 +252,23 @@
     !>((live-struct:check mod-box-state cfg-in-next))
   !>((live-struct-raw:check mod-box-state cfg-in-next))
 ::
+::  unit 8.1.5: a non-boolean constant leaf is EC 2215 (the pin's
+::  TLC_EXPECTED_VALUE), a typed rejection — never a silent pass.
+++  mod-nonbool
+  '''
+  ---- MODULE A ----
+  EXTENDS Integers
+  VARIABLE x
+  Init == x = 0
+  Next == x' = 1 - x
+  Live == <>(1)
+  ====
+  '''
+++  test-nonbool-reject
+  %+  expect-eq
+    !>(`wain`~['Error: TLC expected a boolean value, but did not find one.'])
+  !>((live-struct:check mod-nonbool cfg-in-next))
+::
 ::  makeBinary balances an n-ary conjunction into two-child nodes
 ++  test-make-binary-shape
   =/  a  (stp 1)

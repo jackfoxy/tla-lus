@@ -1,0 +1,20 @@
+LIVESTRUCT
+OOS 2
+--- 0 ---
+PROMISES 0
+CHECKSTATE 0
+CHECKACTION 0
+PEMS 1
+TABLEAU 1
+TF
+[]-line 7, col 10 to line 7, col 14 of module A
+ENDTF
+--- 1 ---
+PROMISES 0
+CHECKSTATE 0
+CHECKACTION 1
+PEMS 1
+TABLEAU 0
+TF
+/\ <>[]-line 8, col 12 to line 8, col 16 of module A
+ENDTF

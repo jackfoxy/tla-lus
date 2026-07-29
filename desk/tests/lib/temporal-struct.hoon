@@ -24,6 +24,12 @@
   %+  expect-eq
     !>(`wain`~['LIVESTRUCT' 'OOS 1' '--- 0 ---' 'PROMISES 0' 'CHECKSTATE 0' 'CHECKACTION 1' 'PEMS 1' 'TF' '/\\ <>[]-line 7, col 14 to line 7, col 18 of module A' 'ENDTF'])
   !>((live-struct-full:check src-boxdiamond-stutter cfg-boxdiamond-stutter))
+++  src-diamond-const-false  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aLive == <>FALSE\0a====\0a'
+++  cfg-diamond-const-false  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-struct-diamond-const-false
+  %+  expect-eq
+    !>(`wain`~['LIVESTRUCT' 'OOS 1' '--- 0 ---' 'PROMISES 0' 'CHECKSTATE 0' 'CHECKACTION 0' 'PEMS 1' 'TF' '[]TRUE' 'ENDTF'])
+  !>((live-struct-full:check src-diamond-const-false cfg-diamond-const-false))
 ++  src-diamond-stutter  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aLive == <>(x = 1)\0a====\0a'
 ++  cfg-diamond-stutter  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-struct-diamond-stutter
@@ -42,6 +48,18 @@
   %+  expect-eq
     !>(`wain`~['LIVESTRUCT' 'OOS 1' '--- 0 ---' 'PROMISES 1' 'CHECKSTATE 0' 'CHECKACTION 0' 'PEMS 1' 'TF' '<>/\\ (line 7, col 10 to line 7, col 14 of module A)' '     /\\ ([]-line 7, col 21 to line 7, col 25 of module A)' 'ENDTF'])
   !>((live-struct-full:check src-leadsto-viol cfg-leadsto-viol))
+++  src-letin-prop  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aLive == <>(LET y == 1 IN x = y)\0a====\0a'
+++  cfg-letin-prop  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-struct-letin-prop
+  %+  expect-eq
+    !>(`wain`~['LIVESTRUCT' 'OOS 1' '--- 0 ---' 'PROMISES 0' 'CHECKSTATE 0' 'CHECKACTION 0' 'PEMS 1' 'TF' '[]-line 7, col 26 to line 7, col 30 of module A' 'ENDTF'])
+  !>((live-struct-full:check src-letin-prop cfg-letin-prop))
+++  src-multi-property  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aP1 == <>(x = 1)\0aP2 == []<>(x = 0)\0a====\0a'
+++  cfg-multi-property  'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
+++  test-struct-multi-property
+  %+  expect-eq
+    !>(`wain`~['LIVESTRUCT' 'OOS 2' '--- 0 ---' 'PROMISES 0' 'CHECKSTATE 0' 'CHECKACTION 0' 'PEMS 1' 'TF' '[]-line 7, col 10 to line 7, col 14 of module A' 'ENDTF' '--- 1 ---' 'PROMISES 0' 'CHECKSTATE 0' 'CHECKACTION 1' 'PEMS 1' 'TF' '/\\ <>[]-line 8, col 12 to line 8, col 16 of module A' 'ENDTF'])
+  !>((live-struct-full:check src-multi-property cfg-multi-property))
 ++  src-sf-absent-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aAy == x = 0 /\\ x\' = 1\0aBy == x = 1 /\\ x\' = 0\0aCy == x = 1 /\\ x\' = 2\0aDone == x = 2 /\\ x\' = 2\0aNext == Ay \\/ By \\/ Cy \\/ Done\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Ay) /\\ WF_x(By) /\\ WF_x(Cy)\0aLive == <>(x = 2)\0a====\0a'
 ++  cfg-sf-absent-viol  'SPECIFICATION Spec\0aPROPERTY Live\0a'
 ++  test-struct-sf-absent-viol
