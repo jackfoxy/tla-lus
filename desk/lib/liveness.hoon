@@ -534,4 +534,63 @@
   ?~  oss  |
   ?:  (oos-violated i.oss states inits nsb env order)  &
   $(oss t.oss)
+::
+::  +|  Lasso counterexample construction (Work Unit 8.6)
+::
++$  lasso  [prefix=(list @t) class=?(%stuttering %back-to-state) loop=@ud]
+::
+++  find-lasso
+  ::  a counterexample lasso for the first violated OrderOfSolution. This
+  ::  increment builds the stuttering lasso — an accepting single-node SCC that
+  ::  is an initial product node with a stutter self-loop (the prefix is that
+  ::  one state); back-to-state lassos (a non-trivial cycle, needing the prefix
+  ::  walk and per-action labels) are a follow-on.
+  |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
+          nsb=sem:sm  env=eenv:ne  order=(list @t)
+      ==
+  ^-  (unit lasso)
+  ?~  oss  ~
+  =/  here  (oos-lasso i.oss states inits nsb env order)
+  ?^(here here $(oss t.oss))
+::
+++  oos-lasso
+  |=  $:  o=oos:tp  states=(map @t state:ne)  inits=(list @t)
+          nsb=sem:sm  env=eenv:ne  order=(list @t)
+      ==
+  ^-  (unit lasso)
+  =/  lp        (labeled-product o states inits nsb env order)
+  =/  init-set  (silt inits.lp)
+  =/  verts     (turn ~(tap by nodes.lp) |=([k=pg-key *] k))
+  =/  pms       pems.o
+  |-  ^-  (unit lasso)
+  ?~  pms  ~
+  =/  adj   (adj-of edges.lp ea-action.i.pms)
+  =/  sccs  (tarjan verts adj)
+  =/  here
+    |-  ^-  (unit lasso)
+    ?~  sccs  ~
+    ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
+      $(sccs t.sccs)
+    =/  l  (stutter-lasso i.sccs edges.lp init-set ea-action.i.pms)
+    ?^(l l $(sccs t.sccs))
+  ?^(here here $(pms t.pms))
+::
+++  stutter-lasso
+  ::  a stuttering lasso when the accepting SCC contains an initial product node
+  ::  with a stutter self-loop (an EAAction-holding self edge): the state
+  ::  stutters there forever, so the prefix is that one state. A longer prefix
+  ::  or a back-to-state cycle (a non-stuttering loop) is a follow-on.
+  |=  $:  scc=(list pg-key)  edges=(list pedge)
+          init-set=(set pg-key)  eaa=(list @ud)
+      ==
+  ^-  (unit lasso)
+  ?~  scc  ~
+  =/  k  i.scc
+  ?.  (~(has in init-set) k)  $(scc t.scc)
+  =/  self
+    %+  lien  edges
+    |=  e=pedge
+    ?&(=(from.e k) =(to.e k) (levy eaa |=(i=@ud (bit-at i ca.e))))
+  ?:  self  `[~[fp.k] %stuttering 1]
+  $(scc t.scc)
 --

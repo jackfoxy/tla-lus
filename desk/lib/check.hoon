@@ -1396,6 +1396,57 @@
     ~['VERDICT violated-property' 'EC 2116']
   ~['VERDICT ok' 'EC 0']
 ::
+++  live-lasso-lines
+  ::  the lasso CLASS/LOOP/TRACE/STATE projection (unit 8.6) for a violated
+  ::  spec — currently the stuttering lasso (an initial state that stutters)
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  g       (build-graph is.c o)
+  =/  states  (states-of seen.g)
+  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
+  ?~  l  ~['(no stuttering lasso)']
+  =/  n  +((lent prefix.u.l))
+  ::  the prefix states (state 1 is the initial predicate)
+  =/  prefix-lines=wain
+    =/  i  1
+    =/  ps  prefix.u.l
+    |-  ^-  wain
+    ?~  ps  ~
+    =/  st  (~(got by states) i.ps)
+    %+  weld
+      ;:  weld
+        ~[(crip "STATE {(scow %ud i)} {(fp-hex i.ps)}")]
+        ~['LABEL <Initial predicate>']
+        (render-state st)
+        ~['ENDSTATE']
+      ==
+    $(ps t.ps, i +(i))
+  ::  the loop-back marker
+  =/  marker=wain
+    :~  (crip "STATE {(scow %ud n)} -1")
+        ?:(=(%stuttering class.u.l) 'LABEL Stuttering' 'LABEL Back to state')
+        'ENDSTATE'
+    ==
+  ;:  weld
+    :~  (crip "CLASS {(trip class.u.l)}")
+        (crip "LOOP {(scow %ud loop.u.l)}")
+        (crip "TRACE {(scow %ud n)}")
+    ==
+    prefix-lines
+    marker
+  ==
+::
+++  fp-hex
+  ::  a state fingerprint as TLC prints it: "0x" + lowercase hex, no separators
+  |=  fp=@t
+  ^-  tape
+  (weld "0x" (skip (slag 2 (scow %ux `@ux`fp)) |=(c=@tD =('.' c))))
+::
 ++  raw-live-oss
   ::  the normalized oos via the raw path (parse/generate/resolve-targets/
   ::  normalize, skipping search-ctx's symmetry-with-temporal rejection so the
