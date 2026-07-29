@@ -1,0 +1,8 @@
+PRODUCT
+OOS 2
+--- 0 ---
+NODES 1
+INITS 1
+--- 1 ---
+NODES 2
+INITS 1
