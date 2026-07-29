@@ -1446,9 +1446,12 @@
     ==
   =/  header=wain
     :~  'LIVENESS'
-        'VERDICT counterexample'
-        'EC 2109'
-        (crip "STAT generated {(scow %ud gen.g)} distinct {(scow %ud distinct.g)} queue 0 depth {(scow %ud depth.g)}")
+        'VERDICT violated-property'
+        'EC 2116'
+        (crip "STAT generated {(scow %ud gen.g)}")
+        (crip "STAT distinct {(scow %ud distinct.g)}")
+        'STAT queue 0'
+        (crip "STAT depth {(scow %ud depth.g)}")
     ==
   ;:  weld
     header
