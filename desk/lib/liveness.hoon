@@ -580,10 +580,8 @@
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso
-  ::  a stuttering lasso: find the deepest (longest path from init) accepting
-  ::  single-node component (stutter node) in the SCC. The prefix includes all
-  ::  states from init through that stuttering state, and the loop target is
-  ::  the 1-based index of the stuttering state within the prefix.
+  ::  a stuttering lasso: find the shortest path from init to any accepting
+  ::  single-node component (stutter node). This becomes the lasso prefix.
   |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
           nodes=(map pg-key pnode)  edges=(list pedge)
           init-set=(set pg-key)  eaa=(list @ud)
@@ -597,11 +595,9 @@
       [i.scc $(scc t.scc)]
     $(scc t.scc)
   ?~  stutter-nodes  ~
-  ::  find the deepest (longest path) to any accepting stutter
-  =/  deepest-path
-    (find-deepest-stutter init-set members stutter-nodes nodes edges)
-  ?^  deepest-path
-    =/  pf  (turn u.deepest-path |=(k=pg-key fp.k))
+  =/  prefix  (prefix-to-stutter init-set members stutter-nodes nodes edges)
+  ?^  prefix
+    =/  pf  (turn u.prefix |=(k=pg-key fp.k))
     `[pf %stuttering (lent pf)]
   ~
 ::
