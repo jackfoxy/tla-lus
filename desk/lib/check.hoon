@@ -8,6 +8,7 @@
 /=  sem-lib  /lib/semantic
 /=  tp       /lib/temporal
 /=  tb       /lib/tableau
+/=  lv       /lib/liveness
 /=  vl       /lib/value
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
@@ -1329,6 +1330,55 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   (render-struct:tp oss.p.sc (module-name-of tree.p.sc) (live-tabs oss.p.sc))
+::
+++  states-of
+  ::  the reachable graph's fingerprint -> state map (drops depth/predecessor)
+  |=  seen=(map @t visit)
+  ^-  (map @t state)
+  (~(run by seen) |=(w=visit st.w))
+::
+++  product-counts
+  ::  the behavior-graph product node/init counts (unit 8.3) for each
+  ::  OrderOfSolution: build the reachable graph once, then pair it with each
+  ::  oos tableau via lib/liveness
+  |=  c=sctx
+  ^-  (list [nodes=@ud inits=@ud])
+  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  g       (build-graph is.c o)
+  =/  states  (states-of seen.g)
+  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  oss  oss.c
+  |-  ^-  (list [nodes=@ud inits=@ud])
+  ?~  oss  ~
+  :-  (build-product:lv i.oss states inits.g nsb.c env order.c)
+  $(oss t.oss)
+::
+++  render-product
+  ::  the PRODUCT projection (unit 8.3): the product node and initial-node
+  ::  counts per OrderOfSolution, matching tools/oracle/ProductDump
+  |=  counts=(list [nodes=@ud inits=@ud])
+  ^-  wain
+  =/  hd=@t  (crip "OOS {(scow %ud (lent counts))}")
+  =/  body
+    =/  i  0
+    =|  acc=(list @t)
+    |-  ^-  (list @t)
+    ?~  counts  (flop acc)
+    =/  block=(list @t)
+      :~  (crip "--- {(scow %ud i)} ---")
+          (crip "NODES {(scow %ud nodes.i.counts)}")
+          (crip "INITS {(scow %ud inits.i.counts)}")
+      ==
+    $(counts t.counts, i +(i), acc (weld (flop block) acc))
+  `wain`['PRODUCT' hd body]
+::
+++  live-product
+  ::  the product projection for a spec+cfg via the production search context
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  (render-product (product-counts p.sc))
 ::
 ++  raw-live-oss
   ::  the normalized oos via the raw path (parse/generate/resolve-targets/

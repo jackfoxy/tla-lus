@@ -50,6 +50,13 @@ def golden(case: Path) -> None:
         s = subprocess.run(["java", "-cp", DUMP_CP, "LivenessStruct", "A"],
                            cwd=td, capture_output=True, text=True, timeout=180)
         (case / "struct.txt").write_text(s.stdout)
+        # product.txt: the behavior-graph PRODUCT projection (per OrderOfSolution
+        # product node + initial-node counts) — the unit 8.3 parity target for
+        # lib/liveness. Drives a standalone LiveCheck over the reachable graph;
+        # deterministic per fixture (FP64 index 0, a set not a run order).
+        p = subprocess.run(["java", "-cp", DUMP_CP, "ProductDump", "A"],
+                           cwd=td, capture_output=True, text=True, timeout=180)
+        (case / "product.txt").write_text(p.stdout)
 
 
 def main() -> None:
