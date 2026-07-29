@@ -1178,23 +1178,29 @@
   ::  build the normalized temporal decomposition for a liveness run (unit
   ::  8.1.4): the production setup now derives the oos via temporal.hoon rather
   ::  than the CST — the verdict still comes from the first-increment recognizer
-  ::  (unit 8.5 retires that). Empty for a pure-safety run.
-  =/  oss  ?~(pp ~ (build-live-oss ca defs fair))
+  ::  (unit 8.5 retires that). Empty for a pure-safety run; a non-boolean
+  ::  constant leaf is a typed rejection (unit 8.1.5).
+  =/  or  ?~(pp `(each (list oos:tp) aerr:tp)`[%& ~] (build-live-oss ca defs consts vars fair))
+  ?:  ?=(%| -.or)  [%| msg.p.or]
   :-  %&
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  ddl  pp  fair  tree
       ?~(nb '' (next-span-label u.nb modn))
-      oss
+      p.or
   ==
 ::
 ++  build-live-oss
   ::  the normalized OrderOfSolutions for a spec's PROPERTY list under its
-  ::  fairness (unit 8.1); shared by the production setup and the differential
+  ::  fairness (unit 8.1); shared by the production setup and the differential.
+  ::  A constant leaf is evaluated under the constant env, so a non-boolean is a
+  ::  typed rejection (aerr).
   |=  $:  ca=cfg-ast:config
           defs=(map @t sem-def:sem-lib)
+          consts=(map @t value)
+          vars=(set @t)
           fair=(list sem:sem-lib)
       ==
-  ^-  (list oos:tp)
+  ^-  (each (list oos:tp) aerr:tp)
   =/  pbods=(list sem:sem-lib)
     =/  ps  properties.ca
     |-  ^-  (list sem:sem-lib)
@@ -1202,7 +1208,7 @@
     =/  b  (sem-body defs i.ps)
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
-  (normalize:tp pbods fair)
+  (normalize:tp pbods fair (make-env:ne defs consts vars))
 ::
 ++  consts-of
   ::  arity-0 config constant assignments as an evaluation binding map (WU6.9
@@ -1314,25 +1320,25 @@
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   (render-struct:tp oss.p.sc (module-name-of tree.p.sc))
 ::
-++  live-struct-raw
-  ::  the same count projection as +live-struct, but skipping search-ctx's
-  ::  symmetry-with-temporal rejection so the normalization of a symmetry+
-  ::  liveness spec (the corpus symmetry-live case) is still exercised. Only
-  ::  the property/fairness normalization is driven — no init solve or search.
+++  raw-live-oss
+  ::  the normalized oos via the raw path (parse/generate/resolve-targets/
+  ::  normalize, skipping search-ctx's symmetry-with-temporal rejection so the
+  ::  symmetry-live corpus case is still exercised); the module name is returned
+  ::  for the structural rendering
   |=  [spec=@t cfg=@t]
-  ^-  wain
+  ^-  (each [modn=@t oss=(list oos:tp)] @t)
   =/  pr  (parse:syntax spec)
-  ?:  ?=(%| -.pr)  ~['Error: parse error']
+  ?:  ?=(%| -.pr)  [%| 'parse error']
   =/  tree  p.pr
   =/  cr  (parse-cfg:config cfg)
-  ?:  ?=(%| -.cr)  ~['Error: config']
+  ?:  ?=(%| -.cr)  [%| 'config']
   =/  ca  p.cr
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
-  ?~  mo  ~['Error: semantic error']
+  ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
   =/  rt  (resolve-targets ca defs)
-  ?:  ?=(%| -.rt)  ~[(cat 3 'Error: ' p.rt)]
+  ?:  ?=(%| -.rt)  [%| p.rt]
   =/  pbods=(list sem:sem-lib)
     =/  ps  properties.ca
     |-  ^-  (list sem:sem-lib)
@@ -1340,33 +1346,26 @@
     =/  b  (sem-body defs i.ps)
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
-  (render-counts:tp (normalize:tp pbods fair.p.rt))
+  =/  env  (make-env:ne defs (const-map cfg) (var-names tree))
+  =/  or  (normalize:tp pbods fair.p.rt env)
+  ?:  ?=(%| -.or)  [%| msg.p.or]
+  [%& modn p.or]
+::
+++  live-struct-raw
+  ::  the count projection via the raw path (see +raw-live-oss)
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  or  (raw-live-oss spec cfg)
+  ?:  ?=(%| -.or)  ~[(cat 3 'Error: ' p.or)]
+  (render-counts:tp oss.p.or)
 ::
 ++  live-struct-full-raw
-  ::  the full structural projection via the raw path (unit 8.1.3), for the
-  ::  symmetry-live corpus case that search-ctx typed-rejects
+  ::  the full structural projection via the raw path (see +raw-live-oss)
   |=  [spec=@t cfg=@t]
   ^-  wain
-  =/  pr  (parse:syntax spec)
-  ?:  ?=(%| -.pr)  ~['Error: parse error']
-  =/  tree  p.pr
-  =/  cr  (parse-cfg:config cfg)
-  ?:  ?=(%| -.cr)  ~['Error: config']
-  =/  ca  p.cr
-  =/  modn  (module-name-of tree)
-  =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
-  ?~  mo  ~['Error: semantic error']
-  =/  defs  (defmap-of:ne u.mo)
-  =/  rt  (resolve-targets ca defs)
-  ?:  ?=(%| -.rt)  ~[(cat 3 'Error: ' p.rt)]
-  =/  pbods=(list sem:sem-lib)
-    =/  ps  properties.ca
-    |-  ^-  (list sem:sem-lib)
-    ?~  ps  ~
-    =/  b  (sem-body defs i.ps)
-    ?~  b  $(ps t.ps)
-    [u.b $(ps t.ps)]
-  (render-struct:tp (normalize:tp pbods fair.p.rt) modn)
+  =/  or  (raw-live-oss spec cfg)
+  ?:  ?=(%| -.or)  ~[(cat 3 'Error: ' p.or)]
+  (render-struct:tp oss.p.or modn.p.or)
 ::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines

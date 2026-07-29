@@ -10,8 +10,12 @@
 ::  hand-rolled (never turn/roll/flop/snoc — the wet gates fuse-loop the mold).
 /-  *tla-lus
 /=  sm      /lib/semantic
+/=  ne      /lib/node-eval
 /=  config  /lib/config
 |%
+::  a typed rejection surfaced during normalization (astToLive constant-leaf
+::  evaluation): an EC code and message, matching the pin's Assert.fail
++$  aerr  [ec=@ud msg=@t]
 ::  +|  Live-expression tree (LN* analogue)
 ::
 +$  live-expr
@@ -232,99 +236,142 @@
 ::  +|  astToLive: semantic node -> live-expr (Liveness.astToLiveAppl)
 ::
 ++  ast
-  |=  s=sem:sm
-  ^-  live-expr
+  ::  Liveness.astToLive / astToLiveAppl: a temporal ExprNode to a live-expr.
+  ::  `env` is the constant evaluation environment, used only to fold a
+  ::  constant-level leaf to LNBool (a non-boolean is a typed rejection)
+  |=  [s=sem:sm env=eenv:ne]
+  ^-  (each live-expr aerr)
   ?.  ?=(%apply -.s)
+    ::  LetIn/Label/SubstIn unwrap to their body (INSTANCE substitution stays a
+    ::  documented deferral, unit 8.1.6); a bodyless let is vacuously TRUE
     ?:  ?=(%letin -.s)
-      ?~  body.s  [%bool &]
-      (ast u.body.s)
-    (leaf s)
+      ?~  body.s  [%& [%bool &]]
+      (ast u.body.s env)
+    (leaf s env)
   =/  op  name.op.s
   =/  as  args.s
-  ?:  |(=(op '$ConjList') =(op '\\land'))  [%conj (ast-list as)]
-  ?:  |(=(op '$DisjList') =(op '\\lor'))   [%disj (ast-list as)]
-  ?:  =(op '[]')    [%all (ast (hd as))]
-  ?:  =(op '<>')    [%even (ast (hd as))]
-  ?:  =(op '$Nop')  (ast (hd as))
+  ?:  |(=(op '$ConjList') =(op '\\land'))
+    =/  r  (ast-list as env)
+    ?:(?=(%| -.r) r [%& [%conj p.r]])
+  ?:  |(=(op '$DisjList') =(op '\\lor'))
+    =/  r  (ast-list as env)
+    ?:(?=(%| -.r) r [%& [%disj p.r]])
+  ?:  =(op '[]')
+    =/  r  (ast (hd as) env)
+    ?:(?=(%| -.r) r [%& [%all p.r]])
+  ?:  =(op '<>')
+    =/  r  (ast (hd as) env)
+    ?:(?=(%| -.r) r [%& [%even p.r]])
+  ?:  =(op '$Nop')  (ast (hd as) env)
   ?:  |(=(op '~>') =(op '-+->'))
     ::  P ~> Q  ==  [](-P \/ <>Q)
-    =/  p  (ast (hd as))
-    =/  q  (ast (hd (tl as)))
-    [%all [%disj ~[[%neg p] [%even q]]]]
+    =/  rp  (ast (hd as) env)
+    ?:  ?=(%| -.rp)  rp
+    =/  rq  (ast (hd (tl as)) env)
+    ?:  ?=(%| -.rq)  rq
+    [%& [%all [%disj ~[[%neg p.rp] [%even p.rq]]]]]
   ?:  =(op '$WF')
     ::  WF_e(A) == []<>(-ENABLED<A>_e \/ <A>_e); args = [e A]
     =/  e  (hd as)
     =/  a  (hd (tl as))
-    [%all [%even [%disj ~[[%neg [%enabled | `e a]] [%act | `e a]]]]]
+    [%& [%all [%even [%disj ~[[%neg [%enabled | `e a]] [%act | `e a]]]]]]
   ?:  =(op '$SF')
     ::  SF_e(A) == <>[]-ENABLED<A>_e \/ []<><A>_e
     =/  e  (hd as)
     =/  a  (hd (tl as))
-    [%disj ~[[%even [%all [%neg [%enabled | `e a]]]] [%all [%even [%act | `e a]]]]]
+    [%& [%disj ~[[%even [%all [%neg [%enabled | `e a]]]] [%all [%even [%act | `e a]]]]]]
   ?:  =(op '$AngleAct')
     ::  <A>_e ; args = [A e]
-    [%act | `(hd (tl as)) (hd as)]
+    [%& [%act | `(hd (tl as)) (hd as)]]
   ?:  =(op '$SquareAct')
-    [%act & `(hd (tl as)) (hd as)]
-  ?:  =(op '\'')      [%act | ~ s]
-  ?:  =(op '\\lnot')  (neg-of (ast (hd as)) s)
-  ?:  =(op '\\neg')   (neg-of (ast (hd as)) s)
-  ?:  =(op '=>')      (implies-of as s)
-  (leaf s)
+    [%& [%act & `(hd (tl as)) (hd as)]]
+  ?:  =(op '\'')      [%& [%act | ~ s]]
+  ?:  =(op '\\lnot')  (neg-of (ast (hd as) env) s env)
+  ?:  =(op '\\neg')   (neg-of (ast (hd as) env) s env)
+  ?:  =(op '=>')      (implies-of as s env)
+  (leaf s env)
 ::
 ++  ast-list
-  |=  l=(list sem:sm)
-  ^-  (list live-expr)
-  ?~  l  ~
-  [(ast i.l) $(l t.l)]
+  |=  [l=(list sem:sm) env=eenv:ne]
+  ^-  (each (list live-expr) aerr)
+  ?~  l  [%& ~]
+  =/  hr  (ast i.l env)
+  ?:  ?=(%| -.hr)  hr
+  =/  tr  $(l t.l)
+  ?:  ?=(%| -.tr)  tr
+  [%& [p.hr p.tr]]
 ::
 ++  leaf
-  ::  a non-temporal leaf, by level (const -> LNBool, state -> LNState,
-  ::  action -> LNAction). Constant folding to a boolean is deferred (no corpus
-  ::  case); a constant leaf is treated as TRUE.
-  |=  s=sem:sm
-  ^-  live-expr
+  ::  a non-temporal leaf, by level: a constant (level 0) evaluates to a boolean
+  ::  (LNBool) under the constant env — a non-boolean is EC 2215 (the pin's
+  ::  TLC_EXPECTED_VALUE); a state (level 1) is LNState, an action LNAction
+  |=  [s=sem:sm env=eenv:ne]
+  ^-  (each live-expr aerr)
   =/  l  (sem-lvl s)
-  ?:  =(0 l)     [%bool &]
-  ?:  (lte l 1)  [%state s]
-  [%act | ~ s]
+  ?:  =(0 l)     (eval-const s env)
+  ?:  (lte l 1)  [%& [%state s]]
+  [%& [%act | ~ s]]
+::
+++  eval-const
+  ::  a constant-level leaf folded to LNBool via node-eval; an evaluation error
+  ::  propagates its EC, a non-boolean value is EC 2215
+  |=  [s=sem:sm env=eenv:ne]
+  ^-  (each live-expr aerr)
+  =/  r  (eval:ne s env)
+  ?:  ?=(%| -.r)  [%| p.r]
+  ?.  ?=(%bool -.p.r)
+    [%| 2.215 'TLC expected a boolean value, but did not find one.']
+  [%& [%bool p.p.r]]
 ::
 ++  neg-of
-  |=  [ln=live-expr s=sem:sm]
-  ^-  live-expr
-  ?:  (gth (le-level ln) 2)  [%neg ln]
-  (leaf s)
+  |=  [lr=(each live-expr aerr) s=sem:sm env=eenv:ne]
+  ^-  (each live-expr aerr)
+  ?:  ?=(%| -.lr)  lr
+  ?:  (gth (le-level p.lr) 2)  [%& [%neg p.lr]]
+  (leaf s env)
 ::
 ++  implies-of
-  |=  [as=(list sem:sm) s=sem:sm]
-  ^-  live-expr
-  =/  l  (ast (hd as))
-  =/  r  (ast (hd (tl as)))
-  ?:  (gth (max (le-level l) (le-level r)) 2)  [%disj ~[[%neg l] r]]
-  (leaf s)
+  |=  [as=(list sem:sm) s=sem:sm env=eenv:ne]
+  ^-  (each live-expr aerr)
+  =/  lr  (ast (hd as) env)
+  ?:  ?=(%| -.lr)  lr
+  =/  rr  (ast (hd (tl as)) env)
+  ?:  ?=(%| -.rr)  rr
+  ?:  (gth (max (le-level p.lr) (le-level p.rr)) 2)
+    [%& [%disj ~[[%neg p.lr] p.rr]]]
+  (leaf s env)
 ::
 ::  +|  parseLiveness: negate the properties, conjoin the fairness
 ::
 ++  parse-liveness
-  |=  [props=(list sem:sm) fair=(list sem:sm)]
-  ^-  (unit live-expr)
-  =/  fc  (ast-list fair)
+  |=  [props=(list sem:sm) fair=(list sem:sm) env=eenv:ne]
+  ^-  (each (unit live-expr) aerr)
+  =/  fcr  (ast-list fair env)
+  ?:  ?=(%| -.fcr)  fcr
+  =/  fc  p.fcr
   ?~  props
-    ?~  fc  ~
-    `[%conj fc]
+    ?~  fc  [%& ~]
+    [%& `[%conj fc]]
   ?~  t.props
-    =/  ln  (ast i.props)
-    ?~  fc  `[%neg ln]
-    `[%conj (weld-le fc ~[[%neg ln]])]
-  =/  nd=live-expr  [%disj (neg-list props)]
-  ?~  fc  `nd
-  `[%conj (weld-le fc ~[nd])]
+    =/  lr  (ast i.props env)
+    ?:  ?=(%| -.lr)  lr
+    ?~  fc  [%& `[%neg p.lr]]
+    [%& `[%conj (weld-le fc ~[[%neg p.lr]])]]
+  =/  nlr  (neg-list props env)
+  ?:  ?=(%| -.nlr)  nlr
+  =/  nd=live-expr  [%disj p.nlr]
+  ?~  fc  [%& `nd]
+  [%& `[%conj (weld-le fc ~[nd])]]
 ::
 ++  neg-list
-  |=  l=(list sem:sm)
-  ^-  (list live-expr)
-  ?~  l  ~
-  [[%neg (ast i.l)] $(l t.l)]
+  |=  [l=(list sem:sm) env=eenv:ne]
+  ^-  (each (list live-expr) aerr)
+  ?~  l  [%& ~]
+  =/  hr  (ast i.l env)
+  ?:  ?=(%| -.hr)  hr
+  =/  tr  $(l t.l)
+  ?:  ?=(%| -.tr)  tr
+  [%& [[%neg p.hr] p.tr]]
 ::
 ::  +|  simplify (LiveExprNode.simplify)
 ::
@@ -738,30 +785,27 @@
   [i.l $(l t.l)]
 ::
 ++  normalize
-  |=  [props=(list sem:sm) fair=(list sem:sm)]
-  ^-  (list oos)
-  =/  lx  (parse-liveness (drop-box-state props) fair)
-  ?~  lx  ~
-  =/  nf  (to-dnf (simplify u.lx))
-  ?:  ?&(?=(%bool -.nf) =(| b.nf))  ~
+  ::  the OrderOfSolutions for a spec's PROPERTY list under its fairness, or a
+  ::  typed rejection (a non-boolean constant leaf). `env` folds constant leaves
+  |=  [props=(list sem:sm) fair=(list sem:sm) env=eenv:ne]
+  ^-  (each (list oos) aerr)
+  =/  lr  (parse-liveness (drop-box-state props) fair env)
+  ?:  ?=(%| -.lr)  lr
+  ?~  p.lr  [%& ~]
+  =/  nf  (to-dnf (simplify u.p.lr))
+  ?:  ?&(?=(%bool -.nf) =(| b.nf))  [%& ~]
   =/  disjs=(list live-expr)  ?:(?=(%disj -.nf) ds.nf ~[nf])
   ::  classify each disjunct; group by equal tf into OrderOfSolutions
+  ::  add-to-group appends a new tf group at the tail, so `gs` is already in
+  ::  disjunct (property) order — the order TLC's OrderOfSolution[] uses
   =/  groups=(list [tf=(unit live-expr) ps=(list pem-acc)])
     =|  gs=(list [tf=(unit live-expr) ps=(list pem-acc)])
     |-  ^-  (list [tf=(unit live-expr) ps=(list pem-acc)])
-    ?~  disjs  (flop-groups gs)
+    ?~  disjs  gs
     =/  cd  (classify-disjunct i.disjs)
     =.  gs  (add-to-group gs tf.cd p.cd)
     $(disjs t.disjs)
-  (turn-groups groups)
-::
-++  flop-groups
-  |=  gs=(list [tf=(unit live-expr) ps=(list pem-acc)])
-  ^-  (list [tf=(unit live-expr) ps=(list pem-acc)])
-  =|  acc=(list [tf=(unit live-expr) ps=(list pem-acc)])
-  |-  ^-  (list [tf=(unit live-expr) ps=(list pem-acc)])
-  ?~  gs  acc
-  $(gs t.gs, acc [i.gs acc])
+  [%& (turn-groups groups)]
 ::
 ++  tf-equal
   |=  [a=(unit live-expr) b=(unit live-expr)]
