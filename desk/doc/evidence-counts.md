@@ -22,7 +22,7 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 | `gen-stdops-tests.py` | 11 | pass | StandardModule overrides (tlc2.module registry) | `desk/tests/lib/stdops-diff.hoon` |
-| `gen-liveness-tests.py` | 16 | oracle-only | Single-worker liveness (tlc2.TLC/LiveCheck) | `(no temporal/tableau/liveness comparator yet — unit 8.1+)` |
+| `gen-liveness-tests.py` | 16 | oracle-only | Single-worker liveness (tlc2.TLC/LiveCheck) | `struct.txt is the 8.1 temporal-normalization oracle; Hoon comparator = tests/lib/temporal{,-struct} (out.txt run projection still oracle-only, unit 8.2+)` |
 
 Compared cases: **796**.  Oracle-only cases: **43**.
 

@@ -363,6 +363,52 @@ without a `SPECIFICATION`/fairness constraint**. Not ported (`partial` row
   `SPECIFICATION`-form fairness, and the **liveness + symmetry**
   unsupported-combination diagnostics.
 
+## Unit P2-8.1 — Temporal-property normalization
+
+`lib/temporal.hoon` ports `Liveness.processLiveness` / `astToLive` and the
+`LiveExprNode` normal form (the `LN*` tree): it turns a temporal `PROPERTY`
+(plus any `SPECIFICATION` fairness) into the `OrderOfSolution` / `PossibleError-
+Model` decomposition that the tableau/product (8.2/8.3) will consume. This is
+the normal-form construction only — the verdict still comes from the first-
+increment no-fairness recognizer (Unit 11 above) until unit 8.5.
+
+**Support matrix** (all at structural + count parity with the oracle):
+
+- `astToLive` operator dispatch: `/\`,`\/`,`¬`,`⇒`, `[]`, `<>`, `[A]_e`/`<A>_e`,
+  `ENABLED`, `~>` desugaring (`P ~> Q ≡ [](¬P ∨ <>Q)`), and the `WF_`/`SF_`
+  expansions (`WF_e(A) ≡ []<>(¬ENABLED<A>_e ∨ <A>_e)`, `SF_e(A) ≡
+  <>[]¬ENABLED<A>_e ∨ []<><A>_e`).
+- Level-driven leaves: level 0 → `LNBool` (evaluated under the constant env),
+  1 → `LNState`, 2 → `LNAction`; a leaf renders as its `Location` span.
+- `simplify` / `toDNF` (with the `LNConj` cross-product) / `pushNeg`,
+  `makeBinary` (balanced binary junctions), `extractPromises` over the binary
+  tf, `classifyExpr` into AEAction/EAAction/AEState bins, and the equal-tf
+  lumping into ordered `OrderOfSolution`s.
+- The projection matches the frozen `struct.txt` for all 16 corpus cases —
+  counts (OOS/promises/checkState/checkAction/pems) and the full
+  `OrderOfSolution.toString` rendering — masking only the 8.2 `TABLEAU` count.
+  `tests/lib/temporal` (counts) and `tests/lib/temporal-struct` (structure) are
+  the Hoon comparators; `gen-liveness-tests` stays oracle-only.
+
+**Approved differences** (row `tlc-live-normalize` = `approved-difference`):
+
+- **Constant-leaf reject message (normalized).** A non-boolean constant leaf
+  (e.g. `<>(1)`) is rejected with the pin's EC 2215 (`TLC_EXPECTED_VALUE`), but
+  the message omits the pin's `%2%` = `expr.toString()` suffix, which is
+  volatile (a numeral renders as its text `1`, a compound expression as a
+  Location span). The EC and the fact of rejection match; the trailing text is
+  normalized, as elsewhere in this port.
+- **Cross-module leaf module name (deferral).** A leaf's `Location` names the
+  **root** module. A leaf defined in an `INSTANCE`d / `EXTENDS`-imported module
+  would, in TLC, name that module; no corpus case exercises it, and INSTANCE
+  substitution is itself deferred.
+- **Symmetry + liveness (typed rejection).** `search-ctx` typed-rejects a spec
+  that declares both `SYMMETRY` and a temporal `PROPERTY`, where TLC emits a
+  warning (EC 2279) and continues. The `symmetry-live` corpus case is therefore
+  normalized through the `live-struct-raw` path (which skips that gate) so the
+  decomposition is still exercised and matched. The warning-vs-reject choice is
+  tracked by `tlc-live-diagnostics`.
+
 ## Unit 12 — Simulation, checkpointing, recovery
 
 Seeded simulation is tested as **engine properties** (reproducibility, bounded

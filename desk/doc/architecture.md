@@ -48,6 +48,11 @@ check.hoon     safety BFS on semantic nodes: ordered         ── unit 7 (B6)
                FP64 identity, shortest traces, out-degree;
 crc.hoon       liveness (stuttering lasso), seeded simulation
    │
+temporal.hoon  temporal-PROPERTY normalization: the LN*        ── unit 8.1
+               live-expression tree, astToLive/simplify/
+               toDNF/pushNeg/makeBinary/extractPromises, and
+               the OrderOfSolution / PossibleErrorModel oos
+   │
 job.hoon       resumable stage engine: init → step → …,      ── units 1, 7, 10
                jammed continuation, typed %limited limits,
                asynchronous %modules source load, quotas
@@ -72,6 +77,22 @@ on the Work Unit 3 semantic graph through `tlc/node-eval` (the retired CST
 solver in `eval.hoon`/`check.hoon` survives only for simulation and the liveness
 state-predicate scan); state identity is the `tlc/fingerprint` FP64 orbit
 representative, never rendered text.
+
+**Temporal-property normalization lives in `lib/temporal`** (unit 8.1), the
+Hoon port of `Liveness.processLiveness` / `astToLive` and the `LiveExprNode`
+normal form. It consumes Work Unit 3 semantic nodes and a `SPECIFICATION`'s
+fairness conjuncts and produces the `oos` — the `OrderOfSolution` /
+`PossibleErrorModel` decomposition (tableau formula, promises, and the shared
+check-state/check-action bins with per-pem index arrays). The `live-expr` tree
+is the recursive-mold hazard handled the obelisk way (a named `$+` union of
+constant-head records, every recursion hand-rolled). `search-ctx:check` builds
+the `oos` for a liveness run and carries it on `sctx`; the molds and the
+`normalize` / `render-struct` interfaces are **frozen** for the tableau (8.2)
+and product/SCC (8.3) layers to build on. The verdict still comes from the
+first-increment recognizer until unit 8.5; nothing on the `oos` path touches
+the retired CST. Constant-level leaves are folded to `LNBool` through
+`node-eval`, so a non-boolean liveness leaf is a typed rejection rather than a
+silent pass.
 
 Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as
