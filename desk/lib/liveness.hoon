@@ -124,4 +124,96 @@
     [key $(ns t.ns)]
   (weld here $(ss t.ss))
 ::
+::  +|  The PossibleErrorModel accepting condition (Work Unit 8.4)
+::
+::  A candidate component (a cycle / strongly-connected component in the product
+::  graph) satisfies a `pem` — is an accepting counterexample — iff, over the
+::  component (LiveWorker.checkComponent):
+::    - EAAction (<>[]E): every edge satisfies each E (E holds always, so on
+::      every transition of the infinitely-repeated cycle);
+::    - AEState  ([]<>S): some node satisfies each S (S holds infinitely often);
+::    - AEAction ([]<>A): some edge satisfies each A (A fires infinitely often);
+::    - promises (<>p): each tableau promise is fulfilled at some node.
+::  WF_/SF_ fairness is *encoded* in the pem (an unfair cycle simply fails the
+::  AEAction/EAAction it contributes), so no separate fairness logic is needed.
+::  The component is presented as per-node checkState bit-lists and particles
+::  and per-edge checkAction bit-lists (the labels the product carries).
+++  comp
+  $:  node-cs=(list (list ?))    ::  per-node checkState results
+      node-par=(list par:tb)     ::  per-node tableau particle (for promises)
+      edge-ca=(list (list ?))    ::  per-edge checkAction results
+  ==
+::
+++  bit-at
+  ::  the i-th boolean of a result vector (missing reads false)
+  |=  [i=@ud v=(list ?)]
+  ^-  ?
+  ?~  v  |
+  ?:(=(0 i) i.v $(i (dec i), v t.v))
+::
+++  all-edges-set
+  ::  every edge has bit `idx` set (the EAAction "holds on every transition")
+  |=  [idx=@ud edges=(list (list ?))]
+  ^-  ?
+  ?~  edges  &
+  ?.  (bit-at idx i.edges)  |
+  $(edges t.edges)
+::
+++  some-set
+  ::  some element of `rows` has bit `idx` set (AEState/AEAction "some node/edge")
+  |=  [idx=@ud rows=(list (list ?))]
+  ^-  ?
+  ?~  rows  |
+  ?:  (bit-at idx i.rows)  &
+  $(rows t.rows)
+::
+++  every-ea
+  ::  each EAAction index holds on every edge
+  |=  [idxs=(list @ud) edges=(list (list ?))]
+  ^-  ?
+  ?~  idxs  &
+  ?.  (all-edges-set i.idxs edges)  |
+  $(idxs t.idxs)
+::
+++  every-some
+  ::  each index (AEState/AEAction) holds on some row (node/edge)
+  |=  [idxs=(list @ud) rows=(list (list ?))]
+  ^-  ?
+  ?~  idxs  &
+  ?.  (some-set i.idxs rows)  |
+  $(idxs t.idxs)
+::
+++  is-fulfilling
+  ::  TBPar.isFulfilling: a particle fulfils promise <>p iff <>p is absent from
+  ::  it, or its body p is present
+  |=  [promise=live-expr p=par:tb]
+  ^-  ?
+  ?.  (par-member:tb promise p)  &
+  ?:  ?=(%even -.promise)  (par-member:tb b.promise p)
+  |
+::
+++  promise-met
+  ::  a promise is fulfilled at some node of the component
+  |=  [promise=live-expr nodes=(list par:tb)]
+  ^-  ?
+  ?~  nodes  |
+  ?:  (is-fulfilling promise i.nodes)  &
+  $(nodes t.nodes)
+::
+++  all-promises
+  |=  [promises=(list live-expr) nodes=(list par:tb)]
+  ^-  ?
+  ?~  promises  &
+  ?.  (promise-met i.promises nodes)  |
+  $(promises t.promises)
+::
+++  pem-accepting
+  ::  whether a candidate component is an accepting counterexample for `p`
+  |=  [p=pem:tp promises=(list live-expr) c=comp]
+  ^-  ?
+  ?&  (every-ea ea-action.p edge-ca.c)
+      (every-some ae-state.p node-cs.c)
+      (every-some ae-action.p edge-ca.c)
+      (all-promises promises node-par.c)
+  ==
 --
