@@ -9,6 +9,7 @@
 /=  tb  /lib/tableau
 /=  ne  /lib/node-eval
 /=  fpl  /lib/fingerprint
+/=  vl  /lib/value
 =,  tp
 |%
 +$  pg-key  [fp=@t tidx=@ud]        ::  a product node (state fingerprint, node)
@@ -216,4 +217,321 @@
       (every-some ae-action.p edge-ca.c)
       (all-promises promises node-par.c)
   ==
+::
+::  +|  checkState / checkAction evaluation (the product edge/node labels)
+::
+++  cs-eval
+  ::  a checkState live-expr (a state predicate, level<=1) at a state
+  |=  [x=live-expr s0=state:ne env=eenv:ne]
+  ^-  ?
+  ?-  -.x
+    %bool   b.x
+    %neg    !(cs-eval b.x s0 env)
+    %conj   (levy cs.x |=(y=live-expr (cs-eval y s0 env)))
+    %disj   (lien ds.x |=(y=live-expr (cs-eval y s0 env)))
+  ::
+      %state
+    =/  r  (pred-bool:ne p.x s0 ~ env)
+    ?:(?=(%& -.r) p.r |)
+  ::
+    %act      ~|(%tlc-live-checkstate-action !!)
+    %enabled  ~|(%tlc-live-checkstate-enabled !!)
+    %all      ~|(%tlc-live-checkstate-temporal !!)
+    %even     ~|(%tlc-live-checkstate-temporal !!)
+    %next     ~|(%tlc-live-checkstate-next !!)
+  ==
+::
+++  ca-eval
+  ::  a checkAction live-expr (an action predicate, level<=2) on a transition
+  ::  s0 -> s1; LNAction/LNStateEnabled leaves carry action/ENABLED semantics
+  |=  [x=live-expr s0=state:ne s1=state:ne env=eenv:ne]
+  ^-  ?
+  ?-  -.x
+    %bool   b.x
+    %neg    !(ca-eval b.x s0 s1 env)
+    %conj   (levy cs.x |=(y=live-expr (ca-eval y s0 s1 env)))
+    %disj   (lien ds.x |=(y=live-expr (ca-eval y s0 s1 env)))
+  ::
+      %state
+    =/  r  (pred-bool:ne p.x s0 ~ env)
+    ?:(?=(%& -.r) p.r |)
+  ::
+    %act      (act-eval box.x sub.x a.x s0 s1 env)
+    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %all      ~|(%tlc-live-checkaction-temporal !!)
+    %even     ~|(%tlc-live-checkaction-temporal !!)
+    %next     ~|(%tlc-live-checkaction-next !!)
+  ==
+::
+++  sub-val
+  ::  a subscript state-expression evaluated at a state (its value, or ~ on
+  ::  an evaluation error)
+  |=  [e=sem:sm st=state:ne env=eenv:ne]
+  ^-  (unit value:vl)
+  =/  r  (eval:ne e env(s0 st))
+  ?:(?=(%& -.r) `p.r ~)
+::
+++  act-eval
+  ::  LNAction.eval: <A>_e is A /\ e' != e ; [A]_e is A \/ e' = e (a subscript
+  ::  stutter makes [A]_e true and <A>_e false without evaluating A)
+  |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne s1=state:ne env=eenv:ne]
+  ^-  ?
+  =/  stut
+    ?~  sub  |
+    =/  v0  (sub-val u.sub s0 env)
+    =/  v1  (sub-val u.sub s1 env)
+    ?&(?=(^ v0) ?=(^ v1) (equal:vl u.v0 u.v1))
+  ?:  &(?=(^ sub) box stut)  &
+  ?:  &(?=(^ sub) !box stut)  |
+  =/  r  (pred-bool:ne a s0 s1 env)
+  ?:(?=(%& -.r) p.r |)
+::
+++  enabled-eval
+  ::  LNStateEnabled.eval: ENABLED <A>_e holds at s0 iff some successor via A
+  ::  changes the subscript e; ENABLED [A]_e is always true
+  |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne env=eenv:ne]
+  ^-  ?
+  ?:  &(box ?=(^ sub))  &
+  =/  r  (solve:ne a %next s0 ~ env(enabled &))
+  ?:  ?=(%| -.r)  |
+  ?~  sub
+    (lien p.r |=(st=state:ne (complete:ne st vars.env)))
+  =/  v0  (sub-val u.sub s0 env)
+  ?~  v0  |
+  %+  lien  p.r
+  |=  st=state:ne
+  ?.  (complete:ne st vars.env)  |
+  =/  v1  (sub-val u.sub st env)
+  ?&(?=(^ v1) !(equal:vl u.v0 u.v1))
+::
+::  +|  Labeled product graph, SCC search, and verdict (Work Unit 8.5)
+::
++$  pnode  [cs=(list ?) par=par:tb]           ::  a product node's labels
++$  pedge  [from=pg-key to=pg-key ca=(list ?)]
+::
+++  cs-bits
+  |=  [xs=(list live-expr) s0=state:ne env=eenv:ne]
+  ^-  (list ?)
+  ?~  xs  ~
+  [(cs-eval i.xs s0 env) $(xs t.xs)]
+::
+++  ca-bits
+  |=  [xs=(list live-expr) s0=state:ne s1=state:ne env=eenv:ne]
+  ^-  (list ?)
+  ?~  xs  ~
+  [(ca-eval i.xs s0 s1 env) $(xs t.xs)]
+::
+++  labeled-product
+  ::  the product graph with per-node checkState bits + particle and per-edge
+  ::  checkAction bits. A no-tableau OOS's product is the reachable state graph
+  ::  (a single implicit tableau node, index 0).
+  |=  $:  o=oos:tp
+          states=(map @t state:ne)
+          inits=(list @t)
+          nsb=sem:sm
+          env=eenv:ne
+          order=(list @t)
+      ==
+  ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+  ?~  tf.o
+    =/  ik=(list pg-key)  (turn inits |=(fp=@t `pg-key`[fp 0]))
+    =/  nm=(map pg-key pnode)
+      %-  malt
+      %+  turn  ~(tap by states)
+      |=  [fp=@t st=state:ne]
+      ^-  [pg-key pnode]
+      [[fp 0] [(cs-bits check-state.o st env) ~]]
+    =/  es=(list pedge)
+      %-  zing
+      %+  turn  ~(tap by states)
+      |=  [fp0=@t s0=state:ne]
+      ^-  (list pedge)
+      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (succ-fps s0 nsb env order)]
+      |=  [fp1=@t s1=state:ne]
+      ^-  pedge
+      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]
+    [nm es ik]
+  =/  tabg  (build-tableau:tb u.tf.o)
+  =/  ik  (init-keys states inits tabg env)
+  =/  seen=(set pg-key)  (silt ik)
+  =/  q  ik
+  =|  nodes=(map pg-key pnode)
+  =|  edges=(list pedge)
+  |-  ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+  ?~  q  [nodes edges ik]
+  =/  k   i.q
+  =/  s0  (~(got by states) fp.k)
+  =/  t0  (snag-node:tb tidx.k nodes.tabg)
+  =.  nodes  (~(put by nodes) k [(cs-bits check-state.o s0 env) par.t0])
+  =/  out  (node-edges k s0 t0 tabg check-action.o nsb env order)
+  =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen) x)))
+  =.  seen  (~(gas in seen) fresh)
+  $(q (weld t.q fresh), edges (weld edges es.out))
+::
+++  node-edges
+  ::  the outgoing product edges of (fp,tidx) with their checkAction labels,
+  ::  and the successor product keys, over the state × tableau successor cross
+  |=  $:  k=pg-key  s0=state:ne  t0=tb-node:tb  tabg=tb-graph:tb
+          ca=(list live-expr)  nsb=sem:sm  env=eenv:ne  order=(list @t)
+      ==
+  ^-  [es=(list pedge) keys=(list pg-key)]
+  ::  stuttering is always a valid liveness behaviour: a state can step to
+  ::  itself (the tableau still advances), so prepend the self-successor
+  =/  stutter=[fp=@t st=state:ne]  [fp.k s0]
+  =/  ss  (weld ~[stutter] (succ-fps s0 nsb env order))
+  |-  ^-  [es=(list pedge) keys=(list pg-key)]
+  ?~  ss  [~ ~]
+  =/  rest  $(ss t.ss)
+  =/  here
+    =/  bits  (ca-bits ca s0 st.i.ss env)
+    =/  ns  nexts.t0
+    |-  ^-  [es=(list pedge) keys=(list pg-key)]
+    ?~  ns  [~ ~]
+    =/  t1  (snag-node:tb i.ns nodes.tabg)
+    =/  more  $(ns t.ns)
+    ?.  (consistent-at t1 st.i.ss env)  more
+    =/  nk=pg-key  [fp.i.ss i.ns]
+    [[[k nk bits] es.more] [nk keys.more]]
+  [(weld es.here es.rest) (weld keys.here keys.rest)]
+::
+++  adj-of
+  ::  adjacency map from an edge list, keeping only edges whose EAAction bits
+  ::  all hold (the <>[]E restriction; a cycle in this subgraph satisfies EAAction)
+  |=  [edges=(list pedge) eaa=(list @ud)]
+  ^-  (jar pg-key pg-key)
+  %+  roll  edges
+  |=  [e=pedge acc=(jar pg-key pg-key)]
+  ?.  (levy eaa |=(i=@ud (bit-at i ca.e)))  acc
+  (~(add ja acc) from.e to.e)
+::
+++  tarjan
+  ::  Tarjan's SCC over the product subgraph; returns the components (each a
+  ::  list of product keys), deterministic in discovery order
+  |=  [verts=(list pg-key) adj=(jar pg-key pg-key)]
+  ^-  (list (list pg-key))
+  =|  idx=@ud
+  =|  index=(map pg-key @ud)
+  =|  low=(map pg-key @ud)
+  =|  onstk=(set pg-key)
+  =|  stk=(list pg-key)
+  =|  out=(list (list pg-key))
+  =<  out
+  |-  ^+  [out=out idx=idx index=index low=low onstk=onstk stk=stk]
+  =*  loop  $
+  ?~  verts  [out idx index low onstk stk]
+  ?:  (~(has by index) i.verts)  loop(verts t.verts)
+  =/  r  (strong i.verts idx index low onstk stk out adj)
+  %=  loop
+    verts   t.verts
+    idx     idx.r
+    index   index.r
+    low     low.r
+    onstk   onstk.r
+    stk     stk.r
+    out     out.r
+  ==
+::
+++  strong
+  ::  the recursive Tarjan visit of one vertex
+  |=  $:  v=pg-key
+          idx=@ud
+          index=(map pg-key @ud)
+          low=(map pg-key @ud)
+          onstk=(set pg-key)
+          stk=(list pg-key)
+          out=(list (list pg-key))
+          adj=(jar pg-key pg-key)
+      ==
+  ^-  $:  idx=@ud  index=(map pg-key @ud)  low=(map pg-key @ud)
+          onstk=(set pg-key)  stk=(list pg-key)  out=(list (list pg-key))
+      ==
+  =.  index  (~(put by index) v idx)
+  =.  low    (~(put by low) v idx)
+  =.  idx    +(idx)
+  =.  stk    [v stk]
+  =.  onstk  (~(put in onstk) v)
+  =/  ws  (~(get ja adj) v)
+  =/  r0
+    |-  ^+  [idx=idx index=index low=low onstk=onstk stk=stk out=out]
+    ?~  ws  [idx index low onstk stk out]
+    =/  w  i.ws
+    ?:  !(~(has by index) w)
+      =/  r  (strong w idx index low onstk stk out adj)
+      =.  low  (~(put by low.r) v (min (~(got by low.r) v) (~(got by low.r) w)))
+      $(ws t.ws, idx idx.r, index index.r, low low, onstk onstk.r, stk stk.r, out out.r)
+    ?:  (~(has in onstk) w)
+      =.  low  (~(put by low) v (min (~(got by low) v) (~(got by index) w)))
+      $(ws t.ws)
+    $(ws t.ws)
+  =.  idx    idx.r0
+  =.  index  index.r0
+  =.  low    low.r0
+  =.  onstk  onstk.r0
+  =.  stk    stk.r0
+  =.  out    out.r0
+  ::  root of an SCC: pop the stack down to v
+  ?.  =((~(got by low) v) (~(got by index) v))
+    [idx index low onstk stk out]
+  =/  r1
+    =|  comp=(list pg-key)
+    |-  ^-  [comp=(list pg-key) onstk=(set pg-key) stk=(list pg-key)]
+    ?~  stk  [comp onstk stk]
+    =/  w  i.stk
+    =.  onstk  (~(del in onstk) w)
+    ?:  =(w v)  [[w comp] onstk t.stk]
+    $(stk t.stk, comp [w comp])
+  [idx index low onstk.r1 stk.r1 [comp.r1 out]]
+::
+++  scc-accepting
+  ::  a strongly-connected component is an accepting counterexample for `pm`
+  ::  iff it contains a cycle (size>1 or a self-loop) and satisfies the pem
+  ::  over its internal EAAction-holding edges and its nodes
+  |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
+          nodes=(map pg-key pnode)  edges=(list pedge)  eaa=(list @ud)
+      ==
+  ^-  ?
+  =/  members  (silt scc)
+  =/  internal
+    %+  skim  edges
+    |=  e=pedge
+    ?&  (~(has in members) from.e)
+        (~(has in members) to.e)
+        (levy eaa |=(i=@ud (bit-at i ca.e)))
+    ==
+  ?.  ?|((gth (lent scc) 1) (lien internal |=(e=pedge =(from.e to.e))))  |
+  =/  node-cs   (turn scc |=(k=pg-key cs:(~(got by nodes) k)))
+  =/  node-par  (turn scc |=(k=pg-key par:(~(got by nodes) k)))
+  =/  edge-ca   (turn internal |=(e=pedge ca.e))
+  (pem-accepting pm promises [node-cs node-par edge-ca])
+::
+++  oos-violated
+  ::  whether any pem of an OrderOfSolution has an accepting SCC in the product
+  |=  $:  o=oos:tp  states=(map @t state:ne)  inits=(list @t)
+          nsb=sem:sm  env=eenv:ne  order=(list @t)
+      ==
+  ^-  ?
+  =/  lp     (labeled-product o states inits nsb env order)
+  =/  verts  (turn ~(tap by nodes.lp) |=([k=pg-key *] k))
+  =/  pms    pems.o
+  |-  ^-  ?
+  ?~  pms  |
+  =/  adj   (adj-of edges.lp ea-action.i.pms)
+  =/  sccs  (tarjan verts adj)
+  =/  hit
+    |-  ^-  ?
+    ?~  sccs  |
+    ?:  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)  &
+    $(sccs t.sccs)
+  ?:(hit & $(pms t.pms))
+::
+++  live-verdict
+  ::  whether any OrderOfSolution is violated (an accepting counterexample
+  ::  exists) — a temporal-property violation
+  |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
+          nsb=sem:sm  env=eenv:ne  order=(list @t)
+      ==
+  ^-  ?
+  ?~  oss  |
+  ?:  (oos-violated i.oss states inits nsb env order)  &
+  $(oss t.oss)
 --

@@ -1380,6 +1380,22 @@
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   (render-product (product-counts p.sc))
 ::
+++  live-verdict-lines
+  ::  the liveness VERDICT/EC projection (unit 8.5) for a spec+cfg — the
+  ::  temporal-property verdict via the SCC/acceptance search over the product
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  g       (build-graph is.c o)
+  =/  states  (states-of seen.g)
+  =/  env     (make-env:ne defs.c consts.c vars.c)
+  ?:  (live-verdict:lv oss.c states inits.g nsb.c env order.c)
+    ~['VERDICT violated-property' 'EC 2116']
+  ~['VERDICT ok' 'EC 0']
+::
 ++  raw-live-oss
   ::  the normalized oos via the raw path (parse/generate/resolve-targets/
   ::  normalize, skipping search-ctx's symmetry-with-temporal rejection so the
