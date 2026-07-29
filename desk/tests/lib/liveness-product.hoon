@@ -1,8 +1,9 @@
 ::  Behavior-graph product node/init counts (unit 8.3): live-product must
 ::  match tools/oracle/ProductDump (desk/test-data/liveness/<case>/product.txt)
-::  for every liveness corpus case. GENERATED — do not edit. symmetry-live is
-::  Excluded: symmetry-live (production reject, 8.7); letin-prop (LET-bound leaf
-::  needs its binding to eval consistency); leadsto-{pass,viol} (~> tableau product).
+::  for every liveness corpus case. leadsto-viol (~> 3-node tableau) and
+::  letin-prop (LET-bound leaf) now match after the 8.2 alpha-closure fixpoint
+::  and the non-temporal-LET leaf fix. Excluded: symmetry-live (production
+::  reject, 8.7); leadsto-pass (fairness residue).
 /+  *test
 /=  check  /lib/check
 |%
@@ -78,4 +79,16 @@
   %+  expect-eq
     !>(`wain`~['PRODUCT' 'OOS 1' '--- 0 ---' 'NODES 2' 'INITS 1'])
   !>((live-product:check src-wf-viol cfg-wf-viol))
+++  src-leadsto-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x = 0 /\\ x\' = 1)\0aLive == (x = 0) ~> (x = 1)\0a====\0a'
+++  cfg-leadsto-viol  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-product-leadsto-viol
+  %+  expect-eq
+    !>(`wain`~['PRODUCT' 'OOS 1' '--- 0 ---' 'NODES 4' 'INITS 2'])
+  !>((live-product:check src-leadsto-viol cfg-leadsto-viol))
+++  src-letin-prop  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aLive == <>(LET y == 1 IN x = y)\0a====\0a'
+++  cfg-letin-prop  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-product-letin-prop
+  %+  expect-eq
+    !>(`wain`~['PRODUCT' 'OOS 1' '--- 0 ---' 'NODES 1' 'INITS 1'])
+  !>((live-product:check src-letin-prop cfg-letin-prop))
 --
