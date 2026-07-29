@@ -46,4 +46,10 @@
   %+  expect-eq
     !>(`wain`~['CLASS back-to-state' 'LOOP 1' 'TRACE 3' 'STATE 1 0xd0ba3e880dcdd983' 'LABEL <Initial predicate>' 'x = 0' 'ENDSTATE' 'STATE 2 0xf67893cfa654c4b3' 'LABEL <Ay line 5, col 7 to line 5, col 21 of module A>' 'x = 1' 'ENDSTATE' 'STATE 1 -1' 'LABEL Back to state' 'ENDSTATE'])
   !>((live-lasso-lines:check src-sf-absent-viol cfg-sf-absent-viol))
+++  src-wf-absent-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 3 /\\ x\' = x + 1\0aNext == Inc \\/ (x = 3 /\\ x\' = 3)\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Inc)\0aLive == <>(x = 3)\0a====\0a'
+++  cfg-wf-absent-viol  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+++  test-lasso-wf-absent-viol
+  %+  expect-eq
+    !>(`wain`~['CLASS stuttering' 'LOOP 3' 'TRACE 4' 'STATE 1 0xd0ba3e880dcdd983' 'LABEL <Initial predicate>' 'x = 0' 'ENDSTATE' 'STATE 2 0xf67893cfa654c4b3' 'LABEL <Inc line 5, col 8 to line 5, col 26 of module A>' 'x = 1' 'ENDSTATE' 'STATE 3 0x9d3f64075affe3e3' 'LABEL <Inc line 5, col 8 to line 5, col 26 of module A>' 'x = 2' 'ENDSTATE' 'STATE 4 -1' 'LABEL Stuttering' 'ENDSTATE'])
+  !>((live-lasso-lines:check src-wf-absent-viol cfg-wf-absent-viol))
 --
