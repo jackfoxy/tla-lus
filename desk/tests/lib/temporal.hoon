@@ -236,6 +236,22 @@
     !>((exp1 0 0 2 1))
   !>((live-struct-raw:check mod-symmetry-live cfg-symmetry))
 ::
+::  unit 8.1.4: the production liveness setup (search-ctx, which now builds the
+::  oos via temporal.hoon) yields the same decomposition as an independent
+::  normalize, for each migrated shape <>P / []<>P / []P.
+++  test-prod-diamond
+  %+  expect-eq
+    !>((live-struct:check mod-diamond cfg-in-next))
+  !>((live-struct-raw:check mod-diamond cfg-in-next))
+++  test-prod-boxdiamond
+  %+  expect-eq
+    !>((live-struct:check mod-boxdiamond cfg-in-next))
+  !>((live-struct-raw:check mod-boxdiamond cfg-in-next))
+++  test-prod-box-state
+  %+  expect-eq
+    !>((live-struct:check mod-box-state cfg-in-next))
+  !>((live-struct-raw:check mod-box-state cfg-in-next))
+::
 ::  makeBinary balances an n-ary conjunction into two-child nodes
 ++  test-make-binary-shape
   =/  a  (stp 1)
