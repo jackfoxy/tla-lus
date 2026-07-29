@@ -980,6 +980,11 @@
                                              ::  INIT/NEXT mode (unit 5.3c/8.1)
       tree=node
       nl=@t                                  ::  Next span label
+      oss=(list oos:tp)                      ::  the normalized temporal
+                                             ::  decomposition (unit 8.1), built
+                                             ::  from the PROPERTY + fairness via
+                                             ::  temporal.hoon; carried for the
+                                             ::  8.2 tableau/product to consume
   ==
 ::
 ++  sem-lvl
@@ -1170,11 +1175,34 @@
   ::  liveness under symmetry); TLC rejects it, so we do too
   ?:  &(?=(^ perms) ?=(^ pp))
     [%| 'unsupported: symmetry with a temporal property (unit 8)']
+  ::  build the normalized temporal decomposition for a liveness run (unit
+  ::  8.1.4): the production setup now derives the oos via temporal.hoon rather
+  ::  than the CST — the verdict still comes from the first-increment recognizer
+  ::  (unit 8.5 retires that). Empty for a pure-safety run.
+  =/  oss  ?~(pp ~ (build-live-oss ca defs fair))
   :-  %&
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  ddl  pp  fair  tree
       ?~(nb '' (next-span-label u.nb modn))
+      oss
   ==
+::
+++  build-live-oss
+  ::  the normalized OrderOfSolutions for a spec's PROPERTY list under its
+  ::  fairness (unit 8.1); shared by the production setup and the differential
+  |=  $:  ca=cfg-ast:config
+          defs=(map @t sem-def:sem-lib)
+          fair=(list sem:sem-lib)
+      ==
+  ^-  (list oos:tp)
+  =/  pbods=(list sem:sem-lib)
+    =/  ps  properties.ca
+    |-  ^-  (list sem:sem-lib)
+    ?~  ps  ~
+    =/  b  (sem-body defs i.ps)
+    ?~  b  $(ps t.ps)
+    [u.b $(ps t.ps)]
+  (normalize:tp pbods fair)
 ::
 ++  consts-of
   ::  arity-0 config constant assignments as an evaluation binding map (WU6.9
@@ -1272,37 +1300,19 @@
   ^-  wain
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  =*  c  p.sc
-  =/  cr  (parse-cfg:config cfg)
-  ?:  ?=(%| -.cr)  ~['Error: config']
-  =/  pbods=(list sem:sem-lib)
-    =/  ps  properties.p.cr
-    |-  ^-  (list sem:sem-lib)
-    ?~  ps  ~
-    =/  b  (sem-body defs.c i.ps)
-    ?~  b  $(ps t.ps)
-    [u.b $(ps t.ps)]
-  (render-counts:tp (normalize:tp pbods fair.c))
+  (render-counts:tp oss.p.sc)
 ::
 ++  live-struct-full
   ::  the full structural projection (unit 8.1.3): the LivenessStruct output
   ::  minus the TABLEAU node count, i.e. the OrderOfSolution.toString rendering
-  ::  for each OrderOfSolution alongside the counts
+  ::  for each OrderOfSolution alongside the counts. Reads the oos the PRODUCTION
+  ::  search context builds (unit 8.1.4), so this differential exercises the very
+  ::  decomposition the liveness path carries.
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  =*  c  p.sc
-  =/  cr  (parse-cfg:config cfg)
-  ?:  ?=(%| -.cr)  ~['Error: config']
-  =/  pbods=(list sem:sem-lib)
-    =/  ps  properties.p.cr
-    |-  ^-  (list sem:sem-lib)
-    ?~  ps  ~
-    =/  b  (sem-body defs.c i.ps)
-    ?~  b  $(ps t.ps)
-    [u.b $(ps t.ps)]
-  (render-struct:tp (normalize:tp pbods fair.c) (module-name-of tree.c))
+  (render-struct:tp oss.p.sc (module-name-of tree.p.sc))
 ::
 ++  live-struct-raw
   ::  the same count projection as +live-struct, but skipping search-ctx's
