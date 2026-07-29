@@ -580,11 +580,10 @@
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso
-  ::  a stuttering lasso: the shortest path from an initial state to a state in
-  ::  the accepting SCC that is itself an accepting single-node component (has
-  ::  a stutter self-loop satisfying the pem). The prefix includes all states
-  ::  up to and including that stuttering state, and the loop target is the
-  ::  1-based index of the stuttering state within the prefix.
+  ::  a stuttering lasso: find the deepest (longest path from init) accepting
+  ::  single-node component (stutter node) in the SCC. The prefix includes all
+  ::  states from init through that stuttering state, and the loop target is
+  ::  the 1-based index of the stuttering state within the prefix.
   |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
           nodes=(map pg-key pnode)  edges=(list pedge)
           init-set=(set pg-key)  eaa=(list @ud)
@@ -598,9 +597,11 @@
       [i.scc $(scc t.scc)]
     $(scc t.scc)
   ?~  stutter-nodes  ~
-  =/  prefix  (prefix-to-stutter init-set members stutter-nodes nodes edges)
-  ?^  prefix
-    =/  pf  (turn u.prefix |=(k=pg-key fp.k))
+  ::  find the deepest (longest path) to any accepting stutter
+  =/  deepest-path
+    (find-deepest-stutter init-set members stutter-nodes nodes edges)
+  ?^  deepest-path
+    =/  pf  (turn u.deepest-path |=(k=pg-key fp.k))
     `[pf %stuttering (lent pf)]
   ~
 ::
@@ -679,7 +680,7 @@
   ^-  (unit (list pg-key))
   =/  stutter-set  (silt stutter-nodes)
   =/  q=(list (list pg-key))
-    %-  turn  (turn ~(tap in init-set) |=(k=pg-key ~[k]))
+    (turn ~(tap in init-set) |=(k=pg-key ~[k]))
   =/  seen=(set pg-key)  init-set
   |-  ^-  (unit (list pg-key))
   ?~  q  ~
@@ -700,7 +701,7 @@
   |=  [init-set=(set pg-key) members=(set pg-key) edges=(list pedge)]
   ^-  (unit (list pg-key))
   =/  q=(list (list pg-key))
-    %-  turn  (turn ~(tap in init-set) |=(k=pg-key ~[k]))
+    (turn ~(tap in init-set) |=(k=pg-key ~[k]))
   =/  seen=(set pg-key)  init-set
   |-  ^-  (unit (list pg-key))
   ?~  q  ~
@@ -725,4 +726,31 @@
   ?~  lst  1
   =.  idx  +(idx)
   ?:(=(i.lst target) idx $(lst t.lst))
+::
+++  find-deepest-stutter
+  ::  find the deepest (longest path from init) to any accepting stutter node
+  ::  via BFS. Returns the full path from init through the stutter.
+  |=  $:  init-set=(set pg-key)  members=(set pg-key)  stutter-nodes=(list pg-key)
+          nodes=(map pg-key pnode)  edges=(list pedge)
+      ==
+  ^-  (unit (list pg-key))
+  =/  stutter-set  (silt stutter-nodes)
+  =/  q=(list (list pg-key))
+    (turn ~(tap in init-set) |=(k=pg-key ~[k]))
+  =/  seen=(set pg-key)  init-set
+  =/  deepest  `~
+  |-  ^-  (unit (list pg-key))
+  ?~  q  deepest
+  =/  path  i.q
+  =/  last  (rear path)
+  ?:  (~(has in stutter-set) last)
+    =.  deepest  `path
+    $(q t.q)
+  =/  succs
+    %+  turn  (skim edges |=(e=pedge =(from.e last)))
+    |=(e=pedge to.e)
+  =/  fresh  (skim succs |=(k=pg-key !(~(has in seen) k)))
+  =.  seen  (~(gas in seen) fresh)
+  =/  more  (turn fresh |=(k=pg-key (snoc path k)))
+  $(q (weld t.q more))
 --
