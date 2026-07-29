@@ -722,31 +722,4 @@
   ?~  lst  1
   =.  idx  +(idx)
   ?:(=(i.lst target) idx $(lst t.lst))
-::
-++  find-deepest-stutter
-  ::  find the deepest (longest path from init) to any accepting stutter node
-  ::  via BFS. Returns the full path from init through the stutter.
-  |=  $:  init-set=(set pg-key)  members=(set pg-key)  stutter-nodes=(list pg-key)
-          nodes=(map pg-key pnode)  edges=(list pedge)
-      ==
-  ^-  (unit (list pg-key))
-  =/  stutter-set  (silt stutter-nodes)
-  =/  q=(list (list pg-key))
-    (turn ~(tap in init-set) |=(k=pg-key ~[k]))
-  =/  seen=(set pg-key)  init-set
-  =/  deepest=(unit (list pg-key))  ~
-  |-  ^-  (unit (list pg-key))
-  ?~  q  deepest
-  =/  path  i.q
-  =/  last  (rear path)
-  ?:  (~(has in stutter-set) last)
-    =.  deepest  `path
-    $(q t.q)
-  =/  succs
-    %+  turn  (skim edges |=(e=pedge =(from.e last)))
-    |=(e=pedge to.e)
-  =/  fresh  (skim succs |=(k=pg-key !(~(has in seen) k)))
-  =.  seen  (~(gas in seen) fresh)
-  =/  more  (turn fresh |=(k=pg-key (snoc path k)))
-  $(q (weld t.q more))
 --
