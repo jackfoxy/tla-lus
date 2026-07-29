@@ -1444,7 +1444,14 @@
         ?:(stut 'LABEL Stuttering' 'LABEL Back to state')
         'ENDSTATE'
     ==
+  =/  header=wain
+    :~  'LIVENESS'
+        'VERDICT counterexample'
+        'EC 2109'
+        (crip "STAT generated {(scow %ud gen.g)} distinct {(scow %ud distinct.g)} queue 0 depth {(scow %ud depth.g)}")
+    ==
   ;:  weld
+    header
     :~  (crip "CLASS {(trip class.u.l)}")
         (crip "LOOP {(scow %ud loop.u.l)}")
         (crip "TRACE {(scow %ud +(np))}")
