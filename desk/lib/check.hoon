@@ -1398,7 +1398,9 @@
 ::
 ++  live-lasso-lines
   ::  the lasso CLASS/LOOP/TRACE/STATE projection (unit 8.6) for a violated
-  ::  spec — currently the stuttering lasso (an initial state that stutters)
+  ::  spec: the stuttering lasso (an initial state that stutters) or a
+  ::  back-to-state lasso (a real cycle returning to an earlier state), with
+  ::  per-state action labels from getActions
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
@@ -1409,37 +1411,98 @@
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
   =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
-  ?~  l  ~['(no stuttering lasso)']
-  =/  n  +((lent prefix.u.l))
-  ::  the prefix states (state 1 is the initial predicate)
+  ?~  l  ~['(no lasso)']
+  =/  modn     (module-name-of tree.c)
+  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  np    (lent prefix.u.l)
+  =/  stut  =(%stuttering class.u.l)
+  =/  marker-num    ?:(stut +(np) loop.u.l)
+  ::  the prefix states: state 1 is the initial predicate, each later state is
+  ::  labeled with the action that generated it
   =/  prefix-lines=wain
     =/  i  1
+    =/  prev=(unit @t)  ~
     =/  ps  prefix.u.l
     |-  ^-  wain
     ?~  ps  ~
     =/  st  (~(got by states) i.ps)
+    =/  label=@t
+      ?~  prev  'LABEL <Initial predicate>'
+      %-  crip
+      %+  weld  "LABEL "
+      (trip (edge-action-label (~(got by states) u.prev) i.ps actions env order.c modn))
     %+  weld
       ;:  weld
         ~[(crip "STATE {(scow %ud i)} {(fp-hex i.ps)}")]
-        ~['LABEL <Initial predicate>']
+        ~[label]
         (render-state st)
         ~['ENDSTATE']
       ==
-    $(ps t.ps, i +(i))
-  ::  the loop-back marker
+    $(ps t.ps, i +(i), prev `i.ps)
   =/  marker=wain
-    :~  (crip "STATE {(scow %ud n)} -1")
-        ?:(=(%stuttering class.u.l) 'LABEL Stuttering' 'LABEL Back to state')
+    :~  (crip "STATE {(scow %ud marker-num)} -1")
+        ?:(stut 'LABEL Stuttering' 'LABEL Back to state')
         'ENDSTATE'
     ==
   ;:  weld
     :~  (crip "CLASS {(trip class.u.l)}")
         (crip "LOOP {(scow %ud loop.u.l)}")
-        (crip "TRACE {(scow %ud n)}")
+        (crip "TRACE {(scow %ud +(np))}")
     ==
     prefix-lines
     marker
   ==
+::
+++  get-actions
+  ::  Tool.getActions: decompose a next-state relation into named leaf actions.
+  ::  A user-op reference recurses into its body (renaming the action), a
+  ::  disjunction recurses each disjunct, anything else is a leaf action.
+  |=  [n=sem:sem-lib nm=@t defs=(map @t sem-def:sem-lib)]
+  ^-  (list [name=@t body=sem:sem-lib])
+  ?:  ?=(%letin -.n)  ?~(body.n ~[[nm n]] $(n u.body.n))
+  ?.  ?=(%apply -.n)  ~[[nm n]]
+  =/  op  name.op.n
+  ?:  ?&(?=(%user-op kind.op.n) ?=(~ args.n))
+    =/  d  (~(get by defs) op)
+    ?:  ?|(?=(~ d) ?=(~ body.u.d))  ~[[nm n]]
+    $(n u.body.u.d, nm op)
+  ?:  |(=(op '$DisjList') =(op '\\lor'))
+    (get-actions-list args.n nm defs)
+  ~[[nm n]]
+::
+++  get-actions-list
+  |=  [l=(list sem:sem-lib) nm=@t defs=(map @t sem-def:sem-lib)]
+  ^-  (list [name=@t body=sem:sem-lib])
+  ?~  l  ~
+  (weld (get-actions i.l nm defs) $(l t.l))
+::
+++  action-label
+  ::  `<name line BL, col BC to line EL, col EC of module M>`
+  |=  [nm=@t sp=(unit span) modn=@t]
+  ^-  @t
+  ?~  sp  (crip "<{(trip nm)}>")
+  =*  s  u.sp
+  %-  crip
+  ;:  weld
+    "<"  (trip nm)  " line "  (a-tape line.from.s)  ", col "  (a-tape col.from.s)
+    " to line "  (a-tape line.to.s)  ", col "  (a-tape col.to.s)
+    " of module "  (trip modn)  ">"
+  ==
+::
+++  edge-action-label
+  ::  the label of the action that generates state `s1fp` from `s0`: the first
+  ::  getActions leaf whose next-state relation reaches that fingerprint
+  |=  $:  s0=state  s1fp=@t
+          actions=(list [name=@t body=sem:sem-lib])
+          e=eenv:ne  order=(list @t)  modn=@t
+      ==
+  ^-  @t
+  ?~  actions  '<unknown action>'
+  =/  r  (next-states:ne s0 body.i.actions e)
+  ?:  ?=(%| -.r)  $(actions t.actions)
+  ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
+    (action-label name.i.actions (sem-span:config body.i.actions) modn)
+  $(actions t.actions)
 ::
 ++  fp-hex
   ::  a state fingerprint as TLC prints it: "0x" + lowercase hex, no separators

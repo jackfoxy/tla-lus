@@ -571,26 +571,74 @@
     ?~  sccs  ~
     ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
       $(sccs t.sccs)
-    =/  l  (stutter-lasso i.sccs edges.lp init-set ea-action.i.pms)
-    ?^(l l $(sccs t.sccs))
+    ::  prefer the shortest accepting cycle: a self-accepting stutter self-loop
+    ::  at an initial node (stuttering), else a back-to-state cycle
+    =/  st  (stutter-lasso i.sccs i.pms promises.o nodes.lp edges.lp init-set ea-action.i.pms)
+    ?^  st  st
+    =/  bt  (bts-lasso i.sccs edges.lp init-set ea-action.i.pms)
+    ?^(bt bt $(sccs t.sccs))
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso
-  ::  a stuttering lasso when the accepting SCC contains an initial product node
-  ::  with a stutter self-loop (an EAAction-holding self edge): the state
-  ::  stutters there forever, so the prefix is that one state. A longer prefix
-  ::  or a back-to-state cycle (a non-stuttering loop) is a follow-on.
-  |=  $:  scc=(list pg-key)  edges=(list pedge)
+  ::  a stuttering lasso when an initial node of the accepting SCC is *itself*
+  ::  an accepting single-node component (a stutter self-loop that satisfies the
+  ::  pem — e.g. an empty/AEState pem with no fairness forbidding the stutter):
+  ::  the state stutters there forever, so the prefix is that one state
+  |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
+          nodes=(map pg-key pnode)  edges=(list pedge)
           init-set=(set pg-key)  eaa=(list @ud)
       ==
   ^-  (unit lasso)
   ?~  scc  ~
   =/  k  i.scc
   ?.  (~(has in init-set) k)  $(scc t.scc)
-  =/  self
-    %+  lien  edges
-    |=  e=pedge
-    ?&(=(from.e k) =(to.e k) (levy eaa |=(i=@ud (bit-at i ca.e))))
-  ?:  self  `[~[fp.k] %stuttering 1]
+  ?.  (scc-accepting ~[k] pm promises nodes edges eaa)  $(scc t.scc)
+  `[~[fp.k] %stuttering 1]
+::
+++  bts-lasso
+  ::  a back-to-state lasso: the shortest cycle of real (non-self-loop)
+  ::  EAAction-holding edges from an initial node back to itself. The prefix is
+  ::  the cycle's distinct states and the loop returns to state 1.
+  |=  $:  scc=(list pg-key)  edges=(list pedge)
+          init-set=(set pg-key)  eaa=(list @ud)
+      ==
+  ^-  (unit lasso)
+  =/  members  (silt scc)
+  =/  radj
+    ::  real (non-self-loop) EAAction-holding adjacency inside the SCC
+    %+  roll  edges
+    |=  [e=pedge acc=(jar pg-key pg-key)]
+    ?.  ?&  !=(from.e to.e)
+            (~(has in members) from.e)
+            (~(has in members) to.e)
+            (levy eaa |=(i=@ud (bit-at i ca.e)))
+        ==
+      acc
+    (~(add ja acc) from.e to.e)
+  |-  ^-  (unit lasso)
+  ?~  scc  ~
+  =/  k  i.scc
+  ?.  (~(has in init-set) k)  $(scc t.scc)
+  =/  cyc  (shortest-cycle k radj)
+  ?^  cyc  `[(turn u.cyc |=(x=pg-key fp.x)) %back-to-state 1]
   $(scc t.scc)
+::
+++  shortest-cycle
+  ::  the shortest cycle from `k` back to `k` in `radj` as a node path
+  ::  [k, …] (excluding the returning step); BFS carrying the path so far
+  |=  [k=pg-key radj=(jar pg-key pg-key)]
+  ^-  (unit (list pg-key))
+  =/  q=(list (list pg-key))  ~[~[k]]
+  =/  seen=(set pg-key)  (silt ~[k])
+  |-  ^-  (unit (list pg-key))
+  ?~  q  ~
+  =/  path  i.q
+  =/  last  (rear path)
+  =/  ws  (~(get ja radj) last)
+  =/  ret  (lien ws |=(w=pg-key =(w k)))
+  ?:  &(ret (gth (lent path) 0))  `path
+  =/  fresh  (skim ws |=(w=pg-key !(~(has in seen) w)))
+  =.  seen  (~(gas in seen) fresh)
+  =/  more  (turn fresh |=(w=pg-key (snoc path w)))
+  $(q (weld t.q more))
 --
