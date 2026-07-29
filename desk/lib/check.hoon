@@ -7,6 +7,7 @@
 /=  fp       /lib/fingerprint
 /=  sem-lib  /lib/semantic
 /=  tp       /lib/temporal
+/=  tb       /lib/tableau
 /=  vl       /lib/value
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
@@ -1308,17 +1309,26 @@
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   (render-counts:tp oss.p.sc)
 ::
+++  live-tabs
+  ::  the tableau node count (unit 8.2) for each OrderOfSolution, in order —
+  ::  0 when the OOS has no tableau formula (hand-rolled; a wet turn over the
+  ::  oos list fuse-loops the recursive live-expr it carries)
+  |=  oss=(list oos:tp)
+  ^-  (list @ud)
+  ?~  oss  ~
+  [(tableau-size:tb tf.i.oss) $(oss t.oss)]
+::
 ++  live-struct-full
-  ::  the full structural projection (unit 8.1.3): the LivenessStruct output
-  ::  minus the TABLEAU node count, i.e. the OrderOfSolution.toString rendering
-  ::  for each OrderOfSolution alongside the counts. Reads the oos the PRODUCTION
-  ::  search context builds (unit 8.1.4), so this differential exercises the very
-  ::  decomposition the liveness path carries.
+  ::  the full structural projection (unit 8.2): the LivenessStruct output
+  ::  including the TABLEAU node count, the OrderOfSolution.toString rendering,
+  ::  and the counts. Reads the oos the PRODUCTION search context builds (unit
+  ::  8.1.4), so this differential exercises the decomposition the liveness path
+  ::  carries and the tableau built from it.
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  (render-struct:tp oss.p.sc (module-name-of tree.p.sc))
+  (render-struct:tp oss.p.sc (module-name-of tree.p.sc) (live-tabs oss.p.sc))
 ::
 ++  raw-live-oss
   ::  the normalized oos via the raw path (parse/generate/resolve-targets/
@@ -1365,7 +1375,7 @@
   ^-  wain
   =/  or  (raw-live-oss spec cfg)
   ?:  ?=(%| -.or)  ~[(cat 3 'Error: ' p.or)]
-  (render-struct:tp oss.p.or modn.p.or)
+  (render-struct:tp oss.p.or modn.p.or (live-tabs oss.p.or))
 ::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines

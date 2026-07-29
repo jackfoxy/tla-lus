@@ -1054,9 +1054,11 @@
   $(t t.t, cur [i.t cur])
 ::
 ++  render-struct
-  ::  the full LivenessStruct projection minus the TABLEAU node count (unit
-  ::  8.2): LIVESTRUCT / OOS n / per-OOS counts + the TF…ENDTF rendering
-  |=  [oss=(list oos) modn=@t]
+  ::  the full LivenessStruct projection (unit 8.2): LIVESTRUCT / OOS n / the
+  ::  per-OOS counts, the TABLEAU node count, and the TF…ENDTF rendering. The
+  ::  tableau sizes are supplied by the caller (tableau.hoon imports this lib,
+  ::  so temporal.hoon must not depend on it), one per OrderOfSolution in order.
+  |=  [oss=(list oos) modn=@t tabs=(list @ud)]
   ^-  wain
   =/  hd=@t  (crip "OOS {(scow %ud (lent oss))}")
   =/  body
@@ -1065,6 +1067,7 @@
     |-  ^-  (list @t)
     ?~  oss  (flop acc)
     =/  o  i.oss
+    =/  tab  ?:((gth (lent tabs) i) (snag i tabs) 0)
     =/  block=(list @t)
       ;:  weld
         :~  (crip "--- {(scow %ud i)} ---")
@@ -1072,6 +1075,7 @@
             (crip "CHECKSTATE {(scow %ud (lent check-state.o))}")
             (crip "CHECKACTION {(scow %ud (lent check-action.o))}")
             (crip "PEMS {(scow %ud (lent pems.o))}")
+            (crip "TABLEAU {(scow %ud tab)}")
             'TF'
         ==
         (to-lines (render-oos modn o))
