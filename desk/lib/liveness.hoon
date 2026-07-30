@@ -566,17 +566,23 @@
   ?~  pms  ~
   =/  adj   (adj-of edges.lp ea-action.i.pms)
   =/  sccs  (tarjan verts adj)
+  ::  a stuttering counterexample is preferred over a back-to-state one; among
+  ::  the accepting stutter SCCs TLC reports the one its DFS finishes first (the
+  ::  deepest reachable stutter), so collect every stutter lasso and keep the
+  ::  one with the longest prefix, falling back to the first back-to-state cycle.
   =/  here
+    =|  stutters=(list lasso)
+    =/  bt=(unit lasso)  ~
     |-  ^-  (unit lasso)
-    ?~  sccs  ~
+    ?~  sccs
+      ?^  stutters  `(deepest-lasso stutters)
+      bt
     ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
       $(sccs t.sccs)
-    ::  prefer the shortest accepting cycle: a self-accepting stutter self-loop
-    ::  at an initial node (stuttering), else a back-to-state cycle
     =/  st  (stutter-lasso i.sccs i.pms promises.o nodes.lp edges.lp init-set ea-action.i.pms)
-    ?^  st  st
-    =/  bt  (bts-lasso i.sccs edges.lp init-set ea-action.i.pms)
-    ?^(bt bt $(sccs t.sccs))
+    =?  stutters  ?=(^ st)  [u.st stutters]
+    =?  bt  &(?=(~ bt) ?=(~ st))  (bts-lasso i.sccs edges.lp init-set ea-action.i.pms)
+    $(sccs t.sccs)
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso
@@ -597,7 +603,11 @@
   ?~  stutter-nodes  ~
   =/  prefix  (prefix-to-stutter init-set members stutter-nodes nodes edges)
   ?^  prefix
-    =/  pf  (turn u.prefix |=(k=pg-key fp.k))
+    ::  the lasso trace is over distinct STATES: consecutive product nodes with
+    ::  the same state fingerprint are a stutter step (the tableau advances while
+    ::  the state holds), so they collapse to one trace state — matching TLC,
+    ::  which reports the state path, not the product path.
+    =/  pf  (dedup-consec (turn u.prefix |=(k=pg-key fp.k)))
     `[pf %stuttering (lent pf)]
   ~
 ::
@@ -722,4 +732,25 @@
   ?~  lst  1
   =.  idx  +(idx)
   ?:(=(i.lst target) idx $(lst t.lst))
+::
+++  dedup-consec
+  ::  collapse each run of equal adjacent elements to a single element
+  |=  l=(list @t)
+  ^-  (list @t)
+  ?~  l  ~
+  ?~  t.l  l
+  ?:  =(i.l i.t.l)  $(l t.l)
+  [i.l $(l t.l)]
+::
+++  deepest-lasso
+  ::  the lasso with the longest prefix (the deepest reachable stutter — the one
+  ::  TLC's DFS finishes first); `ls` is non-empty by construction
+  |=  ls=(list lasso)
+  ^-  lasso
+  ?~  ls  [~ %stuttering 0]
+  =/  best  i.ls
+  |-  ^-  lasso
+  ?~  t.ls  best
+  =?  best  (gth (lent prefix.i.t.ls) (lent prefix.best))  i.t.ls
+  $(ls t.ls)
 --
