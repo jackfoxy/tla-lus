@@ -57,4 +57,16 @@
   %+  expect-eq
     !>(`wain`~['Error: Temporal property P1 was violated.' 'Error: The following behavior constitutes a counter-example:' 'State 1: <Initial predicate>' 'x = 0' 'State 2: Stuttering' '5 states generated, 2 distinct states found, 0 states left on queue.' 'The depth of the complete state graph search is 2.'])
   !>((live-message-lines:check src-multi-property cfg-multi-property))
+::  Symmetry + a temporal property (unit 8.7.2): APPROVED DIFFERENCE. TLC prints
+::  warning 2279 and CONTINUES on the symmetry-reduced graph (out.txt = VERDICT
+::  ok / WARN 2279). The port cannot yet run liveness on this spec class (the
+::  model-value \E action errors "variable unassigned"), so it type-rejects with
+::  the pinned 2279 text. This asserts the diagnostic content, NOT an oracle
+::  match; full warn-and-continue awaits liveness-under-model-values support.
+++  src-symmetry-live  '---- MODULE A ----\0aEXTENDS TLC\0aVARIABLE x\0aCONSTANT S\0aInit == x \\in S\0aNext == \\E s \\in S : x\' = s\0aPerms == Permutations(S)\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aLive == []<>(\\E s \\in S : x = s)\0a====\0a'
+++  cfg-symmetry-live  'SPECIFICATION Spec\0aPROPERTY Live\0aSYMMETRY Perms\0aCONSTANT S = {a, b}\0a'
+++  test-message-symmetry-live-rejected
+  %+  expect-eq
+    !>(`wain`~['Error: Declaring symmetry during liveness checking is dangerous. It might cause TLC to miss violations of the stated liveness properties. Please check liveness without symmetry defined.'])
+  !>((live-message-lines:check src-symmetry-live cfg-symmetry-live))
 --
