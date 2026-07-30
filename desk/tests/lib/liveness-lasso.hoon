@@ -1,12 +1,11 @@
 ::  Full liveness out.txt projection (unit 8.6): live-lasso-lines matches the
 ::  oracle LIVENESS/VERDICT/EC/STAT + CLASS/LOOP/TRACE/STATE projection
 ::  byte-for-byte. Covers stuttering-at-init, back-to-state (per-action
-::  getActions labels), and the LET-bound leaf (letin-prop).
-::  Excluded from the LASSO differential (owning unit): leadsto-viol — its
-::  product is correct (tests/lib/liveness-product) but its accepting stutter
-::  node is (x=0, tableau P3, non-init), so the port builds LOOP 2 where TLC
-::  stutters at the init node (LOOP 1); the stutter-node SELECTION is 8.6.2.
-::  Also open in 8.6.2: wf-absent-viol (multi-step sink stutter, LOOP 3).
+::  getActions labels), the LET-bound leaf (letin-prop), the ~> 3-node tableau
+::  (leadsto-viol, LOOP 1 — the accepting stutter at (x=0, tableau P3) projects
+::  onto the init state, so the state-level trace collapses), and the multi-step
+::  sink stutter (wf-absent-viol, LOOP 3 — the deepest accepting stutter x=2).
+::  The last two are the unit 8.6.2 stutter-selection cases.
 /+  *test
 /=  check  /lib/check
 |%
@@ -52,6 +51,18 @@
   %+  expect-eq
     !>(`wain`~['LIVENESS' 'VERDICT violated-property' 'EC 2116' 'STAT generated 5' 'STAT distinct 3' 'STAT queue 0' 'STAT depth 3' 'CLASS back-to-state' 'LOOP 1' 'TRACE 3' 'STATE 1 0xd0ba3e880dcdd983' 'LABEL <Initial predicate>' 'x = 0' 'ENDSTATE' 'STATE 2 0xf67893cfa654c4b3' 'LABEL <Ay line 5, col 7 to line 5, col 21 of module A>' 'x = 1' 'ENDSTATE' 'STATE 1 -1' 'LABEL Back to state' 'ENDSTATE'])
   !>((live-lasso-lines:check src-sf-absent-viol cfg-sf-absent-viol))
+++  src-leadsto-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x = 0 /\\ x\' = 1)\0aLive == (x = 0) ~> (x = 1)\0a====\0a'
+++  cfg-leadsto-viol  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-lasso-leadsto-viol
+  %+  expect-eq
+    !>(`wain`~['LIVENESS' 'VERDICT violated-property' 'EC 2116' 'STAT generated 4' 'STAT distinct 2' 'STAT queue 0' 'STAT depth 2' 'CLASS stuttering' 'LOOP 1' 'TRACE 2' 'STATE 1 0xd0ba3e880dcdd983' 'LABEL <Initial predicate>' 'x = 0' 'ENDSTATE' 'STATE 2 -1' 'LABEL Stuttering' 'ENDSTATE'])
+  !>((live-lasso-lines:check src-leadsto-viol cfg-leadsto-viol))
+++  src-wf-absent-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 3 /\\ x\' = x + 1\0aNext == Inc \\/ (x = 3 /\\ x\' = 3)\0aLive == <>(x = 3)\0a====\0a'
+++  cfg-wf-absent-viol  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-lasso-wf-absent-viol
+  %+  expect-eq
+    !>(`wain`~['LIVENESS' 'VERDICT violated-property' 'EC 2116' 'STAT generated 5' 'STAT distinct 4' 'STAT queue 0' 'STAT depth 4' 'CLASS stuttering' 'LOOP 3' 'TRACE 4' 'STATE 1 0xd0ba3e880dcdd983' 'LABEL <Initial predicate>' 'x = 0' 'ENDSTATE' 'STATE 2 0xf67893cfa654c4b3' 'LABEL <Inc line 5, col 8 to line 5, col 26 of module A>' 'x = 1' 'ENDSTATE' 'STATE 3 0x9d3f64075affe3e3' 'LABEL <Inc line 5, col 8 to line 5, col 26 of module A>' 'x = 2' 'ENDSTATE' 'STATE 4 -1' 'LABEL Stuttering' 'ENDSTATE'])
+  !>((live-lasso-lines:check src-wf-absent-viol cfg-wf-absent-viol))
 ++  src-letin-prop  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aLive == <>(LET y == 1 IN x = y)\0a====\0a'
 ++  cfg-letin-prop  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-lasso-letin-prop
