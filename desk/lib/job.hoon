@@ -1141,13 +1141,21 @@
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
   =/  ae  (check-assumes:check assumes.u.mo (make-env:ne defs consts vars))
   ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
-  ::  symmetry group (SYMMETRY); combined with a temporal property it is an
-  ::  unsafe combination TLC rejects (WU8 owns liveness under symmetry)
+  ::  symmetry group (SYMMETRY) with a temporal property: TLC warns (2279) and
+  ::  continues, but the port cannot yet run liveness on the reduced graph, so it
+  ::  type-rejects with the pinned 2279 warning text — keyed on the SYMMETRY
+  ::  declaration, before symmetry-perms/init (which error first) (unit 8.7.2)
+  ?:  &(?=(^ symmetry.rs) ?=(^ pp))
+    =/  msg=@t
+      %^    cat  3
+          'Declaring symmetry during liveness checking is dangerous. '
+        %^  cat  3
+          'It might cause TLC to miss violations of the stated liveness properties. '
+        'Please check liveness without symmetry defined.'
+    (finish j [%failed msg] pre)
   =/  pr  (symmetry-perms:check defs consts vars symmetry.rs)
   ?:  ?=(%| -.pr)  (finish j [%failed p.pr] pre)
   =/  perms  p.pr
-  ?:  &(?=(^ perms) ?=(^ pp))
-    (finish j [%failed 'unsupported: symmetry with a temporal property (unit 8)'] pre)
   =/  isb  (sem-body:check defs u.in)
   =/  nsb  (sem-body:check defs u.nx)
   ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)

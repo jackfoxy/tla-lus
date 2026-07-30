@@ -1164,19 +1164,29 @@
   =/  fair  fair.p.rt
   =/  consts  (const-map cfg)
   =/  nb  ?~(nname.p.rt ~ (body-of-def tree u.nname.p.rt))
+  ::  symmetry with a temporal property: TLC warns (2279) and continues on the
+  ::  symmetry-reduced graph. The port cannot yet run liveness on that spec class
+  ::  (model-value \E init/actions error "variable unassigned"), so we type-reject
+  ::  with the pinned 2279 warning text — a tested approved-difference (unit 8.7.2;
+  ::  full warn-and-continue awaits liveness-under-model-values engine support).
+  ::  Keyed on the SYMMETRY declaration (as TLC's warning is) and placed before
+  ::  symmetry-perms/init-states, which error first on such a spec.
+  ?:  &(?=(^ symmetry.ca) ?=(^ pp))
+    :-  %|
+    %^    cat  3
+        'Declaring symmetry during liveness checking is dangerous. '
+      %^  cat  3
+        'It might cause TLC to miss violations of the stated liveness properties. '
+      'Please check liveness without symmetry defined.'
+  =/  pr  (symmetry-perms defs consts vars symmetry.ca)
+  ?:  ?=(%| -.pr)  [%| p.pr]
+  =/  perms  p.pr
   =/  ir  (init-states:ne isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
   =/  cons   (resolve-bodies defs constraints.ca)
   =/  acons  (resolve-bodies defs action-constraints.ca)
   =/  ddl    !=(%false deadlock.ca)
-  =/  pr  (symmetry-perms defs consts vars symmetry.ca)
-  ?:  ?=(%| -.pr)  [%| p.pr]
-  =/  perms  p.pr
-  ::  symmetry with a temporal property is an unsafe combination (WU8 owns
-  ::  liveness under symmetry); TLC rejects it, so we do too
-  ?:  &(?=(^ perms) ?=(^ pp))
-    [%| 'unsupported: symmetry with a temporal property (unit 8)']
   ::  build the normalized temporal decomposition for a liveness run (unit
   ::  8.1.4): the production setup now derives the oos via temporal.hoon rather
   ::  than the CST — the verdict still comes from the first-increment recognizer
