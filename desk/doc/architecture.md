@@ -115,10 +115,12 @@ violated-property` / `EC 2116` / the four `STAT` lines (`generated`/`distinct`/
 / `LOOP` (1-based loop target) / `TRACE` / the numbered `STATE` blocks (state 1 =
 `<Initial predicate>`, the fingerprint as `0x`+separatorless hex via `+fp-hex`,
 the `var = value` bindings, per-transition `getActions` labels) closed by the
-`STATE n -1` marker. The lone deviation is the **stutter-node selection** order
-vs TLC's DFS (unit 8.6.2); the verdict and product are unaffected. The
-first-increment no-fairness recognizer still serves the production verdict/trace
-until unit 8.9 retires it.
+`STATE n -1` marker. Stutter-node selection matches TLC's DFS (unit 8.6.2): the
+trace is over distinct **states**, so a same-fingerprint stutter step collapses
+(`+dedup-consec`), and among the accepting stutter SCCs `+oos-lasso` reports the
+deepest (`+deepest-lasso`, the one TLC finishes first). The first-increment
+no-fairness recognizer still serves the production verdict/trace until unit 8.9
+retires it.
 
 Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as

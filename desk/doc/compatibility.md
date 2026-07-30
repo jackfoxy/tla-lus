@@ -432,20 +432,19 @@ byte-for-byte — `LIVENESS`/`VERDICT`/`EC`/four `STAT` lines/`CLASS`/`LOOP`/`TR
 - **LET-bound leaf** stutter: `letin-prop` — the `<>(LET y == 1 IN x = y)` leaf
   evaluates its binding (a non-temporal LET stays a whole-LET leaf; its rendered
   span is the body's, matching TLC).
-- **General prefix** (`LOOP > 1`) is implemented (`+prefix-to-stutter`/
-  `+prefix-to-bts` BFS + `+shortest-cycle`); the corpus case that exercises it in
-  the trace is blocked only by the selection deviation below.
+- **General prefix** (`LOOP > 1`) and **stutter-node selection** (8.6.2) match
+  TLC: `leadsto-viol` renders `LOOP 1` (the `(x=0, tableau P3)` stutter collapses
+  onto the init state via `+dedup-consec` — the trace is over distinct states,
+  not product nodes) and `wf-absent-viol` `LOOP 3` (`+oos-lasso`/`+deepest-lasso`
+  pick the deepest accepting stutter SCC — the sink `x=2` — the one TLC's DFS
+  finishes first), while a single cyclic accepting SCC still loops at its root
+  (`diamond-const-false`, `LOOP 1`).
 
-**Approved / deferred differences** (row `tlc-live-lasso` = `approved-difference`;
-each names its owning unit):
+The whole `out.txt` matches byte-for-byte for **10 corpus cases**; row
+`tlc-live-lasso` = **`parity`**.
 
-- **Stutter-node selection (owner 8.6.2).** When several accepting stutter points
-  exist the port takes the shortest-prefix one. TLC's DFS instead reports the
-  init-node stutter for `leadsto-viol` (port `LOOP 2` at the `(x=0, tableau P3,
-  non-init)` node vs TLC `LOOP 1`) and the **sink** stutter `x=2` for
-  `wf-absent-viol` (`LOOP 3`). In both the **verdict is correct and the product
-  count matches** — only the reported lasso differs — so both are excluded from
-  the lasso differential (their products stay in `tests/lib/liveness-product`).
+**Deferred differences** (each names its owning unit):
+
 - **`box-state` → invariant engine (owner 8.9).** `[]P` as a temporal property
   routes to the invariant/reachability path (EC 2110), reconciled in 8.9, not a
   temporal lasso.
