@@ -351,17 +351,49 @@ limitations below are now at parity, tested):
 
 ## Unit 11 — Liveness / temporal checking
 
-Liveness is checked only under the **no-fairness** semantics (TLC permits
-infinite stuttering at any reachable state), which makes `<>P` / `[]<>P` / `[]P`
-decidable by reachability with a stutter self-loop lasso. This is a real
-divergence from a fairness-constrained run and is **only correct for specs
-without a `SPECIFICATION`/fairness constraint**. Not ported (`partial` row
-`tlc-liveness`):
+**Superseded by the P2-8 temporal engine (see below).** The unit-11 first
+increment checked liveness only under no-fairness semantics via a stutter-only
+recognizer; unit P2-8 replaced it end to end. As of unit 8.9 the recognizer
+(`+unwrap-prop`/`+check-live`/`+render-live-trace`/`+live-scan`) is deleted and
+production runs the real tableau/product/SCC/lasso engine through the job kernel.
 
-- **Fairness** (`WF_`, `SF_`, `wf-next`), the **tableau / SCC / Büchi**
-  machinery for real non-stuttering lassos, **`P ~> Q` leads-to**,
-  `SPECIFICATION`-form fairness, and the **liveness + symmetry**
-  unsupported-combination diagnostics.
+## Unit P2-8 — Temporal properties, fairness, and liveness (full engine)
+
+The `temporal`/`tableau`/`liveness` layer ports TLC's `Liveness`/`TBGraph`/
+`LiveCheck`/`LiveWorker` pipeline. Production `%check` runs it through the
+resumable job kernel: normalize the property to the `OrderOfSolution` form (8.1),
+build the particle tableau (8.2), the behavior-graph product (8.3, bounded/
+resumable cursor), the `pem` acceptance + Tarjan SCC verdict (8.4/8.5, explicit-
+stack), the lasso counterexample (8.6), and the console/EC diagnostics (8.7).
+
+**Support matrix** (differential-tested against the pinned `LivenessDump` unless
+noted):
+
+- **`<>P` / `[]<>P` / `<>[]P`** and their fairness discriminators — full verdict +
+  lasso parity (stuttering and back-to-state, with `getActions` action labels).
+- **`P ~> Q` leads-to** — verdict + lasso parity (`leadsto-viol` violated,
+  `leadsto-pass` `VERDICT ok`).
+- **`WF_`/`SF_`/`SPECIFICATION`-form fairness** — verdict parity in the
+  differential (`wf-viol`, `sf-absent-viol`, `sf-pass`, `spec-fairness-pass`).
+- **`[]P` box-state** — a state invariant; routed to the safety/invariant engine
+  (EC 2110), matching TLC's `processConfigProps`.
+- **LET-bound leaf** (`letin-prop`) — evaluated with its binding.
+- Every temporal search is **bounded and resumable** (product cursor, explicit-
+  stack SCC), with typed `%limited` (time/state/depth/noun/artifact) and driver
+  cancellation.
+
+**Deviations / deferrals** (each with its owning unit):
+
+- **`SPECIFICATION`-form config in production** — `do-config` accepts only
+  `INIT`/`NEXT` mode, so a `SPECIFICATION`-fairness spec is a typed reject in
+  production (unit-5 `processConfigSpec` residue); the differential still exercises
+  it via `search-ctx`. Affects `leadsto-pass`, `back-to-state`, `wf-viol`,
+  `sf-absent-viol` as production runs.
+- **Symmetry + a temporal property** — typed-rejected with the pinned 2279 text
+  where TLC warns and continues (unit 8.7.2 approved-difference; full
+  warn-and-continue needs liveness under model-value symmetry).
+- **Multi-property violated-property name** — the first `PROPERTY` name (the oos
+  carries no source-property name); correct for the corpus.
 
 ## Unit P2-8.1 — Temporal-property normalization
 
