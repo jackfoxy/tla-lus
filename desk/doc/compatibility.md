@@ -448,8 +448,16 @@ The whole `out.txt` matches byte-for-byte for **10 corpus cases**; row
 - **`box-state` → invariant engine (owner 8.9).** `[]P` as a temporal property
   routes to the invariant/reachability path (EC 2110), reconciled in 8.9, not a
   temporal lasso.
-- **`symmetry-live` (owner 8.7).** Symmetry + a temporal property is a production
-  typed-rejection where TLC warns and continues; exercised via the `-raw` path.
+- **`symmetry-live` (owner 8.7.2, engine follow-on for full parity).** A spec
+  declaring `SYMMETRY` with a temporal `PROPERTY` is type-rejected with the exact
+  `TLC_FEATURE_UNSUPPORTED_LIVENESS_SYMMETRY` (2279) message ("Declaring symmetry
+  during liveness checking is dangerous. …"). TLC instead *warns* 2279 and
+  **continues** on the symmetry-reduced graph (`out.txt` = `VERDICT ok` /
+  `WARN 2279`); the port cannot yet evaluate that spec class (a model-value `\E`
+  init/action under a symmetry group errors "variable unassigned" when the guard
+  is relaxed), so it rejects with the pinned text — a tested approved-difference
+  (`tests/lib/liveness-message`). Full warn-and-continue is a deferred engine
+  follow-on. The normalization is still exercised via the `-raw` path.
 - **`leadsto-pass` (fairness residue).** A passing `~>` under fairness still awaits
   a follow-on; excluded from the product/lasso differentials.
 - **Production path unchanged (owner 8.9).** The first-increment no-fairness
