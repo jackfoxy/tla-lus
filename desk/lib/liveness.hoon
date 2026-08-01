@@ -308,6 +308,53 @@
 ::
 +$  pnode  [cs=(list ?) par=par:tb]           ::  a product node's labels
 +$  pedge  [from=pg-key to=pg-key ca=(list ?)]
+::  the bounded/resumable product-build cursor (unit 8.8.2a): the tableau, the
+::  BFS worklist over product keys, the visited set, and the product built so
+::  far. The static inputs (oos, states, nsb, env, order) are supplied fresh at
+::  each step from the kont, so the persisted cursor stays small.
++$  pcursor
+  $:  tabg=tb-graph:tb
+      q=(list pg-key)
+      seen=(set pg-key)
+      nodes=(map pg-key pnode)
+      edges=(list pedge)
+      inits=(list pg-key)
+  ==
+::
+++  product-init
+  ::  seed a product-build cursor for a tableau OOS from the reachable state
+  ::  graph: the tableau, the consistent initial product keys, and an empty
+  ::  product. (A no-tf OOS is handled whole by the caller.)
+  |=  $:  o=oos:tp  states=(map @t state:ne)  inits=(list @t)
+          env=eenv:ne
+      ==
+  ^-  pcursor
+  ?~  tf.o  [*tb-graph:tb ~ ~ ~ ~ ~]
+  =/  tabg  (build-tableau:tb u.tf.o)
+  =/  ik    (init-keys states inits tabg env)
+  [tabg ik (silt ik) ~ ~ ik]
+::
+++  product-step
+  ::  advance a product-build cursor by at most `budget` worklist keys; `done`
+  ::  is true when the worklist is empty (the product is complete). Mirrors the
+  ::  tableau branch of +labeled-product exactly, one slice at a time.
+  |=  $:  o=oos:tp  states=(map @t state:ne)  nsb=sem:sm  env=eenv:ne
+          order=(list @t)  pc=pcursor  budget=@ud
+      ==
+  ^-  [done=? cur=pcursor]
+  =/  spent  0
+  |-  ^-  [done=? cur=pcursor]
+  ?~  q.pc  [& pc]
+  ?:  =(spent budget)  [| pc]
+  =/  k   i.q.pc
+  =/  s0  (~(got by states) fp.k)
+  =/  t0  (snag-node:tb tidx.k nodes.tabg.pc)
+  =.  nodes.pc  (~(put by nodes.pc) k [(cs-bits check-state.o s0 env) par.t0])
+  =/  out  (node-edges k s0 t0 tabg.pc check-action.o nsb env order)
+  =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen.pc) x)))
+  =.  seen.pc  (~(gas in seen.pc) fresh)
+  =.  edges.pc  (weld edges.pc es.out)
+  $(q.pc (weld t.q.pc fresh), spent +(spent))
 ::
 ++  cs-bits
   |=  [xs=(list live-expr) s0=state:ne env=eenv:ne]
@@ -351,22 +398,11 @@
       ^-  pedge
       [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]
     [nm es ik]
-  =/  tabg  (build-tableau:tb u.tf.o)
-  =/  ik  (init-keys states inits tabg env)
-  =/  seen=(set pg-key)  (silt ik)
-  =/  q  ik
-  =|  nodes=(map pg-key pnode)
-  =|  edges=(list pedge)
-  |-  ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
-  ?~  q  [nodes edges ik]
-  =/  k   i.q
-  =/  s0  (~(got by states) fp.k)
-  =/  t0  (snag-node:tb tidx.k nodes.tabg)
-  =.  nodes  (~(put by nodes) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  out  (node-edges k s0 t0 tabg check-action.o nsb env order)
-  =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen) x)))
-  =.  seen  (~(gas in seen) fresh)
-  $(q (weld t.q fresh), edges (weld edges es.out))
+  ::  drain the bounded product-build cursor in one unbounded pass (the job
+  ::  kernel steps the same cursor a slice at a time — unit 8.8.2a)
+  =/  pc  (product-init o states inits env)
+  =/  r   (product-step o states nsb env order pc (bex 62))
+  [nodes.cur.r edges.cur.r inits.cur.r]
 ::
 ++  node-edges
   ::  the outgoing product edges of (fp,tidx) with their checkAction labels,
@@ -558,7 +594,18 @@
           nsb=sem:sm  env=eenv:ne  order=(list @t)
       ==
   ^-  (unit lasso)
-  =/  lp        (labeled-product o states inits nsb env order)
+  =/  lp  (labeled-product o states inits nsb env order)
+  (lasso-of-product o lp)
+::
+++  lasso-of-product
+  ::  the lasso (if any) for one OrderOfSolution over an ALREADY-BUILT product
+  ::  (unit 8.8.2a): the bounded SCC/acceptance/lasso post-step the job kernel
+  ::  runs after slicing the product build. Separated from +oos-lasso, which
+  ::  builds the product whole for the differential.
+  |=  $:  o=oos:tp
+          lp=[nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+      ==
+  ^-  (unit lasso)
   =/  init-set  (silt inits.lp)
   =/  verts     (turn ~(tap by nodes.lp) |=([k=pg-key *] k))
   =/  pms       pems.o

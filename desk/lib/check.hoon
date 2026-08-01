@@ -1485,20 +1485,34 @@
   ::  the TLC console diagnostic for a temporal run from an ALREADY-BUILT graph
   ::  (unit 8.8.1): shared by the `live-message-lines` differential and the job
   ::  kernel's %liveness stage. Returns the lasso (for the typed result/trace)
-  ::  and the console `wain` — `Model checking completed…` for a pass, else the
-  ::  `Temporal property … was violated.` counter-example (numbered `State N:`
-  ::  trace with getActions labels, `Stuttering` / `Back to state N:` closer,
-  ::  and the reachability counts).
+  ::  and the console `wain`. The whole-graph find-lasso; the job kernel instead
+  ::  builds the lasso via the sliced product cursor and calls +live-render.
   |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
           nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
           gen=@ud  distinct=@ud  depth=@ud
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
-  =/  l       (find-lasso:lv oss states inits nsb env order)
+  =/  l  (find-lasso:lv oss states inits nsb env order)
+  :-  l
+  %-  live-render
+  :*  l  states  nsb  env  order  modn  defs  pname  gen  distinct  depth  ==
+::
+++  live-render
+  ::  render the console diagnostic from a resolved lasso (unit 8.8.2a): shared
+  ::  by +live-report and the job kernel's sliced %check phase. `Model checking
+  ::  completed…` for a pass (l is ~), else the `Temporal property … was
+  ::  violated.` counter-example (numbered `State N:` trace with getActions
+  ::  labels, `Stuttering` / `Back to state N:` closer, and the counts).
+  |=  $:  l=(unit lasso:lv)  states=(map @t state:ne)
+          nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
+          defs=(map @t sem-def:sem-lib)  pname=@t
+          gen=@ud  distinct=@ud  depth=@ud
+      ==
+  ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
   ?~  l
-    [~ ['Model checking completed. No error has been found.' footer]]
+    ['Model checking completed. No error has been found.' footer]
   =/  actions  (get-actions nsb 'Next' defs)
   =/  np       (lent prefix.u.l)
   =/  stut     =(%stuttering class.u.l)
@@ -1530,7 +1544,6 @@
     =/  label
       (edge-action-label (~(got by states) last-fp) loop-fp actions env order modn)
     ~[(crip "Back to state {(a-tape loop.u.l)}: {(trip label)}")]
-  :-  l
   ;:  weld
     ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
     ~['Error: The following behavior constitutes a counter-example:']

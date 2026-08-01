@@ -3,6 +3,7 @@
 /=  syntax    /lib/syntax
 /=  check     /lib/check
 /=  tp        /lib/temporal
+/=  lv        /lib/liveness
 /=  semantic  /lib/semantic
 /=  ne        /lib/node-eval
 /=  config    /lib/config
@@ -141,6 +142,10 @@
           cur=bfs-cursor:check
           todo=(list @t)
           best=(unit [d=@ud fp=@t])
+          ::  %check-phase product slicing (unit 8.8.2a): the OrderOfSolutions
+          ::  still to try, and the current one's bounded product-build cursor
+          otodo=(list oos:tp)
+          pcur=(unit pcursor:lv)
       ==
       ::  seeded simulation
       $:  %sim
@@ -1195,7 +1200,7 @@
       =.  cont.j
         %-  save-kont
         :*  %live  %build  %box  inner.up  ~  u.pp  modn  nl  act
-            o  (bfs-init:check is)  ~  ~
+            o  (bfs-init:check is)  ~  ~  ~  ~
         ==
       (more j pre)
     ::  normalize the property into the 8.1 OrderOfSolution form (no fairness in
@@ -1208,7 +1213,7 @@
     =.  cont.j
       %-  save-kont
       :*  %live  %build  kind.up  inner.up  p.osr  u.pp  modn  nl  act
-          o  (bfs-init:check is)  ~  ~
+          o  (bfs-init:check is)  ~  ~  ~  ~
       ==
     (more j pre)
   ::  safety search: all invariants (ordered), state/action constraints, and
@@ -1261,7 +1266,7 @@
       =/  todo  (live-todo:check kind.kk seen.cur.r inits.cur.r)
       =.  cont.j  (save-kont kk(phase %scan, cur cur.r, todo todo))
       (more j pre)
-    =.  cont.j  (save-kont kk(phase %check, cur cur.r))
+    =.  cont.j  (save-kont kk(phase %check, cur cur.r, otodo oss.kk, pcur ~))
     (more j pre)
   (finish j [%failed 'internal: %explore without a search continuation'] pre)
 ::
@@ -1302,24 +1307,54 @@
   ?.  ?&(?=(^ k) ?=(%live -.u.k) ?=(?(%scan %check) phase.u.k))
     (finish j [%failed 'internal: %liveness without a scan continuation'] pre)
   =/  kk  u.k
-  ::  the 8.2–8.6 temporal check on the built graph (unit 8.8.1): find the lasso
-  ::  for the first violated OrderOfSolution and render tlc2.TLC's console
-  ::  diagnostic + typed result/trace, whole-event (the graph slices in %build)
+  ::  the 8.2–8.6 temporal check on the built graph (unit 8.8.2a): try each
+  ::  OrderOfSolution in turn, slicing the product build a budget at a time; on
+  ::  the first violated one render tlc2.TLC's console diagnostic + typed result.
   ?:  ?=(%check phase.kk)
     =/  st      stats.j
     =/  states  (states-of:check seen.cur.kk)
     =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
-    =/  r
-      %-  live-report:check
-      :*  oss.kk  states  inits.cur.kk  next.o.kk  env  order.o.kk  modn.kk
-          defs.o.kk  pname.kk  generated.st  distinct.st  depth.st
-      ==
-    =/  report  (wain-text report.r)
-    ?~  lasso.r
+    ::  no OrderOfSolution left to try → no temporal violation
+    ?~  otodo.kk
+      =/  report
+        %-  wain-text
+        %-  live-render:check
+        :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
+            generated.st  distinct.st  depth.st
+        ==
       (finish-arts j [%ok st] report ~ pre)
+    =/  o  i.otodo.kk
+    ::  obtain this OOS's lasso, slicing a tf product build; %more persists the
+    ::  cursor and continues, %done carries the (unit lasso)
+    =/  res
+      ^-  $%([%more cur=pcursor:lv] [%done lasso=(unit lasso:lv)])
+      ?~  tf.o
+        :-  %done
+        %+  lasso-of-product:lv  o
+        (labeled-product:lv o states inits.cur.kk next.o.kk env order.o.kk)
+      =/  pc  ?~(pcur.kk (product-init:lv o states inits.cur.kk env) u.pcur.kk)
+      =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget)
+      ?.  done.r  [%more cur.r]
+      [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]
+    ?:  ?=(%more -.res)
+      ::  bound the persisted product cursor, like the safety search
+      =.  cont.j  (save-kont kk(pcur `cur.res))
+      ?:  (noun-over cont.j max-noun-bytes)  (finish j [%limited %noun st] pre)
+      (more j pre)
+    =/  l  lasso.res
+    ?~  l
+      ::  this OOS has no accepting lasso → try the next one, fresh cursor
+      =.  cont.j  (save-kont kk(otodo t.otodo.kk, pcur ~))
+      (more j pre)
+    =/  report
+      %-  wain-text
+      %-  live-render:check
+      :*  l  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
+          generated.st  distinct.st  depth.st
+      ==
     =/  tr-states=(list state:check)
-      (turn prefix.u.lasso.r |=(fp=@t (~(got by states) fp)))
-    =/  typed=trace  [%lasso (trace-states tr-states act.kk) `loop.u.lasso.r]
+      (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
+    =/  typed=trace  [%lasso (trace-states tr-states act.kk) `loop.u.l]
     (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
   ::  the %scan phase is reached only for pure []P (box), so kind is %box
   =/  r
