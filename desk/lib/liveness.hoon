@@ -320,6 +320,21 @@
       edges=(list pedge)
       inits=(list pg-key)
   ==
+::  the bounded/resumable Tarjan SCC cursor (unit 8.8.2b): the roots still to
+::  start, the index/lowlink/on-stack/SCC-stack state, an EXPLICIT DFS frame
+::  stack (replacing recursion — so a deep product cannot overflow the Hoon
+::  stack and the search pauses/resumes), and the components found so far. The
+::  adjacency is supplied fresh at each step, so the persisted cursor stays small.
++$  scursor
+  $:  verts=(list pg-key)
+      idx=@ud
+      index=(map pg-key @ud)
+      low=(map pg-key @ud)
+      onstk=(set pg-key)
+      stk=(list pg-key)
+      work=(list [v=pg-key ws=(list pg-key)])
+      out=(list (list pg-key))
+  ==
 ::
 ++  product-init
   ::  seed a product-build cursor for a tableau OOS from the reachable state
@@ -442,81 +457,90 @@
 ::
 ++  tarjan
   ::  Tarjan's SCC over the product subgraph; returns the components (each a
-  ::  list of product keys), deterministic in discovery order
+  ::  list of product keys), deterministic in discovery order. Drains the
+  ::  explicit-stack cursor in one pass; the job kernel steps it a slice at a
+  ::  time (unit 8.8.2b). Byte-identical to the former recursive +strong.
   |=  [verts=(list pg-key) adj=(jar pg-key pg-key)]
   ^-  (list (list pg-key))
-  =|  idx=@ud
-  =|  index=(map pg-key @ud)
-  =|  low=(map pg-key @ud)
-  =|  onstk=(set pg-key)
-  =|  stk=(list pg-key)
-  =|  out=(list (list pg-key))
-  =<  out
-  |-  ^+  [out=out idx=idx index=index low=low onstk=onstk stk=stk]
-  =*  loop  $
-  ?~  verts  [out idx index low onstk stk]
-  ?:  (~(has by index) i.verts)  loop(verts t.verts)
-  =/  r  (strong i.verts idx index low onstk stk out adj)
-  %=  loop
-    verts   t.verts
-    idx     idx.r
-    index   index.r
-    low     low.r
-    onstk   onstk.r
-    stk     stk.r
-    out     out.r
-  ==
+  out:cur:(tarjan-step adj (tarjan-init verts) (bex 62))
 ::
-++  strong
-  ::  the recursive Tarjan visit of one vertex
-  |=  $:  v=pg-key
-          idx=@ud
-          index=(map pg-key @ud)
-          low=(map pg-key @ud)
-          onstk=(set pg-key)
-          stk=(list pg-key)
-          out=(list (list pg-key))
-          adj=(jar pg-key pg-key)
-      ==
-  ^-  $:  idx=@ud  index=(map pg-key @ud)  low=(map pg-key @ud)
-          onstk=(set pg-key)  stk=(list pg-key)  out=(list (list pg-key))
-      ==
-  =.  index  (~(put by index) v idx)
-  =.  low    (~(put by low) v idx)
-  =.  idx    +(idx)
-  =.  stk    [v stk]
-  =.  onstk  (~(put in onstk) v)
-  =/  ws  (~(get ja adj) v)
-  =/  r0
-    |-  ^+  [idx=idx index=index low=low onstk=onstk stk=stk out=out]
-    ?~  ws  [idx index low onstk stk out]
-    =/  w  i.ws
-    ?:  !(~(has by index) w)
-      =/  r  (strong w idx index low onstk stk out adj)
-      =.  low  (~(put by low.r) v (min (~(got by low.r) v) (~(got by low.r) w)))
-      $(ws t.ws, idx idx.r, index index.r, low low, onstk onstk.r, stk stk.r, out out.r)
-    ?:  (~(has in onstk) w)
-      =.  low  (~(put by low) v (min (~(got by low) v) (~(got by index) w)))
-      $(ws t.ws)
-    $(ws t.ws)
-  =.  idx    idx.r0
-  =.  index  index.r0
-  =.  low    low.r0
-  =.  onstk  onstk.r0
-  =.  stk    stk.r0
-  =.  out    out.r0
-  ::  root of an SCC: pop the stack down to v
-  ?.  =((~(got by low) v) (~(got by index) v))
-    [idx index low onstk stk out]
-  =/  r1
-    =|  comp=(list pg-key)
-    |-  ^-  [comp=(list pg-key) onstk=(set pg-key) stk=(list pg-key)]
-    ?~  stk  [comp onstk stk]
-    =/  w  i.stk
-    =.  onstk  (~(del in onstk) w)
-    ?:  =(w v)  [[w comp] onstk t.stk]
-    $(stk t.stk, comp [w comp])
-  [idx index low onstk.r1 stk.r1 [comp.r1 out]]
+++  tarjan-init
+  |=  verts=(list pg-key)
+  ^-  scursor
+  [verts 0 ~ ~ ~ ~ ~ ~]
+::
+++  tarjan-step
+  ::  advance the SCC search by at most `budget` operations (a root start, a
+  ::  frame's successor edge, or a frame completion). `done` is true when no
+  ::  active DFS frame and no unvisited root remain. An explicit DFS frame stack
+  ::  (`work`) replaces the recursion; the post-recursion lowlink update happens
+  ::  when a frame is popped, bubbling its low to the parent frame.
+  |=  [adj=(jar pg-key pg-key) sc=scursor budget=@ud]
+  ^-  [done=? cur=scursor]
+  =/  spent  0
+  |-  ^-  [done=? cur=scursor]
+  ?:  =(spent budget)  [| sc]
+  ::  bind the frame stack to a LOCAL and narrow that, so the sc.work / sc.verts
+  ::  wings stay list-typed for the =. assignments below (narrowing an sc wing
+  ::  with ?~ would make a later =. onto it need a lest)
+  =/  wk  work.sc
+  ?~  wk
+    ::  no active DFS: advance to the next unvisited root
+    =/  vs  verts.sc
+    ?~  vs  [& sc]
+    =/  v0    i.vs
+    =/  rest  t.vs
+    ?:  (~(has by index.sc) v0)
+      $(verts.sc rest, spent +(spent))
+    =.  verts.sc  rest
+    =.  index.sc  (~(put by index.sc) v0 idx.sc)
+    =.  low.sc    (~(put by low.sc) v0 idx.sc)
+    =.  idx.sc    +(idx.sc)
+    =.  stk.sc    [v0 stk.sc]
+    =.  onstk.sc  (~(put in onstk.sc) v0)
+    =.  work.sc   ~[[v0 (~(get ja adj) v0)]]
+    $(spent +(spent))
+  =/  fr     i.wk
+  =/  wrest  t.wk
+  ?~  ws.fr
+    ::  v.fr has no more successors: emit its SCC if it is a root, pop the frame,
+    ::  and bubble its lowlink to the parent frame
+    =/  v  v.fr
+    =.  sc
+      ?.  =((~(got by low.sc) v) (~(got by index.sc) v))  sc
+      =/  r
+        =/  os  onstk.sc
+        =/  sk  stk.sc
+        =|  comp=(list pg-key)
+        |-  ^-  [comp=(list pg-key) os=_os sk=_sk]
+        ?~  sk  [comp os sk]
+        =/  w  i.sk
+        =.  os  (~(del in os) w)
+        ?:  =(w v)  [[w comp] os t.sk]
+        $(sk t.sk, comp [w comp])
+      sc(onstk os.r, stk sk.r, out [comp.r out.sc])
+    =.  work.sc  wrest
+    =?  low.sc  ?=(^ wrest)
+      =/  p  v.i.wrest
+      (~(put by low.sc) p (min (~(got by low.sc) p) (~(got by low.sc) v)))
+    $(spent +(spent))
+  ::  process v.fr's next successor edge; the advanced top frame + the rest
+  =/  v    v.fr
+  =/  w    i.ws.fr
+  =/  wk2  ^-((list [v=pg-key ws=(list pg-key)]) [[v t.ws.fr] wrest])
+  ?:  (~(has by index.sc) w)
+    =.  work.sc  wk2
+    =?  low.sc  (~(has in onstk.sc) w)
+      (~(put by low.sc) v (min (~(got by low.sc) v) (~(got by index.sc) w)))
+    $(spent +(spent))
+  ::  w unvisited: enter it and push its frame
+  =.  index.sc  (~(put by index.sc) w idx.sc)
+  =.  low.sc    (~(put by low.sc) w idx.sc)
+  =.  idx.sc    +(idx.sc)
+  =.  stk.sc    [w stk.sc]
+  =.  onstk.sc  (~(put in onstk.sc) w)
+  =.  work.sc   [[w (~(get ja adj) w)] wk2]
+  $(spent +(spent))
 ::
 ++  scc-accepting
   ::  a strongly-connected component is an accepting counterexample for `pm`
