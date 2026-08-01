@@ -664,6 +664,11 @@
 ::
 ++  test-pause-resume-every-boundary-liveness
   (every-boundary (check-req live-spec live-bad-cfg) 1)
+::  the sliced 8.2-8.6 %check path (unit 8.8.2a): the leads-to property runs the
+::  tableau/product build a slice at a time, so budget 1 pauses at every
+::  product-step boundary — the verdict, lasso, and job noun must be identical
+++  test-pause-resume-every-boundary-leadsto
+  (every-boundary (check-req live-spec lead-cfg) 1)
 ::
 ::  +|  Simulation Through The Kernel
 ::
