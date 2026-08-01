@@ -502,10 +502,14 @@ The whole `out.txt` matches byte-for-byte for **10 corpus cases**; row
 Seeded simulation is tested as **engine properties** (reproducibility, bounded
 termination, violation discovery), *not* as a byte-for-byte oracle:
 
-- **RNG divergence (approved).** Random successor choice uses the Hoon `og`
-  core, not TLC's `RandomGenerator`; exact seeded-trace parity with
-  `tlc2.TLC -simulate` would require porting TLC's RNG state, seeding/aril
-  behavior, and enumeration order. Row `tlc-util-rng` = `approved-difference`.
+- **RNG parity (9.1, in progress).** `lib/rng.hoon` now ports `java.util.Random`
+  + `tlc2.util.RandomGenerator` exactly — `nextInt`/`nextLong`/`nextDouble`/
+  `nextPrime`/`setSeed(seed,cnt)` are byte-identical to the pinned JVM over 8
+  seeds (`tests/lib/rng`), including the `Math.floor(nextDouble()*n)` successor
+  index via IEEE-754 `@rd`. Row `tlc-util-rng` = `partial`. The simulation
+  successor choice still uses the Hoon `og` core in `lib/check`; swapping it to
+  `lib/rng` (and matching TLC's enumeration order) is unit 9.2. Until then
+  seeded-trace parity with `tlc2.TLC -simulate` is not yet claimed.
 - Absent: symmetry, checkpoint/resume across Gall restart, cancellation inside
   enumeration loops, structured partial statistics on resource limits, DFID,
   and the benchmark suite.

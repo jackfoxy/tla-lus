@@ -23,7 +23,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 | `gen-stdops-tests.py` | 11 | pass | StandardModule overrides (tlc2.module registry) | `desk/tests/lib/stdops-diff.hoon` |
 | `gen-liveness-tests.py` | 16 | pass | Single-worker liveness (tlc2.TLC/LiveCheck) | `Hoon comparators over the pin's goldens: tests/lib/temporal{,-struct} (8.1 normal form), tests/lib/tableau (8.2), tests/lib/liveness-product (8.3), tests/lib/liveness-accept/-verdict (8.4/8.5), tests/lib/liveness-lasso (8.6, whole out.txt, 10 cases), tests/lib/liveness-message (8.7). Production runs the 8.2-8.6 engine through the job kernel (8.8); pure []P box-state routes to the invariant engine (8.9). leadsto-pass matches in the differential (VERDICT ok) but is production-deferred on SPECIFICATION-form config (unit-5 residue). Excluded: symmetry-live (8.7 approved-difference)` |
+| `gen-rng-tests.py` | 8 | pass | java.util.Random PRNG (tlc2.util.RandomGenerator) | `desk/tests/lib/rng.hoon (unit 9.1): lib/rng nextInt/nextLong/nextDouble/nextPrime + setSeed(seed,cnt) vs the JVM over 8 seeds` |
 
-Compared cases: **812**.  Oracle-only cases: **27**.
+Compared cases: **820**.  Oracle-only cases: **27**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.
