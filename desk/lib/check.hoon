@@ -703,109 +703,6 @@
     [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
   $(cur cur.r)
 ::
-++  unwrap-prop
-  ::  classify a temporal property: <>P (%diamond), []<>P (%boxdiamond),
-  ::  []P (%box), or unsupported (%none); `inner` is the state predicate P
-  |=  n=node
-  ^-  [kind=?(%diamond %boxdiamond %box %none) inner=node]
-  =/  m  (unparen n)
-  ?.  (is-kind m %n-prefixexpr)  [%none m]
-  =/  kids  (kids-of m)
-  ?.  =(2 (lent kids))  [%none m]
-  =/  op  (op-name (snag 0 kids))
-  =/  arg  (unparen (snag 1 kids))
-  ?:  =('<>' op)  [%diamond arg]
-  ?.  =('[]' op)  [%none m]
-  ?.  (is-kind arg %n-prefixexpr)  [%box arg]
-  =/  ak  (kids-of arg)
-  ?.  =(2 (lent ak))  [%box arg]
-  ?.  =('<>' (op-name (snag 0 ak)))  [%box arg]
-  [%boxdiamond (unparen (snag 1 ak))]
-::
-++  unparen
-  |=  n=node
-  ^-  node
-  ?.  (is-kind n %n-parenexpr)  n
-  =/  kids  (kids-of n)
-  ?:((gte (lent kids) 2) (unparen (snag 1 kids)) n)
-::
-++  check-live
-  ::  a first-increment liveness check under no fairness: every reachable
-  ::  state may stutter forever, so <>P fails when an initial state has
-  ::  ~P and []<>P fails when any reachable state has ~P (stutter there)
-  |=  [prop=node name=@t g=graph]
-  ^-  [ok=? trace=(list state)]
-  =/  up  (unwrap-prop prop)
-  ?:  ?=(%none kind.up)  [& ~]
-  =/  holds  |=(st=state (ev-bool %init inner.up st ~))
-  ?:  ?=(%diamond kind.up)
-    ::  the first initial state (in generation order) violating P
-    =/  bad
-      |-  ^-  (unit @t)
-      ?~  inits.g  ~
-      ?.  (holds st:(~(got by seen.g) i.inits.g))  `i.inits.g
-      $(inits.g t.inits.g)
-    ?~  bad  [& ~]
-    [| (trace-to seen.g u.bad)]
-  ::  %boxdiamond / %box: the shallowest reachable state violating P
-  =/  entries  ~(tap by seen.g)
-  =/  bad
-    %+  roll  entries
-    |=  [[fp=@t v=visit] best=(unit [d=@ud fp=@t])]
-    ?:  (holds st.v)  best
-    ?:  ?&(?=(^ best) (lte d.u.best depth.v))  best
-    `[depth.v fp]
-  ?~  bad  [& ~]
-  [| (trace-to seen.g fp.u.bad)]
-::
-++  render-live-trace
-  ::  a lasso counterexample: the prefix states then a `Stuttering` step
-  |=  [trace=(list state) next-label=@t]
-  ^-  wain
-  =/  base  (render-trace trace next-label)
-  (snoc base (crip "State {(a-tape +((lent trace)))}: Stuttering"))
-::
-::  +|  Resumable Liveness Scan (unit P2-1)
-::
-+$  scan-slice
-  $%  [%more todo=(list @t) best=(unit [d=@ud fp=@t])]
-      [%done bad=(unit @t)]
-  ==
-::
-++  live-todo
-  ::  the ordered scan worklist for a property kind over a built graph
-  |=  [kind=?(%diamond %boxdiamond %box) seen=(map @t visit) inits=(list @t)]
-  ^-  (list @t)
-  ?:  ?=(%diamond kind)  inits
-  (turn ~(tap by seen) |=([fp=@t *] fp))
-::
-++  live-scan
-  ::  process up to `budget` fingerprints of the worklist, replicating
-  ::  +check-live's selection: the first violating initial state for
-  ::  <>P; the shallowest reachable violator (first seen wins ties, in
-  ::  worklist order) for []P and []<>P
-  |=  $:  kind=?(%diamond %boxdiamond %box)
-          inner=node
-          seen=(map @t visit)
-          todo=(list @t)
-          best=(unit [d=@ud fp=@t])
-          budget=@ud
-      ==
-  ^-  scan-slice
-  =/  spent  0
-  |-  ^-  scan-slice
-  ?~  todo
-    [%done ?~(best ~ `fp.u.best)]
-  ?:  (gte spent budget)  [%more todo best]
-  =/  v   (~(got by seen) i.todo)
-  =/  ok  (ev-bool %init inner st.v ~)
-  ?:  ?=(%diamond kind)
-    ?.  ok  [%done `i.todo]
-    $(todo t.todo, spent +(spent))
-  =?  best  ?&(!ok |(?=(~ best) (gth d.u.best depth.v)))
-    `[depth.v i.todo]
-  $(todo t.todo, spent +(spent))
-::
 ::  +|  Seeded Simulation (bounded, reproducible, resumable)
 ::
 ::
@@ -1687,23 +1584,29 @@
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
-  ::  liveness: a temporal PROPERTY (built via node-eval; the property's
-  ::  state-predicate scan still runs on the CST body — a WU6.9 residue)
+  ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
+  ::  through the safety terminal output; every other form runs the 8.2–8.6
+  ::  engine and renders tlc2.TLC's temporal console diagnostic (unit 8.9)
   ?^  pp.c
-    =/  prop-body  (body-of-def tree.c u.pp.c)
-    ?~  prop-body  ~['No property def']
+    =/  psb  (sem-body defs.c u.pp.c)
+    ?~  psb  ~['No property def']
+    =/  binner  (box-state-inner:tp u.psb)
+    ?^  binner
+      =/  o=bfs-opts
+        [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
+      (render-outcome (explore is.c o) nl.c)
+    =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
+    ?:  ?=(%| -.osr)  ~[(cat 3 'Error: ' msg.p.osr)]
     =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
-    =/  g  (build-graph is.c o)
-    =/  lr  (check-live u.prop-body u.pp.c g)
-    ?:  ok.lr
-      :-  'Model checking completed. No error has been found.'
-      (counts-lines gen.g distinct.g 0 depth.g)
-    ;:  weld
-      ~[(crip "Error: Temporal property {(trip u.pp.c)} was violated.")]
-      ~['Error: The following behavior constitutes a counter-example:']
-      (render-live-trace trace.lr nl.c)
-      (counts-lines gen.g distinct.g 0 depth.g)
-    ==
+    =/  g     (build-graph is.c o)
+    =/  modn  (module-name-of tree.c)
+    =/  r
+      %-  live-report
+      :*  p.osr  (states-of seen.g)  inits.g  nsb.c
+          (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
+          gen.g  distinct.g  depth.g
+      ==
+    report.r
   ::  safety: an INVARIANT
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
   (render-outcome (explore is.c o) nl.c)
@@ -1765,19 +1668,37 @@
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
   ?^  ae  [[%failed msg.u.ae] *run-stats]
-  ::  liveness (temporal property)
+  ::  a temporal property: a pure []P box-state is a state invariant (checked by
+  ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine
   ?^  pp.c
-    =/  prop  (body-of-def tree.c u.pp.c)
-    ?~  prop  [[%failed 'no property definition'] *run-stats]
-    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
-    =/  g   (build-graph is.c o)
-    =/  st  [gen.g distinct.g 0 depth.g]
-    =/  lr  (check-live u.prop u.pp.c g)
-    ?:  ok.lr  [[%ok st] st]
-    [[%violated [%property u.pp.c] st] st]
+    =/  psb  (sem-body defs.c u.pp.c)
+    ?~  psb  [[%failed 'no property definition'] *run-stats]
+    =/  binner  (box-state-inner:tp u.psb)
+    ?~  binner
+      =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
+      ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
+      =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+      =/  g   (build-graph is.c o)
+      =/  st  [gen.g distinct.g 0 depth.g]
+      =/  l
+        %-  find-lasso:lv
+        :*  p.osr  (states-of seen.g)  inits.g  nsb.c
+            (make-env:ne defs.c consts.c vars.c)  order.c
+        ==
+      ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])
+    ::  box-state P as a safety invariant
+    =/  o=bfs-opts
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
+    (explore-outcome (explore is.c o))
   ::  safety (invariant)
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
-  =/  res  (explore is.c o)
+  (explore-outcome (explore is.c o))
+::
+++  explore-outcome
+  ::  a safety outcome as the wire result + run-stats (shared by run-check's
+  ::  invariant and box-state paths)
+  |=  res=outcome
+  ^-  [result run-stats]
   ?-    -.res
       %ok        =/  st  [gen.res distinct.res queued.res depth.res]  [[%ok st] st]
       %limited   =/  st  [gen.res distinct.res queued.res depth.res]  [[%limited what.res st] st]
