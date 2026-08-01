@@ -641,12 +641,16 @@
 ++  live-bad-cfg   'INIT Init\0aNEXT Next\0aPROPERTY PBad\0a'
 ++  lead-cfg       'INIT Init\0aNEXT Next\0aPROPERTY Lead\0a'
 ::
+::  a pure []P property is a state invariant: TLC (and now the port, unit 8.9)
+::  checks it via the safety search, not the temporal engine. PGood holds
+::  everywhere -> %ok; PBad ([](x<2)) fails at x=2 -> an invariant violation with
+::  a safety trace. Box-state runs %parse/%config/%explore (3 stages, no %liveness).
 ++  test-live-ok
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req live-spec live-good-cfg) t0) 256)
   ;:  weld
     (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
-    (expect-eq !>([4 4]) !>(progress.j))
+    (expect-eq !>([3 3]) !>(progress.j))
   ==
 ::
 ++  test-live-violation
@@ -655,9 +659,8 @@
   =/  art  (~(got by artifacts.j) %trace)
   ?>  ?=(%trace -.art)
   ;:  weld
-    (expect-eq !>(`[%violated [%property 'PBad'] [5 4 0 4]]) !>(result.j))
-    (expect-eq !>(%lasso) !>(kind.trace.art))
-    (expect-eq !>(`(lent states.trace.art)) !>(loop-start.trace.art))
+    (expect-eq !>(`[%violated [%invariant 'PBad'] [3 3 0 3]]) !>(result.j))
+    (expect-eq !>(%safety) !>(kind.trace.art))
   ==
 ::
 ++  test-live-leadsto

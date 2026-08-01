@@ -798,6 +798,19 @@
   ?:  (is-box-state i.l)  $(l t.l)
   [i.l $(l t.l)]
 ::
+++  box-state-inner
+  ::  the P of a []P box-state property (a state/constant predicate), which TLC
+  ::  checks as an invariant rather than a temporal property (unit 8.9); ~ if the
+  ::  property is not a pure box-state
+  |=  s=sem:sm
+  ^-  (unit sem:sm)
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('[]' name.op.s)  ~
+  ?~  args.s  ~
+  =/  a  (hd args.s)
+  ?.  (lte (sem-lvl a) 1)  ~
+  `a
+::
 ++  normalize
   ::  the OrderOfSolutions for a spec's PROPERTY list under its fairness, or a
   ::  typed rejection (a non-boolean constant leaf). `env` folds constant leaves
