@@ -1,7 +1,9 @@
 ::  Liveness VERDICT/EC differential (unit 8.5): live-verdict-lines must match
-::  the ProductDump/LivenessDump out.txt verdict for the corpus. GENERATED.
-::  Excluded: box-state (invariant-routed, 8.9), symmetry-live (prod reject),
-::  letin-prop (LET-leaf), leadsto-{pass,viol} (~> tableau residue).
+::  the ProductDump/LivenessDump out.txt verdict for the corpus. leadsto-viol
+::  and letin-prop verdicts are covered by the whole-out.txt liveness-lasso
+::  differential; leadsto-pass is here (VERDICT ok). Excluded: box-state (a state
+::  invariant routed to the safety engine, 8.9), symmetry-live (typed reject,
+::  8.7 approved-difference).
 /+  *test
 /=  check  /lib/check
 |%
@@ -71,4 +73,13 @@
   %+  expect-eq
     !>(`wain`~['VERDICT violated-property' 'EC 2116'])
   !>((live-verdict-lines:check src-wf-viol cfg-wf-viol))
+::  leads-to under fairness holds (unblocked by the 8.2/8.3 ~> tableau + 8.4
+::  fairness work); SPECIFICATION-form config keeps it out of PRODUCTION (unit-5
+::  residue), but the differential runs through search-ctx (unit 8.9)
+++  src-leadsto-pass  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aGo == x = 0 /\\ x\' = 1\0aNext == Go \\/ (x = 1 /\\ x\' = 1)\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Go)\0aLive == (x = 0) ~> (x = 1)\0a====\0a'
+++  cfg-leadsto-pass  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+++  test-verdict-leadsto-pass
+  %+  expect-eq
+    !>(`wain`~['VERDICT ok' 'EC 0'])
+  !>((live-verdict-lines:check src-leadsto-pass cfg-leadsto-pass))
 --
