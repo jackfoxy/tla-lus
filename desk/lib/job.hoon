@@ -2,6 +2,7 @@
 /=  ast       /lib/ast
 /=  syntax    /lib/syntax
 /=  check     /lib/check
+/=  tp        /lib/temporal
 /=  semantic  /lib/semantic
 /=  ne        /lib/node-eval
 /=  config    /lib/config
@@ -123,12 +124,17 @@
       [%tree t=node:check src=(unit srcs)]
       ::  safety search
       [%bfs nl=@t act=next-act o=bfs-opts:check cur=bfs-cursor:check]
-      ::  liveness: full-graph build (%explore), then property scan
+      ::  liveness: full-graph build (%build), then either the first-increment
+      ::  recognizer scan (%scan, pure []P box-state — 8.9 routes it to the
+      ::  invariant engine) or the 8.2–8.6 tableau/product/SCC/lasso check
+      ::  (%check, every other temporal form — <>P, []<>P, ~>, unit 8.8.1)
       $:  %live
-          phase=?(%build %scan)
-          kind=?(%diamond %boxdiamond %box)
+          phase=?(%build %scan %check)
+          kind=?(%diamond %boxdiamond %box %none)
           inner=node:check
+          oss=(list oos:tp)
           pname=@t
+          modn=@t
           nl=@t
           act=next-act
           o=bfs-opts:check
@@ -1173,10 +1179,6 @@
         [%failed (rap 3 ~['no definition for PROPERTY ' u.pp])]
       pre
     =/  up  (unwrap-prop:check u.pb)
-    ?:  ?=(%none kind.up)
-      %^  finish  j
-        [%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)']
-      pre
     ::  a %clay run cannot know it needs a %liveness stage until its
     ::  config is read; the plan grows here, honestly, with its total
     =?  j  !(lien pending.j |=(s=stage =(%liveness s)))
@@ -1186,9 +1188,26 @@
       ==
     =/  o=bfs-opts:check
       [u.nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
+    ::  pure []P (box-state) stays on the first-increment recognizer (the %scan
+    ::  phase) until 8.9 routes it to the invariant engine; every other temporal
+    ::  form runs the 8.2–8.6 engine (the %check phase, unit 8.8.1)
+    ?:  ?=(%box kind.up)
+      =.  cont.j
+        %-  save-kont
+        :*  %live  %build  %box  inner.up  ~  u.pp  modn  nl  act
+            o  (bfs-init:check is)  ~  ~
+        ==
+      (more j pre)
+    ::  normalize the property into the 8.1 OrderOfSolution form (no fairness in
+    ::  %init-next mode); a non-boolean/unsupported leaf is a typed rejection
+    =/  psb  (sem-body:check defs u.pp)
+    ?~  psb
+      (finish j [%failed (rap 3 ~['no definition for PROPERTY ' u.pp])] pre)
+    =/  osr  (oss-of:check ~[u.psb] ~ (make-env:ne defs consts vars))
+    ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  kind.up  inner.up  u.pp  nl  act
+      :*  %live  %build  kind.up  inner.up  p.osr  u.pp  modn  nl  act
           o  (bfs-init:check is)  ~  ~
       ==
     (more j pre)
@@ -1236,8 +1255,13 @@
       (finish j [%failed 'internal: unexpected graph outcome'] pre)
     =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r]
     =.  stats.j  st
-    =/  todo  (live-todo:check kind.kk seen.cur.r inits.cur.r)
-    =.  cont.j  (save-kont kk(phase %scan, cur cur.r, todo todo))
+    ::  pure []P scans the graph (first-increment); every other form runs the
+    ::  8.2–8.6 check whole-event on the built graph (unit 8.8.1)
+    ?:  ?=(%box kind.kk)
+      =/  todo  (live-todo:check kind.kk seen.cur.r inits.cur.r)
+      =.  cont.j  (save-kont kk(phase %scan, cur cur.r, todo todo))
+      (more j pre)
+    =.  cont.j  (save-kont kk(phase %check, cur cur.r))
     (more j pre)
   (finish j [%failed 'internal: %explore without a search continuation'] pre)
 ::
@@ -1275,11 +1299,31 @@
 ++  do-scan
   |=  [j=job-3 k=(unit kont) budget=@ud pre=(list event)]
   ^-  step-result-3
-  ?.  ?&(?=(^ k) ?=(%live -.u.k) =(%scan phase.u.k))
+  ?.  ?&(?=(^ k) ?=(%live -.u.k) ?=(?(%scan %check) phase.u.k))
     (finish j [%failed 'internal: %liveness without a scan continuation'] pre)
   =/  kk  u.k
+  ::  the 8.2–8.6 temporal check on the built graph (unit 8.8.1): find the lasso
+  ::  for the first violated OrderOfSolution and render tlc2.TLC's console
+  ::  diagnostic + typed result/trace, whole-event (the graph slices in %build)
+  ?:  ?=(%check phase.kk)
+    =/  st      stats.j
+    =/  states  (states-of:check seen.cur.kk)
+    =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+    =/  r
+      %-  live-report:check
+      :*  oss.kk  states  inits.cur.kk  next.o.kk  env  order.o.kk  modn.kk
+          defs.o.kk  pname.kk  generated.st  distinct.st  depth.st
+      ==
+    =/  report  (wain-text report.r)
+    ?~  lasso.r
+      (finish-arts j [%ok st] report ~ pre)
+    =/  tr-states=(list state:check)
+      (turn prefix.u.lasso.r |=(fp=@t (~(got by states) fp)))
+    =/  typed=trace  [%lasso (trace-states tr-states act.kk) `loop.u.lasso.r]
+    (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
+  ::  the %scan phase is reached only for pure []P (box), so kind is %box
   =/  r
-    (live-scan:check kind.kk inner.kk seen.cur.kk todo.kk best.kk budget)
+    (live-scan:check %box inner.kk seen.cur.kk todo.kk best.kk budget)
   ?:  ?=(%more -.r)
     =.  cont.j  (save-kont kk(todo todo.r, best best.r))
     (more j pre)

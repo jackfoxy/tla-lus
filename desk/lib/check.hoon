@@ -1220,7 +1220,15 @@
     =/  b  (sem-body defs i.ps)
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
-  (normalize:tp pbods fair (make-env:ne defs consts vars))
+  (oss-of pbods fair (make-env:ne defs consts vars))
+::
+++  oss-of
+  ::  normalize temporal property bodies + fairness conjuncts into the
+  ::  OrderOfSolution list (exposes temporal.normalize for the job kernel's
+  ::  %liveness setup and the differential's build-live-oss)
+  |=  [pbods=(list sem:sem-lib) fair=(list sem:sem-lib) env=eenv:ne]
+  ^-  (each (list oos:tp) aerr:tp)
+  (normalize:tp pbods fair env)
 ::
 ++  consts-of
   ::  arity-0 config constant assignments as an evaluation binding map (WU6.9
@@ -1482,7 +1490,7 @@
   ::  trace with getActions labels, `Stuttering` / `Back to state N:` closer,
   ::  and the reachability counts).
   |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
-          nsb=sem:sm  env=eenv:ne  order=(list @t)  modn=@t
+          nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
           gen=@ud  distinct=@ud  depth=@ud
       ==
