@@ -651,11 +651,15 @@
     (expect-eq !>(`(lent states.trace.art)) !>(loop-start.trace.art))
   ==
 ::
-++  test-live-unsupported-form
+++  test-live-leadsto
+  ::  a leads-to property (unit 8.8.1): (x=0) ~> (x=1) is now handled by the
+  ::  8.2–8.6 engine (was an "unsupported form" reject under the first-increment
+  ::  recognizer). With no fairness TLC permits stuttering at x=0, so it never
+  ::  reaches x=1 — the property is violated.
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req live-spec lead-cfg) t0) 256)
   %+  expect-eq
-    !>(`[%failed 'unsupported: temporal property form (only <>P, []<>P, []P; unit 8)'])
+    !>(`[%violated [%property 'Lead'] [5 4 0 4]])
   !>(result.j)
 ::
 ++  test-pause-resume-every-boundary-liveness
