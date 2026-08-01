@@ -159,13 +159,6 @@
     %nullodn  ~
   ==
 ::
-++  letin-at
-  ::  a LET node with its span replaced by `a` (so a non-temporal LET leaf
-  ::  renders at its body's span, matching TLC, while keeping its bindings)
-  |=  [n=sem-letin:sm a=(unit span)]
-  ^-  sem:sm
-  n(at a)
-::
 ++  le-equal
   |=  [a=live-expr b=live-expr]
   ^-  ?
@@ -260,7 +253,9 @@
       ?.  (lte (sem-lvl s) 2)  (ast u.body.s env)
       =/  bat  (sspan-of u.body.s)
       ?~  bat  (ast u.body.s env)
-      (leaf (letin-at s bat) env)
+      ::  keep the LET's bindings but render at the body's span (matching TLC,
+      ::  which keeps the body node with its bindings resolved)
+      (leaf s(at bat) env)
     (leaf s env)
   =/  op  name.op.s
   =/  as  args.s

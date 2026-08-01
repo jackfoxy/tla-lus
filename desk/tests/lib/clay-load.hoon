@@ -65,7 +65,7 @@
   VARIABLE x
   Init == x = 0
   Next == x' = (x + 1) % 4
-  PGood == [](x < 4)
+  PGood == <>[](x < 4)
   ====
   '''
 ::
@@ -312,7 +312,9 @@
 ::
 ++  test-clay-property-appends-liveness
   ::  a Clay run cannot plan its %liveness stage until the config is
-  ::  read; %config appends it, and the progress total grows with it
+  ::  read; %config appends it, and the progress total grows with it. The
+  ::  property is genuinely temporal (a pure []P would route to the invariant
+  ::  engine and NOT append %liveness, unit 8.9); <>[](x<4) holds since x<4.
   =/  f  (mk-fs ~[[/src/spec/tla live-mod] [/src/cfg/txt live-cfg]])
   =/  j  +:(run-clay f (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
   ;:  weld

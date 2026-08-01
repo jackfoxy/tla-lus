@@ -457,29 +457,14 @@
 ::
 ++  tarjan
   ::  Tarjan's SCC over the product subgraph; returns the components (each a
-  ::  list of product keys), deterministic in discovery order. Drains the
-  ::  explicit-stack cursor in one pass; the job kernel steps it a slice at a
-  ::  time (unit 8.8.2b). Byte-identical to the former recursive +strong.
+  ::  list of product keys), deterministic in discovery order. An explicit DFS
+  ::  frame stack (`work`) replaces the recursion; the post-recursion lowlink
+  ::  update happens when a frame is popped, bubbling its low to the parent
+  ::  frame. Byte-identical to the former recursive +strong.
   |=  [verts=(list pg-key) adj=(jar pg-key pg-key)]
   ^-  (list (list pg-key))
-  out:cur:(tarjan-step adj (tarjan-init verts) (bex 62))
-::
-++  tarjan-init
-  |=  verts=(list pg-key)
-  ^-  scursor
-  [verts 0 ~ ~ ~ ~ ~ ~]
-::
-++  tarjan-step
-  ::  advance the SCC search by at most `budget` operations (a root start, a
-  ::  frame's successor edge, or a frame completion). `done` is true when no
-  ::  active DFS frame and no unvisited root remain. An explicit DFS frame stack
-  ::  (`work`) replaces the recursion; the post-recursion lowlink update happens
-  ::  when a frame is popped, bubbling its low to the parent frame.
-  |=  [adj=(jar pg-key pg-key) sc=scursor budget=@ud]
-  ^-  [done=? cur=scursor]
-  =/  spent  0
-  |-  ^-  [done=? cur=scursor]
-  ?:  =(spent budget)  [| sc]
+  =/  sc=scursor  [verts 0 ~ ~ ~ ~ ~ ~]
+  |-  ^-  (list (list pg-key))
   ::  bind the frame stack to a LOCAL and narrow that, so the sc.work / sc.verts
   ::  wings stay list-typed for the =. assignments below (narrowing an sc wing
   ::  with ?~ would make a later =. onto it need a lest)
@@ -487,11 +472,11 @@
   ?~  wk
     ::  no active DFS: advance to the next unvisited root
     =/  vs  verts.sc
-    ?~  vs  [& sc]
+    ?~  vs  out.sc
     =/  v0    i.vs
     =/  rest  t.vs
     ?:  (~(has by index.sc) v0)
-      $(verts.sc rest, spent +(spent))
+      $(verts.sc rest)
     =.  verts.sc  rest
     =.  index.sc  (~(put by index.sc) v0 idx.sc)
     =.  low.sc    (~(put by low.sc) v0 idx.sc)
@@ -499,7 +484,7 @@
     =.  stk.sc    [v0 stk.sc]
     =.  onstk.sc  (~(put in onstk.sc) v0)
     =.  work.sc   ~[[v0 (~(get ja adj) v0)]]
-    $(spent +(spent))
+    $(sc sc)
   =/  fr     i.wk
   =/  wrest  t.wk
   ?~  ws.fr
@@ -523,7 +508,7 @@
     =?  low.sc  ?=(^ wrest)
       =/  p  v.i.wrest
       (~(put by low.sc) p (min (~(got by low.sc) p) (~(got by low.sc) v)))
-    $(spent +(spent))
+    $(sc sc)
   ::  process v.fr's next successor edge; the advanced top frame + the rest
   =/  v    v.fr
   =/  w    i.ws.fr
@@ -532,7 +517,7 @@
     =.  work.sc  wk2
     =?  low.sc  (~(has in onstk.sc) w)
       (~(put by low.sc) v (min (~(got by low.sc) v) (~(got by index.sc) w)))
-    $(spent +(spent))
+    $(sc sc)
   ::  w unvisited: enter it and push its frame
   =.  index.sc  (~(put by index.sc) w idx.sc)
   =.  low.sc    (~(put by low.sc) w idx.sc)
@@ -540,7 +525,7 @@
   =.  stk.sc    [w stk.sc]
   =.  onstk.sc  (~(put in onstk.sc) w)
   =.  work.sc   [[w (~(get ja adj) w)] wk2]
-  $(spent +(spent))
+  $(sc sc)
 ::
 ++  scc-accepting
   ::  a strongly-connected component is an accepting counterexample for `pm`
@@ -646,8 +631,16 @@
     =/  bt=(unit lasso)  ~
     |-  ^-  (unit lasso)
     ?~  sccs
-      ?^  stutters  `(deepest-lasso stutters)
-      bt
+      ::  keep the accepting stutter with the longest prefix (the deepest
+      ::  reachable stutter, which TLC's DFS finishes first); else back-to-state
+      ?~  stutters  bt
+      :-  ~
+      =/  best  i.stutters
+      =/  more  t.stutters
+      |-  ^-  lasso
+      ?~  more  best
+      =?  best  (gth (lent prefix.i.more) (lent prefix.best))  i.more
+      $(more t.more)
     ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
       $(sccs t.sccs)
     =/  st  (stutter-lasso i.sccs i.pms promises.o nodes.lp edges.lp init-set ea-action.i.pms)
@@ -664,7 +657,6 @@
           init-set=(set pg-key)  eaa=(list @ud)
       ==
   ^-  (unit lasso)
-  =/  members  (silt scc)
   =/  stutter-nodes
     |-  ^-  (list pg-key)
     ?~  scc  ~
@@ -672,13 +664,19 @@
       [i.scc $(scc t.scc)]
     $(scc t.scc)
   ?~  stutter-nodes  ~
-  =/  prefix  (prefix-to-stutter init-set members stutter-nodes nodes edges)
+  =/  prefix  (bfs-to init-set (silt stutter-nodes) edges)
   ?^  prefix
     ::  the lasso trace is over distinct STATES: consecutive product nodes with
     ::  the same state fingerprint are a stutter step (the tableau advances while
     ::  the state holds), so they collapse to one trace state — matching TLC,
     ::  which reports the state path, not the product path.
-    =/  pf  (dedup-consec (turn u.prefix |=(k=pg-key fp.k)))
+    =/  fps  (turn u.prefix |=(k=pg-key fp.k))
+    =/  pf
+      |-  ^-  (list @t)
+      ?~  fps  ~
+      ?~  t.fps  fps
+      ?:  =(i.fps i.t.fps)  $(fps t.fps)
+      [i.fps $(fps t.fps)]
     `[pf %stuttering (lent pf)]
   ~
 ::
@@ -702,7 +700,7 @@
         ==
       acc
     (~(add ja acc) from.e to.e)
-  =/  prefix  (prefix-to-bts init-set members edges)
+  =/  prefix  (bfs-to init-set members edges)
   ?^  prefix
     =/  pf  u.prefix
     =/  last  (rear pf)
@@ -711,7 +709,14 @@
       =/  cycle-fps  (turn u.cyc |=(x=pg-key fp.x))
       =/  all-fps    (weld (turn (snip pf) |=(x=pg-key fp.x)) cycle-fps)
       =/  loop-fp    fp.last
-      =/  loop-idx   (index-of-first loop-fp all-fps)
+      ::  1-based index of the first product state whose fingerprint is loop-fp
+      =/  loop-idx
+        =/  idx  0
+        =/  fps  all-fps
+        |-  ^-  @ud
+        ?~  fps  1
+        =.  idx  +(idx)
+        ?:(=(i.fps loop-fp) idx $(fps t.fps))
       `[all-fps %back-to-state loop-idx]
     ~
   ~
@@ -735,47 +740,11 @@
   =/  more  (turn fresh |=(w=pg-key (snoc path w)))
   $(q (weld t.q more))
 ::
-++  get-loop-target
-  ::  find the 1-based index of the state that the cycle returns to. For a cycle
-  ::  [k1, k2, …, kn], returns to the index of k1 in the cycle. If k1 appears
-  ::  multiple times, returns the index of the first occurrence.
-  |=  [target=pg-key cycle-path=(list pg-key)]
-  ^-  @ud
-  =/  idx  0
-  |-  ^-  @ud
-  ?~  cycle-path  1
-  =.  idx  +(idx)
-  ?:(=(i.cycle-path target) idx $(cycle-path t.cycle-path))
-::
-++  prefix-to-stutter
-  ::  find the shortest path from any initial state to any stutter node (a state
-  ::  in the SCC with a self-loop). Uses BFS. Returns the path including both
-  ::  endpoints (initial state through stutter state), or ~ if no path exists.
-  |=  $:  init-set=(set pg-key)  members=(set pg-key)  stutter-nodes=(list pg-key)
-          nodes=(map pg-key pnode)  edges=(list pedge)
-      ==
-  ^-  (unit (list pg-key))
-  =/  stutter-set  (silt stutter-nodes)
-  =/  q=(list (list pg-key))
-    (turn ~(tap in init-set) |=(k=pg-key ~[k]))
-  =/  seen=(set pg-key)  init-set
-  |-  ^-  (unit (list pg-key))
-  ?~  q  ~
-  =/  path  i.q
-  =/  last  (rear path)
-  ?:  (~(has in stutter-set) last)  `path
-  =/  succs
-    %+  turn  (skim edges |=(e=pedge =(from.e last)))
-    |=(e=pedge to.e)
-  =/  fresh  (skim succs |=(k=pg-key !(~(has in seen) k)))
-  =.  seen  (~(gas in seen) fresh)
-  =/  more  (turn fresh |=(k=pg-key (snoc path k)))
-  $(q (weld t.q more))
-::
-++  prefix-to-bts
-  ::  find the shortest path from any initial state to any state in the SCC.
-  ::  Uses BFS. Returns the path or ~ if no path exists.
-  |=  [init-set=(set pg-key) members=(set pg-key) edges=(list pedge)]
+++  bfs-to
+  ::  the shortest path from any initial state to the first node found in
+  ::  `target`, by BFS over `edges`. Returns the path including both endpoints
+  ::  (initial state through target state), or ~ if no path exists.
+  |=  [init-set=(set pg-key) target=(set pg-key) edges=(list pedge)]
   ^-  (unit (list pg-key))
   =/  q=(list (list pg-key))
     (turn ~(tap in init-set) |=(k=pg-key ~[k]))
@@ -784,7 +753,7 @@
   ?~  q  ~
   =/  path  i.q
   =/  last  (rear path)
-  ?:  (~(has in members) last)  `path
+  ?:  (~(has in target) last)  `path
   =/  succs
     %+  turn  (skim edges |=(e=pedge =(from.e last)))
     |=(e=pedge to.e)
@@ -792,36 +761,4 @@
   =.  seen  (~(gas in seen) fresh)
   =/  more  (turn fresh |=(k=pg-key (snoc path k)))
   $(q (weld t.q more))
-::
-++  index-of-first
-  ::  find the 1-based index of the first occurrence of `target` in `lst`, or 1
-  ::  if not found (works with any noun type: pg-key, @t, etc.)
-  |=  [target=* lst=(list *)]
-  ^-  @ud
-  =/  idx  0
-  |-  ^-  @ud
-  ?~  lst  1
-  =.  idx  +(idx)
-  ?:(=(i.lst target) idx $(lst t.lst))
-::
-++  dedup-consec
-  ::  collapse each run of equal adjacent elements to a single element
-  |=  l=(list @t)
-  ^-  (list @t)
-  ?~  l  ~
-  ?~  t.l  l
-  ?:  =(i.l i.t.l)  $(l t.l)
-  [i.l $(l t.l)]
-::
-++  deepest-lasso
-  ::  the lasso with the longest prefix (the deepest reachable stutter — the one
-  ::  TLC's DFS finishes first); `ls` is non-empty by construction
-  |=  ls=(list lasso)
-  ^-  lasso
-  ?~  ls  [~ %stuttering 0]
-  =/  best  i.ls
-  |-  ^-  lasso
-  ?~  t.ls  best
-  =?  best  (gth (lent prefix.i.t.ls) (lent prefix.best))  i.t.ls
-  $(ls t.ls)
 --
