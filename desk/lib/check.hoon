@@ -1473,29 +1473,25 @@
     marker
   ==
 ::
-++  live-message-lines
-  ::  the TLC console diagnostic for a temporal violation (unit 8.7.1), rendered
-  ::  from the 8.2–8.6 liveness engine's lasso: the `Temporal property … was
-  ::  violated.` message with the property name, the counter-example intro, the
-  ::  numbered `State N: <label>` trace (per-action getActions labels), a
-  ::  `State N: Stuttering` or `Back to state N: <label>` closer, and the
-  ::  reachability counts — matching tlc2.TLC's console output (blanks trimmed).
-  |=  [spec=@t cfg=@t]
-  ^-  wain
-  =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
-  =/  g       (build-graph is.c o)
-  =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
-  =/  l       (find-lasso:lv oss.c states inits.g nsb.c env order.c)
-  =/  footer  (counts-lines gen.g distinct.g 0 depth.g)
+++  live-report
+  ::  the TLC console diagnostic for a temporal run from an ALREADY-BUILT graph
+  ::  (unit 8.8.1): shared by the `live-message-lines` differential and the job
+  ::  kernel's %liveness stage. Returns the lasso (for the typed result/trace)
+  ::  and the console `wain` — `Model checking completed…` for a pass, else the
+  ::  `Temporal property … was violated.` counter-example (numbered `State N:`
+  ::  trace with getActions labels, `Stuttering` / `Back to state N:` closer,
+  ::  and the reachability counts).
+  |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
+          nsb=sem:sm  env=eenv:ne  order=(list @t)  modn=@t
+          defs=(map @t sem-def:sem-lib)  pname=@t
+          gen=@ud  distinct=@ud  depth=@ud
+      ==
+  ^-  [lasso=(unit lasso:lv) report=wain]
+  =/  l       (find-lasso:lv oss states inits nsb env order)
+  =/  footer  (counts-lines gen distinct 0 depth)
   ?~  l
-    ['Model checking completed. No error has been found.' footer]
-  =/  modn     (module-name-of tree.c)
-  =/  actions  (get-actions nsb.c 'Next' defs.c)
-  =/  pname    ?~(pp.c '' u.pp.c)
+    [~ ['Model checking completed. No error has been found.' footer]]
+  =/  actions  (get-actions nsb 'Next' defs)
   =/  np       (lent prefix.u.l)
   =/  stut     =(%stuttering class.u.l)
   ::  the numbered prefix states: state 1 is the initial predicate, each later
@@ -1509,7 +1505,7 @@
     =/  st  (~(got by states) i.ps)
     =/  label=@t
       ?~  prev  '<Initial predicate>'
-      (edge-action-label (~(got by states) u.prev) i.ps actions env order.c modn)
+      (edge-action-label (~(got by states) u.prev) i.ps actions env order modn)
     %+  weld
       ;:  weld
         ~[(crip "State {(a-tape i)}: {(trip label)}")]
@@ -1524,8 +1520,9 @@
     =/  last-fp   (rear prefix.u.l)
     =/  loop-fp   (snag (dec loop.u.l) prefix.u.l)
     =/  label
-      (edge-action-label (~(got by states) last-fp) loop-fp actions env order.c modn)
+      (edge-action-label (~(got by states) last-fp) loop-fp actions env order modn)
     ~[(crip "Back to state {(a-tape loop.u.l)}: {(trip label)}")]
+  :-  l
   ;:  weld
     ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
     ~['Error: The following behavior constitutes a counter-example:']
@@ -1533,6 +1530,28 @@
     closer
     footer
   ==
+::
+++  live-message-lines
+  ::  the TLC console diagnostic for a temporal violation (unit 8.7.1), rendered
+  ::  from the 8.2–8.6 liveness engine's lasso — a thin differential wrapper over
+  ::  `+live-report` (which the job kernel also uses, unit 8.8.1).
+  |=  [spec=@t cfg=@t]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  g       (build-graph is.c o)
+  =/  states  (states-of seen.g)
+  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  modn    (module-name-of tree.c)
+  =/  pname   ?~(pp.c '' u.pp.c)
+  =/  r
+    %-  live-report
+    :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
+        gen.g  distinct.g  depth.g
+    ==
+  report.r
 ::
 ++  get-actions
   ::  Tool.getActions: decompose a next-state relation into named leaf actions.
