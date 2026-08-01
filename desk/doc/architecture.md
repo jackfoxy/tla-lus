@@ -118,9 +118,14 @@ the `var = value` bindings, per-transition `getActions` labels) closed by the
 `STATE n -1` marker. Stutter-node selection matches TLC's DFS (unit 8.6.2): the
 trace is over distinct **states**, so a same-fingerprint stutter step collapses
 (`+dedup-consec`), and among the accepting stutter SCCs `+oos-lasso` reports the
-deepest (`+deepest-lasso`, the one TLC finishes first). The first-increment
-no-fairness recognizer still serves the production verdict/trace until unit 8.9
-retires it.
+deepest (`+deepest-lasso`, the one TLC finishes first). As of unit 8.8 the job
+kernel's %liveness stage runs this engine in production (`do-config`→`do-explore`
+→`do-scan`, via `live-report`/`live-render`) with the product build sliced through
+a bounded resumable `+pcursor` and the SCC search an explicit-stack `+scursor`
+(no recursion-depth bail); pause/resume at every product-step boundary is
+byte-identical, and time/state/depth/noun/artifact limits each return a typed
+`%limited`. The first-increment `check-live` recognizer now serves only pure
+`[]P` (box-state) until unit 8.9 routes it to the invariant engine and retires it.
 
 Purity is the load-bearing property: because `+step:job` is a pure function of
 the job noun, pausing and resuming a job cannot change its output (tested as
