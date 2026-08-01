@@ -576,6 +576,15 @@
     (expect-eq !>(`[%limited %artifact [5 4 0 4]]) !>(result.j))
     (expect-eq !>(~) !>(artifacts.j))
   ==
+::  the state cap applies to a temporal (~>) run's graph build too, so the
+::  8.2-8.6 %check path is reached only within the limit (unit 8.8.3)
+++  test-limited-liveness-states
+  =/  req  (check-req live-spec lead-cfg)
+  =.  max-states.limits.req  2
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq
+    !>(`%states)
+  !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
 ::
 ::  +|  Config Honesty
 ::
