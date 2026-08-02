@@ -16,10 +16,10 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/eval.hoon` |
 | `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/stdmods.hoon` |
-| `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(no Hoon translator yet — unit 8)` |
+| `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(PlusCal excluded from PLAN-2 scope — R1.0; goldens kept, translator not ported)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/cfg.hoon` |
 | `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/cfg-val.hoon` |
-| `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(no semantic-node evaluator yet — unit 6.5)` |
+| `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(evaluator is lib/node-eval — R1.0; this corpus's Hoon comparator is owed, R1.4)` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
 | `gen-stdops-tests.py` | 11 | pass | StandardModule overrides (tlc2.module registry) | `desk/tests/lib/stdops-diff.hoon` |
 | `gen-liveness-tests.py` | 16 | pass | Single-worker liveness (tlc2.TLC/LiveCheck) | `Hoon comparators over the pin's goldens: tests/lib/temporal{,-struct} (8.1 normal form), tests/lib/tableau (8.2), tests/lib/liveness-product (8.3), tests/lib/liveness-accept/-verdict (8.4/8.5), tests/lib/liveness-lasso (8.6, whole out.txt, 10 cases), tests/lib/liveness-message (8.7). Production runs the 8.2-8.6 engine through the job kernel (8.8); pure []P box-state routes to the invariant engine (8.9). leadsto-pass matches in the differential (VERDICT ok) but is production-deferred on SPECIFICATION-form config (unit-5 residue). Excluded: symmetry-live (8.7 approved-difference)` |
