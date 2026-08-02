@@ -26,7 +26,8 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-rng-tests.py` | 8 | pass | java.util.Random PRNG (tlc2.util.RandomGenerator) | `desk/tests/lib/rng.hoon (unit 9.1): lib/rng nextInt/nextLong/nextDouble/nextPrime + setSeed(seed,cnt) vs the JVM over 8 seeds` |
 | `gen-sim-tests.py` | 15 | pass | Seeded simulation traces (tlc2.tool.SimulationWorker) | `desk/tests/lib/sim-diff.hoon (unit 9.2): lib/check simulate reproduces `tlc2.TLC -simulate -workers 1 -seed S` behavior byte-for-byte over a supported-fragment corpus` |
 | `gen-sim-live-tests.py` | 10 | pass | Temporal property in simulation (LiveCheck.checkTrace) | `desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`` |
+| `gen-sim-stats-tests.py` | 7 | pass | Simulation statistics (SimulationWorkerStatistics) | `desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`` |
 
-Compared cases: **845**.  Oracle-only cases: **27**.
+Compared cases: **852**.  Oracle-only cases: **27**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

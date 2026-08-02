@@ -522,10 +522,17 @@ seeded-trace oracle** on the supported fragment:
   single-worker path uses the ledger-excluded `LiveCheck1`, but the per-behavior
   verdict is the same temporal semantics as the modern `LiveCheck.checkTrace`,
   so the verdict is differential-testable.
+- **Structured partial statistics (9.3b).** simulate reports states generated
+  (`|inits|` + successors), the behavior count, and the trace-length
+  distribution (the online integer Welford mean, with var/sd under TLC's
+  `genTrace+1` div-by-zero guard) — matching `tlc2.TLC -simulate`
+  (`tests/lib/sim-stats`). Trace length is uniformly `depth` for non-deadlocking
+  completing runs, so var/sd are 0 there; the meaningful varying stat is
+  states-generated.
 - Still absent in simulation: `x' \in S` nondeterministic assignment (a
   node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
-  state/action `CONSTRAINT` handling, structured partial statistics (9.3b), and
-  checkpoint/resume across a Gall restart (9.4).
+  state/action `CONSTRAINT` handling, and checkpoint/resume across a Gall
+  restart (9.4).
 - Also absent: symmetry, cancellation inside enumeration loops, structured
   partial statistics on resource limits, DFID, and the benchmark suite.
 

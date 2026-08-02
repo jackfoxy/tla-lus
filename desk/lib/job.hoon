@@ -1368,7 +1368,9 @@
   ?:  ?=(%more -.r)
     =.  cont.j  (save-kont kk(cur cur.r))
     (more j pre)
-  =/  st=run-stats  [steps.res.r 0 0 maxn.cur.r]
+  ::  states-generated / behaviors / trace-length in TLC's simulation stat slots
+  ::  (generated = states generated; depth = deepest transition reached)
+  =/  st=run-stats  [gen.res.r 0 0 maxn.cur.r]
   =.  stats.j  st
   =/  head
     %-  crip
@@ -1377,7 +1379,15 @@
       (a-tape:check traces.res.r)
       " behaviors, "
       (a-tape:check steps.res.r)
-      " transitions."
+      " transitions, "
+      (a-tape:check gen.res.r)
+      " states generated (trace length: mean="
+      (a-tape:check mean.res.r)
+      ", var="
+      (a-tape:check var.res.r)
+      ", sd="
+      (a-tape:check sd.res.r)
+      ")."
     ==
   ?~  viol.res.r
     (finish-arts j [%ok st] head ~ pre)

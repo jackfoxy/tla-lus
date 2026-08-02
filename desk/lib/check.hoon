@@ -708,8 +708,12 @@
 ::
 ::
 +$  sim-result
-  $:  traces=@ud       ::  behaviors simulated
+  $:  traces=@ud       ::  behaviors generated (numOfGenTraces)
       steps=@ud        ::  state transitions taken
+      gen=@ud          ::  states generated (|inits| + successors, 9.3b)
+      mean=@ud         ::  trace-length mean over completed behaviors (Welford)
+      var=@ud          ::  Var(X) = round(m2 / (traces + 1))
+      sd=@ud           ::  round(sqrt(m2 / (traces + 1)))
       ::  the first violating behavior, if any: an invariant broken on a
       ::  successor, or a temporal PROPERTY broken by a completed behavior
       viol=(unit [kind=?(%invariant %property) name=@t path=(list state)])
@@ -742,6 +746,9 @@
       t=@ud                  ::  behaviors completed
       steps=@ud
       maxn=@ud               ::  deepest transition index reached
+      gen=@ud                ::  states generated so far (9.3b)
+      tm=@s                  ::  Welford running mean of completed trace lengths
+      tm2=@s                 ::  Welford running M2
       walk=(unit [cur=state n=@ud path=(list state)])
   ==
 +$  sim-slice
@@ -779,6 +786,34 @@
   ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen]
   $(gen t.gen, keep [i.gen keep])
 ::
+++  welford-add
+  ::  fold one completed behavior of length `tl` into the running (mean, m2) with
+  ::  the online integer algorithm tlc2 SimulationWorkerStatistics uses; `k` is
+  ::  the 1-based behavior count (numOfGenTraces at collectPostTrace).
+  |=  [tm=@s tm2=@s tl=@ud k=@ud]
+  ^-  [@s @s]
+  =/  tls    (sun:si tl)
+  =/  delta  (dif:si tls tm)
+  =/  ntm    (sum:si tm (fra:si delta (sun:si k)))
+  =/  ntm2   (sum:si tm2 (pro:si delta (dif:si tls ntm)))
+  [ntm ntm2]
+::
+++  mk-result
+  ::  finalize the run statistics. `gt` is the reported behavior count
+  ::  (numOfGenTraces): completed behaviors, plus the current one when it
+  ::  violated (a violating behavior is counted but excluded from the Welford
+  ::  trace-length stats, as collectPostTrace runs only on a clean behavior).
+  ::  Var(X) and SD use TLC's `genTrace + 1` div-by-zero guard.
+  |=  $:  gt=@ud  cur=sim-cursor
+          viol=(unit [kind=?(%invariant %property) name=@t path=(list state)])
+      ==
+  ^-  sim-result
+  =/  m2   (abs:si tm2.cur)
+  =/  d    +(gt)
+  =/  var  (div (add (mul 2 m2) d) (mul 2 d))       ::  round(m2 / d)
+  =/  sd   (abs:si (need (toi:rd (add:rd (sqt:rd (div:rd (sun:rd m2) (sun:rd d))) .~0.5))))
+  [gt steps.cur gen.cur (abs:si tm.cur) var sd viol]
+::
 ++  sim-live-viol
   ::  the completed behavior (chronological) if it breaks the temporal PROPERTY,
   ::  else ~. tlc2 LiveCheck.checkTrace over the trace's stutter graph, via the
@@ -799,14 +834,14 @@
   ::  or deadlock) its trace is checked against the temporal PROPERTY (9.3a).
   |=  [o=sim-opts cur=sim-cursor budget=@ud]
   ^-  sim-slice
-  ?:  =(~ inits.cur)  [%done [0 0 ~] cur]
+  ?:  =(~ inits.cur)  [%done (mk-result 0 cur ~) cur]
   ::  build the node-eval env (with its override registry) once per event; the
   ::  kont stores defs/consts/vars, never the built env (see +$ sim-opts)
   =/  e  (make-env:ne defs.o consts.o vars.o)
   =/  spent  0
   |-  ^-  sim-slice
   ?:  (gte spent budget)  [%more cur]
-  ?:  =(num.o t.cur)  [%done [t.cur steps.cur ~] cur]
+  ?:  =(num.o t.cur)  [%done (mk-result t.cur cur ~) cur]
   =/  mw  walk.cur
   ?~  mw
     ::  a) start a behavior at a random initial state (TLC checks invariants
@@ -816,17 +851,20 @@
     $(walk.cur `[start 0 ~[start]], spent +(spent))
   =/  w  u.mw
   ?:  =(n.w depth.o)
-    ::  behavior reached full depth: check the temporal property over it
+    ::  behavior reached full depth: check the temporal property, then fold its
+    ::  length into the Welford trace-length stats and start the next behavior
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
-    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+    =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
+    $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   =/  alen  (lent actions.o)
   ?:  =(0 alen)
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
-    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+    =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
+    $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   ::  b) pick an action and the retry stride prime, then walk actions from that
   ::  index until one yields successors ((index + p) % alen per retry)
   =^  index  s.cur  (floor-scaled:rng s.cur alen)
@@ -840,21 +878,25 @@
     ?^  nx.r  r
     $(tries +(tries), index (mod (add index p) alen))
   ?:  ?=(%none -.found)
-    ::  deadlock: no action produced a successor; check the property, end behavior
+    ::  deadlock: no action produced a successor; check the property, fold the
+    ::  behavior length, and start the next behavior
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
-    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+    =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
+    $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   ?:  ?=(%viol -.found)
     ::  an invariant violation ends the run with the offending behavior
     :+  %done
-      [+(t.cur) steps.cur `[%invariant name.found (flop [st.found path.w])]]
+      (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])])
     cur
-  ::  d) pick one successor and make it the current state
+  ::  d) pick one successor and make it the current state; every successor the
+  ::  chosen action generated counts toward states-generated (collectPreSuccessor)
   =^  j  s.cur  (floor-scaled:rng s.cur (lent nx.found))
   =/  s1  (nth-state j nx.found)
   %=  $
     spent      +(spent)
+    gen.cur    (add gen.cur (lent nx.found))
     walk.cur   `[s1 +(n.w) [s1 path.w]]
     steps.cur  +(steps.cur)
     maxn.cur   (max maxn.cur +(n.w))
@@ -867,7 +909,8 @@
   |=  [inits=(list state) seed=@]
   ^-  sim-cursor
   =/  wseed  -:(next-long:rng (scramble:rng seed))
-  [(scramble:rng wseed) inits 0 0 0 ~]
+  ::  states generated counts the initial states first (tlc2 getInitStates)
+  [(scramble:rng wseed) inits 0 0 0 (lent inits) --0 --0 ~]
 ::
 ++  simulate
   ::  bounded seeded simulation: up to `num` random behaviors, each up to
@@ -886,7 +929,7 @@
   |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud]
   ^-  sim-result
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  [0 0 ~]
+  ?:  ?=(%| -.sc)  [0 0 0 0 0 0 ~]
   =*  c  p.sc
   =/  actions  (get-actions nsb.c 'Next' defs.c)
   =/  pname  ?~(pp.c '' u.pp.c)
