@@ -1,0 +1,41 @@
+# test-model: DieHard  (safety violation)
+SANY accept
+TLC violated:Inv
+STATES 252 54 11
+DEPTH 7
+TRACE
+State 1: <Initial predicate>
+/\ action = "nondet"
+/\ smallBucket = 0
+/\ bigBucket = 0
+/\ water_to_pour = 0
+State 2: <FixWater line 58, col 16 to line 60, col 58 of module DieHard>
+/\ action = "fill big"
+/\ smallBucket = 0
+/\ bigBucket = 5
+/\ water_to_pour = 0
+State 3: <FixWater line 70, col 16 to line 73, col 57 of module DieHard>
+/\ action = "pour big to small"
+/\ smallBucket = 3
+/\ bigBucket = 2
+/\ water_to_pour = 3
+State 4: <FixWater line 67, col 16 to line 69, col 56 of module DieHard>
+/\ action = "empty small"
+/\ smallBucket = 0
+/\ bigBucket = 2
+/\ water_to_pour = 3
+State 5: <FixWater line 70, col 16 to line 73, col 57 of module DieHard>
+/\ action = "pour big to small"
+/\ smallBucket = 2
+/\ bigBucket = 0
+/\ water_to_pour = 2
+State 6: <FixWater line 58, col 16 to line 60, col 58 of module DieHard>
+/\ action = "fill big"
+/\ smallBucket = 2
+/\ bigBucket = 5
+/\ water_to_pour = 2
+State 7: <FixWater line 70, col 16 to line 73, col 57 of module DieHard>
+/\ action = "pour big to small"
+/\ smallBucket = 3
+/\ bigBucket = 4
+/\ water_to_pour = 1

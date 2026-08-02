@@ -1,0 +1,5 @@
+# examples: SimpleAllocator  (safety ok, 400 states)
+SANY accept
+TLC ok
+STATES 1633 400 0
+DEPTH 6

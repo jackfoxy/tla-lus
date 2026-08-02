@@ -1,0 +1,5 @@
+# examples: CigaretteSmokers  (safety ok, 6 states)
+SANY accept
+TLC ok
+STATES 15 6 0
+DEPTH 2

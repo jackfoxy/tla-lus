@@ -1,0 +1,5 @@
+# examples: TCommit  (safety ok, 34 states)
+SANY accept
+TLC ok
+STATES 94 34 0
+DEPTH 7
