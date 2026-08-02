@@ -10,6 +10,7 @@
 /=  tb       /lib/tableau
 /=  lv       /lib/liveness
 /=  vl       /lib/value
+/=  rng      /lib/rng
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
   ::
@@ -709,25 +710,35 @@
 +$  sim-result
   $:  traces=@ud       ::  behaviors simulated
       steps=@ud        ::  state transitions taken
-      viol=(unit (list state))  ::  an invariant-violating behavior, if hit
+      ::  the first invariant-violating behavior (its name + state path), if hit
+      viol=(unit [name=@t path=(list state)])
   ==
-::  fixed parameters of one simulation run
+::  fixed parameters of one simulation run (built once from search-ctx). The
+::  successor generation is the unit-7 semantic path (node-eval), and the RNG is
+::  java.util.Random (lib/rng), so a run reproduces `tlc2.TLC -simulate`.
+::  the env is NOT stored built: eenv carries the override registry `ov`, whose
+::  op-impls are gates, and a kont round-trip clams them to bunt gates (a core
+::  cannot survive `;;`). Like bfs-opts, carry defs/consts/vars and rebuild the
+::  env per event (sim-step), so the registry is always freshly constructed.
 +$  sim-opts
-  $:  next=node
-      inv=(unit node)
-      vars=(set @t)
+  $:  actions=(list [name=@t body=sem:sem-lib])  ::  getActions, source order
+      invs=(list [name=@t body=sem:sem-lib])     ::  invariants, decl order
+      defs=(map @t sem-def:sem-lib)              ::  operator definitions
+      consts=(map @t value)                      ::  CONSTANT assignments
+      vars=(set @t)                              ::  VARIABLE names
       num=@ud     ::  behaviors to simulate
       depth=@ud   ::  transitions per behavior
   ==
-::  everything required to resume a run byte-identically; the RNG is
-::  saved as its raw sample, so slicing cannot change the choices
+::  everything required to resume a run byte-identically: the RNG is the raw
+::  48-bit java.util.Random state (lib/rng), advanced only at step boundaries,
+::  so slicing never changes a draw
 +$  sim-cursor
-  $:  seed=@
+  $:  s=@                    ::  localRng state
       inits=(list state)
-      t=@ud               ::  behaviors completed
+      t=@ud                  ::  behaviors completed
       steps=@ud
-      maxn=@ud            ::  deepest transition index reached
-      walk=(unit [cur=state path=(list state) n=@ud])
+      maxn=@ud               ::  deepest transition index reached
+      walk=(unit [cur=state n=@ud path=(list state)])
   ==
 +$  sim-slice
   $%  [%more cur=sim-cursor]
@@ -741,96 +752,118 @@
   ^-  state
   (snag i l)
 ::
-++  sim-init
-  |=  [init=node vars=(set @t) seed=@]
-  ^-  sim-cursor
-  [seed (gen init vars %init ~ ~) 0 0 0 ~]
+++  nth-action
+  ::  index into an action list (dry, same recursive-mold reason as +nth-state)
+  |=  [i=@ud l=(list [name=@t body=sem:sem-lib])]
+  ^-  sem:sem-lib
+  body:(snag i l)
+::
+++  sim-nexts
+  ::  SimulationWorker.getNextStates for one action: the complete successor list
+  ::  in generation order. A successor that violates an invariant ends the run
+  ::  (addElement throws before it is added, in generation order), so it is
+  ::  returned as %viol carrying that (final) state.
+  |=  [cur=state body=sem:sem-lib invs=(list [name=@t body=sem:sem-lib]) e=eenv:ne]
+  ^-  $%([%viol name=@t st=state] [%ok nx=(list state)])
+  =/  nr  (next-states:ne cur body e)
+  ?:  ?=(%| -.nr)  [%ok ~]
+  =/  gen  p.nr
+  =|  keep=(list state)
+  |-  ^-  $%([%viol name=@t st=state] [%ok nx=(list state)])
+  ?~  gen  [%ok (flop keep)]
+  =/  fv  (first-violated invs i.gen e)
+  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen]
+  $(gen t.gen, keep [i.gen keep])
 ::
 ++  sim-step
-  ::  spend up to `budget` work units (one per transition or behavior
-  ::  boundary). The RNG call sequence is identical for every slicing,
-  ::  so the run is a pure function of [opts cursor].
-  ::  narrowing note: the walk option is tested via a local copy so the
-  ::  recursion can always assign a fresh wide cursor
+  ::  spend up to `budget` work units (one per transition or behavior boundary).
+  ::  Per step the RNG is drawn as TLC's SimulationWorker: nextDouble for the
+  ::  action index, nextPrime for the retry stride, then nextDouble for the
+  ::  successor pick. The draw sequence is fixed, so the run is a pure function
+  ::  of [opts cursor] regardless of slicing.
   |=  [o=sim-opts cur=sim-cursor budget=@ud]
   ^-  sim-slice
   ?:  =(~ inits.cur)  [%done [0 0 ~] cur]
-  =/  rng  ~(. og seed.cur)
+  ::  build the node-eval env (with its override registry) once per event; the
+  ::  kont stores defs/consts/vars, never the built env (see +$ sim-opts)
+  =/  e  (make-env:ne defs.o consts.o vars.o)
   =/  spent  0
   |-  ^-  sim-slice
-  ?:  (gte spent budget)  [%more cur(seed +<.rng)]
-  ?:  =(num.o t.cur)  [%done [t.cur steps.cur ~] cur(seed +<.rng)]
+  ?:  (gte spent budget)  [%more cur]
+  ?:  =(num.o t.cur)  [%done [t.cur steps.cur ~] cur]
   =/  mw  walk.cur
   ?~  mw
-    ::  begin a new behavior at a random initial state
-    =^  i0  rng  (rads:rng (lent inits.cur))
+    ::  a) start a behavior at a random initial state (TLC checks invariants
+    ::  only on successors in simulation, never on the initial state)
+    =^  i0  s.cur  (floor-scaled:rng s.cur (lent inits.cur))
     =/  start  (nth-state i0 inits.cur)
-    $(cur cur(walk `[start ~[start] 0]), spent +(spent))
+    $(walk.cur `[start 0 ~[start]], spent +(spent))
   =/  w  u.mw
-  ?:  ?&(?=(^ inv.o) !(ev-bool %init u.inv.o cur.w ~))
-    :+  %done
-      [+(t.cur) steps.cur `(flop path.w)]
-    cur(seed +<.rng)
   ?:  =(n.w depth.o)
-    $(cur cur(walk ~, t +(t.cur)), spent +(spent))
-  =/  nexts  (gen next.o vars.o %next cur.w ~)
-  ?:  =(~ nexts)
-    $(cur cur(walk ~, t +(t.cur)), spent +(spent))
-  =^  idx  rng  (rads:rng (lent nexts))
-  =/  pick  (nth-state idx nexts)
-  %=  $
-    spent  +(spent)
+    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+  =/  alen  (lent actions.o)
+  ?:  =(0 alen)
+    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+  ::  b) pick an action and the retry stride prime, then walk actions from that
+  ::  index until one yields successors ((index + p) % alen per retry)
+  =^  index  s.cur  (floor-scaled:rng s.cur alen)
+  =^  p      s.cur  (next-prime:rng s.cur)
+  =/  found
+    =/  tries  0
+    |-  ^-  $%([%viol name=@t st=state] [%ok nx=(list state)] [%none ~])
+    ?:  =(tries alen)  [%none ~]
+    =/  r  (sim-nexts cur.w (nth-action index actions.o) invs.o e)
+    ?:  ?=(%viol -.r)  r
+    ?^  nx.r  r
+    $(tries +(tries), index (mod (add index p) alen))
+  ?:  ?=(%none -.found)
+    ::  deadlock: no action produced a successor; end this behavior
+    $(walk.cur ~, t.cur +(t.cur), spent +(spent))
+  ?:  ?=(%viol -.found)
+    ::  an invariant violation ends the run with the offending behavior
+    :+  %done
+      [+(t.cur) steps.cur `[name.found (flop [st.found path.w])]]
     cur
-    %=  cur
-      walk   `[pick [pick path.w] +(n.w)]
-      steps  +(steps.cur)
-      maxn   (max maxn.cur +(n.w))
-    ==
+  ::  d) pick one successor and make it the current state
+  =^  j  s.cur  (floor-scaled:rng s.cur (lent nx.found))
+  =/  s1  (nth-state j nx.found)
+  %=  $
+    spent      +(spent)
+    walk.cur   `[s1 +(n.w) [s1 path.w]]
+    steps.cur  +(steps.cur)
+    maxn.cur   (max maxn.cur +(n.w))
   ==
 ::
+++  sim-cursor-init
+  ::  a fresh simulation cursor. Single-worker Simulator seeds the worker RNG
+  ::  from one nextLong of the user-seeded generator, then the worker scrambles
+  ::  it (new RandomGenerator(workerSeed)); that scrambled value is the state.
+  |=  [inits=(list state) seed=@]
+  ^-  sim-cursor
+  =/  wseed  -:(next-long:rng (scramble:rng seed))
+  [(scramble:rng wseed) inits 0 0 0 ~]
+::
 ++  simulate
-  ::  bounded seeded simulation: up to `traces` random behaviors, each up
-  ::  to `depth` transitions. Deterministic in `seed`, so two runs with the
-  ::  same seed and limits produce the same result (reproducibility) and
-  ::  the limits always terminate with partial statistics
-  |=  $:  init=node
-          next=node
-          inv=(unit node)
-          vars=(set @t)
-          seed=@
-          traces=@ud
-          depth=@ud
-      ==
+  ::  bounded seeded simulation: up to `num` random behaviors, each up to
+  ::  `depth` transitions, byte-identical to `tlc2.TLC -simulate -workers 1`.
+  |=  [o=sim-opts inits=(list state) seed=@]
   ^-  sim-result
-  =/  o=sim-opts  [next inv vars traces depth]
-  =/  cur  (sim-init init vars seed)
+  =/  cur  (sim-cursor-init inits seed)
   |-  ^-  sim-result
   =/  r  (sim-step o cur 1.024)
   ?:  ?=(%done -.r)  res.r
   $(cur cur.r)
 ::
 ++  simulate-spec
-  ::  run a bounded seeded simulation from spec + config source, returning
-  ::  a structured summary (traces / steps / whether a violation was found)
+  ::  run a bounded seeded simulation from spec + config source, returning a
+  ::  structured summary (traces / steps / whether a violation was found)
   |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud]
   ^-  sim-result
-  =/  pr  (parse:syntax spec)
-  ?:  ?=(%| -.pr)  [0 0 ~]
-  =/  tree  p.pr
-  =/  vars  (var-names tree)
-  =/  nm  (cfg-names cfg)
-  ?~  nm  [0 0 ~]
-  =/  in  in.u.nm
-  =/  nx  nx.u.nm
-  =/  iv  iv.u.nm
-  ?~  in  [0 0 ~]
-  ?~  nx  [0 0 ~]
-  =/  ib  (body-of-def tree u.in)
-  =/  nb  (body-of-def tree u.nx)
-  ?~  ib  [0 0 ~]
-  ?~  nb  [0 0 ~]
-  =/  inv  ?~(iv ~ (body-of-def tree u.iv))
-  (simulate u.ib u.nb inv vars seed traces depth)
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  [0 0 ~]
+  =*  c  p.sc
+  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  (simulate [actions invs.c defs.c consts.c vars.c traces depth] is.c seed)
 ::
 ++  sem-body
   ::  the semantic body of the operator definition named `nm`

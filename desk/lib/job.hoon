@@ -144,7 +144,6 @@
       ==
       ::  seeded simulation
       $:  %sim
-          iname=@t
           nl=@t
           act=next-act
           o=sim-opts:check
@@ -1126,21 +1125,8 @@
   =/  act=next-act
     =/  sp  (span-of:ast u.nb)
     `[u.nx ?~(sp ~ `[modn u.sp])]
-  ?:  ?=(%simulate -.mode)
-    ?:  ?=(^ pp)
-      %^  finish  j
-        [%failed 'unsupported: temporal property in simulation (unit 9)']
-      pre
-    =/  dep
-      ?:  =(0 max-depth.lims)  depth.mode
-      (min depth.mode max-depth.lims)
-    =/  o=sim-opts:check  [u.nb ivb vars num.mode dep]
-    =.  cont.j
-      %-  save-kont
-      [%sim ?~(iv '' u.iv) nl act o (sim-init:check u.ib vars seed.mode)]
-    (more j pre)
-  ::  WU6.9: safety and liveness run on the Work Unit 3 SEMANTIC graph via
-  ::  node-eval (the simulation path above keeps the CST solver, a residue).
+  ::  safety, liveness, and simulation all run on the Work Unit 3 SEMANTIC
+  ::  graph via node-eval (unit 9.2 retired simulation's CST solver).
   =/  defs    (defmap-of:ne u.mo)
   =/  consts  (consts-of:check constants.rs)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
@@ -1172,6 +1158,19 @@
   =/  isr  (init-states:ne u.isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
+  ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
+  ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
+  ::  -simulate -workers 1`. A temporal property in simulation is liveness
+  ::  checking during simulation (unit 9.3), not yet supported.
+  ?:  ?=(%simulate -.mode)
+    ?^  pp
+      (finish j [%failed 'unsupported: temporal property in simulation (unit 9.3)'] pre)
+    =/  dep
+      ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
+    =/  actions  (get-actions:check u.nsb 'Next' defs)
+    =/  o=sim-opts:check  [actions invs defs consts vars num.mode dep]
+    =.  cont.j  (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode)])
+    (more j pre)
   ?^  pp
     =/  psb  (sem-body:check defs u.pp)
     ?~  psb
@@ -1375,16 +1374,18 @@
     ==
   ?~  viol.res.r
     (finish-arts j [%ok st] head ~ pre)
+  =/  vname  name.u.viol.res.r
+  =/  vpath  path.u.viol.res.r
   =/  report
     %-  wain-text
     ;:  weld
-      ~[(crip "Error: Invariant {(trip iname.kk)} is violated.")]
+      ~[(crip "Error: Invariant {(trip vname)} is violated.")]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check u.viol.res.r nl.kk)
+      (render-trace:check vpath nl.kk)
       ~[head]
     ==
-  =/  typed=trace  [%simulate (trace-states u.viol.res.r act.kk) ~]
-  (finish-arts j [%violated [%invariant iname.kk] st] report `typed pre)
+  =/  typed=trace  [%simulate (trace-states vpath act.kk) ~]
+  (finish-arts j [%violated [%invariant vname] st] report `typed pre)
 ::
 ::  +|  Stage: %terminal
 ::

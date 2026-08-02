@@ -499,20 +499,27 @@ The whole `out.txt` matches byte-for-byte for **10 corpus cases**; row
 
 ## Unit 12 — Simulation, checkpointing, recovery
 
-Seeded simulation is tested as **engine properties** (reproducibility, bounded
-termination, violation discovery), *not* as a byte-for-byte oracle:
+Seeded simulation is tested both as **engine properties** (reproducibility,
+bounded termination, violation discovery) and, since 9.2, as a **byte-for-byte
+seeded-trace oracle** on the supported fragment:
 
-- **RNG parity (9.1, in progress).** `lib/rng.hoon` now ports `java.util.Random`
-  + `tlc2.util.RandomGenerator` exactly — `nextInt`/`nextLong`/`nextDouble`/
-  `nextPrime`/`setSeed(seed,cnt)` are byte-identical to the pinned JVM over 8
-  seeds (`tests/lib/rng`), including the `Math.floor(nextDouble()*n)` successor
-  index via IEEE-754 `@rd`. Row `tlc-util-rng` = `partial`. The simulation
-  successor choice still uses the Hoon `og` core in `lib/check`; swapping it to
-  `lib/rng` (and matching TLC's enumeration order) is unit 9.2. Until then
-  seeded-trace parity with `tlc2.TLC -simulate` is not yet claimed.
-- Absent: symmetry, checkpoint/resume across Gall restart, cancellation inside
-  enumeration loops, structured partial statistics on resource limits, DFID,
-  and the benchmark suite.
+- **RNG + exact seeded traces (9.1/9.2).** `lib/rng.hoon` ports
+  `java.util.Random` + `tlc2.util.RandomGenerator` exactly (byte-identical to the
+  JVM over 8 seeds, `tests/lib/rng`), and `lib/check`'s simulation now uses it
+  (the Hoon `og` core is retired). The engine is `tlc2.tool.SimulationWorker`
+  over the unit-7 semantic graph: the single worker's RNG is seeded from one
+  `nextLong` of the user-seeded generator, and each step draws `nextDouble`
+  (action index over source-order actions), `nextPrime` (retry stride), then
+  `nextDouble` (successor pick). Whole seeded behaviors reproduce `tlc2.TLC
+  -simulate -workers 1 -seed S` **byte-for-byte** on the node-eval supported
+  fragment (`x' = e` actions and disjunctions), verified by `tests/lib/sim-diff`.
+  Rows `tlc-util-rng` = `parity`, `op-check-simulate` = `partial`.
+- Still absent in simulation: `x' \in S` nondeterministic assignment (a
+  node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
+  state/action `CONSTRAINT` handling, liveness checking during simulation (9.3),
+  and checkpoint/resume across a Gall restart (9.4).
+- Also absent: symmetry, cancellation inside enumeration loops, structured
+  partial statistics on resource limits, DFID, and the benchmark suite.
 
 ## Unit P2-1 — Resumable job kernel (supersedes the unit-13 stub engine)
 
