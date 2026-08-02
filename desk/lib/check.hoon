@@ -710,8 +710,9 @@
 +$  sim-result
   $:  traces=@ud       ::  behaviors simulated
       steps=@ud        ::  state transitions taken
-      ::  the first invariant-violating behavior (its name + state path), if hit
-      viol=(unit [name=@t path=(list state)])
+      ::  the first violating behavior, if any: an invariant broken on a
+      ::  successor, or a temporal PROPERTY broken by a completed behavior
+      viol=(unit [kind=?(%invariant %property) name=@t path=(list state)])
   ==
 ::  fixed parameters of one simulation run (built once from search-ctx). The
 ::  successor generation is the unit-7 semantic path (node-eval), and the RNG is
@@ -723,9 +724,12 @@
 +$  sim-opts
   $:  actions=(list [name=@t body=sem:sem-lib])  ::  getActions, source order
       invs=(list [name=@t body=sem:sem-lib])     ::  invariants, decl order
+      oss=(list oos:tp)          ::  normalized temporal PROPERTY (~ = none, 9.3a)
+      pname=@t                   ::  PROPERTY name (for the temporal verdict)
       defs=(map @t sem-def:sem-lib)              ::  operator definitions
       consts=(map @t value)                      ::  CONSTANT assignments
       vars=(set @t)                              ::  VARIABLE names
+      order=(list @t)            ::  vars in declaration order (fingerprints)
       num=@ud     ::  behaviors to simulate
       depth=@ud   ::  transitions per behavior
   ==
@@ -775,12 +779,24 @@
   ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen]
   $(gen t.gen, keep [i.gen keep])
 ::
+++  sim-live-viol
+  ::  the completed behavior (chronological) if it breaks the temporal PROPERTY,
+  ::  else ~. tlc2 LiveCheck.checkTrace over the trace's stutter graph, via the
+  ::  8.2–8.6 engine (+trace-lasso). `path` is newest-first (the walk order).
+  |=  [o=sim-opts path=(list state) e=eenv:ne]
+  ^-  (unit (list state))
+  ?~  oss.o  ~
+  =/  chron  (flop path)
+  ?~  (trace-lasso:lv oss.o chron e order.o)  ~
+  `chron
+::
 ++  sim-step
   ::  spend up to `budget` work units (one per transition or behavior boundary).
   ::  Per step the RNG is drawn as TLC's SimulationWorker: nextDouble for the
   ::  action index, nextPrime for the retry stride, then nextDouble for the
   ::  successor pick. The draw sequence is fixed, so the run is a pure function
-  ::  of [opts cursor] regardless of slicing.
+  ::  of [opts cursor] regardless of slicing. When a behavior completes (depth
+  ::  or deadlock) its trace is checked against the temporal PROPERTY (9.3a).
   |=  [o=sim-opts cur=sim-cursor budget=@ud]
   ^-  sim-slice
   ?:  =(~ inits.cur)  [%done [0 0 ~] cur]
@@ -800,9 +816,16 @@
     $(walk.cur `[start 0 ~[start]], spent +(spent))
   =/  w  u.mw
   ?:  =(n.w depth.o)
+    ::  behavior reached full depth: check the temporal property over it
+    =/  lv  (sim-live-viol o path.w e)
+    ?^  lv
+      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
     $(walk.cur ~, t.cur +(t.cur), spent +(spent))
   =/  alen  (lent actions.o)
   ?:  =(0 alen)
+    =/  lv  (sim-live-viol o path.w e)
+    ?^  lv
+      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
     $(walk.cur ~, t.cur +(t.cur), spent +(spent))
   ::  b) pick an action and the retry stride prime, then walk actions from that
   ::  index until one yields successors ((index + p) % alen per retry)
@@ -817,12 +840,15 @@
     ?^  nx.r  r
     $(tries +(tries), index (mod (add index p) alen))
   ?:  ?=(%none -.found)
-    ::  deadlock: no action produced a successor; end this behavior
+    ::  deadlock: no action produced a successor; check the property, end behavior
+    =/  lv  (sim-live-viol o path.w e)
+    ?^  lv
+      [%done [+(t.cur) steps.cur `[%property pname.o u.lv]] cur]
     $(walk.cur ~, t.cur +(t.cur), spent +(spent))
   ?:  ?=(%viol -.found)
     ::  an invariant violation ends the run with the offending behavior
     :+  %done
-      [+(t.cur) steps.cur `[name.found (flop [st.found path.w])]]
+      [+(t.cur) steps.cur `[%invariant name.found (flop [st.found path.w])]]
     cur
   ::  d) pick one successor and make it the current state
   =^  j  s.cur  (floor-scaled:rng s.cur (lent nx.found))
@@ -863,7 +889,8 @@
   ?:  ?=(%| -.sc)  [0 0 ~]
   =*  c  p.sc
   =/  actions  (get-actions nsb.c 'Next' defs.c)
-  (simulate [actions invs.c defs.c consts.c vars.c traces depth] is.c seed)
+  =/  pname  ?~(pp.c '' u.pp.c)
+  (simulate [actions invs.c oss.c pname defs.c consts.c vars.c order.c traces depth] is.c seed)
 ::
 ++  sem-body
   ::  the semantic body of the operator definition named `nm`

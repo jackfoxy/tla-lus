@@ -708,6 +708,32 @@
   ::  the saved RNG sample must make slicing invisible
   (every-boundary (sim-req cyc-spec bare-cfg 42 3 8) 1)
 ::
+++  live-viol-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  A == x' = 1 - x
+  B == x' = x
+  Next == A \/ B
+  Live == <>[](x = 1)
+  ====
+  '''
+++  live-prop-cfg  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+::  a temporal PROPERTY is checked per behavior during simulation (9.3a); the
+::  %sim kont round-trips the normalized `oss` across the config->sim events
+++  test-sim-finds-property
+  =/  req  (sim-req live-viol-spec live-prop-cfg 1 3 8)
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    %+  expect-eq
+      !>(`[%property 'Live'])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
 ::  +|  Analyze Through The Kernel
 ::
 ::

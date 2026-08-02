@@ -365,7 +365,8 @@
   =/  s0  (~(got by states) fp.k)
   =/  t0  (snag-node:tb tidx.k nodes.tabg.pc)
   =.  nodes.pc  (~(put by nodes.pc) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  out  (node-edges k s0 t0 tabg.pc check-action.o nsb env order)
+  =/  succs  (succ-fps s0 nsb env order)
+  =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env)
   =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen.pc) x)))
   =.  seen.pc  (~(gas in seen.pc) fresh)
   =.  edges.pc  (weld edges.pc es.out)
@@ -421,15 +422,17 @@
 ::
 ++  node-edges
   ::  the outgoing product edges of (fp,tidx) with their checkAction labels,
-  ::  and the successor product keys, over the state × tableau successor cross
+  ::  and the successor product keys, over the state × tableau successor cross.
+  ::  `succs` are the state's non-stutter successors (from the reachable graph in
+  ::  the whole search, or a trace's own next states in +trace-product).
   |=  $:  k=pg-key  s0=state:ne  t0=tb-node:tb  tabg=tb-graph:tb
-          ca=(list live-expr)  nsb=sem:sm  env=eenv:ne  order=(list @t)
+          ca=(list live-expr)  succs=(list [fp=@t st=state:ne])  env=eenv:ne
       ==
   ^-  [es=(list pedge) keys=(list pg-key)]
   ::  stuttering is always a valid liveness behaviour: a state can step to
   ::  itself (the tableau still advances), so prepend the self-successor
   =/  stutter=[fp=@t st=state:ne]  [fp.k s0]
-  =/  ss  (weld ~[stutter] (succ-fps s0 nsb env order))
+  =/  ss  (weld ~[stutter] succs)
   |-  ^-  [es=(list pedge) keys=(list pg-key)]
   ?~  ss  [~ ~]
   =/  rest  $(ss t.ss)
@@ -444,6 +447,84 @@
     =/  nk=pg-key  [fp.i.ss i.ns]
     [[[k nk bits] es.more] [nk keys.more]]
   [(weld es.here es.rest) (weld keys.here keys.rest)]
+::
+::  +|  Liveness over a simulation trace (Work Unit 9.3a)
+::
+++  trace-graph
+  ::  the fingerprint-keyed behavior graph of a simulation trace: each state by
+  ::  its fingerprint, the initial fp, and each fp's trace successors (the states
+  ::  that follow its occurrences — accumulated by fingerprint, matching
+  ::  addNextState). The product build adds the stutter self-loop. This is the
+  ::  graph tlc2 LiveCheck.checkTrace feeds the liveness checker per behavior.
+  |=  [trace=(list state:ne) order=(list @t)]
+  ^-  [states=(map @t state:ne) init=@t succ=(jar @t [fp=@t st=state:ne])]
+  ?~  trace  [~ *@t ~]
+  =/  ini  `@t`(state-fp:fpl order i.trace)
+  =|  states=(map @t state:ne)
+  =|  succ=(jar @t [fp=@t st=state:ne])
+  =.  states  (~(put by states) ini i.trace)
+  =/  prev=[fp=@t st=state:ne]  [ini i.trace]
+  =/  rest  t.trace
+  |-  ^-  [states=(map @t state:ne) init=@t succ=_succ]
+  ?~  rest  [states ini succ]
+  =/  fp1  `@t`(state-fp:fpl order i.rest)
+  =.  states  (~(put by states) fp1 i.rest)
+  =.  succ    (~(add ja succ) fp.prev [fp1 i.rest])
+  $(rest t.rest, prev [fp1 i.rest])
+::
+++  trace-product
+  ::  the tableau product over a trace's behavior graph (+trace-graph). Mirrors
+  ::  +labeled-product but the state successors are the trace's own, not a
+  ::  next-states search, so it needs no reachable-graph exploration.
+  |=  [o=oos:tp trace=(list state:ne) env=eenv:ne order=(list @t)]
+  ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+  =/  g  (trace-graph trace order)
+  ?~  tf.o
+    =/  ik=(list pg-key)  ~[[init.g 0]]
+    =/  nm=(map pg-key pnode)
+      %-  malt
+      %+  turn  ~(tap by states.g)
+      |=  [fp=@t st=state:ne]
+      ^-  [pg-key pnode]
+      [[fp 0] [(cs-bits check-state.o st env) ~]]
+    =/  es=(list pedge)
+      %-  zing
+      %+  turn  ~(tap by states.g)
+      |=  [fp0=@t s0=state:ne]
+      ^-  (list pedge)
+      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (~(get ja succ.g) fp0)]
+      |=  [fp1=@t s1=state:ne]
+      ^-  pedge
+      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]
+    [nm es ik]
+  =/  tabg  (build-tableau:tb u.tf.o)
+  =/  ik    (init-keys states.g ~[init.g] tabg env)
+  =|  nodes=(map pg-key pnode)
+  =|  edges=(list pedge)
+  =/  seen=(set pg-key)  (silt ik)
+  =/  q  ik
+  |-  ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+  ?~  q  [nodes edges ik]
+  =/  k   i.q
+  =/  s0  (~(got by states.g) fp.k)
+  =/  t0  (snag-node:tb tidx.k nodes.tabg)
+  =.  nodes  (~(put by nodes) k [(cs-bits check-state.o s0 env) par.t0])
+  =/  out  (node-edges k s0 t0 tabg check-action.o (~(get ja succ.g) fp.k) env)
+  =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen) x)))
+  =.  seen   (~(gas in seen) fresh)
+  =.  edges  (weld edges es.out)
+  $(q (weld t.q fresh))
+::
+++  trace-lasso
+  ::  a temporal counterexample lasso for the first violated OrderOfSolution over
+  ::  a simulation trace's behavior graph (tlc2 LiveCheck.checkTrace). Reuses the
+  ::  8.2–8.6 tableau product + SCC/acceptance (+lasso-of-product) — the only
+  ::  difference from the whole-graph check is the trace-fixed successors.
+  |=  [oss=(list oos:tp) trace=(list state:ne) env=eenv:ne order=(list @t)]
+  ^-  (unit lasso)
+  ?~  oss  ~
+  =/  here  (lasso-of-product i.oss (trace-product i.oss trace env order))
+  ?^(here here $(oss t.oss))
 ::
 ++  adj-of
   ::  adjacency map from an edge list, keeping only edges whose EAAction bits

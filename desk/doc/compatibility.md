@@ -514,10 +514,18 @@ seeded-trace oracle** on the supported fragment:
   -simulate -workers 1 -seed S` **byte-for-byte** on the node-eval supported
   fragment (`x' = e` actions and disjunctions), verified by `tests/lib/sim-diff`.
   Rows `tlc-util-rng` = `parity`, `op-check-simulate` = `partial`.
+- **Temporal property in simulation (9.3a).** A `PROPERTY` under `-simulate` is
+  now checked per completed behavior over its stutter graph (tlc2
+  `LiveCheck.checkTrace`), reusing the 8.2–8.6 tableau product + SCC via
+  `+trace-lasso`. simulate reaches the same violated/ok verdict and trace count
+  as `tlc2.TLC -simulate PROPERTY` (`tests/lib/sim-live`). TLC's default
+  single-worker path uses the ledger-excluded `LiveCheck1`, but the per-behavior
+  verdict is the same temporal semantics as the modern `LiveCheck.checkTrace`,
+  so the verdict is differential-testable.
 - Still absent in simulation: `x' \in S` nondeterministic assignment (a
   node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
-  state/action `CONSTRAINT` handling, liveness checking during simulation (9.3),
-  and checkpoint/resume across a Gall restart (9.4).
+  state/action `CONSTRAINT` handling, structured partial statistics (9.3b), and
+  checkpoint/resume across a Gall restart (9.4).
 - Also absent: symmetry, cancellation inside enumeration loops, structured
   partial statistics on resource limits, DFID, and the benchmark suite.
 

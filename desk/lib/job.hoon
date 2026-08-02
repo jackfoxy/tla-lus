@@ -1160,15 +1160,22 @@
   =/  is  p.isr
   ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
   ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
-  ::  -simulate -workers 1`. A temporal property in simulation is liveness
-  ::  checking during simulation (unit 9.3), not yet supported.
+  ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior over its
+  ::  stutter graph (unit 9.3a, LiveCheck.checkTrace via the 8.2–8.6 engine).
   ?:  ?=(%simulate -.mode)
-    ?^  pp
-      (finish j [%failed 'unsupported: temporal property in simulation (unit 9.3)'] pre)
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
     =/  actions  (get-actions:check u.nsb 'Next' defs)
-    =/  o=sim-opts:check  [actions invs defs consts vars num.mode dep]
+    ::  normalize the PROPERTY (if any) into the OrderOfSolution form; an
+    ::  unsupported property is a typed rejection, never a silent %ok
+    =/  osr=(each (list oos:tp) aerr:tp)
+      ?~  pp  [%& ~]
+      =/  psb  (sem-body:check defs u.pp)
+      ?~  psb  [%| [0 (rap 3 ~['no definition for PROPERTY ' u.pp])]]
+      (oss-of:check ~[u.psb] ~ (make-env:ne defs consts vars))
+    ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
+    =/  o=sim-opts:check
+      [actions invs p.osr ?~(pp '' u.pp) defs consts vars order num.mode dep]
     =.  cont.j  (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode)])
     (more j pre)
   ?^  pp
@@ -1374,18 +1381,25 @@
     ==
   ?~  viol.res.r
     (finish-arts j [%ok st] head ~ pre)
+  =/  vk     kind.u.viol.res.r
   =/  vname  name.u.viol.res.r
   =/  vpath  path.u.viol.res.r
+  =/  headline=@t
+    ?-  vk
+      %invariant  (crip "Error: Invariant {(trip vname)} is violated.")
+      %property   (crip "Error: Temporal property {(trip vname)} is violated.")
+    ==
   =/  report
     %-  wain-text
     ;:  weld
-      ~[(crip "Error: Invariant {(trip vname)} is violated.")]
+      ~[headline]
       ~['Error: The behavior up to this point is:']
       (render-trace:check vpath nl.kk)
       ~[head]
     ==
   =/  typed=trace  [%simulate (trace-states vpath act.kk) ~]
-  (finish-arts j [%violated [%invariant vname] st] report `typed pre)
+  =/  vn  ?-(vk %invariant [%invariant vname], %property [%property vname])
+  (finish-arts j [%violated vn st] report `typed pre)
 ::
 ::  +|  Stage: %terminal
 ::
