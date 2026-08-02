@@ -1254,6 +1254,9 @@
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
     ?:  ?=(%more -.r)
+      ::  partial statistics at the slice boundary (as in do-explore), so a
+      ::  max-time interruption of the graph build reports progress (9.5)
+      =.  stats.j  [gen.cur.r distinct.cur.r (lent queue.cur.r) depth.cur.r]
       =.  cont.j  (save-kont kk(cur cur.r))
       (more j pre)
     ?:  ?=(%limited -.out.r)
@@ -1366,6 +1369,9 @@
   =/  kk  u.k
   =/  r  (sim-step:check o.kk cur.kk budget)
   ?:  ?=(%more -.r)
+    ::  commit partial statistics at the slice boundary so an interruption
+    ::  (max-time / noun bound) reports the run so far, not empty stats (9.5)
+    =.  stats.j  [gen.cur.r 0 0 maxn.cur.r]
     =.  cont.j  (save-kont kk(cur cur.r))
     (more j pre)
   ::  states-generated / behaviors / trace-length in TLC's simulation stat slots

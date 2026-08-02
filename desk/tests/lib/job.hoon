@@ -568,6 +568,21 @@
     (expect-eq !>(`[%limited %time *run-stats]) !>(result.job.r))
   ==
 ::
+++  test-limited-time-simulation-partial-stats
+  ::  a simulation interrupted by max-time reports the PARTIAL statistics
+  ::  accumulated so far (states generated > 0), not empty stats (unit 9.5).
+  ::  A big run + a small budget guarantees the sim is mid-flight after k slices.
+  =/  j0  (init:job-lib (sim-req cyc-spec bare-cfg 42 20 30) t0)
+  =/  jp  +:(run-k j0 4 12)
+  =/  r   (step:job-lib jp 4 (add t0 ~m11))
+  ?>  ?=(%stop -.r)
+  ?>  ?=(^ result.job.r)
+  ?>  ?=(%limited -.u.result.job.r)
+  ;:  weld
+    (expect-eq !>(%time) !>(kind.u.result.job.r))
+    (expect !>((gth generated.stats.job.r 0)))
+  ==
+::
 ++  test-limited-artifact
   =/  req  (check-req cyc-spec mc-cfg)
   =.  max-artifact.limits.req  4

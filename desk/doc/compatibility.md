@@ -537,11 +537,16 @@ seeded-trace oracle** on the supported fragment:
   both checked at slice granularity (the bounded per-event budget is the
   cancellation/interrupt point — there is no mid-loop check). TLC's on-disk
   checkpoint format is replaced by Gall's noun-state persistence.
+- **Structured partial statistics on interruption (9.5).** simulation and the
+  liveness graph build commit their running statistics at every slice boundary,
+  so a `max-time` / noun-bound interruption reports the states generated so far
+  rather than empty stats (`tests/lib/job` test-limited-time-simulation-partial-
+  stats). Cancellation/limits are checked at slice granularity (the bounded
+  per-event budget); there is no mid-loop check, by design.
 - Still absent in simulation: `x' \in S` nondeterministic assignment (a
   node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
   and state/action `CONSTRAINT` handling.
-- Also absent: symmetry, cancellation inside enumeration loops, structured
-  partial statistics on resource limits, DFID, and the benchmark suite.
+- Also absent: symmetry, DFID, and the benchmark suite.
 
 ## Unit P2-1 — Resumable job kernel (supersedes the unit-13 stub engine)
 
