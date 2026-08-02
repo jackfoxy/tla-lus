@@ -1160,7 +1160,7 @@
   =/  is  p.isr
   ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
   ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
-  ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior over its
+  ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior on its
   ::  stutter graph (unit 9.3a, LiveCheck.checkTrace via the 8.2–8.6 engine).
   ?:  ?=(%simulate -.mode)
     =/  dep

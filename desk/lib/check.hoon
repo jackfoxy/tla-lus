@@ -728,7 +728,7 @@
 +$  sim-opts
   $:  actions=(list [name=@t body=sem:sem-lib])  ::  getActions, source order
       invs=(list [name=@t body=sem:sem-lib])     ::  invariants, decl order
-      oss=(list oos:tp)          ::  normalized temporal PROPERTY (~ = none, 9.3a)
+      oss=(list oos:tp)          ::  normalized temporal PROPERTY (~ none; 9.3a)
       pname=@t                   ::  PROPERTY name (for the temporal verdict)
       defs=(map @t sem-def:sem-lib)              ::  operator definitions
       consts=(map @t value)                      ::  CONSTANT assignments
@@ -774,7 +774,9 @@
   ::  in generation order. A successor that violates an invariant ends the run
   ::  (addElement throws before it is added, in generation order), so it is
   ::  returned as %viol carrying that (final) state.
-  |=  [cur=state body=sem:sem-lib invs=(list [name=@t body=sem:sem-lib]) e=eenv:ne]
+  |=  $:  cur=state  body=sem:sem-lib
+          invs=(list [name=@t body=sem:sem-lib])  e=eenv:ne
+      ==
   ^-  $%([%viol name=@t st=state] [%ok nx=(list state)])
   =/  nr  (next-states:ne cur body e)
   ?:  ?=(%| -.nr)  [%ok ~]
@@ -787,7 +789,7 @@
   $(gen t.gen, keep [i.gen keep])
 ::
 ++  welford-add
-  ::  fold one completed behavior of length `tl` into the running (mean, m2) with
+  ::  fold one completed behavior of length `tl` into the running mean/m2 with
   ::  the online integer algorithm tlc2 SimulationWorkerStatistics uses; `k` is
   ::  the 1-based behavior count (numOfGenTraces at collectPostTrace).
   |=  [tm=@s tm2=@s tl=@ud k=@ud]
@@ -811,7 +813,9 @@
   =/  m2   (abs:si tm2.cur)
   =/  d    +(gt)
   =/  var  (div (add (mul 2 m2) d) (mul 2 d))       ::  round(m2 / d)
-  =/  sd   (abs:si (need (toi:rd (add:rd (sqt:rd (div:rd (sun:rd m2) (sun:rd d))) .~0.5))))
+  =/  sd
+    =/  x  (div:rd (sun:rd m2) (sun:rd d))
+    (abs:si (need (toi:rd (add:rd (sqt:rd x) .~0.5))))
   [gt steps.cur gen.cur (abs:si tm.cur) var sd viol]
 ::
 ++  sim-live-viol
@@ -891,7 +895,7 @@
       (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])])
     cur
   ::  d) pick one successor and make it the current state; every successor the
-  ::  chosen action generated counts toward states-generated (collectPreSuccessor)
+  ::  chosen action generated counts toward states-generated (collectPre)
   =^  j  s.cur  (floor-scaled:rng s.cur (lent nx.found))
   =/  s1  (nth-state j nx.found)
   %=  $
@@ -933,7 +937,9 @@
   =*  c  p.sc
   =/  actions  (get-actions nsb.c 'Next' defs.c)
   =/  pname  ?~(pp.c '' u.pp.c)
-  (simulate [actions invs.c oss.c pname defs.c consts.c vars.c order.c traces depth] is.c seed)
+  =/  o=sim-opts
+    [actions invs.c oss.c pname defs.c consts.c vars.c order.c traces depth]
+  (simulate o is.c seed)
 ::
 ++  sem-body
   ::  the semantic body of the operator definition named `nm`

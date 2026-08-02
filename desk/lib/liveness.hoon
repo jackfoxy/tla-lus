@@ -452,7 +452,7 @@
 ::
 ++  trace-graph
   ::  the fingerprint-keyed behavior graph of a simulation trace: each state by
-  ::  its fingerprint, the initial fp, and each fp's trace successors (the states
+  ::  its fingerprint, the initial fp, and each fp's trace successors (those
   ::  that follow its occurrences — accumulated by fingerprint, matching
   ::  addNextState). The product build adds the stutter self-loop. This is the
   ::  graph tlc2 LiveCheck.checkTrace feeds the liveness checker per behavior.
@@ -516,8 +516,8 @@
   $(q (weld t.q fresh))
 ::
 ++  trace-lasso
-  ::  a temporal counterexample lasso for the first violated OrderOfSolution over
-  ::  a simulation trace's behavior graph (tlc2 LiveCheck.checkTrace). Reuses the
+  ::  a temporal counterexample lasso for the first violated OrderOfSolution
+  ::  over a trace's behavior graph (tlc2 LiveCheck.checkTrace). Reuses the
   ::  8.2–8.6 tableau product + SCC/acceptance (+lasso-of-product) — the only
   ::  difference from the whole-graph check is the trace-fixed successors.
   |=  [oss=(list oos:tp) trace=(list state:ne) env=eenv:ne order=(list @t)]
