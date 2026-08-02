@@ -529,10 +529,17 @@ seeded-trace oracle** on the supported fragment:
   (`tests/lib/sim-stats`). Trace length is uniformly `depth` for non-deadlocking
   completing runs, so var/sd are 0 there; the meaningful varying stat is
   states-generated.
+- **Checkpoint/resume across a Gall restart (9.4).** An in-flight job — its
+  jammed `%bfs`/`%sim`/`%live` cursor in the agent state — survives a restart
+  (`on-save` -> `on-load`) and resumes to the byte-identical uninterrupted
+  result at any slice boundary (`tests/app` test-inflight-resume-across-reload).
+  `max-time` returns a typed `%limited %time` and a cancel a typed `%cancelled`,
+  both checked at slice granularity (the bounded per-event budget is the
+  cancellation/interrupt point — there is no mid-loop check). TLC's on-disk
+  checkpoint format is replaced by Gall's noun-state persistence.
 - Still absent in simulation: `x' \in S` nondeterministic assignment (a
   node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
-  state/action `CONSTRAINT` handling, and checkpoint/resume across a Gall
-  restart (9.4).
+  and state/action `CONSTRAINT` handling.
 - Also absent: symmetry, cancellation inside enumeration loops, structured
   partial statistics on resource limits, DFID, and the benchmark suite.
 

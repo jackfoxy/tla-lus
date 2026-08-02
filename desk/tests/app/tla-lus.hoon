@@ -47,6 +47,39 @@
 ::  (plan:job-lib demo-req) is ~[%parse %config %explore]
 ++  total  3
 ::
+++  sim-demo-req
+  ::  a seeded simulation over cyc-spec (Inv holds, so it completes num behaviors)
+  ^-  request
+  :*  [%check [| ~ [%simulate 1 2 6]]]
+      :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
+          `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+      ==
+      default-limits:job-lib  |
+  ==
+::
+++  live-src
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  A == x' = 1 - x
+  B == x' = x
+  Next == A \/ B
+  Live == <>[](x = 1)
+  ====
+  '''
+++  live-demo-req
+  ::  a temporal-property run (exercises the %live build/check kont end to end)
+  ^-  request
+  :*  [%check [| ~ [%exhaustive &]]]
+      :*  %inline  'spec'  (malt ~[['spec' live-src]])
+          `'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+      ==
+      default-limits:job-lib  |
+  ==
+::
 ++  do-poke
   |=  [ag=agent:gall act=action]
   ^-  [(list card) agent:gall]
@@ -83,6 +116,28 @@
   =/  res  (~(on-peek ag bol) [%x %job id ~])
   !<((unit job) q:(need (need res)))
 ::
+++  run-to-result
+  ::  submit and wake to completion (12 wakes covers any of these plans)
+  |=  req=request
+  ^-  (unit job)
+  =/  ag  `agent:gall`agent
+  =^  c0  ag  (do-poke ag [%submit ~.j1 req])
+  =^  c1  ag  (wake-n ag ~.j1 12)
+  (scry-job ag ~.j1)
+::
+++  reload-at
+  ::  submit, wake `k` times (leaving a mid-run jammed kont in state), then
+  ::  round-trip the whole agent state through on-save/on-load (a Gall restart)
+  ::  and wake to completion — the resumed job must match an uninterrupted run
+  |=  [req=request k=@ud]
+  ^-  (unit job)
+  =/  ag  `agent:gall`agent
+  =^  c0  ag  (do-poke ag [%submit ~.j1 req])
+  =^  c1  ag  (wake-n ag ~.j1 k)
+  =/  ag2  `agent:gall`+:(~(on-load agent bol) ~(on-save ag bol))
+  =^  c2  ag2  (wake-n ag2 ~.j1 12)
+  (scry-job ag2 ~.j1)
+::
 ++  fact-update
   ::  extract the update payload from a %fact card
   |=  c=card
@@ -103,6 +158,22 @@
   =/  saved  ~(on-save ag bol)
   =/  ag2  `agent:gall`+:(~(on-load agent bol) saved)
   (expect-eq !>(q:~(on-save ag bol)) !>(q:~(on-save ag2 bol)))
+::
+++  test-inflight-resume-across-reload
+  ::  unit 9.4: a mid-run job's checkpointed cursor (the jammed %bfs/%sim/%live
+  ::  kont in agent state) survives a Gall restart (on-save -> on-load) and
+  ::  resumes to the byte-identical uninterrupted result, at any slice boundary.
+  =/  reqs=(list request)  ~[demo-req sim-demo-req live-demo-req]
+  |-  ^-  tang
+  ?~  reqs  ~
+  =/  base  (need (run-to-result i.reqs))
+  %+  weld
+    ;:  weld
+      (expect-eq !>(result.base) !>(result:(need (reload-at i.reqs 1))))
+      (expect-eq !>(result.base) !>(result:(need (reload-at i.reqs 2))))
+      (expect-eq !>(progress.base) !>(progress:(need (reload-at i.reqs 2))))
+    ==
+  $(reqs t.reqs)
 ::
 ++  test-on-load-migrates-v0
   =/  old
