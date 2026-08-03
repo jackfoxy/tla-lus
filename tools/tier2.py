@@ -74,7 +74,7 @@ def main() -> int:
           "(R1.1.1), TLC verdict/distinct-count (R1.1.2), a 142-spec "
           "mule-isolated SANY batch (R1.1.3/4, 140/142 agree), a 14-spec "
           "TLC safety batch (R1.1.5, 4/14 agree — the rest pin R1.5), and a "
-          "162-spec subdir SANY batch (R1.1.6, tier2-sub.hoon, 148/162 agree). "
+          "240-spec subdir SANY batch (R1.1.6/7, tier2-sub.hoon, 216/240 agree). "
           "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
           "Known divergences: desk/test-data/tier2/divergences.txt.")

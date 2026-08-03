@@ -338,7 +338,7 @@ TLC_BATCH_REASONS = {
 # arms in a separate shard (`tests/lib/tier2-sub.hoon`). Larger-closure subdir
 # specs are a follow-on. Root module names collide across subdirs (`MC` ×3), so
 # a spec's identity is its relative PATH, not its module name.
-SUBDIR_CLOSURE_MAX = 1500
+SUBDIR_CLOSURE_MAX = 4000
 SUBDIR_CHUNK = 55
 
 # Frozen from the ship run, one `<path> -> <outcome>` per divergent spec, in
@@ -348,30 +348,46 @@ SUBDIR_CHUNK = 55
 # (`suite/`, `coverage/`). `hoon=reject` = Java accepts / Hoon rejects (a feature
 # gap); `hoon=accept` = Java rejects / Hoon too lenient.
 SUB_BATCH_DIVERGENCES = [
+    "EWD840/Error02 -> hoon=reject",
+    "EWD840/Error03 -> hoon=reject",
+    "EWD840/MC02 -> hoon=reject",
+    "EWD840/MC02Sim -> hoon=reject",
     "ModuleOverwrites/ModuleOverwrites -> hoon=reject",
     "coverage/F -> hoon=reject",
     "coverage/K -> hoon=reject",
     "coverage/L -> hoon=reject",
+    "gh1134/MultiUser -> hoon=reject",
+    "gh1134/SingleUser -> hoon=reject",
     "suite/etest15 -> hoon=reject",
     "suite/etest16 -> hoon=accept",
     "suite/test16 -> hoon=reject",
     "suite/test201 -> hoon=reject",
     "suite/test203 -> hoon=reject",
     "suite/test214 -> hoon=accept",
+    "suite/test216 -> hoon=reject",
     "suite/test30 -> hoon=reject",
     "suite/test42 -> hoon=reject",
+    "suite/test43 -> hoon=reject",
     "suite/test52 -> hoon=reject",
+    "suite/test7 -> hoon=reject",
+    "suite/test9 -> hoon=reject",
     "suite/test999 -> hoon=reject",
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
 _CONF = "SANY conformance edge (front-end semantic/level residue, R1.3)"
+_INST = "INSTANCE ... WITH substitution edge (R1.3)"
 SUB_BATCH_REASONS = {
     "ModuleOverwrites/ModuleOverwrites": _LAM,
     "coverage/F": _LAM, "coverage/K": _LAM, "coverage/L": _LAM,
+    "EWD840/Error02": _LAM, "EWD840/Error03": _LAM,
+    "EWD840/MC02": _LAM, "EWD840/MC02Sim": _LAM,
     "suite/test201": "LAMBDA through an INSTANCE ... WITH (R1.3)",
     "suite/test203": "INSTANCE ... WITH over a RECURSIVE definition (R1.3)",
     "suite/test30": _HO, "suite/test999": _HO,
+    "gh1134/MultiUser": _INST, "suite/test216": _INST + " (with WF_/temporal)",
+    "gh1134/SingleUser": _CONF, "suite/test43": _CONF, "suite/test7": _CONF,
+    "suite/test9": _CONF,
     "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
     "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
 }
@@ -392,7 +408,7 @@ def closure_of(tla: Path):
         seen.add(n)
         t = read(byname[n])
         out[n] = t
-        for r in module_refs(t):
+        for r in sorted(module_refs(t)):
             if r not in VENDORED and r in byname:
                 q.append(r)
     return out, byname
@@ -460,7 +476,7 @@ def dep_closure(spec_dir: Path, module: str) -> dict:
         seen.add(name)
         text = read(byname[name])
         out[name] = text
-        for r in module_refs(text):
+        for r in sorted(module_refs(text)):
             if r not in VENDORED and r in byname:
                 queue.append(r)
     return out
