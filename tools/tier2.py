@@ -68,10 +68,11 @@ def main() -> int:
               "proving the Java behavior from the pin.")
         return 1 if check else 0
     print("\ntier-2 differential integrity: OK — inventory + curated oracle + "
-          "SANY comparator shard reproduce byte-identically from the pins.")
-    print("Hoon SANY comparator: desk/tests/lib/tier2.hoon (run on the ship: "
-          "-test /=tla-lus=/tests/lib/tier2 ~). Known divergences: "
-          "desk/test-data/tier2/divergences.txt. TLC comparator: R1.1.2.")
+          "comparator shard reproduce byte-identically from the pins.")
+    print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
+          "(R1.1.1) + TLC verdict/distinct-count (R1.1.2). Run on the ship: "
+          "-test /=tla-lus=/tests/lib/tier2 ~. Known divergences: "
+          "desk/test-data/tier2/divergences.txt. Scale-up: R1.1.3.")
     return 0
 
 

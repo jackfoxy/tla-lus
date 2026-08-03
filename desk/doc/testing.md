@@ -90,11 +90,20 @@ two current divergences (`IllegalOperatorTest` — a higher-order operator-argum
 arity edge; `CigaretteSmokers` — `LAMBDA` not in the WU3 graph) are front-end
 residues owned by R1.3.
 
-**Status:** the classified scope map, the curated Java oracle, and the SANY
-comparator are frozen and byte-reproducible (`tools/tier2.py --check`). The Hoon
-TLC comparator (verdict + state counts vs the oracle) is R1.1.2; scaling the run
-set to the full inventory and tier-3 perf models is R1.1.3+. See `port-map.md`
-for which feature rows are live.
+**TLC comparator (R1.1.2).** For each curated safety spec the shard runs
+`check:check` and compares the **verdict line + distinct/queue counts** to the
+pinned TLC run (the `generated` counter is dropped — it has a safety-stats
+off-by-one nuance — and trace labels/depth are a safety `partial` residue, both
+compared in a later increment). `DieHard` (a safety violation, 54 distinct) is
+green; `HourClock` and `TCommit` are recorded as divergences — both hit the
+`x \in S` nondeterministic-assignment residue (the Hoon solver errors
+`variable is unassigned`), owned by R1.5.
+
+**Status:** the classified scope map, the curated Java oracle, and the SANY +
+TLC comparators are frozen and byte-reproducible (`tools/tier2.py --check`).
+Scaling the run sets to the full inventory, adding trace/coverage comparison,
+and tier-3 perf models is R1.1.3+. See `port-map.md` for which feature rows are
+live.
 
 ## Tier 3 — pre-release
 
