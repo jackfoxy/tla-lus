@@ -820,6 +820,21 @@
     lvls.lr
   ==
 ::
+++  sany-verdict
+  ::  the tier-2 SANY accept/reject verdict (R1.1.1): a spec is accepted
+  ::  iff the analyze pipeline resolves it and the semantic + level phases
+  ::  raise no %error diagnostic — SANY's own console verdict (it prints
+  ::  `*** Errors` and rejects on a semantic/level error, accepts with only
+  ::  warnings). A parse or module-resolution failure surfaces as ~ from
+  ::  +analyze-graph and is likewise a reject.
+  |=  [root=@t src=(map @t @t)]
+  ^-  ?(%accept %reject)
+  =/  ag  (analyze-graph root src)
+  ?~  ag  %reject
+  =/  err  |=(ds=(list sdiag) (lien ds |=(d=sdiag =(%error sev.d))))
+  ?:  ?|((err sem.u.ag) (err lvl.u.ag))  %reject
+  %accept
+::
 ++  generate
   ::  the typed semantic graph for later units (B5 consumes this)
   |=  [root=@t src=(map @t @t)]

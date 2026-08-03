@@ -29,11 +29,16 @@ TIER2 = REPO / "desk/test-data/tier2"
 GEN = REPO / "tools/gen-tier2-tests.py"
 
 
+SHARD = REPO / "desk/tests/lib/tier2.hoon"
+
+
 def snapshot() -> dict:
     h = {}
     for f in sorted(TIER2.rglob("*")):
         if f.is_file():
             h[str(f.relative_to(TIER2))] = hashlib.md5(f.read_bytes()).hexdigest()
+    if SHARD.is_file():                      # the generated Hoon comparator
+        h["tests/lib/tier2.hoon"] = hashlib.md5(SHARD.read_bytes()).hexdigest()
     return h
 
 
@@ -62,9 +67,11 @@ def main() -> int:
               "Investigate before committing; never weaken a golden without "
               "proving the Java behavior from the pin.")
         return 1 if check else 0
-    print("\ntier-2 differential integrity: OK — inventory + curated oracle "
-          "reproduce byte-identically from the pins.")
-    print("Hoon-side comparison: not yet wired (R1.1.1).")
+    print("\ntier-2 differential integrity: OK — inventory + curated oracle + "
+          "SANY comparator shard reproduce byte-identically from the pins.")
+    print("Hoon SANY comparator: desk/tests/lib/tier2.hoon (run on the ship: "
+          "-test /=tla-lus=/tests/lib/tier2 ~). Known divergences: "
+          "desk/test-data/tier2/divergences.txt. TLC comparator: R1.1.2.")
     return 0
 
 

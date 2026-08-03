@@ -77,10 +77,24 @@ proves the inventory + curated oracle reproduce byte-identically from the pins.
 The endpoint: each in-scope spec run through **both** SANY implementations (Java
 and the Hoon units 4–7) and, where it has a config, through **both** TLC and the
 Hoon checker (units 10–11), comparing pass/fail category, diagnostic codes/spans,
-semantic trees, verdict, state counts, depth, and normalized traces. **Status
-(R1.1.0):** the classified scope map and the curated Java oracle are frozen and
-byte-reproducible; the Hoon-side comparison and the full-corpus run set are
-R1.1.1+. See `port-map.md` for which feature rows are live.
+semantic trees, verdict, state counts, depth, and normalized traces.
+
+**SANY comparator (R1.1.1).** `gen-tier2-tests.py` emits `desk/tests/lib/tier2.hoon`
+— a Hoon shard that runs each curated spec through `+sany-verdict:semantic` (the
+analyze pipeline's accept/reject, matching SANY's console verdict) and compares
+it to the pinned Java SANY verdict. It runs on the ship
+(`-test /=tla-lus=/tests/lib/tier2 ~`). Specs whose Hoon verdict disagrees with
+Java are recorded in `desk/test-data/tier2/divergences.txt` with a reason — not
+tested green, but census-tracked so a new divergence cannot appear silently. The
+two current divergences (`IllegalOperatorTest` — a higher-order operator-argument
+arity edge; `CigaretteSmokers` — `LAMBDA` not in the WU3 graph) are front-end
+residues owned by R1.3.
+
+**Status:** the classified scope map, the curated Java oracle, and the SANY
+comparator are frozen and byte-reproducible (`tools/tier2.py --check`). The Hoon
+TLC comparator (verdict + state counts vs the oracle) is R1.1.2; scaling the run
+set to the full inventory and tier-3 perf models is R1.1.3+. See `port-map.md`
+for which feature rows are live.
 
 ## Tier 3 — pre-release
 
