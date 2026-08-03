@@ -248,6 +248,36 @@ TLC_DIVERGENCES = [
 ]
 
 
+# R1.1.3 scale-up: the flat single-file in-scope test-model batch, run through
+# the Hoon SANY pipeline in one mule-isolated arm and compared en masse to the
+# Java verdict. Cap keeps the single arm's runtime bounded.
+BATCH_CAP = 119
+
+
+def sany_batch_modules() -> list:
+    """Clean flat top-level test-model specs, in scope (sany/check),
+    self-contained (dependency closure is the module itself), and small."""
+    local = {p.stem for p in TESTMODEL.glob("*.tla")}
+    out = []
+    for tla in sorted(TESTMODEL.glob("*.tla")):
+        text = read(tla)
+        k, _ = classify(text, local, tla.with_suffix(".cfg").exists())
+        if k not in ("sany", "check"):
+            continue
+        if len(dep_closure(TESTMODEL, tla.stem)) != 1 or len(text) > 1800:
+            continue
+        out.append(tla.stem)
+    return out[:BATCH_CAP]
+
+
+# Modules in the batch whose Hoon +sany-verdict disagrees with Java, discovered
+# by running the batch on the ship. Each entry is `<module>:<hoon-outcome>`
+# where outcome is `crash` or `hoon=<accept|reject>`; the batch arm asserts the
+# actual divergence list equals this frozen set. Populated from the ship run;
+# grouped reasons live in `divergences.txt`.
+SANY_BATCH_DIVERGENCES = ["IllegalOperatorTest:hoon=accept"]
+
+
 def sany_verdict(module: str, spec: Path) -> str:
     """Just accept/reject (the comparator key; diagnostic-text parity is
     tier 1's job). Reuses norm_sany's first line."""
@@ -324,6 +354,22 @@ def write_sany_shard():
         "      =/  c  (skim w |=(l=@t ?=(^ (fand \"distinct states found\" (trip l)))))",
         "      ?~(c '' (drop-gen i.c))",
         "  ==",
+        "++  sany-batch-run",
+        "  ::  run each batch spec through +sany-verdict under +mule (a crash",
+        "  ::  becomes a recorded outcome, not a test abort) and return the sorted",
+        "  ::  list of modules whose Hoon verdict disagrees with Java",
+        "  |=  b=(list [name=@t jv=?(%accept %reject) src=(list [@t @t])])",
+        "  ^-  (list @t)",
+        "  =|  out=(list @t)",
+        "  |-  ^-  (list @t)",
+        "  ?~  b  (sort out lte)",
+        "  =/  r  (mule |.((sany-verdict:semantic name.i.b (malt src.i.b))))",
+        "  =/  e=@t",
+        "    ?-  -.r",
+        "      %|  (cat 3 name.i.b ':crash')",
+        "      %&  ?:(=(p.r jv.i.b) '' (cat 3 name.i.b (cat 3 ':hoon=' p.r)))",
+        "    ==",
+        "  $(b t.b, out ?~(e out [e out]))",
     ]
     for corpus, sdir, module in SANY_CURATED:
         spec = Path(sdir) / f"{module}.tla"
@@ -363,6 +409,29 @@ def write_sany_shard():
             f"  %+  check:check  '{hcord(spec_text)}'",
             f"  '{hcord(cfg_text)}'",
         ]
+    # the batch SANY runner (R1.1.3)
+    batch = sany_batch_modules()
+    if SANY_BATCH_DIVERGENCES:
+        expect = ["    :~  " + "  ".join(f"'{d}'" for d in SANY_BATCH_DIVERGENCES),
+                  "    =="]
+    else:
+        expect = ["    ~"]
+    lines += [
+        "::",
+        "++  test-sany-batch",
+        "  %+  expect-eq",
+        "    !>  ^-  (list @t)",
+        *expect,
+        "  !>",
+        "  %-  sany-batch-run",
+        "  ^-  (list [@t ?(%accept %reject) (list [@t @t])])",
+        "  :~",
+    ]
+    for module in batch:
+        jv = sany_verdict(module, TESTMODEL / f"{module}.tla")
+        text = read(TESTMODEL / f"{module}.tla")
+        lines.append(f"      ['{module}' %{jv} ~[['{module}' '{hcord(text)}']]]")
+    lines += ["  =="]
     lines.append("--")
     (REPO / "desk/tests/lib/tier2.hoon").write_text("\n".join(lines) + "\n")
     print(f"  sany shard: {len(SANY_CURATED)} cases -> tests/lib/tier2.hoon")
@@ -382,6 +451,16 @@ def write_sany_shard():
         dl.append(f"sany\t{module}\tjava={jv} hoon={hoon}: {reason}")
     for corpus, sdir, module, cfg, reason in TLC_DIVERGENCES:
         dl.append(f"tlc\t{module}\t{reason}")
+    nb = len(sany_batch_modules())
+    dl += [
+        "",
+        f"# batch (R1.1.3): {nb} flat single-file in-scope test-model specs run "
+        "through +sany-verdict",
+        f"# in one mule-isolated arm; {len(SANY_BATCH_DIVERGENCES)} disagree with "
+        f"Java ({nb - len(SANY_BATCH_DIVERGENCES)}/{nb} agree):",
+    ]
+    for d in SANY_BATCH_DIVERGENCES:
+        dl.append(f"batch\t{d}")
     (OUT / "divergences.txt").write_text("\n".join(dl) + "\n")
     n = len(KNOWN_DIVERGENCES) + len(TLC_DIVERGENCES)
     print(f"  divergences: {n} recorded -> tier2/divergences.txt")

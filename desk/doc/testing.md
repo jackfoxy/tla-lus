@@ -99,11 +99,20 @@ green; `HourClock` and `TCommit` are recorded as divergences — both hit the
 `x \in S` nondeterministic-assignment residue (the Hoon solver errors
 `variable is unassigned`), owned by R1.5.
 
-**Status:** the classified scope map, the curated Java oracle, and the SANY +
-TLC comparators are frozen and byte-reproducible (`tools/tier2.py --check`).
-Scaling the run sets to the full inventory, adding trace/coverage comparison,
-and tier-3 perf models is R1.1.3+. See `port-map.md` for which feature rows are
-live.
+**Batch scale-up (R1.1.3).** `test-sany-batch` is one **`mule`-isolated** arm
+that runs the whole flat single-file in-scope test-model batch (119 specs)
+through `+sany-verdict` — a crash becomes a recorded outcome, not a test abort —
+and asserts the sorted list of modules whose Hoon verdict disagrees with Java
+equals a frozen census. Result: **118/119 agree**; the sole divergence is
+`IllegalOperatorTest` (the higher-order op-arg edge above). This is the slow
+tier-2 element (~5 min); it belongs to the nightly runner, not every-change
+tier 1.
+
+**Status:** the classified scope map, the curated Java oracle, the SANY + TLC
+comparators, and the 119-spec SANY batch are frozen and byte-reproducible
+(`tools/tier2.py --check`). Extending the batch to multi-file / subdir specs and
+the TLC set, adding trace/coverage comparison, and tier-3 perf models is R1.1.4+.
+See `port-map.md` for which feature rows are live.
 
 ## Tier 3 — pre-release
 
