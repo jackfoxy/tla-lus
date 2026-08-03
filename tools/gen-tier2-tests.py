@@ -332,6 +332,95 @@ TLC_BATCH_REASONS = {
 }
 
 
+# R1.1.6: subdir SANY specs. Tests cannot scry Clay (the framework passes no
+# our/now) and the full 310-spec / 1.2 MB closure set is past the embedding
+# limit, so this covers the small-closure subset (< 1.5 KB) via chunked embedded
+# arms in a separate shard (`tests/lib/tier2-sub.hoon`). Larger-closure subdir
+# specs are a follow-on. Root module names collide across subdirs (`MC` ×3), so
+# a spec's identity is its relative PATH, not its module name.
+SUBDIR_CLOSURE_MAX = 1500
+SUBDIR_CHUNK = 55
+
+# Frozen from the ship run, one `<path> -> <outcome>` per divergent spec, in
+# processing (chunk) order. Reasons grouped in `divergences.txt`.
+# Frozen from the ship run, in sorted (processing) order. Every divergence is a
+# front-end (R1.3) residue — these are SANY's own adversarial conformance specs
+# (`suite/`, `coverage/`). `hoon=reject` = Java accepts / Hoon rejects (a feature
+# gap); `hoon=accept` = Java rejects / Hoon too lenient.
+SUB_BATCH_DIVERGENCES = [
+    "ModuleOverwrites/ModuleOverwrites -> hoon=reject",
+    "coverage/F -> hoon=reject",
+    "coverage/K -> hoon=reject",
+    "coverage/L -> hoon=reject",
+    "suite/etest15 -> hoon=reject",
+    "suite/etest16 -> hoon=accept",
+    "suite/test16 -> hoon=reject",
+    "suite/test201 -> hoon=reject",
+    "suite/test203 -> hoon=reject",
+    "suite/test214 -> hoon=accept",
+    "suite/test30 -> hoon=reject",
+    "suite/test42 -> hoon=reject",
+    "suite/test52 -> hoon=reject",
+    "suite/test999 -> hoon=reject",
+]
+_LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
+_HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
+_CONF = "SANY conformance edge (front-end semantic/level residue, R1.3)"
+SUB_BATCH_REASONS = {
+    "ModuleOverwrites/ModuleOverwrites": _LAM,
+    "coverage/F": _LAM, "coverage/K": _LAM, "coverage/L": _LAM,
+    "suite/test201": "LAMBDA through an INSTANCE ... WITH (R1.3)",
+    "suite/test203": "INSTANCE ... WITH over a RECURSIVE definition (R1.3)",
+    "suite/test30": _HO, "suite/test999": _HO,
+    "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
+    "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
+}
+
+
+def closure_of(tla: Path):
+    """(closure {module: text}, byname) for a spec file, resolving modules in
+    the spec's own directory then the flat test-model root, skipping vendored
+    StandardModules."""
+    byname = {p.stem: p for p in tla.parent.glob("*.tla")}
+    for p in TESTMODEL.glob("*.tla"):
+        byname.setdefault(p.stem, p)
+    out, q, seen = {}, [tla.stem], set()
+    while q:
+        n = q.pop()
+        if n in seen or n not in byname:
+            continue
+        seen.add(n)
+        t = read(byname[n])
+        out[n] = t
+        for r in module_refs(t):
+            if r not in VENDORED and r in byname:
+                q.append(r)
+    return out, byname
+
+
+def sany_subdir_specs() -> list:
+    """(path-id, root-module, {module: text}) for small-closure in-scope subdir
+    specs whose closure resolves entirely (no missing module)."""
+    flat = {p.stem for p in TESTMODEL.glob("*.tla")}
+    out = []
+    for tla in sorted(TESTMODEL.rglob("*.tla")):
+        if tla.parent == TESTMODEL:
+            continue
+        loc = {p.stem for p in tla.parent.glob("*.tla")} | flat
+        k, _ = classify(read(tla), loc, tla.with_suffix(".cfg").exists())
+        if k not in ("sany", "check"):
+            continue
+        cl, byname = closure_of(tla)
+        if any(r not in VENDORED and r not in byname
+               for m in cl for r in module_refs(cl[m])):
+            continue
+        if sum(len(t) for t in cl.values()) >= SUBDIR_CLOSURE_MAX:
+            continue
+        rid = str(tla.relative_to(TESTMODEL))[:-4]      # drop ".tla"
+        out.append((rid, tla.stem, cl))
+    return out
+
+
 def sany_verdict(module: str, spec: Path) -> str:
     """Just accept/reject (the comparator key; diagnostic-text parity is
     tier 1's job). Reuses norm_sany's first line."""
@@ -569,6 +658,17 @@ def write_sany_shard():
     for d in TLC_BATCH_DIVERGENCES:
         mod = d.split(" -> ")[0]
         dl.append(f"tlc-batch\t{d}\t{TLC_BATCH_REASONS.get(mod, '')}")
+    nsub = len(sany_subdir_specs())
+    dl += [
+        "",
+        f"# subdir-batch (R1.1.6): {nsub} small-closure in-scope test-model "
+        "subdir specs through +sany-verdict;",
+        f"# {len(SUB_BATCH_DIVERGENCES)} disagree with Java "
+        f"({nsub - len(SUB_BATCH_DIVERGENCES)}/{nsub} agree):",
+    ]
+    for d in SUB_BATCH_DIVERGENCES:
+        rid = d.split(" -> ")[0]
+        dl.append(f"subdir-batch\t{d}\t{SUB_BATCH_REASONS.get(rid, '')}")
     (OUT / "divergences.txt").write_text("\n".join(dl) + "\n")
     n = len(KNOWN_DIVERGENCES) + len(TLC_DIVERGENCES)
     print(f"  divergences: {n} recorded -> tier2/divergences.txt")
@@ -700,6 +800,65 @@ def run_curated():
               f"{'sany+tlc' if cfg else 'sany'}")
 
 
+def write_subdir_shard():
+    """Generate the chunked subdir SANY comparator shard (R1.1.6)."""
+    specs = sany_subdir_specs()
+    lines = [
+        "::  GENERATED by tools/gen-tier2-tests.py -- do not edit.",
+        "::  Tier-2 subdir SANY comparator (Release R1, R1.1.6): small-closure",
+        "::  in-scope test-model subdir specs, run through +sany-verdict in",
+        "::  chunked mule-isolated arms and compared to the pinned Java verdict.",
+        "::  A spec's identity is its relative path (root names collide).",
+        "/+  *test",
+        "/=  semantic  /lib/semantic",
+        "|%",
+        "++  sub-batch-run",
+        "  |=  b=(list [id=@t root=@t jv=?(%accept %reject) src=(list [@t @t])])",
+        "  ^-  (list @t)",
+        "  =|  out=(list @t)",
+        "  |-  ^-  (list @t)",
+        "  ?~  b  (flop out)",
+        "  =/  r  (mule |.((sany-verdict:semantic root.i.b (malt src.i.b))))",
+        "  =/  e=@t",
+        "    ?-  -.r",
+        "      %|  (cat 3 id.i.b ' -> crash')",
+        "      %&  ?:  =(p.r jv.i.b)  ''",
+        "          (cat 3 id.i.b (cat 3 ' -> hoon=' p.r))",
+        "    ==",
+        "  $(b t.b, out ?~(e out [e out]))",
+    ]
+    chunks = [specs[i:i + SUBDIR_CHUNK]
+              for i in range(0, len(specs), SUBDIR_CHUNK)]
+    for ci, chunk in enumerate(chunks, 1):
+        ids = {rid for rid, _, _ in chunk}
+        exp = [d for d in SUB_BATCH_DIVERGENCES
+               if d.split(" -> ")[0] in ids]
+        if exp:
+            eblock = ["    :~  " + "  ".join(f"'{d}'" for d in exp), "    =="]
+        else:
+            eblock = ["    ~"]
+        lines += [
+            "::",
+            f"++  test-sany-sub-{ci}",
+            "  %+  expect-eq",
+            "    !>  ^-  (list @t)",
+            *eblock,
+            "  !>",
+            "  %-  sub-batch-run",
+            "  ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])",
+            "  :~",
+        ]
+        for rid, root, cl in chunk:
+            jv = sany_verdict(root, TESTMODEL / (rid + ".tla"))
+            src = " ".join(f"['{n}' '{hcord(t)}']" for n, t in cl.items())
+            lines.append(f"      ['{rid}' '{root}' %{jv} ~[{src}]]")
+        lines += ["  =="]
+    lines.append("--")
+    (REPO / "desk/tests/lib/tier2-sub.hoon").write_text("\n".join(lines) + "\n")
+    print(f"  subdir shard: {len(specs)} specs in {len(chunks)} arms "
+          "-> tests/lib/tier2-sub.hoon")
+
+
 def main() -> int:
     if "--list" not in sys.argv and not check_pin():
         return 2
@@ -716,6 +875,8 @@ def main() -> int:
     run_curated()
     print("sany comparator shard:")
     write_sany_shard()
+    print("subdir sany shard:")
+    write_subdir_shard()
     return 0
 
 

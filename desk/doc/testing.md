@@ -122,12 +122,23 @@ eagerly enumerates `SUBSET`), and `ConstantOperatorConfiguration` (a cfg CONSTAN
 operator override not applied) — all owned by **R1.5**. The census is the point:
 tier 2 hands R1.5 a concrete target list.
 
+**Subdir batch (R1.1.6).** Tests cannot scry Clay (the framework passes no
+`our`/`now`), and the full 310-spec subdir closure set is ~1.2 MB — past the
+embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **small-closure
+subset (162 specs, < 1.5 KB closure)** via chunked `mule`-isolated arms; a spec's
+identity is its relative **path** (root module names collide across subdirs).
+Result: **148/162 agree**; all 14 divergences are front-end (R1.3) residues on
+SANY's own adversarial conformance specs (`suite/`, `coverage/`) — 5 LAMBDA, 2
+higher-order operator parameters, 1 INSTANCE-over-RECURSIVE, 6 semantic/level
+conformance edges. Combined SANY coverage is now **288/304** test-model specs.
+The larger-closure subdir specs remain a follow-on.
+
 **Status:** the classified scope map, the curated Java oracle, the SANY + TLC
-comparators, the 142-spec SANY batch, and the 14-spec TLC batch are frozen and
-byte-reproducible (`tools/tier2.py --check`). Extending the SANY batch to the 318
-subdir specs (needs Clay-read, not embedding, at that scale), broadening the TLC
-batch, adding trace/coverage comparison, and tier-3 perf models is R1.1.6+. See
-`port-map.md` for which feature rows are live.
+comparators, the 142-spec flat + 162-spec subdir SANY batches, and the 14-spec
+TLC batch are frozen and byte-reproducible (`tools/tier2.py --check`). The
+larger-closure subdir specs, broadening the TLC batch, trace/coverage comparison,
+and tier-3 perf models are R1.1.7+. See `port-map.md` for which feature rows are
+live.
 
 ## Tier 3 — pre-release
 

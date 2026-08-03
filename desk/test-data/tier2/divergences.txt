@@ -25,3 +25,20 @@ tlc-batch	Github725d -> Error: primed variable is unassigned in the successor st
 tlc-batch	SubsetEq -> Error: SUBSET argument too large to enumerate.	Hoon eagerly enumerates SUBSET where TLC handles it lazily — the lazy set-enumeration residue (6.3 / R1.5)
 tlc-batch	SubseteqNextState -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
 tlc-batch	TraceWithLargeSetOfInitialStatesTest -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
+
+# subdir-batch (R1.1.6): 162 small-closure in-scope test-model subdir specs through +sany-verdict;
+# 14 disagree with Java (148/162 agree):
+subdir-batch	ModuleOverwrites/ModuleOverwrites -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
+subdir-batch	coverage/F -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
+subdir-batch	coverage/K -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
+subdir-batch	coverage/L -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
+subdir-batch	suite/etest15 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/etest16 -> hoon=accept	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test16 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test201 -> hoon=reject	LAMBDA through an INSTANCE ... WITH (R1.3)
+subdir-batch	suite/test203 -> hoon=reject	INSTANCE ... WITH over a RECURSIVE definition (R1.3)
+subdir-batch	suite/test214 -> hoon=accept	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test30 -> hoon=reject	higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3
+subdir-batch	suite/test42 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test52 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test999 -> hoon=reject	higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3

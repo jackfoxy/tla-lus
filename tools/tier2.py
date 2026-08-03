@@ -37,8 +37,9 @@ def snapshot() -> dict:
     for f in sorted(TIER2.rglob("*")):
         if f.is_file():
             h[str(f.relative_to(TIER2))] = hashlib.md5(f.read_bytes()).hexdigest()
-    if SHARD.is_file():                      # the generated Hoon comparator
-        h["tests/lib/tier2.hoon"] = hashlib.md5(SHARD.read_bytes()).hexdigest()
+    for s in (SHARD, REPO / "desk/tests/lib/tier2-sub.hoon"):
+        if s.is_file():                      # the generated Hoon comparators
+            h["tests/lib/" + s.name] = hashlib.md5(s.read_bytes()).hexdigest()
     return h
 
 
@@ -71,11 +72,12 @@ def main() -> int:
           "comparator shard reproduce byte-identically from the pins.")
     print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
           "(R1.1.1), TLC verdict/distinct-count (R1.1.2), a 142-spec "
-          "mule-isolated SANY batch (R1.1.3/4, 140/142 agree), and a 14-spec "
-          "TLC safety batch (R1.1.5, 4/14 agree — the rest pin R1.5). "
+          "mule-isolated SANY batch (R1.1.3/4, 140/142 agree), a 14-spec "
+          "TLC safety batch (R1.1.5, 4/14 agree — the rest pin R1.5), and a "
+          "162-spec subdir SANY batch (R1.1.6, tier2-sub.hoon, 148/162 agree). "
           "Run on the ship: "
-          "-test /=tla-lus=/tests/lib/tier2 ~. Known divergences: "
-          "desk/test-data/tier2/divergences.txt.")
+          "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
+          "Known divergences: desk/test-data/tier2/divergences.txt.")
     return 0
 
 
