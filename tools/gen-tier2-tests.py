@@ -281,6 +281,57 @@ BATCH_REASONS = {
 }
 
 
+# R1.1.5: a bounded TLC batch — clean single-file test-model SAFETY specs
+# (ok / invariant-violated / deadlock, small state space) run through
+# `check:check` in one mule-isolated arm, comparing the verdict + distinct-count
+# to the pinned TLC run. Edge specs whose oracle is a TLC exception / config
+# error / temporal-handling message are out of this verdict-comparison scope.
+TLC_BATCH = [
+    "AssignmentInit", "AssignmentInitNeg", "AssignmentNext",
+    "ConstantOperatorConfiguration", "Continue", "DepthFirstErrorTrace",
+    "DistributedTrace", "Github1145b", "Github725d", "Github743", "Github746",
+    "SubsetEq", "SubseteqNextState", "TraceWithLargeSetOfInitialStatesTest",
+]
+
+# TLC batch modules whose Hoon check disagrees with TLC (frozen from the ship
+# run); `<module>:diverge` or `<module>:crash`. Grouped reasons in
+# `divergences.txt`.
+# Frozen from the ship run, in TLC_BATCH order (the arm returns processing
+# order via +flop). Each entry is `<module> -> <Hoon verdict>`.
+_U = "Error: variable is unassigned in the current state"
+_P = "Error: primed variable is unassigned in the successor state"
+TLC_BATCH_DIVERGENCES = [
+    f"AssignmentInit -> {_U}: s",
+    f"AssignmentInitNeg -> {_U}: s",
+    "AssignmentNext -> Error: Deadlock reached.",
+    "ConstantOperatorConfiguration -> Error: undefined identifier: F",
+    f"Continue -> {_P}: y",
+    f"DistributedTrace -> {_U}: x",
+    f"Github725d -> {_P}: a",
+    "SubsetEq -> Error: SUBSET argument too large to enumerate.",
+    f"SubseteqNextState -> {_U}: x",
+    f"TraceWithLargeSetOfInitialStatesTest -> {_U}: x",
+]
+# grouped cause, keyed by module
+TLC_BATCH_REASONS = {
+    "AssignmentInit": "`x \\in S` nondeterministic init assignment (R1.5)",
+    "AssignmentInitNeg": "`x \\in S` nondeterministic init assignment (R1.5)",
+    "AssignmentNext": "Hoon deadlocks where TLC completes — a next-state "
+                      "assignment-completeness gap (`x' \\in S`, R1.5)",
+    "ConstantOperatorConfiguration": "a CONSTANT operator override from the cfg "
+                                     "(`F <- ..`) is not applied — cfg-constants "
+                                     "operator-arg residue",
+    "Continue": "`x' \\in S` nondeterministic next assignment (R1.5)",
+    "DistributedTrace": "`x \\in S` nondeterministic init assignment (R1.5)",
+    "Github725d": "`x' \\in S` nondeterministic next assignment (R1.5)",
+    "SubsetEq": "Hoon eagerly enumerates SUBSET where TLC handles it lazily — "
+                "the lazy set-enumeration residue (6.3 / R1.5)",
+    "SubseteqNextState": "`x \\in S` nondeterministic init assignment (R1.5)",
+    "TraceWithLargeSetOfInitialStatesTest": "`x \\in S` nondeterministic init "
+                                            "assignment (R1.5)",
+}
+
+
 def sany_verdict(module: str, spec: Path) -> str:
     """Just accept/reject (the comparator key; diagnostic-text parity is
     tier 1's job). Reuses norm_sany's first line."""
@@ -373,6 +424,22 @@ def write_sany_shard():
         "      %&  ?:(=(p.r jv.i.b) '' (cat 3 name.i.b (cat 3 ':hoon=' p.r)))",
         "    ==",
         "  $(b t.b, out ?~(e out [e out]))",
+        "++  tlc-batch-run",
+        "  ::  run each batch spec through check:check under +mule and return the",
+        "  ::  sorted modules whose [verdict distinct] disagrees with TLC",
+        "  |=  b=(list [name=@t exp=(list @t) spec=@t cfg=@t])",
+        "  ^-  (list @t)",
+        "  =|  out=(list @t)",
+        "  |-  ^-  (list @t)",
+        "  ?~  b  (flop out)",
+        "  =/  r  (mule |.((tlc-sum (check:check spec.i.b cfg.i.b))))",
+        "  =/  e=@t",
+        "    ?-  -.r",
+        "      %|  (cat 3 name.i.b ' -> crash')",
+        "      %&  ?:  =(p.r exp.i.b)  ''",
+        "          (cat 3 name.i.b (cat 3 ' -> ' ?~(p.r '' i.p.r)))",
+        "    ==",
+        "  $(b t.b, out ?~(e out [e out]))",
     ]
     for corpus, sdir, module in SANY_CURATED:
         spec = Path(sdir) / f"{module}.tla"
@@ -436,6 +503,32 @@ def write_sany_shard():
         srclist = " ".join(f"['{n}' '{hcord(t)}']" for n, t in src.items())
         lines.append(f"      ['{module}' %{jv} ~[{srclist}]]")
     lines += ["  =="]
+    # the batch TLC runner (R1.1.5)
+    if TLC_BATCH_DIVERGENCES:
+        texpect = ["    :~  " + "  ".join(f"'{d}'" for d in TLC_BATCH_DIVERGENCES),
+                   "    =="]
+    else:
+        texpect = ["    ~"]
+    lines += [
+        "::",
+        "++  test-tlc-batch",
+        "  %+  expect-eq",
+        "    !>  ^-  (list @t)",
+        *texpect,
+        "  !>",
+        "  %-  tlc-batch-run",
+        "  ^-  (list [@t (list @t) @t @t])",
+        "  :~",
+    ]
+    for module in TLC_BATCH:
+        verdict, counts = tlc_summary(module, TESTMODEL, f"{module}.cfg")
+        dist = counts.split(", ", 1)[1] if ", " in counts else counts
+        spec_text = read(TESTMODEL / f"{module}.tla")
+        cfg_text = read(TESTMODEL / f"{module}.cfg")
+        exp = f"~['{hcord(verdict)}' '{hcord(dist)}']"
+        lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
+                     f"'{hcord(cfg_text)}']")
+    lines += ["  =="]
     lines.append("--")
     (REPO / "desk/tests/lib/tier2.hoon").write_text("\n".join(lines) + "\n")
     print(f"  sany shard: {len(SANY_CURATED)} cases -> tests/lib/tier2.hoon")
@@ -466,6 +559,16 @@ def write_sany_shard():
     for d in SANY_BATCH_DIVERGENCES:
         mod = d.split(":")[0]
         dl.append(f"batch\t{d}\t{BATCH_REASONS.get(mod, '')}")
+    dl += [
+        "",
+        f"# tlc-batch (R1.1.5): {len(TLC_BATCH)} clean single-file test-model "
+        "safety specs run through check:check;",
+        f"# {len(TLC_BATCH_DIVERGENCES)} disagree with TLC "
+        f"({len(TLC_BATCH) - len(TLC_BATCH_DIVERGENCES)}/{len(TLC_BATCH)} agree):",
+    ]
+    for d in TLC_BATCH_DIVERGENCES:
+        mod = d.split(" -> ")[0]
+        dl.append(f"tlc-batch\t{d}\t{TLC_BATCH_REASONS.get(mod, '')}")
     (OUT / "divergences.txt").write_text("\n".join(dl) + "\n")
     n = len(KNOWN_DIVERGENCES) + len(TLC_DIVERGENCES)
     print(f"  divergences: {n} recorded -> tier2/divergences.txt")

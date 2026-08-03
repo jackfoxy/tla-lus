@@ -70,8 +70,10 @@ def main() -> int:
     print("\ntier-2 differential integrity: OK — inventory + curated oracle + "
           "comparator shard reproduce byte-identically from the pins.")
     print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
-          "(R1.1.1), TLC verdict/distinct-count (R1.1.2), and a 142-spec "
-          "mule-isolated SANY batch (R1.1.3/4, 140/142 agree). Run on the ship: "
+          "(R1.1.1), TLC verdict/distinct-count (R1.1.2), a 142-spec "
+          "mule-isolated SANY batch (R1.1.3/4, 140/142 agree), and a 14-spec "
+          "TLC safety batch (R1.1.5, 4/14 agree — the rest pin R1.5). "
+          "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~. Known divergences: "
           "desk/test-data/tier2/divergences.txt.")
     return 0

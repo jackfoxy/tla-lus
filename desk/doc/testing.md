@@ -110,10 +110,23 @@ edge) and `BagsTest` (`BagOfAll(LAMBDA …)`, LAMBDA not in the WU3 graph). This
 the slow tier-2 element (~7.5 min); it belongs to the nightly runner, not
 every-change tier 1.
 
+**TLC batch (R1.1.5).** `test-tlc-batch` is the checker analogue: one
+`mule`-isolated arm runs 14 clean single-file test-model **safety** specs (ok /
+invariant-violated / deadlock, small state) through `check:check` and compares
+each `[verdict, distinct]` to the pinned TLC run, censusing divergences with the
+Hoon verdict inline. Result: **4/14 agree** — a sharp contrast to SANY's 140/142.
+The 10 divergences map the checker's real-spec gaps: **7 are the `x \in S` /
+`x' \in S` nondeterministic-assignment residue** (`variable is unassigned`),
+plus `AssignmentNext` (Hoon deadlocks where TLC completes), `SubsetEq` (Hoon
+eagerly enumerates `SUBSET`), and `ConstantOperatorConfiguration` (a cfg CONSTANT
+operator override not applied) — all owned by **R1.5**. The census is the point:
+tier 2 hands R1.5 a concrete target list.
+
 **Status:** the classified scope map, the curated Java oracle, the SANY + TLC
-comparators, and the 142-spec SANY batch are frozen and byte-reproducible
-(`tools/tier2.py --check`). Extending the batch to the 318 subdir specs and a TLC
-batch, adding trace/coverage comparison, and tier-3 perf models is R1.1.5+. See
+comparators, the 142-spec SANY batch, and the 14-spec TLC batch are frozen and
+byte-reproducible (`tools/tier2.py --check`). Extending the SANY batch to the 318
+subdir specs (needs Clay-read, not embedding, at that scale), broadening the TLC
+batch, adding trace/coverage comparison, and tier-3 perf models is R1.1.6+. See
 `port-map.md` for which feature rows are live.
 
 ## Tier 3 — pre-release

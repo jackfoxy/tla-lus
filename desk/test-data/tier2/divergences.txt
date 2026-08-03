@@ -12,3 +12,16 @@ tlc	TCommit	Hoon check errors `primed variable is unassigned: rmState`: an actio
 # in one mule-isolated arm; 2 disagree with Java (140/142 agree):
 batch	BagsTest:hoon=reject	LAMBDA (`BagOfAll(LAMBDA e : ..)`) not in the WU3 graph — the unit-3 residue (R1.3)
 batch	IllegalOperatorTest:hoon=accept	higher-order operator-argument arity edge — the 4271 check compares arity only (R1.3)
+
+# tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
+# 10 disagree with TLC (4/14 agree):
+tlc-batch	AssignmentInit -> Error: variable is unassigned in the current state: s	`x \in S` nondeterministic init assignment (R1.5)
+tlc-batch	AssignmentInitNeg -> Error: variable is unassigned in the current state: s	`x \in S` nondeterministic init assignment (R1.5)
+tlc-batch	AssignmentNext -> Error: Deadlock reached.	Hoon deadlocks where TLC completes — a next-state assignment-completeness gap (`x' \in S`, R1.5)
+tlc-batch	ConstantOperatorConfiguration -> Error: undefined identifier: F	a CONSTANT operator override from the cfg (`F <- ..`) is not applied — cfg-constants operator-arg residue
+tlc-batch	Continue -> Error: primed variable is unassigned in the successor state: y	`x' \in S` nondeterministic next assignment (R1.5)
+tlc-batch	DistributedTrace -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
+tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	`x' \in S` nondeterministic next assignment (R1.5)
+tlc-batch	SubsetEq -> Error: SUBSET argument too large to enumerate.	Hoon eagerly enumerates SUBSET where TLC handles it lazily — the lazy set-enumeration residue (6.3 / R1.5)
+tlc-batch	SubseteqNextState -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
+tlc-batch	TraceWithLargeSetOfInitialStatesTest -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
