@@ -293,9 +293,13 @@ TLC_BATCH = [
     "SubsetEq", "SubseteqNextState", "TraceWithLargeSetOfInitialStatesTest",
 ]
 
-# TLC batch modules whose Hoon check disagrees with TLC (frozen from the ship
-# run); `<module>:diverge` or `<module>:crash`. Grouped reasons in
-# `divergences.txt`.
+# NB (R1.1.8): a TLC LIVENESS batch was attempted but DEFERRED — the raw
+# `check:check` entry has no state cap, so a liveness spec with an unbounded /
+# looping Hoon state graph hangs the arm (mule catches a bail, not an infinite
+# loop). A liveness batch needs a bounded checker entry (the job engine's
+# budget-sliced path); revisit once that is exposed to the comparator.
+
+# TLC safety batch modules whose Hoon check disagrees with TLC.
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing
 # order via +flop). Each entry is `<module> -> <Hoon verdict>`.
 _U = "Error: variable is unassigned in the current state"
@@ -338,7 +342,7 @@ TLC_BATCH_REASONS = {
 # arms in a separate shard (`tests/lib/tier2-sub.hoon`). Larger-closure subdir
 # specs are a follow-on. Root module names collide across subdirs (`MC` ×3), so
 # a spec's identity is its relative PATH, not its module name.
-SUBDIR_CLOSURE_MAX = 4000
+SUBDIR_CLOSURE_MAX = 8000
 SUBDIR_CHUNK = 55
 
 # Frozen from the ship run, one `<path> -> <outcome>` per divergent spec, in
@@ -356,15 +360,19 @@ SUB_BATCH_DIVERGENCES = [
     "coverage/F -> hoon=reject",
     "coverage/K -> hoon=reject",
     "coverage/L -> hoon=reject",
+    "examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject",
     "gh1134/MultiUser -> hoon=reject",
     "gh1134/SingleUser -> hoon=reject",
     "suite/etest15 -> hoon=reject",
     "suite/etest16 -> hoon=accept",
+    "suite/test10 -> hoon=reject",
     "suite/test16 -> hoon=reject",
     "suite/test201 -> hoon=reject",
     "suite/test203 -> hoon=reject",
+    "suite/test206 -> hoon=reject",
     "suite/test214 -> hoon=accept",
     "suite/test216 -> hoon=reject",
+    "suite/test219a -> hoon=reject",
     "suite/test30 -> hoon=reject",
     "suite/test42 -> hoon=reject",
     "suite/test43 -> hoon=reject",
@@ -390,6 +398,11 @@ SUB_BATCH_REASONS = {
     "suite/test9": _CONF,
     "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
     "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
+    "examples/SingleLaneBridge/SingleLaneBridge":
+        "RECURSIVE + higher-order op-arg (`~>`/WF_ liveness spec) — R1.3",
+    "suite/test206": _INST + " (with \\E/SUBSET/higher-order)",
+    "suite/test219a": _INST + " (with \\E/SUBSET/higher-order)",
+    "suite/test10": _CONF,
 }
 
 

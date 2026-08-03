@@ -124,24 +124,30 @@ tier 2 hands R1.5 a concrete target list.
 
 **Subdir batch (R1.1.6).** Tests cannot scry Clay (the framework passes no
 `our`/`now`), and the full 310-spec subdir closure set is ~1.2 MB — past the
-embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **mid-closure
-subset (240 specs, < 4 KB closure; R1.1.6 seeded it at 162 / < 1.5 KB, R1.1.7
-extended it)** via five chunked `mule`-isolated arms; a spec's identity is its
-relative **path** (root module names collide across subdirs), and the embedded
-closure is emitted in sorted module order so the shard is byte-reproducible.
-Result: **216/240 agree**; all 24 divergences are front-end (R1.3) residues on
-SANY's own adversarial conformance specs (`suite/`, `coverage/`, `EWD840/`,
-`gh1134/`) — 9 LAMBDA, 2 higher-order operator parameters, 3 INSTANCE-`WITH`
-(one over RECURSIVE, one with temporal), 10 semantic/level conformance edges.
-Combined SANY coverage is now **382/406** test-model specs. The ~70
-large/monster-closure subdir specs remain a follow-on.
+embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **closure < 8 KB
+subset (270 specs; R1.1.6 seeded it at 162 / < 1.5 KB, R1.1.7 → 240 / < 4 KB,
+R1.1.8 → 270 / < 8 KB)** via chunked `mule`-isolated arms; a spec's identity is
+its relative **path** (root module names collide across subdirs), and the
+embedded closure is emitted in sorted module order so the shard is
+byte-reproducible. Result: **242/270 agree**; all 28 divergences are front-end
+(R1.3) residues on SANY's own adversarial conformance specs (`suite/`,
+`coverage/`, `EWD840/`, `gh1134/`, `examples/`) — LAMBDA, higher-order operator
+parameters, INSTANCE-`WITH` (some over RECURSIVE / with temporal), and
+semantic/level conformance edges. Combined SANY coverage is now **410/436**
+test-model specs. The ~40 largest (> 8 KB closure, e.g. `suite/test211` 63 KB)
+would need Clay-read and remain a follow-on.
+
+A TLC **liveness** batch was attempted here and deferred: the Hoon liveness path
+builds its state graph unbounded (even `run-check`'s temporal branch), so a spec
+with a large/looping graph hangs the arm — a liveness comparator needs a bounded
+liveness-graph build (engine work, R1.5/R1.6), not just spec selection.
 
 **Status:** the classified scope map, the curated Java oracle, the SANY + TLC
-comparators, the 142-spec flat + 240-spec subdir SANY batches, and the 14-spec
-TLC batch are frozen and byte-reproducible (`tools/tier2.py --check`). The
-large-closure subdir specs, broadening the TLC batch, trace/coverage comparison,
-and tier-3 perf models are R1.1.8+. See `port-map.md` for which feature rows are
-live.
+comparators, the 142-spec flat + 270-spec subdir SANY batches, and the 14-spec
+TLC safety batch are frozen and byte-reproducible (`tools/tier2.py --check`). The
+largest subdir specs (Clay-read), a bounded TLC-liveness batch, trace/coverage
+comparison, and tier-3 perf models are R1.1.9+. See `port-map.md` for which
+feature rows are live.
 
 ## Tier 3 — pre-release
 
