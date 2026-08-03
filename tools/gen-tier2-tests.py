@@ -248,15 +248,12 @@ TLC_DIVERGENCES = [
 ]
 
 
-# R1.1.3 scale-up: the flat single-file in-scope test-model batch, run through
-# the Hoon SANY pipeline in one mule-isolated arm and compared en masse to the
-# Java verdict. Cap keeps the single arm's runtime bounded.
-BATCH_CAP = 119
-
-
 def sany_batch_modules() -> list:
-    """Clean flat top-level test-model specs, in scope (sany/check),
-    self-contained (dependency closure is the module itself), and small."""
+    """The full flat top-level test-model in-scope batch (sany/check) whose
+    dependency closure resolves entirely within the flat directory (R1.1.4:
+    all sizes and multi-file closures, not just the single-file < 1.8 KB seed
+    of R1.1.3). Subdir specs are a later step. Run through the Hoon SANY
+    pipeline in one mule-isolated arm and compared en masse to Java."""
     local = {p.stem for p in TESTMODEL.glob("*.tla")}
     out = []
     for tla in sorted(TESTMODEL.glob("*.tla")):
@@ -264,10 +261,10 @@ def sany_batch_modules() -> list:
         k, _ = classify(text, local, tla.with_suffix(".cfg").exists())
         if k not in ("sany", "check"):
             continue
-        if len(dep_closure(TESTMODEL, tla.stem)) != 1 or len(text) > 1800:
-            continue
+        if any(m not in local for m in dep_closure(TESTMODEL, tla.stem)):
+            continue                          # closure must be flat-resolvable
         out.append(tla.stem)
-    return out[:BATCH_CAP]
+    return out
 
 
 # Modules in the batch whose Hoon +sany-verdict disagrees with Java, discovered
@@ -275,7 +272,13 @@ def sany_batch_modules() -> list:
 # where outcome is `crash` or `hoon=<accept|reject>`; the batch arm asserts the
 # actual divergence list equals this frozen set. Populated from the ship run;
 # grouped reasons live in `divergences.txt`.
-SANY_BATCH_DIVERGENCES = ["IllegalOperatorTest:hoon=accept"]
+SANY_BATCH_DIVERGENCES = ["BagsTest:hoon=reject", "IllegalOperatorTest:hoon=accept"]
+BATCH_REASONS = {
+    "BagsTest": "LAMBDA (`BagOfAll(LAMBDA e : ..)`) not in the WU3 graph — the "
+                "unit-3 residue (R1.3)",
+    "IllegalOperatorTest": "higher-order operator-argument arity edge — the "
+                           "4271 check compares arity only (R1.3)",
+}
 
 
 def sany_verdict(module: str, spec: Path) -> str:
@@ -429,8 +432,9 @@ def write_sany_shard():
     ]
     for module in batch:
         jv = sany_verdict(module, TESTMODEL / f"{module}.tla")
-        text = read(TESTMODEL / f"{module}.tla")
-        lines.append(f"      ['{module}' %{jv} ~[['{module}' '{hcord(text)}']]]")
+        src = dep_closure(TESTMODEL, module)
+        srclist = " ".join(f"['{n}' '{hcord(t)}']" for n, t in src.items())
+        lines.append(f"      ['{module}' %{jv} ~[{srclist}]]")
     lines += ["  =="]
     lines.append("--")
     (REPO / "desk/tests/lib/tier2.hoon").write_text("\n".join(lines) + "\n")
@@ -460,7 +464,8 @@ def write_sany_shard():
         f"Java ({nb - len(SANY_BATCH_DIVERGENCES)}/{nb} agree):",
     ]
     for d in SANY_BATCH_DIVERGENCES:
-        dl.append(f"batch\t{d}")
+        mod = d.split(":")[0]
+        dl.append(f"batch\t{d}\t{BATCH_REASONS.get(mod, '')}")
     (OUT / "divergences.txt").write_text("\n".join(dl) + "\n")
     n = len(KNOWN_DIVERGENCES) + len(TLC_DIVERGENCES)
     print(f"  divergences: {n} recorded -> tier2/divergences.txt")
