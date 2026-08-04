@@ -420,21 +420,36 @@
   ?:  ?=(%| -.m)  m
   [%& [%bool ?:(neg !p.m p.m)]]
 ::
+++  subset-arg
+  ::  the argument of a `SUBSET _` application, if `n` is one
+  |=  n=sem:sm
+  ^-  (unit sem:sm)
+  ?.  ?=(%apply -.n)  ~
+  ?.  =('SUBSET' name.op.n)  ~
+  ?~  args.n  ~
+  `i.args.n
+::
 ++  bi-subseteq
+  ::  `A \subseteq B`, kept lazy: both sides are set descriptors and A is
+  ::  streamed, so a lazy left set (SUBSET/UNION/[D->R]) is never forced. tlc2
+  ::  reduces `SUBSET A \subseteq SUBSET B` to `A \subseteq B` (SubsetValue.
+  ::  isSubsetEq) to avoid materializing the power set; peel matching SUBSETs
+  ::  first, then compare the underlying sets lazily.
   |=  [as=(list sem:sm) e=eenv]
   ^-  eres
-  =/  a  (eval (snag 0 as) e)
-  ?:  ?=(%| -.a)  a
-  ?.  (set-like:v p.a)  [%| 0 'left of \\subseteq is not a set.']
-  =/  s  (eval-domain (snag 1 as) e)
-  ?:  ?=(%| -.s)  s
-  =/  els  (set-elems:v (normalize:v p.a))
-  |-  ^-  eres
-  ?~  els  [%& [%bool &]]
-  =/  m  (set-member:v i.els p.s)
-  ?:  ?=(%| -.m)  m
-  ?.  p.m  [%& [%bool |]]
-  $(els t.els)
+  =/  ln  (snag 0 as)
+  =/  rn  (snag 1 as)
+  |-
+  =/  la  (subset-arg ln)
+  =/  lb  (subset-arg rn)
+  ?:  ?&(?=(^ la) ?=(^ lb))
+    $(ln u.la, rn u.lb)
+  =/  sa  (eval-domain ln e)
+  ?:  ?=(%| -.sa)  sa
+  =/  sb  (eval-domain rn e)
+  ?:  ?=(%| -.sb)  sb
+  =/  r  (sexp-subseteq:v p.sa p.sb)
+  ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
 ++  eval-conj
   |=  [as=(list sem:sm) e=eenv]

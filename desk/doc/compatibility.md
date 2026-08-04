@@ -942,7 +942,11 @@ signature, which is normalized away.
 
 `Cardinality` and `IsFiniteSet` take their argument as a lazy *set*, so
 `IsFiniteSet(Nat)` is FALSE and `Cardinality(Nat)` is EC 2181 — the infinite
-descriptors answer rather than being forced. Bag operators accept exactly what
+descriptors answer rather than being forced. `\subseteq` is likewise lazy: the
+left set is streamed and `SUBSET A \subseteq SUBSET B` is reduced to
+`A \subseteq B` (tlc2 `SubsetValue.isSubsetEq`), so neither power set is
+materialized — `SUBSET (1..42) \subseteq SUBSET (1..23)` answers instead of
+overflowing (R1.5.2). Bag operators accept exactly what
 `Value.toFcnRcd` accepts (a function, a tuple, or a record), and their
 diagnostics reproduce the pin's text including its quirks: the infix operators
 are named `(+)` and `(-)`, and `SetToBag` reports itself as `BagToSet`.

@@ -170,3 +170,35 @@ non-empty check).
 
 **Deferred:** arm D (Github725d, LET-wrapped primed `=` LHS inside ENABLED) —
 niche, one spec, tracked as R1.5.x.
+
+## R1.5.2 — DONE 2026-08-04 (closes SubsetEq)
+
+Lazy `SUBSET` in a `\subseteq` position. The oracle: TLC's `SubsetValue.isSubsetEq`
+(SubsetValue.java:104) **reduces `SUBSET A \subseteq SUBSET B` to `A \subseteq B`**
+when the RHS is also a `SUBSET` (and not a `KSubsetValue`), avoiding the power-set
+blowup; otherwise it streams the left set element-by-element (`Value.isSubsetEq`),
+and `member` stays lazy. SubsetEq's `Next` is a 10-way conjunction of
+`SUBSET X \subseteq SUBSET Y` (X,Y up to `1..42`, and `SUBSET {1} \subseteq
+SUBSET Int/Nat`), all reducing to interval/`Int`/`Nat` comparisons → `b' = TRUE`,
+verdict ok / 1 distinct.
+
+Fix (two files):
+- `value.hoon` **`+sexp-subseteq`**: streams `la` through the `ecur` cursor,
+  failing on the first element not in `lb` (`+set-member`, already lazy), bounded
+  by `max-card` — the value-core analogue of `Value.isSubsetEq`.
+- `node-eval.hoon` **`+bi-subseteq`** rewritten: peel matching `SUBSET`/`SUBSET`
+  pairs at the node level (`+subset-arg`) to reduce to the underlying sets, then
+  evaluate both sides with `+eval-domain` (lazy descriptors, so `Int`/`Nat` on the
+  right are representable) and call `+sexp-subseteq`. The old path force-evaluated
+  the left operand (`eval` → `set-elems`), overflowing on `SUBSET (1..42)`.
+
+The reduction is at the node level (not on the flat `sexp`, which cannot nest a
+descriptor inside `%subset`), so `SUBSET Int`/`SUBSET Nat` reduce to `Int`/`Nat`
+before any forcing. A non-reduced `SUBSET A \subseteq T` still streams the power
+set and overflows past `max-card`, matching TLC's `super.isSubsetEq`.
+
+**Verified:** SubsetEq ok/1; `tests/lib/eval` (023 `\subseteq`, 027 `SUBSET`) +
+the value/stdops/finitesets/bags set-operation suites green (no regression).
+Census: `SubsetEq` dropped from `TLC_BATCH_DIVERGENCES` (now 2 left:
+ConstantOperatorConfiguration → R1.5.3, Github725d → R1.5.x). HOON GOTCHA: a
+wet `snag 0 args.n` on a `?~`-narrowed non-null list nest-fails — use `i.args.n`.

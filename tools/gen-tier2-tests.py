@@ -300,16 +300,13 @@ TLC_BATCH = [
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing
 # order via +flop). Each entry is `<module> -> <Hoon verdict>`.
 # R1.5.1 closed the 7 `x \in S` / `x' \in S` / parameterized-action-operator
-# assignment specs (AssignmentInit, AssignmentInitNeg, AssignmentNext, Continue,
-# DistributedTrace, SubseteqNextState, TraceWithLargeSetOfInitialStatesTest) —
-# they now agree with TLC and are compared green by the batch arm. The three
-# remaining are separate residues: SUBSET laziness (R1.5.2), a cfg CONSTANT
-# operator override (R1.5.3), and a LET-wrapped primed ENABLED LHS (R1.5.x).
+# assignment specs; R1.5.2 closed SubsetEq (lazy `SUBSET A \subseteq SUBSET B`
+# reduction). The two remaining are separate residues: a cfg CONSTANT operator
+# override (R1.5.3) and a LET-wrapped primed ENABLED LHS (R1.5.x).
 _P = "Error: primed variable is unassigned in the successor state"
 TLC_BATCH_DIVERGENCES = [
     "ConstantOperatorConfiguration -> Error: undefined identifier: F",
     f"Github725d -> {_P}: a",
-    "SubsetEq -> Error: SUBSET argument too large to enumerate.",
 ]
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
@@ -318,8 +315,6 @@ TLC_BATCH_REASONS = {
                                      "operator-arg residue (R1.5.3)",
     "Github725d": "a LET-wrapped primed variable as the `=` LHS inside ENABLED "
                   "is not recognized as assignable (R1.5.x)",
-    "SubsetEq": "Hoon eagerly enumerates SUBSET where TLC handles it lazily — "
-                "the lazy set-enumeration residue (6.3 / R1.5.2)",
 }
 
 

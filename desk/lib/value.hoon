@@ -1128,6 +1128,31 @@
     [%& (levy u.tp |=(el=value (memb el s.x)))]
   ==
 ::
+++  sexp-subseteq
+  ::  lazy `la \subseteq lb` over descriptors (tlc2 Value.isSubsetEq): stream
+  ::  `la`, failing on the first element not in `lb`; membership in `lb` stays
+  ::  lazy. Bounded by `max-card` so a genuinely large left set overflows rather
+  ::  than hangs (the caller reduces SUBSET A \subseteq SUBSET B to A \subseteq B
+  ::  first, so the powerset is never streamed here).
+  |=  [la=sexp lb=sexp]
+  ^-  (each ? eval-err)
+  =/  rc  (enum la)
+  ?:  ?=(%| -.rc)  rc
+  =/  cur  p.rc
+  =|  n=@ud
+  |-  ^-  (each ? eval-err)
+  ?:  (gth n max-card)  [%| 0 'Set too large to enumerate.']
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& &]
+      %item
+    =/  m  (set-member v.es lb)
+    ?:  ?=(%| -.m)  m
+    ?.  p.m  [%& |]
+    $(cur +.st, n +(n))
+  ==
+::
 ++  not-a-member
   ::  the shared "is not even a candidate" branch of tlc2's UserObj.member
   |=  [e=value nm=@t]
