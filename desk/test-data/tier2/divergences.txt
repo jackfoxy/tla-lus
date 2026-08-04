@@ -26,12 +26,13 @@ tlc-batch	SubsetEq -> Error: SUBSET argument too large to enumerate.	Hoon eagerl
 tlc-batch	SubseteqNextState -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
 tlc-batch	TraceWithLargeSetOfInitialStatesTest -> Error: variable is unassigned in the current state: x	`x \in S` nondeterministic init assignment (R1.5)
 
-# subdir-batch (R1.1.6): 270 small-closure in-scope test-model subdir specs through +sany-verdict;
-# 28 disagree with Java (242/270 agree):
+# subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
+# 32 disagree with Java (263/295 agree):
 subdir-batch	EWD840/Error02 -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
 subdir-batch	EWD840/Error03 -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
 subdir-batch	EWD840/MC02 -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
 subdir-batch	EWD840/MC02Sim -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
+subdir-batch	EWD998/EWD998 -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3) (in a `~>`/WF_ liveness spec)
 subdir-batch	ModuleOverwrites/ModuleOverwrites -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
 subdir-batch	coverage/F -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
 subdir-batch	coverage/K -> hoon=reject	LAMBDA not in the WU3 graph (unit-3 residue, R1.3)
@@ -48,10 +49,13 @@ subdir-batch	suite/test203 -> hoon=reject	INSTANCE ... WITH over a RECURSIVE def
 subdir-batch	suite/test206 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with \E/SUBSET/higher-order)
 subdir-batch	suite/test214 -> hoon=accept	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test216 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with WF_/temporal)
+subdir-batch	suite/test219 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3)
 subdir-batch	suite/test219a -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with \E/SUBSET/higher-order)
+subdir-batch	suite/test23 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test30 -> hoon=reject	higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3
 subdir-batch	suite/test42 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test43 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
+subdir-batch	suite/test51 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with `~>`/higher-order)
 subdir-batch	suite/test52 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test7 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test9 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)

@@ -122,32 +122,43 @@ eagerly enumerates `SUBSET`), and `ConstantOperatorConfiguration` (a cfg CONSTAN
 operator override not applied) — all owned by **R1.5**. The census is the point:
 tier 2 hands R1.5 a concrete target list.
 
-**Subdir batch (R1.1.6).** Tests cannot scry Clay (the framework passes no
+**Subdir batch (R1.1.6–R1.1.9).** Tests cannot scry Clay (the framework passes no
 `our`/`now`), and the full 310-spec subdir closure set is ~1.2 MB — past the
-embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **closure < 8 KB
-subset (270 specs; R1.1.6 seeded it at 162 / < 1.5 KB, R1.1.7 → 240 / < 4 KB,
-R1.1.8 → 270 / < 8 KB)** via chunked `mule`-isolated arms; a spec's identity is
-its relative **path** (root module names collide across subdirs), and the
-embedded closure is emitted in sorted module order so the shard is
-byte-reproducible. Result: **242/270 agree**; all 28 divergences are front-end
-(R1.3) residues on SANY's own adversarial conformance specs (`suite/`,
-`coverage/`, `EWD840/`, `gh1134/`, `examples/`) — LAMBDA, higher-order operator
-parameters, INSTANCE-`WITH` (some over RECURSIVE / with temporal), and
-semantic/level conformance edges. Combined SANY coverage is now **410/436**
-test-model specs. The ~40 largest (> 8 KB closure, e.g. `suite/test211` 63 KB)
-would need Clay-read and remain a follow-on.
+embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **closure < 16 KB
+subset (295 specs; grown across R1.1.6–R1.1.9: 162 → 240 → 270 → 295)** via
+chunked `mule`-isolated arms; a spec's identity is its relative **path** (root
+module names collide across subdirs), and the embedded closure is emitted in
+sorted module order so the shard is byte-reproducible. Result: **263/295 agree**;
+all 32 divergences are front-end (R1.3) residues on SANY's own adversarial
+conformance specs (`suite/`, `coverage/`, `EWD840/`, `EWD998/`, `gh1134/`,
+`examples/`) — LAMBDA, higher-order operator parameters, INSTANCE-`WITH` (some
+over RECURSIVE / with temporal), and semantic/level conformance edges. Combined
+SANY coverage is now **403/437** embedded test-model specs (142 flat + 295 subdir). The **15 largest** (> 16 KB
+closure, e.g. `suite/test211` 63 KB, `VoteProof/MC` 50 KB) are the embedded
+batch's ceiling — they would need Clay-read, which the ship's test framework
+cannot do (no `our`/`now`); they are the documented tier-2 SANY remainder.
 
-A TLC **liveness** batch was attempted here and deferred: the Hoon liveness path
-builds its state graph unbounded (even `run-check`'s temporal branch), so a spec
-with a large/looping graph hangs the arm — a liveness comparator needs a bounded
-liveness-graph build (engine work, R1.5/R1.6), not just spec selection.
+## Tier-2 close-out (R1.1)
 
-**Status:** the classified scope map, the curated Java oracle, the SANY + TLC
-comparators, the 142-spec flat + 270-spec subdir SANY batches, and the 14-spec
-TLC safety batch are frozen and byte-reproducible (`tools/tier2.py --check`). The
-largest subdir specs (Clay-read), a bounded TLC-liveness batch, trace/coverage
-comparison, and tier-3 perf models are R1.1.9+. See `port-map.md` for which
-feature rows are live.
+R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
+(all byte-reproducible via `tools/tier2.py --check`, drift-guarded):
+
+- **Classified scope inventory** over both corpora (`inventory.txt`).
+- **SANY comparator** — 142 flat + 295 subdir = **437 test-model specs through
+  the Hoon front-end vs Java SANY, 403 agreeing**; every divergence pinned to a
+  front-end (R1.3) residue in `divergences.txt`.
+- **TLC safety comparator** — a curated set + a 14-spec batch through the Hoon
+  checker vs TLC; the divergences pin the evaluation residues (R1.5).
+
+Deliberately deferred (each with a concrete unblock condition), tracked in
+`port-map.md`:
+
+- **The 15 > 16 KB subdir SANY specs** — need Clay-read (tests cannot scry Clay).
+- **A TLC liveness batch** — needs a *bounded* liveness-graph build (the current
+  `check:check`/`run-check` temporal path is unbounded); engine work, R1.5/R1.6.
+- **Trace + coverage comparison** — needs the `Tool.getActions` decomposition
+  (per-action labels / coverage counters), R1.5.
+- **Tier-3 performance models** — the pre-release scale/perf harness.
 
 ## Tier 3 — pre-release
 

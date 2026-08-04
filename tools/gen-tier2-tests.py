@@ -342,7 +342,7 @@ TLC_BATCH_REASONS = {
 # arms in a separate shard (`tests/lib/tier2-sub.hoon`). Larger-closure subdir
 # specs are a follow-on. Root module names collide across subdirs (`MC` ×3), so
 # a spec's identity is its relative PATH, not its module name.
-SUBDIR_CLOSURE_MAX = 8000
+SUBDIR_CLOSURE_MAX = 16000
 SUBDIR_CHUNK = 55
 
 # Frozen from the ship run, one `<path> -> <outcome>` per divergent spec, in
@@ -356,6 +356,7 @@ SUB_BATCH_DIVERGENCES = [
     "EWD840/Error03 -> hoon=reject",
     "EWD840/MC02 -> hoon=reject",
     "EWD840/MC02Sim -> hoon=reject",
+    "EWD998/EWD998 -> hoon=reject",
     "ModuleOverwrites/ModuleOverwrites -> hoon=reject",
     "coverage/F -> hoon=reject",
     "coverage/K -> hoon=reject",
@@ -372,10 +373,13 @@ SUB_BATCH_DIVERGENCES = [
     "suite/test206 -> hoon=reject",
     "suite/test214 -> hoon=accept",
     "suite/test216 -> hoon=reject",
+    "suite/test219 -> hoon=reject",
     "suite/test219a -> hoon=reject",
+    "suite/test23 -> hoon=reject",
     "suite/test30 -> hoon=reject",
     "suite/test42 -> hoon=reject",
     "suite/test43 -> hoon=reject",
+    "suite/test51 -> hoon=reject",
     "suite/test52 -> hoon=reject",
     "suite/test7 -> hoon=reject",
     "suite/test9 -> hoon=reject",
@@ -403,6 +407,9 @@ SUB_BATCH_REASONS = {
     "suite/test206": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test219a": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test10": _CONF,
+    "EWD998/EWD998": _LAM + " (in a `~>`/WF_ liveness spec)",
+    "suite/test219": _INST, "suite/test51": _INST + " (with `~>`/higher-order)",
+    "suite/test23": _CONF,
 }
 
 
