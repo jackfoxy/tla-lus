@@ -301,18 +301,15 @@ TLC_BATCH = [
 # order via +flop). Each entry is `<module> -> <Hoon verdict>`.
 # R1.5.1 closed the 7 `x \in S` / `x' \in S` / parameterized-action-operator
 # assignment specs; R1.5.2 closed SubsetEq (lazy `SUBSET A \subseteq SUBSET B`
-# reduction). The two remaining are separate residues: a cfg CONSTANT operator
-# override (R1.5.3) and a LET-wrapped primed ENABLED LHS (R1.5.x).
+# reduction); R1.5.3 closed ConstantOperatorConfiguration (cfg constant-operator
+# `F(a) = v` enumeration bound as a function value). The one remaining residue is
+# a LET-wrapped primed ENABLED LHS (R1.5.x).
 _P = "Error: primed variable is unassigned in the successor state"
 TLC_BATCH_DIVERGENCES = [
-    "ConstantOperatorConfiguration -> Error: undefined identifier: F",
     f"Github725d -> {_P}: a",
 ]
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
-    "ConstantOperatorConfiguration": "a CONSTANT operator override from the cfg "
-                                     "(`F <- ..`) is not applied — cfg-constants "
-                                     "operator-arg residue (R1.5.3)",
     "Github725d": "a LET-wrapped primed variable as the `=` LHS inside ENABLED "
                   "is not recognized as assignable (R1.5.x)",
 }

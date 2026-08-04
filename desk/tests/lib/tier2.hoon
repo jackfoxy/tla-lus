@@ -302,7 +302,7 @@
 ++  test-tlc-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'ConstantOperatorConfiguration -> Error: undefined identifier: F'  'Github725d -> Error: primed variable is unassigned in the successor state: a'
+    :~  'Github725d -> Error: primed variable is unassigned in the successor state: a'
     ==
   !>
   %-  tlc-batch-run

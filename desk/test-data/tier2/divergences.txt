@@ -12,8 +12,7 @@ batch	BagsTest:hoon=reject	LAMBDA (`BagOfAll(LAMBDA e : ..)`) not in the WU3 gra
 batch	IllegalOperatorTest:hoon=accept	higher-order operator-argument arity edge — the 4271 check compares arity only (R1.3)
 
 # tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
-# 2 disagree with TLC (12/14 agree):
-tlc-batch	ConstantOperatorConfiguration -> Error: undefined identifier: F	a CONSTANT operator override from the cfg (`F <- ..`) is not applied — cfg-constants operator-arg residue (R1.5.3)
+# 1 disagree with TLC (13/14 agree):
 tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	a LET-wrapped primed variable as the `=` LHS inside ENABLED is not recognized as assignable (R1.5.x)
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;

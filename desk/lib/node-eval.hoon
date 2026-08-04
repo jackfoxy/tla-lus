@@ -133,8 +133,8 @@
   =/  kd  kind.op.n
   ?:  ?=(%builtin kd)  (eval-builtin n e)
   ?-  kd
-      %constant      (lookup-val nm e)
-      %new-constant  (lookup-val nm e)
+      %constant      (apply-const nm n e)
+      %new-constant  (apply-const nm n e)
       %user-op       (eval-user n e)
       %formal-param
     ?.  =(~ args.n)  (eval-user n e)
@@ -154,6 +154,21 @@
   =/  hit  (~(get by vals.e) nm)
   ?~  hit  [%| 0 (rap 3 ~['undefined identifier: ' nm])]
   [%& u.hit]
+::
+++  apply-const
+  ::  a CONSTANT reference. Arity-0 resolves to its value; a constant OPERATOR
+  ::  (`CONSTANT F(_)` bound by a cfg `F(a) = v` enumeration) is applied at the
+  ::  argument (arity 1) or the argument tuple (arity n) — the config builds it
+  ::  as a function value (tlc2's OpRcdValue), so application is `F[args]`
+  |=  [nm=@t n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?~  args.n  (lookup-val nm e)
+  =/  fv  (~(get by vals.e) nm)
+  ?~  fv  [%| 0 (rap 3 ~['undefined identifier: ' nm])]
+  =/  as  (eval-args args.n e)
+  ?:  ?=(%| -.as)  as
+  =/  dp=value:v  ?:(=(1 (lent p.as)) (snag 0 p.as) [%seq p.as])
+  (apply:v u.fv dp)
 ::
 ++  lookup-var
   ::  a variable resolves from the successor state under a prime, else the

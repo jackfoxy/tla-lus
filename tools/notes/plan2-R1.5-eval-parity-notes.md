@@ -202,3 +202,30 @@ the value/stdops/finitesets/bags set-operation suites green (no regression).
 Census: `SubsetEq` dropped from `TLC_BATCH_DIVERGENCES` (now 2 left:
 ConstantOperatorConfiguration → R1.5.3, Github725d → R1.5.x). HOON GOTCHA: a
 wet `snag 0 args.n` on a `?~`-narrowed non-null list nest-fails — use `i.args.n`.
+
+## R1.5.3 — DONE 2026-08-04 (closes ConstantOperatorConfiguration)
+
+A cfg constant-operator override. `CONSTANT F(_)` declared in the spec, with the
+cfg enumerating `F(0) = 1 / F(1) = 2 / F(2) = 2`. TLC builds an OpRcdValue from
+the enumeration and applies it; the port parsed the assignment (`cfg-constants`
+already parity) but **dropped it at eval** — `+consts-of` only kept arity-0
+constants, so `F(x)` was `undefined identifier: F`. Oracle: `Next == x' = F(x)`,
+`Init == x = 0` → x: 0→1→2, Inv `x /= 2` violated at x=2 (3 distinct).
+
+Fix (no eenv/make-env churn — reuses the existing value-const map):
+- `check.hoon` **`+consts-of`** now groups `F(a,..) = v` assignments by name into
+  a **function value** (`[%fcn pairs]`), the domain point being the argument
+  (arity 1) or the argument tuple (arity n). Arity-0 assignments still bind a
+  value directly.
+- `node-eval.hoon` **`+apply-const`** (routed from the `%constant`/`%new-constant`
+  arms of `+eval-apply`): arity-0 → `lookup-val`; with args → look up the bound
+  function value and apply it at the argument/tuple (`apply:v`). `F(x)` is a
+  `%constant` reference with arity (semantic.hoon:296), so no graph change.
+
+Faithful to tlc2's OpRcdValue for application; the operator constant is never
+rendered as a value in-corpus (only applied), so representing it as a function
+is observationally identical here (a documented micro-difference if one were
+printed). **Verified:** ConstantOperatorConfiguration violated-Inv/3;
+config/checker + eval/value/stdops regression suites green. Census: dropped from
+`TLC_BATCH_DIVERGENCES` — **1 of the original 12 TLC divergences left**
+(Github725d, arm D, R1.5.x). Ledger `cfg-constants` rationale extended.

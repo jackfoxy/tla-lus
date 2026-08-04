@@ -1251,11 +1251,28 @@
   (normalize:tp pbods fair env)
 ::
 ++  consts-of
-  ::  arity-0 config constant assignments as an evaluation binding map (WU6.9
-  ::  task 1); operator-valued constants are a later increment
+  ::  config constant assignments as an evaluation binding map (WU6.9 task 1).
+  ::  An arity-0 assignment binds a value directly; `F(a,..) = v` assignments (a
+  ::  constant OPERATOR, tlc2's OpRcdValue) are grouped by name into a function
+  ::  value applied at the argument (arity 1) or the argument tuple (arity n) —
+  ::  see +apply-const in node-eval (R1.5.3).
   |=  cs=(list cfg-const:config)
   ^-  (map @t value)
-  (malt (murn cs |=(c=cfg-const:config ?~(args.c `[lhs.c val.c] ~))))
+  =/  built
+    =|  vals=(map @t value)
+    =|  ops=(map @t (list vpair:vl))
+    |-  ^-  [v=(map @t value) o=(map @t (list vpair:vl))]
+    ?~  cs  [vals ops]
+    ?~  args.i.cs
+      $(cs t.cs, vals (~(put by vals) lhs.i.cs val.i.cs))
+    =/  dp=value  ?:(=(1 (lent args.i.cs)) i.args.i.cs [%seq args.i.cs])
+    =/  ex  (~(gut by ops) lhs.i.cs *(list vpair:vl))
+    $(cs t.cs, ops (~(put by ops) lhs.i.cs (snoc ex [dp val.i.cs])))
+  =/  vals  v.built
+  =/  os  ~(tap by o.built)
+  |-  ^-  (map @t value)
+  ?~  os  vals
+  $(os t.os, vals (~(put by vals) p.i.os [%fcn q.i.os]))
 ::
 ++  const-map
   |=  cfg=@t
