@@ -229,23 +229,20 @@ TEMP_PATH = re.compile(r"/tmp/[^ )]*|(?:jar:)?file:[^ )]*|/mnt/[^ )]*\.tla")
 # (corpus, dir, module, cfg)
 TLC_CURATED = [
     ("test-model", TESTMODEL, "DieHard", "DieHard.cfg"),   # safety violation
+    # R1.5.1: `x \in S` nondeterministic init assignment now enumerated by the
+    # node-eval solver, so these agree (ok / 12 and 34 distinct)
+    ("examples", EXAMPLES / "specifications/SpecifyingSystems/HourClock",
+     "HourClock", "HourClock.cfg"),                        # safety ok, 12 states
+    ("examples", EXAMPLES / "specifications/transaction_commit",
+     "TCommit", "TCommit.cfg"),                            # safety ok, 34 states
 ]
 
-# Known Hoon<->TLC divergences on in-scope safety specs (R1.1.2), each an
-# assignment-completeness residue owned by R1.5. (corpus, dir, module, cfg,
+# Known Hoon<->TLC divergences on in-scope safety specs (R1.1.2). HourClock and
+# TCommit were closed by R1.5.1 (nondeterministic `x \in S` / `x' \in S`
+# assignment + parameterized-action-operator expansion in the node-eval solver)
+# and moved to TLC_CURATED as tested-green arms. (corpus, dir, module, cfg,
 # reason)
-TLC_DIVERGENCES = [
-    ("examples", EXAMPLES / "specifications/SpecifyingSystems/HourClock",
-     "HourClock", "HourClock.cfg",
-     "Hoon check errors `variable is unassigned: hr`: Init is `hr \\in 1..12`, "
-     "a nondeterministic `x \\in S` assignment the node-eval solver does not "
-     "yet expand (the R1.5 residue)"),
-    ("examples", EXAMPLES / "specifications/transaction_commit",
-     "TCommit", "TCommit.cfg",
-     "Hoon check errors `primed variable is unassigned: rmState`: an action "
-     "leaves rmState unconstrained where TLC treats it as an `x' \\in S` / "
-     "implicit assignment (the R1.5 residue)"),
-]
+TLC_DIVERGENCES = []
 
 
 def sany_batch_modules() -> list:
@@ -302,37 +299,27 @@ TLC_BATCH = [
 # TLC safety batch modules whose Hoon check disagrees with TLC.
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing
 # order via +flop). Each entry is `<module> -> <Hoon verdict>`.
-_U = "Error: variable is unassigned in the current state"
+# R1.5.1 closed the 7 `x \in S` / `x' \in S` / parameterized-action-operator
+# assignment specs (AssignmentInit, AssignmentInitNeg, AssignmentNext, Continue,
+# DistributedTrace, SubseteqNextState, TraceWithLargeSetOfInitialStatesTest) —
+# they now agree with TLC and are compared green by the batch arm. The three
+# remaining are separate residues: SUBSET laziness (R1.5.2), a cfg CONSTANT
+# operator override (R1.5.3), and a LET-wrapped primed ENABLED LHS (R1.5.x).
 _P = "Error: primed variable is unassigned in the successor state"
 TLC_BATCH_DIVERGENCES = [
-    f"AssignmentInit -> {_U}: s",
-    f"AssignmentInitNeg -> {_U}: s",
-    "AssignmentNext -> Error: Deadlock reached.",
     "ConstantOperatorConfiguration -> Error: undefined identifier: F",
-    f"Continue -> {_P}: y",
-    f"DistributedTrace -> {_U}: x",
     f"Github725d -> {_P}: a",
     "SubsetEq -> Error: SUBSET argument too large to enumerate.",
-    f"SubseteqNextState -> {_U}: x",
-    f"TraceWithLargeSetOfInitialStatesTest -> {_U}: x",
 ]
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
-    "AssignmentInit": "`x \\in S` nondeterministic init assignment (R1.5)",
-    "AssignmentInitNeg": "`x \\in S` nondeterministic init assignment (R1.5)",
-    "AssignmentNext": "Hoon deadlocks where TLC completes — a next-state "
-                      "assignment-completeness gap (`x' \\in S`, R1.5)",
     "ConstantOperatorConfiguration": "a CONSTANT operator override from the cfg "
                                      "(`F <- ..`) is not applied — cfg-constants "
-                                     "operator-arg residue",
-    "Continue": "`x' \\in S` nondeterministic next assignment (R1.5)",
-    "DistributedTrace": "`x \\in S` nondeterministic init assignment (R1.5)",
-    "Github725d": "`x' \\in S` nondeterministic next assignment (R1.5)",
+                                     "operator-arg residue (R1.5.3)",
+    "Github725d": "a LET-wrapped primed variable as the `=` LHS inside ENABLED "
+                  "is not recognized as assignable (R1.5.x)",
     "SubsetEq": "Hoon eagerly enumerates SUBSET where TLC handles it lazily — "
-                "the lazy set-enumeration residue (6.3 / R1.5)",
-    "SubseteqNextState": "`x \\in S` nondeterministic init assignment (R1.5)",
-    "TraceWithLargeSetOfInitialStatesTest": "`x \\in S` nondeterministic init "
-                                            "assignment (R1.5)",
+                "the lazy set-enumeration residue (6.3 / R1.5.2)",
 }
 
 

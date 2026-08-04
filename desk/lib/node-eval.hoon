@@ -47,6 +47,13 @@
       ::  declared VARIABLE names — the assignable identities the action
       ::  solver (WU6.7) and ENABLED distinguish from constants/operators
       vars=(set @t)
+      ::  call-by-name substitution for operator parameters (WU6.7 / R1.5.1):
+      ::  a formal param bound to the argument NODE (not its value), so an
+      ::  assignable state variable passed to an action operator stays
+      ::  assignable in the body — tlc2's Context does the same, keeping the
+      ::  argument as an OpApplNode. Value/operator arguments still bind
+      ::  through `vals`/`ops`; only bare state-variable arguments land here.
+      psub=(map @t sem:sm)
       ::  the StandardModule override registry, built once per environment
       ::  (unit 6C.1); rebuilding the table inside an evaluation loop would
       ::  cost a map construction per operator application
@@ -130,7 +137,11 @@
       %new-constant  (lookup-val nm e)
       %user-op       (eval-user n e)
       %formal-param
-    ?:(=(~ args.n) (lookup-val nm e) (eval-user n e))
+    ?.  =(~ args.n)  (eval-user n e)
+    ::  a param bound call-by-name (a substituted argument node) is evaluated
+    ::  in place; otherwise it is a value parameter resolved from `vals`
+    =/  s  (~(get by psub.e) nm)
+    ?~(s (lookup-val nm e) (eval u.s e))
   ::
     %variable         (lookup-var nm e)
     %thm-assump       [%| 0 'a theorem/assumption is not an evaluable value.']
@@ -962,15 +973,30 @@
   ?:  =(%init mode)  e(s0 part, s1 ~, primed |)
   e(s0 cur, s1 part, primed |)
 ::
+++  deref-sem
+  ::  resolve a call-by-name parameter to the argument node it was bound to
+  ::  (R1.5.1); non-params and unbound params pass through. Substituted nodes
+  ::  are always plain variable references, so chasing cannot self-loop.
+  |=  [n=sem:sm psub=(map @t sem:sm)]
+  ^-  sem:sm
+  ?.  ?=(%apply -.n)  n
+  ?.  ?=(%formal-param kind.op.n)  n
+  ?.  ?=(~ args.n)  n
+  =/  s  (~(get by psub) name.op.n)
+  ?~(s n $(n u.s))
+::
 ++  assignable-sem
   ::  the variable name assigned by `lhs`, if it is an unbound assignable
-  |=  [lhs=sem:sm mode=?(%init %next) vars=(set @t) part=state]
+  |=  $:  lhs=sem:sm  mode=?(%init %next)  vars=(set @t)
+          part=state  psub=(map @t sem:sm)
+      ==
   ^-  (unit @t)
+  =.  lhs  (deref-sem lhs psub)
   ?.  ?=(%apply -.lhs)  ~
   =/  nm=(unit @t)
     ?:  =(%next mode)
       ?.  =('\'' name.op.lhs)  ~
-      =/  a  (snag 0 args.lhs)
+      =/  a  (deref-sem (snag 0 args.lhs) psub)
       ?.  ?=(%apply -.a)  ~
       ?.  ?=(%variable kind.op.a)  ~
       `name.op.a
@@ -1013,6 +1039,37 @@
     %item  $(acc [v.es acc], cur +.st)
   ==
 ::
+++  state-var-ref
+  ::  the node is a bare reference to a declared state variable
+  |=  [n=sem:sm e=eenv]
+  ^-  ?
+  =.  n  (deref-sem n psub.e)
+  ?.  ?=(%apply -.n)  |
+  ?.  ?=(~ args.n)  |
+  ?.  ?=(%variable kind.op.n)  |
+  (~(has in vars.e) name.op.n)
+::
+++  bind-psub
+  ::  bind an operator's parameters for solving: a bare state-variable argument
+  ::  is kept as a NODE (call-by-name, so it stays assignable in the body); an
+  ::  operator argument resolves through `ops`; any other value argument is
+  ::  evaluated once in the caller env and bound through `vals`
+  |=  [e=eenv ps=(list spar:sm) as=(list sem:sm)]
+  ^-  (each eenv eval-err:v)
+  ?~  ps  [%& e]
+  ?~  as  [%& e]
+  ?:  (gth arity.i.ps 0)
+    =/  od  (resolve-oparg i.as e)
+    ?~  od  [%| 0 'unsupported operator-valued argument.']
+    $(ps t.ps, as t.as, e e(ops (~(put by ops.e) name.i.ps u.od)))
+  ?:  (state-var-ref i.as e)
+    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
+  ?.  used.i.ps
+    $(ps t.ps, as t.as)
+  =/  av  (eval i.as e)
+  ?:  ?=(%| -.av)  av
+  $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
+::
 ++  solve
   |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
   ^-  sres
@@ -1026,22 +1083,48 @@
     (solve-disj args.n mode cur part e)
   ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e)
   ?:  =(nm '$BoundedExists')  (solve-exists n mode cur part e)
+  ?:  =(nm '$BoundedForall')  (solve-forall n mode cur part e)
   ?:  =(nm 'UNCHANGED')  (solve-unchanged (snag 0 args.n) mode cur part e)
   ?:  =(nm '=')
-    =/  as  (assignable-sem (snag 0 args.n) mode vars.e part)
+    =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
     ?~  as  (solve-filter n mode cur part e)
     =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
     ?:  ?=(%| -.rv)  rv
     [%& ~[(~(put by part) u.as p.rv)]]
-  ::  an arity-0 user-op reference in action position (e.g. `Next == Inc \/ Dec`
-  ::  where `Inc == x < 3 /\ x' = x + 1`) is expanded to its body and solved —
-  ::  otherwise a primed variable in the body would be filtered as a boolean,
-  ::  yielding no successors. Parameterized action operators are a deferral.
-  ?:  ?&(?=(%user-op kind.op.n) ?=(~ args.n))
+  ::  `x \in S` on an unbound assignable var is a NONDETERMINISTIC assignment:
+  ::  enumerate S in TLC order, one successor per element (init + next). Any
+  ::  other `\in` (a bound var, a membership filter) prunes as a boolean.
+  ?:  =(nm '\\in')
+    =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
+    ?~  as  (solve-filter n mode cur part e)
+    =/  sd  (eval-domain (snag 1 args.n) (senv mode cur part e))
+    ?:  ?=(%| -.sd)  sd
+    =/  els  (drain-sexp p.sd)
+    ?:  ?=(%| -.els)  els
+    [%& (turn p.els |=(x=value:v (~(put by part) u.as x)))]
+  ::  `x \subseteq S` on an unbound assignable var enumerates the powerset of S
+  ::  as candidate assignments (the set-valued sibling of `\in`)
+  ?:  =(nm '\\subseteq')
+    =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
+    ?~  as  (solve-filter n mode cur part e)
+    =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
+    ?:  ?=(%| -.rv)  rv
+    =/  els  (drain-sexp [%subset p.rv])
+    ?:  ?=(%| -.els)  els
+    [%& (turn p.els |=(x=value:v (~(put by part) u.as x)))]
+  ::  a user-op reference in action position is expanded to its body and solved
+  ::  (e.g. `Next == Inc \/ Dec`), so a primed variable in the body is not
+  ::  filtered as a boolean. Parameters are bound call-by-name (`+bind-psub`):
+  ::  an assignable variable passed as an argument (`Init(s)`, `Next(s)`) stays
+  ::  assignable, mirroring tlc2's Context substitution.
+  ?:  ?=(%user-op kind.op.n)
     =/  d  (~(get by ops.e) nm)
     ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e)
+    ?.  =((lent params.u.d) (lent args.n))  (solve-filter n mode cur part e)
     ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
-    (solve u.body.u.d mode cur part e(fuel (dec fuel.e)))
+    =/  e2  (bind-psub e(fuel (dec fuel.e)) params.u.d args.n)
+    ?:  ?=(%| -.e2)  e2
+    (solve u.body.u.d mode cur part p.e2)
   (solve-filter n mode cur part e)
 ::
 ++  solve-filter
@@ -1123,6 +1206,31 @@
   ?:  ?=(%| -.r)  r
   $(xs t.xs, out (weld out p.r))
 ::
+++  solve-forall
+  ::  \A x \in S : A — a bounded universal in action position is the
+  ::  conjunction of A over the domain (tlc2 expands a bounded \A the same way
+  ::  in getInitStates/getNextStates); thread the partial state through each
+  ::  element in enumeration order, so `x = e` on the first element assigns and
+  ::  a later element filters against it
+  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv]
+  ^-  sres
+  =/  bs  (flatten-bound bound.n)
+  ?.  ?=([* ~] bs)
+    [%| 0 'an action universal over multiple binders is unsupported.']
+  =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
+  ?:  ?=(%| -.sd)  sd
+  =/  els  (drain-sexp p.sd)
+  ?:  ?=(%| -.els)  els
+  =/  body  (snag 0 args.n)
+  =/  acc=(list state)  ~[part]
+  =/  xs  p.els
+  |-  ^-  sres
+  ?~  xs  [%& acc]
+  =/  e2  e(vals (~(put by vals.e) nm.i.bs i.xs))
+  =/  step  (solve-each body mode cur acc e2)
+  ?:  ?=(%| -.step)  step
+  $(xs t.xs, acc p.step)
+::
 ++  solve-unchanged
   ::  UNCHANGED e assigns each named variable to its current value
   |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
@@ -1138,13 +1246,15 @@
   [%& ~[out]]
 ::
 ++  eval-enabled
-  ::  ENABLED A: a successor state satisfying A exists from the current
-  ::  state; the witness is discarded (EvalControl.Enabled)
+  ::  ENABLED A: a successor satisfying A exists from the current state; the
+  ::  witness is discarded (EvalControl.Enabled). Primed variables the action
+  ::  does not constrain are existentially free (tlc2's Tool.enabled), so any
+  ::  satisfying PARTIAL assignment enables A — completeness is not required.
   |=  [n=sem:sm e=eenv]
   ^-  eres
   =/  r  (solve n %next s0.e ~ e(enabled &))
   ?:  ?=(%| -.r)  r
-  [%& [%bool (lien p.r |=(st=state (complete st vars.e)))]]
+  [%& [%bool ?=(^ p.r)]]
 ::
 ::  +|  Test / Driver Entrypoints
 ::
@@ -1194,7 +1304,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) make-senv:so]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ make-senv:so]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -1248,7 +1358,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars make-senv:so]
+  [consts defs ~ default-fuel ~ ~ | | vars ~ make-senv:so]
 ::
 ++  init-states
   ::  the complete initial-state stream for an Init BODY under a prebuilt env

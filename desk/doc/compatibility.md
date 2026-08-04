@@ -337,8 +337,9 @@ limitations below are now at parity, tested):
 - **Out-degree min/mean/95th-percentile** distribution (needs the bucket
   histogram); only the maximum is ported.
 - **`SPECIFICATION`-form config** (Init `/\` `[][Next]_v`), **implied-init /
-  implied-action** properties, **axiom-marked** assumptions, **unions of
-  `Permutations`**, and the node-eval **`x \in S` initial-assignment** form.
+  implied-action** properties, **axiom-marked** assumptions, and **unions of
+  `Permutations`**. (The node-eval **`x \in S` / `x' \in S` / `x \subseteq S`
+  nondeterministic-assignment** form landed in R1.5.1.)
 - **Evaluating an operator imported from another *user* module** (`EXTENDS
   helper` where the checked predicate calls `helper`'s def) — the evaluation
   defmap holds only own + INSTANCE-imported def bodies, not EXTENDS-inherited
@@ -543,9 +544,10 @@ seeded-trace oracle** on the supported fragment:
   rather than empty stats (`tests/lib/job` test-limited-time-simulation-partial-
   stats). Cancellation/limits are checked at slice granularity (the bounded
   per-event budget); there is no mid-loop check, by design.
-- Still absent in simulation: `x' \in S` nondeterministic assignment (a
-  node-eval residue — the exhaustive checker rejects it too, not an RNG gap),
-  and state/action `CONSTRAINT` handling.
+- `x \in S` / `x' \in S` / `x \subseteq S` nondeterministic assignment is
+  handled by the shared node-eval solver as of R1.5.1 (exhaustive and simulation
+  both fan out over the candidate set). Still absent in simulation: state/action
+  `CONSTRAINT` handling.
 - Also absent: symmetry, DFID, and the benchmark suite.
 
 ## Unit P2-1 — Resumable job kernel (supersedes the unit-13 stub engine)

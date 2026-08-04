@@ -470,22 +470,36 @@
   ::  CONSTRAINT (or a transition pruned by an ACTION_CONSTRAINT) is not
   ::  enqueued; a first-seen in-model state is enqueued and checked against the
   ::  invariants in declaration order. `prev` is the predecessor state (~ for an
-  ::  initial state), needed to evaluate action constraints.
-  ::  (Simplification vs TLC: TLC still checks invariants on constraint-pruned
-  ::  states; we skip them. No corpus case combines a constraint with an
-  ::  invariant on the pruned boundary — documented in the parity ledger.)
+  ::  initial state), needed to evaluate action constraints. A CONSTRAINT-pruned
+  ::  state is not enqueued or counted, but TLC still checks its invariants, so a
+  ::  violation on the pruned boundary is reported (R1.5.1).
   |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t prev=(unit state)]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   =/  e  (env-of o)
   =/  ch  (con-hold cons.o st e)
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
-  ?.  p.ch  [~ cur]
+  ?.  p.ch  (check-pruned o cur st pred e)
   ?^  prev
     =/  ah  (acon-hold acons.o u.prev st e)
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     ?.  p.ah  [~ cur]
     (register-in o cur st d pred e)
   (register-in o cur st d pred e)
+::
+++  check-pruned
+  ::  a CONSTRAINT-pruned state: check its invariants (declaration order) but do
+  ::  not dedup, count, or enqueue it. A violation ends the run; the trace is the
+  ::  predecessor's behavior extended by this state (it is absent from `seen`).
+  |=  [o=bfs-opts cur=bfs-cursor st=state pred=@t e=eenv:ne]
+  ^-  [out=(unit outcome) cur=bfs-cursor]
+  =/  iv  (first-violated invs.o st e)
+  ?~  iv  [~ cur]
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+  :_  cur
+  :-  ~
+  :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+      (weld (trace-to seen.cur pred) ~[st])  p.u.iv  =('' pred)
+  ==
 ::
 ++  register-in
   ::  the in-model path: dedup, depth bound, enqueue, ordered invariant check
