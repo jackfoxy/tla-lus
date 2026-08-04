@@ -1292,7 +1292,10 @@
       %inv       [%violated [%invariant name.out] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
-  =/  report  (wain-text (render-outcome:check out nl))
+  ::  the job console keeps the single whole-Next label (per-action labels via
+  ::  getActions are the run-check console path, R1.5.4; job-kernel per-action
+  ::  trace labels are a follow-on)
+  =/  report  (wain-text (render-outcome:check out nl ~ *eenv:ne ~ ''))
   =/  tr=(unit trace)
     ?+  -.out  ~
       %inv       `[%safety (trace-states trace.out act) ~]
@@ -1410,7 +1413,7 @@
     ;:  weld
       ~[headline]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check vpath nl.kk)
+      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '')
       ~[head]
     ==
   =/  typed=trace  [%simulate (trace-states vpath act.kk) ~]

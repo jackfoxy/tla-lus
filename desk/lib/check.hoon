@@ -652,16 +652,26 @@
   (crip "{(trip k)} = {(trip v)}")
 ::
 ++  render-trace
-  ::  `State N: <label>` blocks; state 1 is the initial predicate, later
-  ::  states are labeled with the Next action's source span
-  |=  [trace=(list state) next-label=@t]
+  ::  `State N: <label>` blocks; state 1 is the initial predicate, each later
+  ::  state is labeled with the specific getActions leaf action that generated
+  ::  it from its predecessor (Tool.getActions decomposition, R1.5.4). With no
+  ::  action context (`actions` ~) it falls back to the whole-Next label — the
+  ::  single-action case renders identically either way.
+  |=  $:  trace=(list state)  next-label=@t
+          actions=(list [name=@t body=sem:sem-lib])
+          e=eenv:ne  order=(list @t)  modn=@t
+      ==
   ^-  wain
   =/  i  1
+  =/  prev=(unit state)  ~
   %-  zing
   |-  ^-  (list wain)
   ?~  trace  ~
-  =/  label  ?:(=(1 i) '<Initial predicate>' next-label)
-  :_  $(trace t.trace, i +(i))
+  =/  label=@t
+    ?~  prev  '<Initial predicate>'
+    ?~  actions  next-label
+    (edge-action-label u.prev (@t (state-fp:fp order i.trace)) actions e order modn)
+  :_  $(trace t.trace, i +(i), prev `i.trace)
   ;:  weld
     ~[(crip "State {(a-tape i)}: {(trip label)}")]
     (render-state i.trace)
@@ -1734,7 +1744,10 @@
     ?^  binner
       =/  o=bfs-opts
         [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
-      (render-outcome (explore is.c o) nl.c)
+      =/  actions  (get-actions nsb.c 'Next' defs.c)
+      =/  env      (make-env:ne defs.c consts.c vars.c)
+      =/  modn     (module-name-of tree.c)
+      (render-outcome (explore is.c o) nl.c actions env order.c modn)
     =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
     ?:  ?=(%| -.osr)  ~[(cat 3 'Error: ' msg.p.osr)]
     =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
@@ -1749,11 +1762,19 @@
     report.r
   ::  safety: an INVARIANT
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
-  (render-outcome (explore is.c o) nl.c)
+  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  env      (make-env:ne defs.c consts.c vars.c)
+  =/  modn     (module-name-of tree.c)
+  (render-outcome (explore is.c o) nl.c actions env order.c modn)
 ::
 ++  render-outcome
-  ::  TLC's terminal lines for a safety outcome
-  |=  [res=outcome nl=@t]
+  ::  TLC's terminal lines for a safety outcome. `actions`/`e`/`order`/`modn`
+  ::  give the getActions per-action trace labels (R1.5.4); pass ~ actions to
+  ::  fall back to the single whole-Next label.
+  |=  $:  res=outcome  nl=@t
+          actions=(list [name=@t body=sem:sem-lib])
+          e=eenv:ne  order=(list @t)  modn=@t
+      ==
   ^-  wain
   ?-    -.res
       %ok
@@ -1779,7 +1800,7 @@
     ;:  weld
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl)
+      (render-trace trace.res nl actions e order modn)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
@@ -1787,7 +1808,7 @@
     ;:  weld
       ~['Error: Deadlock reached.']
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl)
+      (render-trace trace.res nl actions e order modn)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::

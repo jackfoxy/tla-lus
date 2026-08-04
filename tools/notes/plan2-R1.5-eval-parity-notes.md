@@ -197,6 +197,45 @@ descriptor inside `%subset`), so `SUBSET Int`/`SUBSET Nat` reduce to `Int`/`Nat`
 before any forcing. A non-reduced `SUBSET A \subseteq T` still streams the power
 set and overflows past `max-card`, matching TLC's `super.isSubsetEq`.
 
+## R1.5.4 — DONE 2026-08-04 (per-action trace labels + coverage decomposition)
+
+`Tool.getActions` decomposition, re-opening the R1.1 trace/coverage deferral.
+
+**Oracle findings (SafetyDump + -coverage):**
+- Trace LABEL (`TLCStateInfo.info`) per transition = the SPECIFIC action, not the
+  whole Next: a `\/` splits into per-disjunct leaf actions labeled with the
+  disjunct's body span (`<Next line 5, col 12 to line 5, col 31 of module A>`); a
+  user-op reference renames to the innermost op with ITS body span
+  (`<Inc line 5, col 8 to line 5, col 26 of module A>`).
+- Coverage counts (`c[2]`) = `getEvalCount()` (ActionWrapper.java:155) — an
+  **engine-internal cost-model evaluation count**, NOT a state count. My
+  disjunctive probe: Init 3, disj1 6, disj2 1 (a 4-state search); the `coverage`
+  corpus case's 1/3/3 only *coincidentally* equals successor counts. A
+  structurally-different evaluator can't reproduce these → **approved difference**
+  (the C1.7 UniqueString-order precedent). The coverage location itself uses the
+  action's DEF-NAME span (`<Inc line 5, col 1 to line 5, col 3>`), distinct from
+  the trace label's body span.
+
+**Trace-label fix (the reproducible parity win):** `check.hoon` `+render-trace`
+now labels each non-initial trace state via `+edge-action-label` (finds the
+first `get-actions` leaf whose `next-states` from the predecessor reaches the
+state, and formats `name` + body span). `+render-outcome` and `run-check` thread
+`actions`/`env`/`order`/`modn`; an empty `actions` falls back to the whole-Next
+label (single-action specs render identically, so the byte-exact mc traces
+invfail/deadlock are unchanged — SEM span == the old CST `nl` span). The
+`get-actions` decomposition (already present for simulation) handles `\/` +
+user-op inlining; `\E`-action splitting (per-element binding) is a documented
+residual, and the job-kernel wire trace keeps the single label (a follow-on).
+
+**Coverage:** the action DECOMPOSITION/set is reproducible (`get-actions`,
+verified by the trace labels); the COUNTS are the measured approved-difference,
+and the coverage-line `printLocation()` name-span rendering is a residual.
+
+**Verified:** `tests/lib/trace` test-{disj,named}-action-labels match the oracle
+LABEL projection; mc/trace/safety-gen/inv-constraints/job green (no regression).
+Ledger: `tlc-safety-trace` residue narrowed (per-action `\/`/named labels done);
+`tlc-coverage` absent→partial (decomposition reproducible, counts approved-diff).
+
 **Verified:** SubsetEq ok/1; `tests/lib/eval` (023 `\subseteq`, 027 `SUBSET`) +
 the value/stdops/finitesets/bags set-operation suites green (no regression).
 Census: `SubsetEq` dropped from `TLC_BATCH_DIVERGENCES` (now 2 left:

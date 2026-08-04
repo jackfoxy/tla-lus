@@ -327,11 +327,20 @@ limitations below are now at parity, tested):
 
 **Residue** (tracked as `partial`/`absent` rows, dependencies noted):
 
-- **Per-leaf-action trace labels and `TLC_COVERAGE_INIT/NEXT` counters** — both
-  need `Tool.getActions`' decomposition of `Next` through top-level `\/` and
-  `\E` (per-disjunct spans). The port uses one uniform `<Next …>` label, correct
-  for a single-leaf `Next` (every mc case); a branching multi-variable trace is
-  tested by its statistics, not a byte trace.
+- **Per-leaf-action trace labels** — as of R1.5.4 each non-initial trace state
+  is labeled with the specific `Tool.getActions` leaf that generated it: a `\/`
+  splits into per-disjunct leaf actions (`<Next line …>` at the disjunct span)
+  and a user-op reference renames to the innermost op (`<Inc line …>`), matching
+  SafetyDump's LABEL. `\E`-action splitting (per-element binding) still uses the
+  whole-`\E` span, and the job-kernel wire trace keeps the single label — both
+  residual.
+- **`TLC_COVERAGE_INIT/NEXT` counts are an approved difference.** The action
+  *decomposition* keying them (`get-actions`) is reproducible, but the counts
+  are TLC's `getEvalCount()` — an engine-internal cost-model evaluation count
+  (measured: a 4-state disjunctive search reports Init 3 / disj1 6 / disj2 1),
+  which a structurally-different evaluator cannot reproduce byte-for-byte, like
+  the UniqueString order (family 5). The `coverage` corpus case's 1/3/3 equals
+  successor counts only coincidentally.
 - **Multi-variable `/\` state rendering** in declaration order pairs with the
   above (needed together for a branching multi-var trace).
 - **Out-degree min/mean/95th-percentile** distribution (needs the bucket

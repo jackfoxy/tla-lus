@@ -3,7 +3,8 @@
 ::  the violating state; deterministic BFS reaches it at the minimal depth. The
 ::  byte-exact deadlock and initial-violation traces live in the mc corpus;
 ::  here we assert the shortest-path depth/distinct via run-check (independent
-::  of enumeration order and the deferred per-action trace labels).
+::  of enumeration order). Per-action trace labels (getActions) are exercised by
+::  the disjunction cases below (R1.5.4).
 /+  *test
 /=  check  /lib/check
 |%
@@ -39,4 +40,59 @@
   %+  expect-eq
     !>  `@ud`1
   !>  ?:(?=([%violated *] r) queued.stats.r 0)
+::
+::  +|  Per-action trace labels (Tool.getActions decomposition, R1.5.4)
+::
+::  each non-initial trace state is labeled with the SPECIFIC action that
+::  generated it, not the whole-Next span: `\/` splits into per-disjunct leaf
+::  actions and a user-op reference renames to the innermost named action,
+::  exactly as tlc2.Tool.getActions + TLCStateInfo.info. Verified against
+::  SafetyDump's LABEL projection.
+++  state-labels
+  ::  the `State N: <label>` lines of a rendered check run
+  |=  w=wain
+  ^-  (list @t)
+  %+  murn  w
+  |=(l=@t ?:(=("State " (scag 6 (trip l))) `l ~))
+::  an inline disjunction: state 2/3 carry the FIRST disjunct's span, not the
+::  two-line whole-Next span (line 5 col 12 .. line 6 col 31)
+++  disj
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"  "EXTENDS Naturals\0a"  "VARIABLES x, y\0a"
+    "Init == x = 0 /\\ y = 0\0a"
+    "Next == \\/ x' = x + 1 /\\ y' = y\0a"
+    "        \\/ y' = y + 1 /\\ x' = x\0a"
+    "Inv == x < 2\0a"  "====\0a"
+  ==
+++  test-disj-action-labels
+  %+  expect-eq
+    !>  ^-  (list @t)
+    :~  'State 1: <Initial predicate>'
+        'State 2: <Next line 5, col 12 to line 5, col 31 of module A>'
+        'State 3: <Next line 5, col 12 to line 5, col 31 of module A>'
+    ==
+  !>  (state-labels (check:check disj cfg))
+::  named sub-actions: the disjunction of two user ops; the label renames to the
+::  innermost op (`Inc`) and uses its BODY span (col 8 .. 26)
+++  named
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"  "EXTENDS Naturals\0a"  "VARIABLE x\0a"
+    "Init == x = 0\0a"
+    "Inc == x < 3 /\\ x' = x + 1\0a"
+    "Dec == x > 0 /\\ x' = x - 1\0a"
+    "Next == Inc \\/ Dec\0a"
+    "Inv == x < 2\0a"  "====\0a"
+  ==
+++  test-named-action-labels
+  %+  expect-eq
+    !>  ^-  (list @t)
+    :~  'State 1: <Initial predicate>'
+        'State 2: <Inc line 5, col 8 to line 5, col 26 of module A>'
+        'State 3: <Inc line 5, col 8 to line 5, col 26 of module A>'
+    ==
+  !>  (state-labels (check:check named cfg))
 --
