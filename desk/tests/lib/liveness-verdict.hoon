@@ -82,4 +82,19 @@
   %+  expect-eq
     !>(`wain`~['VERDICT ok' 'EC 0'])
   !>((live-verdict-lines:check src-leadsto-pass cfg-leadsto-pass))
+::
+::  +|  Bounded temporal graph build (R1.5.5)
+::
+::  the liveness path builds the whole reachability graph before searching for a
+::  lasso, so a large/looping state space would hang; the distinct-state `cap`
+::  (run-check's third argument) bounds it — a capped build yields %limited
+::  instead of a verdict on a partial graph, an unbounded (0) build completes.
+++  src-live-cap  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 10\0aProp == []<>(x = 0)\0a====\0a'
+++  cfg-live-cap  'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
+++  test-live-graph-capped
+  =/  r  ^-(result:check -:(run-check:check src-live-cap cfg-live-cap 3))
+  (expect-eq !>(^-(? &)) !>(?=(%limited -.r)))
+++  test-live-graph-uncapped
+  =/  r  ^-(result:check -:(run-check:check src-live-cap cfg-live-cap 0))
+  (expect-eq !>(^-(? |)) !>(?=(%limited -.r)))
 --

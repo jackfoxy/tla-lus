@@ -290,11 +290,15 @@ TLC_BATCH = [
     "SubsetEq", "SubseteqNextState", "TraceWithLargeSetOfInitialStatesTest",
 ]
 
-# NB (R1.1.8): a TLC LIVENESS batch was attempted but DEFERRED — the raw
-# `check:check` entry has no state cap, so a liveness spec with an unbounded /
-# looping Hoon state graph hangs the arm (mule catches a bail, not an infinite
-# loop). A liveness batch needs a bounded checker entry (the job engine's
-# budget-sliced path); revisit once that is exposed to the comparator.
+# NB (R1.1.8 -> R1.5.5): a TLC LIVENESS batch was DEFERRED because the raw
+# `check:check` entry had no state cap, so a liveness spec with a large / looping
+# Hoon state graph hung the arm (mule catches a bail, not an infinite loop).
+# R1.5.5 threaded a distinct-state cap through the temporal `build-graph` path of
+# `run-check`/`check` (`build-graph-cap` + `live-graph-cap`): a capped build now
+# yields %limited instead of hanging, so a liveness batch can run bounded (a spec
+# past the bound is a documented %limited divergence, TLC being unbounded). Wiring
+# the batch comparator (the 10 oracle verdicts from R1.1.8) is an R1.5.7 close-out
+# step.
 
 # TLC safety batch modules whose Hoon check disagrees with TLC.
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing

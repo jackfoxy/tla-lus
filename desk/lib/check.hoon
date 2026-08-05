@@ -728,6 +728,29 @@
     [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
   $(cur cur.r)
 ::
+++  live-graph-cap
+  ::  the distinct-state safety bound for a temporal graph build (R1.5.5). The
+  ::  liveness path builds the WHOLE reachability graph before searching for a
+  ::  lasso, so an unbounded build hangs on a large/looping state space; a build
+  ::  reaching this many distinct states stops and yields %limited (TLC's own
+  ::  liveness is unbounded, so a spec past the bound is a documented divergence,
+  ::  not a hang). Small temporal specs are far below it and are unaffected.
+  ^~  100.000
+::
+++  build-graph-cap
+  ::  +build-graph that also reports whether the distinct-state `cap` (o.cap,
+  ::  0 = unbounded) was reached (R1.5.5). A capped liveness build yields
+  ::  %limited rather than a verdict on a partial graph, and never hangs.
+  |=  [is=(list state) o=bfs-opts]
+  ^-  [g=graph capped=?]
+  =/  cur  (bfs-init is)
+  |-  ^-  [g=graph capped=?]
+  =/  r  (bfs-step o cur 1.024)
+  ?:  ?=(%done -.r)
+    :-  [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+    ?=(%limited -.out.r)
+  $(cur cur.r)
+::
 ::  +|  Seeded Simulation (bounded, reproducible, resumable)
 ::
 ::
@@ -1750,14 +1773,20 @@
       (render-outcome (explore is.c o) nl.c actions env order.c modn)
     =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
     ?:  ?=(%| -.osr)  ~[(cat 3 'Error: ' msg.p.osr)]
-    =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
-    =/  g     (build-graph is.c o)
+    ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
+    ::  on a large/looping state space; a capped build renders %limited
+    =/  o=bfs-opts
+      [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | live-graph-cap 0]
+    =/  bg    (build-graph-cap is.c o)
     =/  modn  (module-name-of tree.c)
+    ?:  capped.bg
+      :-  'Model checking stopped: state limit reached.'
+      (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
     =/  r
       %-  live-report
-      :*  p.osr  (states-of seen.g)  inits.g  nsb.c
+      :*  p.osr  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
-          gen.g  distinct.g  depth.g
+          gen.g.bg  distinct.g.bg  depth.g.bg
       ==
     report.r
   ::  safety: an INVARIANT
@@ -1838,12 +1867,15 @@
     ?~  binner
       =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
-      =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
-      =/  g   (build-graph is.c o)
-      =/  st  [gen.g distinct.g 0 depth.g]
+      ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
+      ::  yields %limited rather than a lasso verdict on a partial graph
+      =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | cap 0]
+      =/  bg  (build-graph-cap is.c o)
+      =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg]
+      ?:  capped.bg  [[%limited %states st] st]
       =/  l
         %-  find-lasso:lv
-        :*  p.osr  (states-of seen.g)  inits.g  nsb.c
+        :*  p.osr  (states-of seen.g.bg)  inits.g.bg  nsb.c
             (make-env:ne defs.c consts.c vars.c)  order.c
         ==
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])

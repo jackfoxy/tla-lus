@@ -236,6 +236,33 @@ LABEL projection; mc/trace/safety-gen/inv-constraints/job green (no regression).
 Ledger: `tlc-safety-trace` residue narrowed (per-action `\/`/named labels done);
 `tlc-coverage` absent→partial (decomposition reproducible, counts approved-diff).
 
+## R1.5.5 — DONE 2026-08-04 (bounded liveness graph-build)
+
+Re-opens the R1.1 TLC liveness batch deferral. The direct `run-check`/`check`
+liveness path builds the WHOLE reachability graph (`+build-graph`) before the
+lasso search, hardcoded to cap 0 — so a large/looping temporal state space hung
+the arm (R1.1.8: "mule catches a bail"). The safety `+explore` already honored
+`bfs-opts.cap` (`bfs-step` returns `%limited` when distinct > cap); the liveness
+`+build-graph` looped until `%done` and ignored the outcome kind.
+
+Fix: NEW `+build-graph-cap` runs the same BFS but returns `[g=graph capped=?]`
+(`capped` = the `%done` outcome was `%limited`). `run-check`'s liveness path
+threads its existing `cap` arg → `[%limited %states st]` when capped; the console
+`check` uses a module constant `+live-graph-cap` (100.000, far above any tested
+spec) and renders `Model checking stopped: state limit reached.` when capped, so
+`check:check [spec cfg]` (36 callers, signature unchanged) never hangs. Small
+temporal specs are unaffected; the job-kernel path was already bounded
+(`tlc-live-checkpoint` product cursor). A spec past the bound is a documented
+`%limited` divergence (TLC's liveness is unbounded), not a hang.
+
+The 4 differential comparators (`live-{verdict,lasso,message}-lines`) keep the
+unbounded `+build-graph` (cap 0, exact verdict on small corpus specs). New tests
+`tests/lib/liveness-verdict` test-live-graph-{capped,uncapped} (cap 3 → %limited,
+cap 0 → real verdict). Generator liveness-batch deferral note updated; wiring the
+batch comparator (the 10 R1.1.8 oracle verdicts) is an R1.5.7 close-out. HOON:
+`crip` wants a `tape`, a single-quoted `'…'` literal is already a `@t` (drop
+`crip`); `expect-eq` compares TYPES, so widen a loobean with `^-(? &)`.
+
 **Verified:** SubsetEq ok/1; `tests/lib/eval` (023 `\subseteq`, 027 `SUBSET`) +
 the value/stdops/finitesets/bags set-operation suites green (no regression).
 Census: `SubsetEq` dropped from `TLC_BATCH_DIVERGENCES` (now 2 left:

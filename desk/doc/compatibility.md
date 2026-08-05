@@ -345,6 +345,12 @@ limitations below are now at parity, tested):
   above (needed together for a branching multi-var trace).
 - **Out-degree min/mean/95th-percentile** distribution (needs the bucket
   histogram); only the maximum is ported.
+- **Bounded liveness graph-build (R1.5.5).** The direct `run-check`/`check`
+  temporal path builds the whole reachability graph before the lasso search, so
+  it is bounded by a distinct-state cap (run-check's `cap`; the console `check`
+  uses a 100k safety bound) and yields `%limited` on a large/looping state space
+  rather than hanging. TLC's own liveness is unbounded, so a spec past the bound
+  is a `%limited` divergence, not a hang; small temporal specs are unaffected.
 - **`SPECIFICATION`-form config** (Init `/\` `[][Next]_v`), **implied-init /
   implied-action** properties, **axiom-marked** assumptions, and **unions of
   `Permutations`**. (The node-eval **`x \in S` / `x' \in S` / `x \subseteq S`
