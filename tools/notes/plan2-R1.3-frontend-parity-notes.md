@@ -131,3 +131,86 @@ Recommended order per the plan: **R1.3.1 (LAMBDA, ~12 specs, highest leverage)
 → R1.3.2 → R1.3.3 → R1.3.4 → R1.3.5 (ledger residue) → R1.3.6 (close-out)**.
 Ship-run gotchas (dojo send-keys `-l --`, `|commit` before `=x -build-file`,
 scrollback-vs-stale) are in `[[tla-lus-dev-environment]]`.
+
+---
+
+# R1.3.1 — LAMBDA in the WU3 semantic graph
+
+Sub-plan: `~/FoxyLabs/tla-lus/R1.3.1-plan.md`. Closes the 12-spec LAMBDA bucket.
+
+## R1.3.1.0 — kickoff (DOCS/ORACLE ONLY, 2026-08-05)
+
+No ship/generator/census change. Captures how SANY renders a LAMBDA op-arg,
+confirms the representation approach, maps the multi-param shape, and lists the
+byte-stability guard. `SemDump` at the pin (`java -cp <jar>:tools/oracle/build
+SemDump <spec>.tla`, from the spec dir) is the golden source.
+
+### 1. Oracle capture — how SANY projects a LAMBDA op-arg
+
+A LAMBDA is an `OpArgNode` referencing a synthesized `OpDefNode` **named
+`LAMBDA`**. `SemDump` projects it (SemDump.java:348) as a single summary line —
+**the body is NOT rendered as a child**, and the LAMBDA gets **no `lvl <name>`
+row** in the LEVELS section (it is anonymous):
+
+```
+oparg LAMBDA op=LAMBDA arity=<nparams> L<bodylevel> <span>
+```
+
+Frozen goldens (byte-reproducible from the pin):
+
+| spec | line | arity | level | note |
+|---|---|---|---|---|
+| `CigaretteSmokers` | `oparg LAMBDA op=LAMBDA arity=1 L1 44.38-44.66` | 1 | **L1** | body reads `smokers` (a var) → state level |
+| `BagsTest` | `oparg LAMBDA op=LAMBDA arity=1 L0 186.17-186.34` (×5) | 1 | L0 | body uses only its param → constant |
+| `coverage/F` | `oparg LAMBDA op=LAMBDA arity=1 L0 8.31-8.45` | 1 | L0 | `LAMBDA s : s > 1` |
+| `coverage/F` | `oparg LAMBDA op=LAMBDA arity=2 L0 8.48-8.78` | **2** | L0 | `LAMBDA odd, b : …` — multi-param, second LAMBDA in the same application |
+
+`CigaretteSmokers` LEVELS confirms no LAMBDA row; its body's arg-level-params
+fold into the **enclosing** def: `lvl stopSmoking L2 lp={…,smokers} …` and the
+oparg carries `L1`.
+
+### 2. Representation — approach (a) CONFIRMED, with a refinement
+
+The Hoon dump renderer at **`semantic.hoon:4833`** already emits the exact
+`oparg LAMBDA op=LAMBDA arity=N …` line for **any** `$OpArg`-shaped `%apply`
+(`name.op == '$OpArg'`, `ubound` head = the name, `args` head = a `%lit %num`
+arity). So generation only has to produce that shape with **name `LAMBDA`** —
+**no new renderer, no new `sem` variant, no new LEVELS row, no mold change.**
+
+Refinement over the plan's "synthetic `LAMBDA` op-def in the context": a LAMBDA
+is **anonymous and non-unique** (`coverage/F` has two, `BagsTest` five, all named
+`LAMBDA`). Registering a named `LAMBDA` symbol in the shared context would
+**collide** across sibling LAMBDAs and could spuriously create a LEVELS row.
+Instead **carry the LAMBDA's level data inline on the `$OpArg` node**:
+
+- `sem-apply` (`semantic.hoon:977`) is reused unchanged. `args` head stays the
+  arity `%lit %num` (what the renderer reads); **the generated LAMBDA body sem
+  rides as the `args` tail element.** The `$OpArg` render arm reads only the head
+  and returns `:_ ~` (never recurses into `args`), so the body stays invisible in
+  the tree — exactly matching SANY's no-body projection.
+
+### 3. Targets for the code increments
+
+- **R1.3.1.1 (generation).** In `g-arg-list` (`semantic.hoon:1157`), before
+  `oparg-of`/`g-x`, detect an `n-lambda` arg node; extract its bound idents
+  (params) and body (from the `n-lambda` kids the parser flops in at
+  `syntax.hoon:2039`); emit `%apply` with `op=['$OpArg' <kind>]`,
+  `ubound=[['LAMBDA' | <lambda-span>]]`, `args=[<arity-lit> <body-sem>]`,
+  `at=<lambda-span>`, `lvl=<body level>`. Body generated with the params in
+  scope as `%formal-param` symbols. arity = param count (multi-param ⇒ 2+).
+- **R1.3.1.2 (level).** Teach `oparg-def`/`oparg-param` (`:2609`/`:2960`) and
+  node-eval's `resolve-oparg` (`node-eval.hoon:734…`) the `name=='LAMBDA'`
+  convention: not context-resolvable — take the body level + arg-level-params
+  from the inline `args`-tail body so they fold into the enclosing def's
+  `lc`/`lp`/`nlp` (as `stopSmoking` shows). Leibniz/4272-4273 + arity vs the HO
+  slot.
+- **Watch:** verify `resolve-oparg` and any other `$OpArg` `args` consumer
+  tolerate the 2-element `args` (arity + body); the semantic level readers use
+  the head only, but node-eval must be checked in R1.3.1.1.
+
+### 4. Byte-stability guard
+
+`tests/lib/sem` has **73 goldens, none containing LAMBDA** (grep clean), so the
+LAMBDA arm must leave every existing sem/level golden byte-identical — the
+regression assertion for each increment. New LAMBDA sem goldens are added from
+`SemDump` on the closed specs as they land.
