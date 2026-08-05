@@ -352,9 +352,11 @@ limitations below are now at parity, tested):
   rather than hanging. TLC's own liveness is unbounded, so a spec past the bound
   is a `%limited` divergence, not a hang; small temporal specs are unaffected.
 - **`SPECIFICATION`-form config** (Init `/\` `[][Next]_v`), **implied-init /
-  implied-action** properties, **axiom-marked** assumptions, and **unions of
-  `Permutations`**. (The node-eval **`x \in S` / `x' \in S` / `x \subseteq S`
-  nondeterministic-assignment** form landed in R1.5.1.)
+  implied-action** properties, and **axiom-marked** assumptions. (The node-eval
+  **`x \in S` / `x' \in S` / `x \subseteq S` nondeterministic-assignment** form
+  landed in R1.5.1; **unions of `Permutations`** for symmetry landed in R1.5.6 —
+  `+canonicalize` iterates the union set to a fixpoint, the orbit under the group
+  it generates, matching TLC's cross-product perms.)
 - **Evaluating an operator imported from another *user* module** (`EXTENDS
   helper` where the checked predicate calls `helper`'s def) — the evaluation
   defmap holds only own + INSTANCE-imported def bodies, not EXTENDS-inherited
