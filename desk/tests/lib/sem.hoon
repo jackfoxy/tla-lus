@@ -835,6 +835,43 @@
       '---- MODULE A ----\0aCONSTANT P, a, b\0aPick == IF P THEN a ELSE b\0a====\0a'
   ==
 ::
+++  test-sem-lambda
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Apply arity=1 local=n L0 2.1-2.19'
+        '    param P arity=1 L0 2.7-2.10'
+        '    apply P opkind=FormalParamKind L0 2.16-2.19'
+        '      num 0 L0 2.18-2.18'
+        '  def Apply2 arity=1 local=n L0 3.1-3.26'
+        '    param Q arity=2 L0 3.8-3.14'
+        '    apply Q opkind=FormalParamKind L0 3.20-3.26'
+        '      num 0 L0 3.22-3.22'
+        '      num 1 L0 3.25-3.25'
+        '  def Foo arity=0 local=n L0 4.1-4.30'
+        '    apply Apply opkind=UserDefinedOpKind L0 4.8-4.30'
+        '      oparg LAMBDA op=LAMBDA arity=1 L0 4.14-4.29'
+        '  def Bar arity=0 local=n L0 5.1-5.34'
+        '    apply Apply2 opkind=UserDefinedOpKind L0 5.8-5.34'
+        '      oparg LAMBDA op=LAMBDA arity=2 L0 5.15-5.33'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Apply L0 ml=[3] w=[1] mml=[0] olc=[F]'
+        'lvl Apply2 L0 ml=[3] w=[1] mml=[0,0] olc=[FF]'
+        'lvl Foo L0'
+        'lvl Bar L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aApply(P(_)) == P(0)\0aApply2(Q(_, _)) == Q(0, 1)\0aFoo == Apply(LAMBDA y : y = 1)\0aBar == Apply2(LAMBDA a, b : a = b)\0a====\0a'
+  ==
+::
 ++  test-sem-letin
   %+  expect-eq
     !>  ^-  wain

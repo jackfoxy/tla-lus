@@ -1165,6 +1165,9 @@
   =|  ds=(list sdiag)
   |-  ^-  [rs=(list sem) ds=(list sdiag)]
   ?~  ns  [(flop rs) ds]
+  =/  la  (lambda-of i.ns c)
+  ?^  la
+    $(ns t.ns, rs [u.la rs])
   =/  oa  (oparg-of i.ns c)
   ?^  oa
     $(ns t.ns, rs [u.oa rs])
@@ -1173,6 +1176,39 @@
     ns  t.ns
     rs  ?~(r.g rs [u.r.g rs])
     ds  (weld ds ds.g)
+  ==
+::
+++  lam-arity
+  ::  the bound-ident count of a LAMBDA node (0 for a non-LAMBDA)
+  |=  n=node
+  ^-  @ud
+  ?.  (is-kind n %n-lambda)  0
+  %-  lent
+  (skim (kids-of n) |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
+::
+++  lambda-of
+  ::  a LAMBDA in an operator-application argument position: SANY builds
+  ::  an OpArgNode referencing a synthesized OpDefNode named LAMBDA. We
+  ::  encode it as the reserved $OpArg %apply named LAMBDA — arity = the
+  ::  bound-ident count, level = the body level under those params. The
+  ::  LAMBDA is anonymous (no LEVELS row) and non-unique (sibling LAMBDAs
+  ::  share the name), so it is NOT registered in the context; the $OpArg
+  ::  render arm (only reads the arity head) prints just the summary line,
+  ::  matching SANY's body-less projection. (R1.3.1.1)
+  |=  [n=node c=ctx]
+  ^-  (unit sem)
+  ?.  (is-kind n %n-lambda)  ~
+  =/  kids  (kids-of n)
+  =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
+  =/  body  (rear-node kids)
+  =/  params=(list [@t node @ud])
+    (turn ids |=(k=node [(leaf-text k) k 0]))
+  =/  c2  (add-params c params)
+  =/  sp  (span-of:ast n)
+  :-  ~
+  :*  %apply  ['$OpArg' %user-op]  (expr-level body c2)  sp
+      [['LAMBDA' | sp] ~]  ~
+      [[%lit %num (crip (a-co (lent params))) sp] ~]
   ==
 ::
 ++  oparg-of
@@ -1484,6 +1520,10 @@
         out  ?~(r.g out [u.r.g out])
         ds   (weld ds ds.g)
       ==
+    ::  a LAMBDA of the expected arity supplies the operator argument
+    ::  directly (SANY's synthesized OpArgNode -> OpDefNode named LAMBDA)
+    =/  la  ?:(=(expect (lam-arity i.nl)) (lambda-of i.nl c) ~)
+    ?^  la  $(nl t.nl, i +(i), out [u.la out])
     =/  ra  (ref-arity i.nl c)
     =/  oa  ?:(?&(?=(^ ra) =(expect u.ra)) (oparg-of i.nl c) ~)
     ?^  oa  $(nl t.nl, i +(i), out [u.oa out])

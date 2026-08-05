@@ -214,3 +214,53 @@ Instead **carry the LAMBDA's level data inline on the `$OpArg` node**:
 LAMBDA arm must leave every existing sem/level golden byte-identical — the
 regression assertion for each increment. New LAMBDA sem goldens are added from
 `SemDump` on the closed specs as they land.
+
+## R1.3.1.1 — generation (SHIP-VERIFIED, 2026-08-05)
+
+The higher-order operator-argument path is **`g-opappl`** (`semantic.hoon:1464`),
+NOT `g-arg-list` — per argument position `i` it reads `expect = (at-or parg.u.s
+i 0)` (the operator's own per-param arity from the `parg` field) and, when
+`expect /= 0`, only builds an `$OpArg` if the arg is a bare operator reference
+of matching arity (`ref-arity`); anything else → 4270/4271 + `nullODN`. A LAMBDA
+took that error path (observed: `apply nullODN` in the arg slot + `D 4270 … in a
+position an operator is required` + `D 4271`).
+
+**Fix** (two helpers + one hook, all in the generator core):
+
+- `+lam-arity` (`semantic.hoon`) — bound-ident count of an `n-lambda` (0 for
+  non-LAMBDA).
+- `+lambda-of` — detects `n-lambda`, extracts the param idents (`skim` the
+  `%identifier` leaves) and body (`rear-node`), puts the params in scope with
+  `add-params`, and emits the reserved `$OpArg` `%apply`: `op=['$OpArg'
+  %user-op]`, `ubound=[['LAMBDA' | span]]`, `args=[[%lit %num <arity> span]]`,
+  `lvl=(expr-level body c2)`, `at=<lambda span>`. Anonymous, non-unique → NOT
+  registered in the context; the `$OpArg` render arm (`:4833`) reads only the
+  arity head, so it prints exactly `oparg LAMBDA op=LAMBDA arity=N …`.
+- **Hook in `g-opappl`** at the `expect /= 0` branch (`:1515`), before the
+  `ref-arity`/`oparg-of` logic: `=/ la ?:(=(expect (lam-arity i.nl)) (lambda-of
+  i.nl c) ~)  ?^ la $(…, out [u.la out])`. (`g-arg-list` also got the hook for
+  non-`g-opappl` apply forms — harmless, not the failing path.)
+
+**Verification.** New byte-exact differential `tests/lib/sem/lambda`
+(`desk/test-data/sem/lambda/A.tla`: single-param `Apply(LAMBDA y : y = 1)` +
+**multi-param** `Apply2(LAMBDA a, b : a = b)`, both constant-level so no level
+work needed): `test-sem-lambda` **OK**, all 74 sem goldens `ok=%.y` — no
+regression. Emits `oparg LAMBDA op=LAMBDA arity=1 …` and `arity=2 …`
+byte-identical to `SemDump`.
+
+**Real-spec confirmation.** The flat tier-2 SANY batch (`test-sany-batch`) now
+reports its divergence set as `IllegalOperatorTest:hoon=accept` — **`BagsTest`
+dropped out (reject → accept)**, `IllegalOperatorTest` correctly unchanged (its
+4271 too-lenient case is R1.3.2). The arm `FAILED` only because the frozen
+`SANY_BATCH_DIVERGENCES` still lists `BagsTest` (census flip = R1.3.1.5); no
+spurious flips.
+
+**Scope note.** Generation drives the SANY **accept/reject** verdict (what the
+tier-2 SANY batch compares), so this one change closes the accept/reject for the
+whole LAMBDA bucket, not just the two .1 probes — the census flip is still
+deferred to R1.3.1.5. What remains for **R1.3.1.2** is the LEVELS byte-match on
+non-constant LAMBDAs: level-check's `$OpArg` arm (`:2688-2698`) rewrites the
+node level via `l-resolve 'LAMBDA'` → falls through to level 0, so a state-level
+LAMBDA (CigaretteSmokers `arity=1 L1`) still renders `L0` and its arg-level-params
+do not fold into the enclosing def. `.2` special-cases `name=='LAMBDA'` to keep
+the body level + propagate arg-level-params, and teaches node-eval `resolve-oparg`.
