@@ -295,10 +295,11 @@ TLC_BATCH = [
 # Hoon state graph hung the arm (mule catches a bail, not an infinite loop).
 # R1.5.5 threaded a distinct-state cap through the temporal `build-graph` path of
 # `run-check`/`check` (`build-graph-cap` + `live-graph-cap`): a capped build now
-# yields %limited instead of hanging, so a liveness batch can run bounded (a spec
-# past the bound is a documented %limited divergence, TLC being unbounded). Wiring
-# the batch comparator (the 10 oracle verdicts from R1.1.8) is an R1.5.7 close-out
-# step.
+# yields %limited instead of hanging, so the graph-SIZE hang is fixed. R1.5.7 then
+# wired and ship-ran a curated liveness batch and hit a SECOND, orthogonal blocker
+# (see the NB after TLC_BATCH_REASONS): a per-state value-core EVAL blowup hard-bails
+# `check:check` (uncatchable by `mule`) on some SPECIFICATION-form / multi-PROPERTY
+# specs, aborting the arm. The batch stays deferred on that value-core hardening.
 
 # TLC safety batch modules whose Hoon check disagrees with TLC.
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing
@@ -317,6 +318,17 @@ TLC_BATCH_REASONS = {
     "Github725d": "a LET-wrapped primed variable as the `=` LHS inside ENABLED "
                   "is not recognized as assignable (R1.5.x)",
 }
+
+# NB (R1.5.7): a tier-2 TLC LIVENESS batch (clean single-file test-model specs
+# with a temporal PROPERTY) was wired and ship-run, and surfaced a SECOND, deeper
+# blocker beyond R1.1.8's unbounded graph (which R1.5.5 fixed with `live-graph-cap`):
+# some SPECIFICATION-form / multi-PROPERTY liveness specs (from the small clean set
+# Github1037/1389ViolatedB/710d/710e/715/725b/725f/LivenessConstraintWarning/Test2a)
+# HARD-bail inside the value core during `check:check` — a bail `mule` does not
+# catch, which aborts the whole test arm and floods the dojo. R1.5.5 bounds the
+# GRAPH SIZE (distinct-state count); this is a per-state EVALUATION blowup, an
+# orthogonal value-core hardening task. The batch is therefore not yet wired; the
+# unblock condition is that value-core hardening, not the graph bound.
 
 
 # R1.1.6: subdir SANY specs. Tests cannot scry Clay (the framework passes no

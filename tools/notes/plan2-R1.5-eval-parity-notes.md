@@ -301,6 +301,37 @@ No ship-behavior change beyond `+canonicalize` (fingerprint). Docs/ledger only f
 tlc-fp/op-check-exhaustive. Verified: symmetry (reduced + union) + fp/neval-fp/
 safety-gen/mc/trace/stats/job green.
 
+## R1.5.7 — DONE 2026-08-04 (R1.5 close-out)
+
+**Safety batch green.** The tier-2 `tlc-batch` census is empty except the one
+documented `Github725d` entry (LET-wrapped primed `=` LHS inside ENABLED, R1.5.x).
+R1.5.1–6 closed 11 of the original 12 TLC divergences; `test-tlc-batch` green,
+byte-reproducible.
+
+**Liveness batch — a second blocker, deferred.** I wired a curated single-file
+liveness batch (9 clean specs with a temporal PROPERTY) reusing `+tlc-batch-run`
+on the R1.5.5-bounded `check:check`, and ship-ran it. Finding: beyond R1.1.8's
+unbounded-graph HANG (which R1.5.5 fixed with `live-graph-cap`), some
+SPECIFICATION-form / multi-PROPERTY liveness specs trigger a per-state value-core
+EVALUATION blowup that HARD-bails `check:check` — a bail `mule` does NOT catch,
+which aborts the whole test arm and floods the dojo with a `lib/value`/`lib/
+fingerprint` stack. R1.5.5 bounds the graph SIZE (distinct-state count); this is
+an orthogonal per-state eval-hardening task. So the batch was reverted (it
+destabilizes the suite) and stays a documented deferral with the refined unblock
+condition — value-core eval hardening, not the graph bound. Both generator NBs
+(the R1.1.8→R1.5.5 one and a new post-`TLC_BATCH_REASONS` one) record this.
+
+**Ledger at parity.** The R1.5 rows are parity: `tlc-eval-state`/`-action`/
+`tlc-safety-stategen` (R1.5.1), `tlc-enum` (R1.5.2), `cfg-constants` (R1.5.3),
+`tlc-safety-trace`/`tlc-coverage` (R1.5.4; coverage counts approved-difference),
+`tlc-safety-symmetry`/`tlc-fp`/`op-check-exhaustive` (R1.5.6). Parity 52→55 over R1.5.
+
+**Ship-ops.** After a mid-session harness teardown killed the `tla-zod` fake ship,
+resume it with `vere-v4.5-linux-x86_64 /mnt/mars/piers/tla-zod` (no pill) in a
+fresh tmux session. The dojo line editor wedges into a multi-line `\`-continuation
+buffer after a crash flood — recover with `C-c` then `C-a C-k` (not `C-u`), and
+never send a new command while output is still streaming.
+
 **Verified:** SubsetEq ok/1; `tests/lib/eval` (023 `\subseteq`, 027 `SUBSET`) +
 the value/stdops/finitesets/bags set-operation suites green (no regression).
 Census: `SubsetEq` dropped from `TLC_BATCH_DIVERGENCES` (now 2 left:
