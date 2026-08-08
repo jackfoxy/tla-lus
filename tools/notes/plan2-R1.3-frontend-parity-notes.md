@@ -264,3 +264,41 @@ node level via `l-resolve 'LAMBDA'` → falls through to level 0, so a state-lev
 LAMBDA (CigaretteSmokers `arity=1 L1`) still renders `L0` and its arg-level-params
 do not fold into the enclosing def. `.2` special-cases `name=='LAMBDA'` to keep
 the body level + propagate arg-level-params, and teaches node-eval `resolve-oparg`.
+
+## R1.3.1.2 — level-checking (SHIP-VERIFIED, 2026-08-05)
+
+A LAMBDA is an inline `OpDefNode`, so its level data is exactly what **`+l-def`**
+(`semantic.hoon:3604`, the `OpDefNode.levelCheck` port) computes from a
+`sem-def`, and `OpArgNode.levelCheck` then **copies** the referenced operator's
+`[lvl ok lp lc ac ap all]` (never `nlp`). Reused wholesale:
+
+- **Generation (`+lambda-of`)** now also carries what level-check needs: the
+  bound idents ride in `bound` (one `sem-bound`, the param `sbind`s, no range),
+  and the generated body rides as the **`args` tail** (`args = [arity-lit
+  body]`). Both are invisible to the `$OpArg` render arm (reads only the ubound
+  name + arity head), so the `.1` tree goldens are unchanged.
+- **Level (`+l-x` `$OpArg` arm, `:2741`)** — a new `nm == 'LAMBDA'` branch
+  reconstructs the anonymous `sem-def` (`[%sdef 'LAMBDA' arity | lvl at params
+  body '']` from `bound` + the `args` tail), runs `(l-def df e ~)`, and returns
+  `s(lvl lvl.ol)` + `[lvl.ol ok.ol lp.ol lc.ol ac.ol ap.ol all.ol ~]` (nlp `~`,
+  matching SANY). `l-def` already strips the LAMBDA's own params from `lp`/`lc`/
+  `ac`/`ap` (its `pset` machinery), so only outer refs propagate — the enclosing
+  def picks them up through the existing higher-order `l-apply-def` path with no
+  further change. `l-def`'s `eo` (which would register `'LAMBDA'` in `ops`) is
+  discarded, so sibling LAMBDAs (all named `LAMBDA`) never collide.
+
+Node-eval **`resolve-oparg`** already tolerates the shape: it looks `'LAMBDA'`
+up in `ops.e`, misses, returns `~` → no crash. Actually *evaluating* a
+LAMBDA-parameterized operator (model-checking `BagOfAll(LAMBDA …)`) stays
+deferred; no census spec model-checks a LAMBDA.
+
+**Verification.** New `tests/lib/sem/lambdalvl` (`Apply(LAMBDA y : y = x)` over
+`VARIABLE x`) pins the state-level case: `oparg LAMBDA … L1`, `apply Apply … L1`,
+`Foo L1 lp={x} lc={x<=2}` — byte-identical to `SemDump`. `test-sem-lambdalvl`
+**OK**; `test-sem-lambda` (constant L0) **stayed byte-identical** (`l-def` yields
+L0 there); all 75 sem goldens `ok=%.y`, no regression. (The R1.3.1.1 "remaining
+for R1.3.1.2" paragraph above is now closed by this section.)
+
+**Bug caught in the loop:** first build `nest-fail`ed — I wrote the arm's return
+as `:_ ds.ld :- s …` (a `[[s r] ds]` 2-tuple) instead of the arm's `[s r ds]`
+3-tuple; fixed with `:*  s(…)  [lres]  ds.ld  ==`.

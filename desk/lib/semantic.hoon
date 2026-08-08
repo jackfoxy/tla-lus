@@ -1204,11 +1204,21 @@
   =/  params=(list [@t node @ud])
     (turn ids |=(k=node [(leaf-text k) k 0]))
   =/  c2  (add-params c params)
+  =/  gb  (g-x body c2)
   =/  sp  (span-of:ast n)
+  ::  the bound idents ride in `bound` and the generated body as the args
+  ::  tail so level-check (+l-def, R1.3.1.2) can recompute the anonymous
+  ::  OpDefNode's level data; both are invisible to the $OpArg render arm,
+  ::  which reads only the ubound name and the arity head
+  =/  pbinds=(list sbind)
+    (turn ids |=(k=node `sbind`[(leaf-text k) & (span-of:ast k)]))
   :-  ~
   :*  %apply  ['$OpArg' %user-op]  (expr-level body c2)  sp
-      [['LAMBDA' | sp] ~]  ~
-      [[%lit %num (crip (a-co (lent params))) sp] ~]
+      [['LAMBDA' | sp] ~]
+      [[pbinds ~] ~]
+      :~  [%lit %num (crip (a-co (lent params))) sp]
+          ?~(r.gb [%nullodn ~] u.r.gb)
+      ==
   ==
 ::
 ++  oparg-of
@@ -2728,6 +2738,23 @@
       %apply
     ?:  =('$OpArg' name.op.s)
       =/  nm  ?~(ubound.s '' name.i.ubound.s)
+      ?:  =('LAMBDA' nm)
+        ::  an anonymous LAMBDA op-arg: level-check its body under the
+        ::  bound idents (l-def, the OpDefNode path) and copy the resulting
+        ::  operator level data, exactly as OpArgNode.levelCheck copies its
+        ::  referenced operator's (nonLeibnizParams never filled). (R1.3.1.2)
+        =/  params=(list spar)
+          ?~  bound.s  ~
+          (turn vars.i.bound.s |=(b=sbind `spar`[name.b 0 & at.b]))
+        =/  body  ?~(args.s ~ ?~(t.args.s ~ `i.t.args.s))
+        =/  df=sem-def
+          [%sdef 'LAMBDA' (lent params) | lvl.s at.s params body '']
+        =/  ld  (l-def df e ~)
+        =/  ol  ol.ld
+        :*  s(lvl lvl.ol)
+            [lvl.ol ok.ol lp.ol lc.ol ac.ol ap.ol all.ol ~]
+            ds.ld
+        ==
       ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
         =/  key  (scope-key nm kind.op.s e)
         =/  lvl  (kind-lvl kind.op.s)

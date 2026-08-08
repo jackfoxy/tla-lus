@@ -872,6 +872,34 @@
       '---- MODULE A ----\0aApply(P(_)) == P(0)\0aApply2(Q(_, _)) == Q(0, 1)\0aFoo == Apply(LAMBDA y : y = 1)\0aBar == Apply2(LAMBDA a, b : a = b)\0a====\0a'
   ==
 ::
+++  test-sem-lambdalvl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Apply arity=1 local=n L0 3.1-3.19'
+        '    param P arity=1 L0 3.7-3.10'
+        '    apply P opkind=FormalParamKind L0 3.16-3.19'
+        '      num 0 L0 3.18-3.18'
+        '  def Foo arity=0 local=n L1 4.1-4.30'
+        '    apply Apply opkind=UserDefinedOpKind L1 4.8-4.30'
+        '      oparg LAMBDA op=LAMBDA arity=1 L1 4.14-4.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=2}'
+        'lvl Apply L0 ml=[3] w=[1] mml=[0] olc=[F]'
+        'lvl Foo L1 lp={x} lc={x<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aApply(P(_)) == P(0)\0aFoo == Apply(LAMBDA y : y = x)\0a====\0a'
+  ==
+::
 ++  test-sem-letin
   %+  expect-eq
     !>  ^-  wain
