@@ -160,8 +160,7 @@
 ++  test-sany-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'IllegalOperatorTest:hoon=accept'
-    ==
+    ~
   !>
   %-  sany-batch-run
   ^-  (list [@t ?(%accept %reject) (list [@t @t])])

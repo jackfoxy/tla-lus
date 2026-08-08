@@ -24,8 +24,7 @@
 ++  test-sany-sub-1
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'EWD998/EWD998 -> hoon=reject'
-    ==
+    ~
   !>
   %-  sub-batch-run
   ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])
@@ -222,7 +221,7 @@
 ++  test-sany-sub-4
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test206 -> hoon=reject'  'suite/test214 -> hoon=accept'  'suite/test216 -> hoon=reject'  'suite/test219 -> hoon=reject'  'suite/test219a -> hoon=reject'  'suite/test23 -> hoon=reject'  'suite/test30 -> hoon=reject'  'suite/test42 -> hoon=reject'  'suite/test43 -> hoon=reject'
+    :~  'suite/test206 -> hoon=reject'  'suite/test214 -> hoon=accept'  'suite/test216 -> hoon=reject'  'suite/test219 -> hoon=reject'  'suite/test219a -> hoon=reject'  'suite/test23 -> hoon=reject'  'suite/test42 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run
@@ -288,7 +287,7 @@
 ++  test-sany-sub-5
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test51 -> hoon=reject'  'suite/test52 -> hoon=reject'  'suite/test7 -> hoon=reject'  'suite/test9 -> hoon=reject'  'suite/test999 -> hoon=reject'
+    :~  'suite/test51 -> hoon=reject'  'suite/test52 -> hoon=reject'  'suite/test7 -> hoon=reject'  'suite/test9 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run

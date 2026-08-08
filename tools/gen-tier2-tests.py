@@ -212,13 +212,10 @@ SANY_CURATED = [
 # recorded (machine-checked into `divergences.txt`) so the census is explicit
 # and a NEW divergence cannot appear silently. (corpus, dir, module, reason)
 KNOWN_DIVERGENCES = [
-    ("test-model", TESTMODEL, "IllegalOperatorTest",
-     "Java rejects, Hoon accepts: `D(D)` passes a higher-order operator where a "
-     "first-order 1-parameter operator is expected; the Hoon 4271 check "
-     "compares arity only, not the argument operator's own parameter order "
-     "(a level-higher-order edge — R1.3)"),
     # CigaretteSmokers closed by R1.3.1 (LAMBDA in the WU3 semantic graph) —
-    # now a tested-green SANY_CURATED arm.
+    # now a tested-green SANY_CURATED arm. IllegalOperatorTest closed by
+    # R1.3.2.1 (deep-4271: an operator argument must be first-order) — now
+    # agrees (both reject) in the flat SANY batch.
 ]
 
 TEMP_PATH = re.compile(r"/tmp/[^ )]*|(?:jar:)?file:[^ )]*|/mnt/[^ )]*\.tla")
@@ -269,11 +266,10 @@ def sany_batch_modules() -> list:
 # where outcome is `crash` or `hoon=<accept|reject>`; the batch arm asserts the
 # actual divergence list equals this frozen set. Populated from the ship run;
 # grouped reasons live in `divergences.txt`.
-SANY_BATCH_DIVERGENCES = ["IllegalOperatorTest:hoon=accept"]
+SANY_BATCH_DIVERGENCES = []
 BATCH_REASONS = {
-    # BagsTest closed by R1.3.1 (LAMBDA in the WU3 graph); now agrees.
-    "IllegalOperatorTest": "higher-order operator-argument arity edge — the "
-                           "4271 check compares arity only (R1.3)",
+    # BagsTest closed by R1.3.1 (LAMBDA in the WU3 graph). IllegalOperatorTest
+    # closed by R1.3.2.1 (deep-4271, first-order op-arg check). Both now agree.
 }
 
 
@@ -346,7 +342,6 @@ SUBDIR_CHUNK = 55
 # (`suite/`, `coverage/`). `hoon=reject` = Java accepts / Hoon rejects (a feature
 # gap); `hoon=accept` = Java rejects / Hoon too lenient.
 SUB_BATCH_DIVERGENCES = [
-    "EWD998/EWD998 -> hoon=reject",
     "examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject",
     "gh1134/MultiUser -> hoon=reject",
     "gh1134/SingleUser -> hoon=reject",
@@ -355,20 +350,18 @@ SUB_BATCH_DIVERGENCES = [
     "suite/test10 -> hoon=reject",
     "suite/test16 -> hoon=reject",
     "suite/test203 -> hoon=reject",
+    # test30/test999 closed by R1.3.2.2 (infix operator constants).
     "suite/test206 -> hoon=reject",
     "suite/test214 -> hoon=accept",
     "suite/test216 -> hoon=reject",
     "suite/test219 -> hoon=reject",
     "suite/test219a -> hoon=reject",
     "suite/test23 -> hoon=reject",
-    "suite/test30 -> hoon=reject",
     "suite/test42 -> hoon=reject",
-    "suite/test43 -> hoon=reject",
     "suite/test51 -> hoon=reject",
     "suite/test52 -> hoon=reject",
     "suite/test7 -> hoon=reject",
     "suite/test9 -> hoon=reject",
-    "suite/test999 -> hoon=reject",
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
@@ -378,9 +371,10 @@ SUB_BATCH_REASONS = {
     # R1.3.1 closed the LAMBDA specs (ModuleOverwrites, coverage/F,K,L,
     # EWD840/Error02,Error03,MC02,MC02Sim, suite/test201).
     "suite/test203": "INSTANCE ... WITH over a RECURSIVE definition (R1.3)",
-    "suite/test30": _HO, "suite/test999": _HO,
+    # test30/test999 closed by R1.3.2.2 (infix operator constants).
     "gh1134/MultiUser": _INST, "suite/test216": _INST + " (with WF_/temporal)",
-    "gh1134/SingleUser": _CONF, "suite/test43": _CONF, "suite/test7": _CONF,
+    # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
+    "gh1134/SingleUser": _CONF, "suite/test7": _CONF,
     "suite/test9": _CONF,
     "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
     "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
@@ -389,10 +383,8 @@ SUB_BATCH_REASONS = {
     "suite/test206": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test219a": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test10": _CONF,
-    "EWD998/EWD998": "built-in operator (`+`/`\\cup`) passed as an operator "
-                     "argument to TLCGetAndSet (EC 4270/4271); its LAMBDAs are "
-                     "handled by R1.3.1 — a higher-order built-in-op-arg gap, "
-                     "R1.3.2-class",
+    # EWD998/EWD998 closed by R1.3.2.3 (built-in operator `+`/`\cup` as an
+    # operator argument to TLCGetAndSet).
     "suite/test219": _INST, "suite/test51": _INST + " (with `~>`/higher-order)",
     "suite/test23": _CONF,
 }

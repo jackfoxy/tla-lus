@@ -3,19 +3,16 @@
 # oracle. Not tested green (they would fail); census-tracked so a new
 # divergence cannot appear silently. columns: phase | module | reason
 
-sany	IllegalOperatorTest	java=reject hoon=accept: Java rejects, Hoon accepts: `D(D)` passes a higher-order operator where a first-order 1-parameter operator is expected; the Hoon 4271 check compares arity only, not the argument operator's own parameter order (a level-higher-order edge — R1.3)
 
 # batch (R1.1.3): 142 flat single-file in-scope test-model specs run through +sany-verdict
-# in one mule-isolated arm; 1 disagree with Java (141/142 agree):
-batch	IllegalOperatorTest:hoon=accept	higher-order operator-argument arity edge — the 4271 check compares arity only (R1.3)
+# in one mule-isolated arm; 0 disagree with Java (142/142 agree):
 
 # tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
 # 1 disagree with TLC (13/14 agree):
 tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	a LET-wrapped primed variable as the `=` LHS inside ENABLED is not recognized as assignable (R1.5.x)
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
-# 23 disagree with Java (272/295 agree):
-subdir-batch	EWD998/EWD998 -> hoon=reject	built-in operator (`+`/`\cup`) passed as an operator argument to TLCGetAndSet (EC 4270/4271); its LAMBDAs are handled by R1.3.1 — a higher-order built-in-op-arg gap, R1.3.2-class
+# 19 disagree with Java (276/295 agree):
 subdir-batch	examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject	RECURSIVE + higher-order op-arg (`~>`/WF_ liveness spec) — R1.3
 subdir-batch	gh1134/MultiUser -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3)
 subdir-batch	gh1134/SingleUser -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
@@ -30,11 +27,8 @@ subdir-batch	suite/test216 -> hoon=reject	INSTANCE ... WITH substitution edge (R
 subdir-batch	suite/test219 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3)
 subdir-batch	suite/test219a -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with \E/SUBSET/higher-order)
 subdir-batch	suite/test23 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
-subdir-batch	suite/test30 -> hoon=reject	higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3
 subdir-batch	suite/test42 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
-subdir-batch	suite/test43 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test51 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with `~>`/higher-order)
 subdir-batch	suite/test52 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test7 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test9 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
-subdir-batch	suite/test999 -> hoon=reject	higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3

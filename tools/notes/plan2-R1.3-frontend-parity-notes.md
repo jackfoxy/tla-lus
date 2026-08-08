@@ -509,3 +509,9 @@ New sem golden `bltopargs` (`Apply(a, Op(_,_), b) == Op(a,b)` / `Apply(1, +, 2)`
 arity=2`, `oparg \union op=\union arity=2`, `Foo`/`Bar` L0. All 83 sem goldens
 `ok=%.y`. **`EWD998/EWD998` now accepts (0 errors)** — the last LAMBDA-bucket
 spec, and the R1.3.1 residual, closed. Census flip at R1.3.2.4.
+
+**R1.3.2.4 note:** the .3 built-in-op-arg fix also closed **`suite/test43`**
+(`SortSeq(<<…>>, <)` / `(…, \leq)` / `(…, >)` — built-in comparison operators as
+`SortSeq`'s operator argument), surfaced when its subdir arm flipped; removed
+from `SUB_BATCH_DIVERGENCES` too (23→19, 276/295 agree). All 6 subdir arms +
+the flat batch green; `tier2.py --check` byte-reproducible.
