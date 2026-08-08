@@ -819,6 +819,36 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aNext == x\' = x + 1\0a====\0a'
   ==
 ::
+++  test-sem-infixconst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  const ++ arity=2 L0 2.10-2.13'
+        '  const Plus arity=2 L0 2.16-2.25'
+        '  def Foo arity=0 local=n L0 3.1-3.13'
+        '    apply ++ opkind=ConstantDeclKind L0 3.8-3.13'
+        '      num 2 L0 3.8-3.8'
+        '      num 3 L0 3.13-3.13'
+        '  def Bar arity=0 local=n L0 4.1-4.17'
+        '    apply Plus opkind=ConstantDeclKind L0 4.8-4.17'
+        '      num 2 L0 4.13-4.13'
+        '      num 3 L0 4.16-4.16'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={++,Plus} alc={(++,0)>=0,(++,1)>=0,(Plus,0)>=0,(Plus,1)>=0}'
+        'lvl Foo L0 lp={++} alc={(++,0)>=0,(++,1)>=0}'
+        'lvl Bar L0 lp={Plus} alc={(Plus,0)>=0,(Plus,1)>=0}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT _++_, Plus(_, _)\0aFoo == 2 ++ 3\0aBar == Plus(2, 3)\0a====\0a'
+  ==
+::
 ++  test-sem-inst
   %+  expect-eq
     !>  ^-  wain

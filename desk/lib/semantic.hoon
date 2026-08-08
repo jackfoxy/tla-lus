@@ -285,15 +285,34 @@
     `[(leaf-text k) [%variable 0 | 1 ~ ~] k]
   ?:  (is-kind nd %n-paramdeclaration)
     ::  CONSTANT decl: n-consdecl head, then n-identdecl / operator params
-    ::  (an operator constant like P(_) has nonzero arity)
+    ::  (an operator constant like P(_) has nonzero arity; an operator
+    ::  symbol constant `_++_`/`-._`/`_^` registers under its operator
+    ::  name at arity 2/1/1, matching the name an infix/prefix/postfix
+    ::  use resolves to (R1.3.2.2)
     %+  murn  (kids-of nd)
     |=  k=node
     ^-  (unit [@t sym node])
-    ?.  (is-kind k %n-identdecl)  ~
-    =/  ik  (kids-of k)
-    ?~  ik  ~
-    ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
-    `[(leaf-text i.ik) [%constant (us-arity k) | 0 ~ ~] k]
+    ?:  (is-kind k %n-identdecl)
+      =/  ik  (kids-of k)
+      ?~  ik  ~
+      ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
+      `[(leaf-text i.ik) [%constant (us-arity k) | 0 ~ ~] k]
+    ::  the operator symbol is a childless tok-node (its text is in the
+    ::  image); position and arity depend on the fixity
+    =/  oi=(unit [nm=@t ary=@ud])
+      =/  ks  (kids-of k)
+      ?:  (is-kind k %n-infixdecl)
+        ?:  (lth (lent ks) 2)  ~
+        `[(resolve-syn (node-text (snag 1 ks))) 2]
+      ?:  (is-kind k %n-prefixdecl)
+        ?:  (lth (lent ks) 1)  ~
+        `[(resolve-syn (node-text (snag 0 ks))) 1]
+      ?:  (is-kind k %n-postfixdecl)
+        ?:  (lth (lent ks) 2)  ~
+        `[(resolve-syn (node-text (snag 1 ks))) 1]
+      ~
+    ?~  oi  ~
+    `[nm.u.oi [%constant ary.u.oi | 0 ~ ~] k]
   ~
 ::
 ++  recursive-syms

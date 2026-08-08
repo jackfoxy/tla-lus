@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={++,Plus} alc={(++,0)>=0,(++,1)>=0,(Plus,0)>=0,(Plus,1)>=0}
+lvl Foo L0 lp={++} alc={(++,0)>=0,(++,1)>=0}
+lvl Bar L0 lp={Plus} alc={(Plus,0)>=0,(Plus,1)>=0}

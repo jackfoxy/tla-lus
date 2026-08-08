@@ -456,3 +456,31 @@ byte-exact, all 81 sem goldens `ok=%.y` (the `ho*`/`errarity` HO-arg cases
 unaffected — first-order op-args build the oparg exactly as before). `sany-verdict`
 now **rejects** `IllegalOperatorTest` (the `e2` `%error`), agreeing with Java;
 census flip deferred to R1.3.2.4.
+
+## R1.3.2.2 — infix operator constants (SHIP-VERIFIED, 2026-08-08)
+
+`param-decl` (`syntax.hoon:~3210`) parses an operator-symbol constant as
+`n-infixdecl` (`_op_`), `n-prefixdecl` (`op _`), or `n-postfixdecl` (`_ op`) —
+NOT `n-identdecl` — but `+decl-syms` (`semantic.hoon:275`) only registered
+`n-identdecl` kids, so `CONSTANT _++_` was dropped and `2 ++ 3` failed to
+resolve (EC 4004). SANY registers it as a constant **named `++`** (arity 2,
+`ConstantDeclKind`), exactly like the prefix HO constant `Plus(_,_)`.
+
+**Fix:** `+decl-syms`'s `n-paramdeclaration` arm now also handles the three
+operator-decl kinds. The operator symbol is a childless tok-node carrying the
+text in its `image`, read with `+node-text` and `+resolve-syn` (matching what an
+infix/prefix/postfix *use* resolves to via `op-of-genop`); it registers
+`[%constant <arity> …]` — arity 2 for infix, 1 for prefix/postfix — at the decl
+node's span, identical in shape to the `Plus(_,_)` identdecl case (so the level
+machinery yields the same `lp`/`alc`).
+
+New sem golden `infixconst` (`CONSTANT _++_, Plus(_,_)` / `Foo == 2 ++ 3` /
+`Bar == Plus(2, 3)`): `test-sem-infixconst` **OK** byte-exact — `const ++
+arity=2`, `apply ++ opkind=ConstantDeclKind`, `LEVELS … lp={++,Plus}
+alc={(++,0)>=0,…}`. All 82 sem goldens `ok=%.y`. `test30`/`test999` (whose only
+errors were the two `++` 4004s — R1.3.2.0) now accept; census flip at R1.3.2.4.
+Prefix/postfix operator constants are handled by the same arm (no census spec
+exercises them; not golden-tested).
+
+HOON: `snag`/`i.ks` on a `?~`-narrowed list nest-fails (`mull-grow`, `have %~`);
+use a non-narrowing `(lth (lent ks) n)` guard + `snag` on the plain list.
