@@ -1,0 +1,30 @@
+ACCEPT
+MODULE A 1.1-12.12
+  var x L1 9.10-9.10
+  def Foo arity=2 local=n L0 5.1-5.34
+    param Op arity=1 L0 5.5-5.9
+    param S arity=0 L0 5.12-5.12
+    apply $BoundedForall opkind=BuiltInKind L0 5.18-5.34
+      bound s L0 5.21-5.21
+        apply S opkind=FormalParamKind L0 5.27-5.27
+      apply Op opkind=FormalParamKind L0 5.30-5.34
+        apply s opkind=FormalParamKind L0 5.33-5.33
+  def Bar arity=1 local=n L0 7.1-7.37
+    param S arity=0 L0 7.5-7.5
+    apply Foo opkind=UserDefinedOpKind L0 7.11-7.37
+      oparg LAMBDA op=LAMBDA arity=1 L0 7.15-7.33
+      apply S opkind=FormalParamKind L0 7.36-7.36
+  def Spec arity=0 local=n L3 11.1-11.45
+    apply \land opkind=BuiltInKind L3 11.9-11.45
+      apply = opkind=BuiltInKind L1 11.9-11.24
+        apply x opkind=VariableDeclKind L1 11.9-11.9
+        apply Bar opkind=UserDefinedOpKind L0 11.13-11.24
+          apply $SetEnumerate opkind=BuiltInKind L0 11.17-11.23
+            num 1 L0 11.18-11.18
+            num 2 L0 11.20-11.20
+            num 3 L0 11.22-11.22
+      apply [] opkind=BuiltInKind L3 11.29-11.45
+        apply $SquareAct opkind=BuiltInKind L2 11.31-11.45
+          apply UNCHANGED opkind=BuiltInKind L2 11.32-11.42
+            apply x opkind=VariableDeclKind L1 11.42-11.42
+          apply x opkind=VariableDeclKind L1 11.45-11.45

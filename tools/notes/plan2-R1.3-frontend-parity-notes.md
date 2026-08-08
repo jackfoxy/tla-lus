@@ -302,3 +302,31 @@ for R1.3.1.2" paragraph above is now closed by this section.)
 **Bug caught in the loop:** first build `nest-fail`ed — I wrote the arm's return
 as `:_ ds.ld :- s …` (a `[[s r] ds]` 2-tuple) instead of the arm's `[s r ds]`
 3-tuple; fixed with `:*  s(…)  [lres]  ds.ld  ==`.
+
+## R1.3.1.3 — multi-param, multi-LAMBDA, fixtures (SHIP-VERIFIED, 2026-08-05)
+
+**No code change** — the .1 generation + .2 level mechanism already covers every
+shape in this bucket; R1.3.1.3 is verification via direct byte-exact goldens.
+`coverage/{F,K,L}` are self-contained (`EXTENDS Naturals`, which the sem harness
+already resolves), so they go in verbatim (module renamed `F`/`K`/`L` → `A`,
+span-preserving — same length):
+
+- **`covf`** = `coverage/F`: two LAMBDAs in **one** application (`Op({…}, LAMBDA
+  s : …, LAMBDA odd, b : …)`) — `arity=1` then **`arity=2`** — inside a
+  set-comprehension user HO op.
+- **`covk`** = `coverage/K`: LAMBDA to a user HO op `Foo(Op(_), S)` from inside a
+  parameterized def `Bar(S)`, body `e \in Nat`.
+- **`covl`** = `coverage/L`: LAMBDA to `ChooseOne(S, P(_))` (a `CHOOSE` HO op),
+  constant body.
+- **`lamseq`** (synthetic): `SelectSeq(<<1,2,3>>, LAMBDA e : e = 1)` — the
+  **imported** (Sequences StandardModule) HO-op path, which the census's
+  `ModuleOverwrites/ModuleOverwrites` and `EWD840/{Error02,Error03,MC02,MC02Sim}`
+  all use (`SelectSeq(seq, LAMBDA …)` inside a `LET`/`ENABLED`). SANY resolves
+  `SelectSeq` as `UserDefinedOpKind` with the operator param at position 1, so
+  `g-opappl`'s `expect = (at-or parg 1 0) = 1` routes the LAMBDA to `lambda-of`.
+
+`test-sem-{covf,covk,covl,lamseq}` all **OK**, all 79 sem goldens `ok=%.y`.
+Both HO-op flavors (user-defined `covk`/`covf`/`covl`, imported `lamseq`) are
+byte-proven, so the 5 non-coverage specs (same `SelectSeq`+LAMBDA path, only
+wrapped in `LET`/`ENABLED` — context-independent for `g-opappl`) are covered;
+their accept flip is confirmed corpus-wide at R1.3.1.5.

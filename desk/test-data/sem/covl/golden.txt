@@ -1,0 +1,30 @@
+ACCEPT
+MODULE A 1.1-10.12
+  var v L1 4.10-4.10
+  def ChooseOne arity=2 local=n L0 6.1-6.64
+    param S arity=0 L0 6.11-6.11
+    param P arity=1 L0 6.14-6.17
+    apply $BoundedChoose opkind=BuiltInKind L0 6.23-6.64
+      bound x L0 6.30-6.30
+        apply S opkind=FormalParamKind L0 6.36-6.36
+      apply \land opkind=BuiltInKind L0 6.40-6.64
+        apply P opkind=FormalParamKind L0 6.40-6.43
+          apply x opkind=FormalParamKind L0 6.42-6.42
+        apply $BoundedForall opkind=BuiltInKind L0 6.48-6.64
+          bound y L0 6.51-6.51
+            apply S opkind=FormalParamKind L0 6.57-6.57
+          apply P opkind=FormalParamKind L0 6.61-6.64
+            apply y opkind=FormalParamKind L0 6.63-6.63
+  def Spec arity=0 local=n L3 8.1-8.64
+    apply \land opkind=BuiltInKind L3 8.9-8.64
+      apply = opkind=BuiltInKind L1 8.9-8.43
+        apply v opkind=VariableDeclKind L1 8.9-8.9
+        apply ChooseOne opkind=UserDefinedOpKind L0 8.13-8.43
+          apply $SetEnumerate opkind=BuiltInKind L0 8.23-8.25
+            num 1 L0 8.24-8.24
+          oparg LAMBDA op=LAMBDA arity=1 L0 8.28-8.42
+      apply [] opkind=BuiltInKind L3 8.48-8.64
+        apply $SquareAct opkind=BuiltInKind L2 8.50-8.64
+          apply UNCHANGED opkind=BuiltInKind L2 8.51-8.61
+            apply v opkind=VariableDeclKind L1 8.61-8.61
+          apply v opkind=VariableDeclKind L1 8.64-8.64

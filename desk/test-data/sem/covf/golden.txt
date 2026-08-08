@@ -1,0 +1,31 @@
+ACCEPT
+MODULE A 1.1-11.77
+  var x L1 4.10-4.10
+  def Op arity=3 local=n L0 6.1-6.56
+    param S arity=0 L0 6.4-6.4
+    param P arity=1 L0 6.7-6.10
+    param Q arity=2 L0 6.13-6.19
+    apply $SubsetOf opkind=BuiltInKind L0 6.25-6.56
+      bound s L0 6.27-6.27
+        apply S opkind=FormalParamKind L0 6.33-6.33
+      apply \land opkind=BuiltInKind L0 6.37-6.54
+        apply P opkind=FormalParamKind L0 6.37-6.40
+          apply s opkind=FormalParamKind L0 6.39-6.39
+        apply Q opkind=FormalParamKind L0 6.45-6.54
+          apply s opkind=FormalParamKind L0 6.47-6.47
+          apply TRUE opkind=BuiltInKind L0 6.50-6.53
+  def Init arity=0 local=n L1 8.1-8.79
+    apply \in opkind=BuiltInKind L1 8.9-8.79
+      apply x opkind=VariableDeclKind L1 8.9-8.9
+      apply Op opkind=UserDefinedOpKind L0 8.15-8.79
+        apply $SetEnumerate opkind=BuiltInKind L0 8.18-8.28
+          num 1 L0 8.19-8.19
+          num 2 L0 8.21-8.21
+          num 3 L0 8.23-8.23
+          num 4 L0 8.25-8.25
+          num 5 L0 8.27-8.27
+        oparg LAMBDA op=LAMBDA arity=1 L0 8.31-8.45
+        oparg LAMBDA op=LAMBDA arity=2 L0 8.48-8.78
+  def Next arity=0 local=n L2 10.1-10.19
+    apply UNCHANGED opkind=BuiltInKind L2 10.9-10.19
+      apply x opkind=VariableDeclKind L1 10.19-10.19

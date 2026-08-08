@@ -161,6 +161,153 @@
       '---- MODULE A ----\0aCONSTANT N\0aVARIABLE x\0a====\0a'
   ==
 ::
+++  test-sem-covf
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-11.77'
+        '  var x L1 4.10-4.10'
+        '  def Op arity=3 local=n L0 6.1-6.56'
+        '    param S arity=0 L0 6.4-6.4'
+        '    param P arity=1 L0 6.7-6.10'
+        '    param Q arity=2 L0 6.13-6.19'
+        '    apply $SubsetOf opkind=BuiltInKind L0 6.25-6.56'
+        '      bound s L0 6.27-6.27'
+        '        apply S opkind=FormalParamKind L0 6.33-6.33'
+        '      apply \\land opkind=BuiltInKind L0 6.37-6.54'
+        '        apply P opkind=FormalParamKind L0 6.37-6.40'
+        '          apply s opkind=FormalParamKind L0 6.39-6.39'
+        '        apply Q opkind=FormalParamKind L0 6.45-6.54'
+        '          apply s opkind=FormalParamKind L0 6.47-6.47'
+        '          apply TRUE opkind=BuiltInKind L0 6.50-6.53'
+        '  def Init arity=0 local=n L1 8.1-8.79'
+        '    apply \\in opkind=BuiltInKind L1 8.9-8.79'
+        '      apply x opkind=VariableDeclKind L1 8.9-8.9'
+        '      apply Op opkind=UserDefinedOpKind L0 8.15-8.79'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 8.18-8.28'
+        '          num 1 L0 8.19-8.19'
+        '          num 2 L0 8.21-8.21'
+        '          num 3 L0 8.23-8.23'
+        '          num 4 L0 8.25-8.25'
+        '          num 5 L0 8.27-8.27'
+        '        oparg LAMBDA op=LAMBDA arity=1 L0 8.31-8.45'
+        '        oparg LAMBDA op=LAMBDA arity=2 L0 8.48-8.78'
+        '  def Next arity=0 local=n L2 10.1-10.19'
+        '    apply UNCHANGED opkind=BuiltInKind L2 10.9-10.19'
+        '      apply x opkind=VariableDeclKind L1 10.19-10.19'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,s<=2,x<=1}'
+        'lvl Op L0 ml=[3,2,2] w=[1,1,1] mml=[;0;0,0] olc=[;FFF;FFFFFF] lc={s<=2}'
+        'lvl Init L1 lp={x} lc={s<=2,x<=2}'
+        'lvl Next L2 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---------------------------- MODULE A ----------------------------\0aEXTENDS Naturals\0a\0aVARIABLE x\0a\0aOp(S, P(_), Q(_, _)) == { s \\in S : P(s) /\\ Q(s, TRUE) }\0a\0aInit == x \\in Op({1,2,3,4,5}, LAMBDA s: s > 1, LAMBDA odd, b: odd % 2 # 0 /\\ b) \0a\0aNext == UNCHANGED x\0a=============================================================================\0a'
+  ==
+::
+++  test-sem-covk
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-12.12'
+        '  var x L1 9.10-9.10'
+        '  def Foo arity=2 local=n L0 5.1-5.34'
+        '    param Op arity=1 L0 5.5-5.9'
+        '    param S arity=0 L0 5.12-5.12'
+        '    apply $BoundedForall opkind=BuiltInKind L0 5.18-5.34'
+        '      bound s L0 5.21-5.21'
+        '        apply S opkind=FormalParamKind L0 5.27-5.27'
+        '      apply Op opkind=FormalParamKind L0 5.30-5.34'
+        '        apply s opkind=FormalParamKind L0 5.33-5.33'
+        '  def Bar arity=1 local=n L0 7.1-7.37'
+        '    param S arity=0 L0 7.5-7.5'
+        '    apply Foo opkind=UserDefinedOpKind L0 7.11-7.37'
+        '      oparg LAMBDA op=LAMBDA arity=1 L0 7.15-7.33'
+        '      apply S opkind=FormalParamKind L0 7.36-7.36'
+        '  def Spec arity=0 local=n L3 11.1-11.45'
+        '    apply \\land opkind=BuiltInKind L3 11.9-11.45'
+        '      apply = opkind=BuiltInKind L1 11.9-11.24'
+        '        apply x opkind=VariableDeclKind L1 11.9-11.9'
+        '        apply Bar opkind=UserDefinedOpKind L0 11.13-11.24'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 11.17-11.23'
+        '            num 1 L0 11.18-11.18'
+        '            num 2 L0 11.20-11.20'
+        '            num 3 L0 11.22-11.22'
+        '      apply [] opkind=BuiltInKind L3 11.29-11.45'
+        '        apply $SquareAct opkind=BuiltInKind L2 11.31-11.45'
+        '          apply UNCHANGED opkind=BuiltInKind L2 11.32-11.42'
+        '            apply x opkind=VariableDeclKind L1 11.42-11.42'
+        '          apply x opkind=VariableDeclKind L1 11.45-11.45'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,s<=3,x<=1}'
+        'lvl Foo L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FF;] lc={s<=3}'
+        'lvl Bar L0 ml=[3] w=[1] lc={s<=3}'
+        'lvl Spec L3 lp={x} lc={s<=3,x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '------------------------------ MODULE A ------------------------------\0a\0aEXTENDS Naturals\0a\0aFoo(Op(_), S) == \\A s \\in S: Op(s)\0a\0aBar(S) == Foo(LAMBDA e: e \\in Nat, S)\0a\0aVARIABLE x\0a\0aSpec == x = Bar({1,2,3}) /\\ [][UNCHANGED x]_x \0a============\0a'
+  ==
+::
+++  test-sem-covl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-10.12'
+        '  var v L1 4.10-4.10'
+        '  def ChooseOne arity=2 local=n L0 6.1-6.64'
+        '    param S arity=0 L0 6.11-6.11'
+        '    param P arity=1 L0 6.14-6.17'
+        '    apply $BoundedChoose opkind=BuiltInKind L0 6.23-6.64'
+        '      bound x L0 6.30-6.30'
+        '        apply S opkind=FormalParamKind L0 6.36-6.36'
+        '      apply \\land opkind=BuiltInKind L0 6.40-6.64'
+        '        apply P opkind=FormalParamKind L0 6.40-6.43'
+        '          apply x opkind=FormalParamKind L0 6.42-6.42'
+        '        apply $BoundedForall opkind=BuiltInKind L0 6.48-6.64'
+        '          bound y L0 6.51-6.51'
+        '            apply S opkind=FormalParamKind L0 6.57-6.57'
+        '          apply P opkind=FormalParamKind L0 6.61-6.64'
+        '            apply y opkind=FormalParamKind L0 6.63-6.63'
+        '  def Spec arity=0 local=n L3 8.1-8.64'
+        '    apply \\land opkind=BuiltInKind L3 8.9-8.64'
+        '      apply = opkind=BuiltInKind L1 8.9-8.43'
+        '        apply v opkind=VariableDeclKind L1 8.9-8.9'
+        '        apply ChooseOne opkind=UserDefinedOpKind L0 8.13-8.43'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 8.23-8.25'
+        '            num 1 L0 8.24-8.24'
+        '          oparg LAMBDA op=LAMBDA arity=1 L0 8.28-8.42'
+        '      apply [] opkind=BuiltInKind L3 8.48-8.64'
+        '        apply $SquareAct opkind=BuiltInKind L2 8.50-8.64'
+        '          apply UNCHANGED opkind=BuiltInKind L2 8.51-8.61'
+        '            apply v opkind=VariableDeclKind L1 8.61-8.61'
+        '          apply v opkind=VariableDeclKind L1 8.64-8.64'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,v<=1,x<=2,y<=3}'
+        'lvl ChooseOne L0 ml=[2,2] w=[1,1] mml=[;0] olc=[;FF] lc={x<=2,y<=3}'
+        'lvl Spec L3 lp={v} lc={v<=1,x<=2,y<=3} nlp={v}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '------------------------------ MODULE A ------------------------------\0aEXTENDS Naturals\0a\0aVARIABLE v\0a\0aChooseOne(S, P(_)) == CHOOSE x \\in S : P(x) /\\ \\A y \\in S : P(y)\0a\0aSpec == v = ChooseOne({1}, LAMBDA x : TRUE) /\\ [][UNCHANGED v]_v\0a\0a============\0a'
+  ==
+::
 ++  test-sem-errarity
   %+  expect-eq
     !>  ^-  wain
@@ -898,6 +1045,32 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aVARIABLE x\0aApply(P(_)) == P(0)\0aFoo == Apply(LAMBDA y : y = x)\0a====\0a'
+  ==
+::
+++  test-sem-lamseq
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Foo arity=0 local=n L0 3.1-3.47'
+        '    apply SelectSeq opkind=UserDefinedOpKind L0 3.8-3.47'
+        '      apply $Tuple opkind=BuiltInKind L0 3.18-3.28'
+        '        num 1 L0 3.20-3.20'
+        '        num 2 L0 3.23-3.23'
+        '        num 3 L0 3.26-3.26'
+        '      oparg LAMBDA op=LAMBDA arity=1 L0 3.31-3.46'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={F<=3,i<=3,i<=3,i<=3,i<=3,n<=2,n<=2,n<=2}'
+        'lvl Foo L0 lc={F<=3,i<=3,i<=3,n<=2,n<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Sequences\0aFoo == SelectSeq(<<1, 2, 3>>, LAMBDA e : e = 1)\0a====\0a'
   ==
 ::
 ++  test-sem-letin
