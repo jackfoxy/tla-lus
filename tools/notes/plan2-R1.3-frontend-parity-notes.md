@@ -330,3 +330,45 @@ Both HO-op flavors (user-defined `covk`/`covf`/`covl`, imported `lamseq`) are
 byte-proven, so the 5 non-coverage specs (same `SelectSeq`+LAMBDA path, only
 wrapped in `LET`/`ENABLED` — context-independent for `g-opappl`) are covered;
 their accept flip is confirmed corpus-wide at R1.3.1.5.
+
+**Corpus confirmation (subdir SANY batch, `sany-verdict`).** arms 1-3 FAILED with
+exactly the LAMBDA specs dropping from the frozen divergence set — proof they now
+accept: `coverage/{F,K,L}` (sub-2), `suite/test201` (sub-3), `EWD840/{Error02,
+Error03,MC02,MC02Sim}` + `ModuleOverwrites/ModuleOverwrites` (sub-1). Correctly
+still divergent: `SingleLaneBridge`, `gh1134/*` (R1.3.3/.4), the `suite/*`
+conformance specs (R1.3.4), and **`EWD998/EWD998`** (see R1.3.1.4). (An earlier
+`ok=%.y` reading was stale scrollback; the clean re-run is `ok=%.n` with these
+three arms failing.)
+
+## R1.3.1.4 — LAMBDA in temporal; INSTANCE decision (SHIP-VERIFIED, 2026-08-05)
+
+**No new code** — LAMBDA in temporal/action context already works; this step is
+verification + a scope decision on the two named specs.
+
+- **`suite/test201` (LAMBDA through `INSTANCE … WITH`) — CLOSED, no R1.3.3
+  deferral.** The subdir batch shows it flips to accept: the substitution
+  expression `A <- LAMBDA y : y^3` reaches the same generation path (a LAMBDA in
+  an operator-argument/substitution position), so the `.1`/`.2` mechanism carries
+  it. The plan's conditional deferral is therefore resolved as *keep in R1.3.1*.
+- **LAMBDA in temporal/action level — verified.** New `tests/lib/sem/lamact`
+  (`Next == Apply(LAMBDA y : y = x')`, primed var → action level): SANY renders
+  `oparg LAMBDA … L2`, `Next L2 lc={x<=1}`; `test-sem-lamact` **OK** byte-exact,
+  no new code (`l-def`/`l-x` compute the level-2 body). `EWD840/{MC02,MC02Sim}`
+  (LAMBDA inside `ENABLED`) flipping in the batch is the real-spec witness.
+- **`EWD998/EWD998` — residual reject is NOT a LAMBDA gap; deferred.** Dumping its
+  closure (EWD998 + Utils) through `analyze-graph` gives **10 `%error` diags, all
+  `TLCGetAndSet`** 4270/4271 at lines 188/190/202/204/206 — i.e. a **built-in
+  operator (`+`, `\cup`) passed as an operator argument** (`TLCGetAndSet(0, +,
+  …)`, `(4, \cup, …)`). The spec's actual LAMBDA arguments (lines 193/198,
+  `LAMBDA o,v : Pairwise(o,v,+)` / `… v'[n] …`) raise **no** error — the LAMBDAs
+  are handled. The blocker is higher-order **built-in**-operator arguments, which
+  `g-opappl` routes only for user/imported ops (`ref-arity`/`oparg-of` are
+  ctx-keyed, and a built-in like `+` is not a ctx entry). This is an R1.3.2-class
+  (higher-order op-arg) gap, out of R1.3.1 scope; EWD998 stays in the census as a
+  documented residual and closes when built-in-op-args are handled.
+  - **Known limitation noted:** `+lambda-of` generates the body with `g-x` but
+    does not thread the body's diagnostics, so an error *inside* a LAMBDA body
+    (e.g. a built-in-op-arg) is currently swallowed — masking, not causing, the
+    same gap. Threading body diags belongs with the built-in-op-arg fix (doing it
+    alone would make a `Pairwise(o,v,+)`-in-LAMBDA body falsely reject while SANY
+    accepts). Tracked with the EWD998 residual.

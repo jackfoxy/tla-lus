@@ -982,6 +982,34 @@
       '---- MODULE A ----\0aCONSTANT P, a, b\0aPick == IF P THEN a ELSE b\0a====\0a'
   ==
 ::
+++  test-sem-lamact
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def Apply arity=1 local=n L0 3.1-3.19'
+        '    param P arity=1 L0 3.7-3.10'
+        '    apply P opkind=FormalParamKind L0 3.16-3.19'
+        '      num 0 L0 3.18-3.18'
+        '  def Next arity=0 local=n L2 4.1-4.32'
+        '    apply Apply opkind=UserDefinedOpKind L2 4.9-4.32'
+        '      oparg LAMBDA op=LAMBDA arity=1 L2 4.15-4.31'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl Apply L0 ml=[3] w=[1] mml=[0] olc=[F]'
+        'lvl Next L2 lc={x<=1}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aApply(P(_)) == P(0)\0aNext == Apply(LAMBDA y : y = x\')\0a====\0a'
+  ==
+::
 ++  test-sem-lambda
   %+  expect-eq
     !>  ^-  wain
