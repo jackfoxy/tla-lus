@@ -994,6 +994,67 @@
       '---- MODULE B ----\0aVARIABLE y\0aCONSTANT c\0aOp == y = c\0a====\0a'
   ==
 ::
+++  test-sem-instnest
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Use arity=0 local=n L0 3.1-3.14'
+        '    apply M!Op opkind=UserDefinedOpKind L0 3.8-3.14'
+        '      num 1 L0 3.13-3.13'
+        '  instance module=B local=n L0 2.1-2.10'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Use L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aINSTANCE B\0aUse == M!Op(1)\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aM == INSTANCE C\0a====\0a'
+      :-  'C'
+      '---- MODULE C ----\0aOp(x) == x\0a====\0a'
+  ==
+::
+++  test-sem-instparm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  const k arity=0 L0 2.10-2.10'
+        '  def Inst!Op arity=1 local=n L0 3.1-3.41'
+        '    param n arity=0 L0 3.6-3.6'
+        '    substin subs=2 L0 3.1-3.41'
+        '      sub c <-'
+        '        apply n opkind=FormalParamKind L0 3.33-3.33'
+        '      sub d <-'
+        '        apply k opkind=ConstantDeclKind L0 3.41-3.41'
+        '      in'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.7-3.12'
+        '          apply c opkind=ConstantDeclKind L0 3.8-3.8'
+        '          apply d opkind=ConstantDeclKind L0 3.11-3.11'
+        '  instance name=Inst module=B local=n L0 3.1-3.41'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={k} lc={k<=2}'
+        'lvl Inst!Op L0 ml=[2] w=[1] lp={k} lc={k<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT k\0aInst(n) == INSTANCE B WITH c <- n, d <- k\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c, d\0aOp == {c, d}\0a====\0a'
+  ==
+::
 ++  test-sem-instrex
   %+  expect-eq
     !>  ^-  wain

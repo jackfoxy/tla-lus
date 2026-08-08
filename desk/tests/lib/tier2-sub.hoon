@@ -89,7 +89,7 @@
 ++  test-sany-sub-2
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject'  'gh1134/MultiUser -> hoon=reject'  'gh1134/SingleUser -> hoon=reject'
+    :~  'examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject'
     ==
   !>
   %-  sub-batch-run
@@ -155,7 +155,7 @@
 ++  test-sany-sub-3
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/etest15 -> hoon=reject'  'suite/etest16 -> hoon=accept'  'suite/test10 -> hoon=reject'  'suite/test16 -> hoon=reject'  'suite/test203 -> hoon=reject'
+    :~  'suite/etest15 -> hoon=reject'  'suite/etest16 -> hoon=accept'  'suite/test10 -> hoon=reject'  'suite/test16 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run

@@ -338,19 +338,29 @@
 ::
 ++  inst-syms
   ::  the ctx entries an INSTANCE unit contributes
-  |=  [iu=[name=(unit @t) local=? nl=node] deps=(map @t ctx) full=ctx]
+  |=  [iu=[name=(unit @t) local=? params=(list [@t node @ud]) nl=node] deps=(map @t ctx) full=ctx]
   ^-  (list [@t sym])
   =/  ip  (inst-parts nl.iu)
   =/  bctx  (~(gut by deps) mod.ip ~)
+  =/  nparams  (lent params.iu)
+  ::  a parametrized instance `I(x)` prepends its own parameters to every
+  ::  imported operator: arity grows by their count, each an individual
+  =/  pargs=(list @ud)  (reap nparams 0)
   =/  sub-lvl
     %+  roll  subs.ip
     |=  [[param=@t expr=node] acc=@ud]
-    (max acc (expr-level expr full))
+    (max acc (expr-level expr (add-params full params.iu)))
   %+  murn  ~(tap by bctx)
   |=  [opn=@t s=sym]
   ^-  (unit [@t sym])
   ?.  =(%user-op kind.s)  ~
-  `[(inst-op-name name.iu opn) s(level (max level.s sub-lvl))]
+  =/  s2  s(level (max level.s sub-lvl))
+  =.  arity.s2  (add nparams arity.s2)
+  =.  parg.s2  (weld pargs parg.s2)
+  ::  the prepended parameters are ordinary individuals (weight 1); an
+  ::  empty weights list already means all-1, so only pad an explicit one
+  =?  weights.s2  ?=(^ weights.s2)  (weld `(list @ud)`(reap nparams 1) weights.s2)
+  `[(inst-op-name name.iu opn) s2]
 ::
 ::  +|  Module Export Contexts (dependency-first)
 ::
@@ -1115,9 +1125,13 @@
 ::
 ++  unit-instance
   ::  a module unit's instance content: named (I == INSTANCE ..),
-  ::  unnamed (INSTANCE ..), or ~
+  ::  parametrized (I(x) == INSTANCE ..), unnamed (INSTANCE ..), or ~.
+  ::  `params` are the instance's own formal parameters (the `x` in
+  ::  `I(x)`) — in scope for the WITH expressions and prepended to every
+  ::  imported definition, exactly as SANY does for a parametrized
+  ::  ModuleInstance
   |=  u=node
-  ^-  (unit [name=(unit @t) local=? nl=node])
+  ^-  (unit [name=(unit @t) local=? params=(list [@t node @ud]) nl=node])
   ?:  (is-kind u %n-moduledefinition)
     =/  kids  (kids-of u)
     =/  local  (has-local kids)
@@ -1128,13 +1142,14 @@
       ?~  lhs  ~
       =/  ids  (skim (kids-of i.lhs) |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
       ?~(ids ~ `(leaf-text i.ids))
-    `[nm local i.nls]
+    =/  params  ?~(lhs ~ (lhs-params i.lhs))
+    `[nm local params i.nls]
   ?.  (is-kind u %n-instance)  ~
   =/  kids  (kids-of u)
   =/  local  (has-local kids)
   =/  nls  (skim kids |=(k=node (is-kind k %n-nonlocalinstance)))
   ?~  nls  ~
-  `[~ local i.nls]
+  `[~ local ~ i.nls]
 ::
 ++  inst-op-name
   |=  [inm=(unit @t) opn=@t]
@@ -1542,7 +1557,12 @@
   =/  ids  (skim (kids-of gid) |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
   ?~  ids  [~ ~]
   =/  idn  (rear-node `(list node)`ids)
-  =/  nm  (leaf-text idn)
+  ::  an instance-prefixed application `M!Op(..)` resolves under its
+  ::  qualified name, exactly like the 0-ary +g-genid path
+  =/  nm
+    =/  raw  (leaf-text idn)
+    =/  pfx  (genid-prefix gid)
+    ?~(pfx raw (rap 3 ~[u.pfx raw]))
   =/  s  (~(get by c) nm)
   ?~  s
     :-  `[%nullodn ~]
@@ -2117,7 +2137,7 @@
   ::  record. A substitution for an operator-valued parameter is an
   ::  $OpArg, exactly like an operator argument at an application
   |=  $:  u=node
-          iu=[name=(unit @t) local=? nl=node]
+          iu=[name=(unit @t) local=? params=(list [@t node @ud]) nl=node]
           c=ctx
           ctxs=(map @t ctx)
           mods=(map @t loaded:modules)
@@ -2127,6 +2147,14 @@
           inst=sem-inst
           ds=(list sdiag)
       ==
+  ::  a parametrized instance `I(x) == INSTANCE M` binds `x` in scope for
+  ::  the WITH expressions and prepends it to every imported definition
+  =/  iparams  params.iu
+  =/  isps=(list spar)
+    %+  turn  iparams
+    |=  [pn=@t pnode=node par=@ud]
+    `spar`[pn par & (span-of:ast pnode)]
+  =.  c  (add-params c iparams)
   =/  ip  (inst-parts nl.iu)
   =/  irec=sem-inst  [name.iu mod.ip local.iu (span-of:ast u) ~]
   =/  bt  (~(get by mods) mod.ip)
@@ -2255,11 +2283,11 @@
     =/  wrapped=sem-def
       :*  %sdef
           (inst-op-name name.iu name.base)
-          arity.base
+          (add (lent iparams) arity.base)
           local.iu
           ilvl
           (span-of:ast u)
-          params.base
+          (weld isps params.base)
           `subw
           ''
       ==
@@ -3986,6 +4014,11 @@
       =/  qs  ~(tap in lp.u.hit)
       |-  ^-  (map lkey @ud)
       ?~  qs  acc
+      ::  a parametrized instance `I(x)` substitutes its own formal
+      ::  parameters; those are bound within the instance's definitions,
+      ::  never module-level declarations, so they do not surface in the
+      ::  instance node's (module-scope) levelConstraints (SANY likewise)
+      ?:  =(%formal-param kind.i.qs)  $(qs t.qs)
       $(qs t.qs, acc (lc-put acc i.qs plevel))
     $(ps t.ps, acc acc2)
   ::  getSubLCSet's arg-level-param bounds: for a module argLevelParam

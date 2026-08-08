@@ -343,13 +343,17 @@ SUBDIR_CHUNK = 55
 # gap); `hoon=accept` = Java rejects / Hoon too lenient.
 SUB_BATCH_DIVERGENCES = [
     "examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject",
-    "gh1134/MultiUser -> hoon=reject",
-    "gh1134/SingleUser -> hoon=reject",
+    # gh1134/MultiUser + gh1134/SingleUser closed by R1.3.3.1: MultiUser via
+    # parametrized-instance parameter scope, both via nested-instance member
+    # `StateMachine!Init(..)` resolution. (SingleUser's R1.3.0 `_CONF`
+    # classification was wrong — its cause is the nested-member gap.)
     "suite/etest15 -> hoon=reject",
     "suite/etest16 -> hoon=accept",
     "suite/test10 -> hoon=reject",
     "suite/test16 -> hoon=reject",
-    "suite/test203 -> hoon=reject",
+    # suite/test203 closed by R1.3.3.1: `foo(n) == INSTANCE M WITH A <- g,
+    # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
+    # early by the parametrized-parameter fix.
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
     "suite/test206 -> hoon=reject",
     "suite/test214 -> hoon=accept",
@@ -370,11 +374,13 @@ _INST = "INSTANCE ... WITH substitution edge (R1.3)"
 SUB_BATCH_REASONS = {
     # R1.3.1 closed the LAMBDA specs (ModuleOverwrites, coverage/F,K,L,
     # EWD840/Error02,Error03,MC02,MC02Sim, suite/test201).
-    "suite/test203": "INSTANCE ... WITH over a RECURSIVE definition (R1.3)",
+    # test203 closed by R1.3.3.1 (parametrized instance `foo(n)`, Gap A).
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
-    "gh1134/MultiUser": _INST, "suite/test216": _INST + " (with WF_/temporal)",
+    # gh1134/MultiUser + gh1134/SingleUser closed by R1.3.3.1 (parametrized-
+    # instance parameter scope + nested-instance member `M!Op(..)`).
+    "suite/test216": _INST + " (with WF_/temporal)",
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
-    "gh1134/SingleUser": _CONF, "suite/test7": _CONF,
+    "suite/test7": _CONF,
     "suite/test9": _CONF,
     "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
     "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
@@ -385,7 +391,13 @@ SUB_BATCH_REASONS = {
     "suite/test10": _CONF,
     # EWD998/EWD998 closed by R1.3.2.3 (built-in operator `+`/`\cup` as an
     # operator argument to TLCGetAndSet).
-    "suite/test219": _INST, "suite/test51": _INST + " (with `~>`/higher-order)",
+    # test219 is NOT an INSTANCE-substitution gap: R1.3.3.1 landed the
+    # parametrized/nested instance edges (MultiUser accepts), but test219
+    # still fails at PARSE — it is dominated by labels (`lab(x,y,z) ::`) and
+    # `!`-subexpression selectors (`!:!++`, `!>>`, `!2!1`), the unit-3
+    # subexpression-navigation residue tracked under R1.3.5.
+    "suite/test219": "labels + `!`-subexpression selectors (parse; R1.3.5)",
+    "suite/test51": _INST + " (with `~>`/higher-order)",
     "suite/test23": _CONF,
 }
 

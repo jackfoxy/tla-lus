@@ -12,19 +12,16 @@
 tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	a LET-wrapped primed variable as the `=` LHS inside ENABLED is not recognized as assignable (R1.5.x)
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
-# 19 disagree with Java (276/295 agree):
+# 16 disagree with Java (279/295 agree):
 subdir-batch	examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject	RECURSIVE + higher-order op-arg (`~>`/WF_ liveness spec) — R1.3
-subdir-batch	gh1134/MultiUser -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3)
-subdir-batch	gh1134/SingleUser -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/etest15 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/etest16 -> hoon=accept	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test10 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test16 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
-subdir-batch	suite/test203 -> hoon=reject	INSTANCE ... WITH over a RECURSIVE definition (R1.3)
 subdir-batch	suite/test206 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with \E/SUBSET/higher-order)
 subdir-batch	suite/test214 -> hoon=accept	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test216 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with WF_/temporal)
-subdir-batch	suite/test219 -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3)
+subdir-batch	suite/test219 -> hoon=reject	labels + `!`-subexpression selectors (parse; R1.3.5)
 subdir-batch	suite/test219a -> hoon=reject	INSTANCE ... WITH substitution edge (R1.3) (with \E/SUBSET/higher-order)
 subdir-batch	suite/test23 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)
 subdir-batch	suite/test42 -> hoon=reject	SANY conformance edge (front-end semantic/level residue, R1.3)

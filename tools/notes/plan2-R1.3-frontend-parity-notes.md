@@ -515,3 +515,155 @@ spec, and the R1.3.1 residual, closed. Census flip at R1.3.2.4.
 `SortSeq`'s operator argument), surfaced when its subdir arm flipped; removed
 from `SUB_BATCH_DIVERGENCES` too (23→19, 276/295 agree). All 6 subdir arms +
 the flat batch green; `tier2.py --check` byte-reproducible.
+
+## R1.3.3.0 — kickoff (DOCS/ORACLE ONLY, 2026-08-08)
+
+No ship change, no generator change, no `-test`, no census edit. `SemDump` the
+INSTANCE bucket at the pin, confirm all four substitution edges map onto the
+**existing** `sem-isub`/`$SubstIn`/`l-substin` scaffolding (no new IR shape), and
+name the `sem` goldens that must stay byte-identical. Plan:
+`~/FoxyLabs/tla-lus/R1.3.3-plan.md`. Same pattern as R1.3.2.0 / R1.3.1.0.
+
+### 1. The 8 specs, regrouped to the four code edges
+
+Reassignments from R1.3.0 §2 hold: `suite/test201` already closed by R1.3.1 (not
+a deferral); `suite/test203` added here; `gh1134/SingleUser` is R1.3.4 (`_CONF`),
+only `MultiUser` is R1.3.3. The eight: `gh1134/MultiUser`, `suite/{test206,
+test216,test219,test219a,test51,test203}`, `examples/SingleLaneBridge/
+SingleLaneBridge`.
+
+| edge (increment) | specs | oracle shape |
+|---|---|---|
+| **.1 operator + param subst** | `test219`, `gh1134/MultiUser` | subst into a **HO instance member** (`I!SortSeq arity=3` with an operator param `Op`) + param subst `b <- n` |
+| **.2 `\E`/SUBSET/HO under subst** | `test206`, `test219a` | operator subst as an **oparg** (`sub A5 <- oparg A5/LAMBDA arity=5`), HO instance param (`Inst2(A5(_,_,_,_,_))` → `Inst2!Foo arity=6`), `SUBSET`/`$UnboundedChoose`/`\EE` bodies |
+| **.3 temporal under instance** | `test216`, `test51` | named-instance **temporal members** kept at L3 (`J!SpecC` = `[]`/`$SquareAct`/`<>`/`$WF`), constant subst `D <- 42/43` + temporal theorems; temporal operators as **op-args at L3** (`TempTest(oparg ~> arity=2 L3)`, `-+-> L3`, `\cdot L2`) |
+| **.4 RECURSIVE under WITH** | `test203`, `SingleLaneBridge` | operator subst of a **RECURSIVE** op (`sub A <- oparg g op=g arity=1`, `g` mutually recursive via member `foo!h`); `RECURSIVE SeqFromSet(_)` + HO op-arg in a `WF_`/`~>` liveness spec |
+
+### 2. Oracle captures (byte goldens, `SemDump A.tla` from the spec's dir at the pin)
+
+All eight are **ACCEPT** (feature gap, not a reject-mismatch — no error text to
+match; acceptance + the semantic tree is the golden). Representative fragments:
+
+```
+test219:   def I!SortSeq arity=3 local=n L0
+             param Op arity=2 L0            (HO operator param)
+             substin subs=1 L0
+               sub C <- num 4 L0
+               in  letin ... apply Op opkind=FormalParamKind   (Op used under subst)
+
+test203:   def foo!h arity=1 local=n L0
+             substin subs=2 L0
+               sub A <- oparg g op=g arity=1 L0     (OPERATOR subst -> oparg)
+               sub b <- apply n opkind=FormalParamKind
+               in  apply A opkind=ConstantDeclKind ( apply b opkind=ConstantDeclKind )
+           def g arity=1 ... apply foo!h opkind=UserDefinedOpKind   (RECURSIVE via member)
+
+test219a:  def Inst2!Foo arity=6 local=n L0
+             substin subs=1 L0
+               sub A5 <- oparg A5 op=A5 arity=5 L0   (op subst as oparg, instance-prefixed COp!@!++)
+
+test216:   def Thm2Def ... substin sub D <- num 42 in apply + (apply D ConstantDeclKind) ...
+           def J!SpecC arity=0 L3  ... apply [] L3 ( apply $SquareAct L2 )   (temporal member kept L3)
+           def Spec arity=0 L3  apply $WF L3
+
+test51:    def TempTest arity=1 L0
+             apply TempTest L3 ( oparg ~>   op=~>   arity=2 L3 )
+             apply TempTest L3 ( oparg -+-> op=-+-> arity=2 L3 )
+             apply TempTest L2 ( oparg \cdot op=\cdot arity=2 L2 )
+```
+
+### 3. Edges map onto the existing scaffolding — NO new IR shape
+
+- `sem-isub = [param=@t pkind=symkind expr=(unit sem)]` (`semantic.hoon:1035`).
+  `expr` is a `sem`, so it already holds **all four** subst kinds: `num`
+  (constant), an `$OpArg`-encoded `%apply` (operator subst — the R1.3.2 `$OpArg`,
+  reused), and an `apply` of a formal param (`b <- n`). `$SubstIn`/`$APSubstIn`
+  reserved-`%apply` encoding (`:1018`,`:2114`,`:2268`) and `l-substin` level-check
+  (`:2943`, raises the body level by the subst exprs') are already in place.
+- **Proof the simple case already works:** `sem` goldens `lvlinsth`/`lvlinstm`/
+  `lvlinstp` already carry `F <- Op` (operator subst) and pass. The R1.3.3 gaps
+  are the *harder* subst positions, not the mold: (a) op subst of a RECURSIVE /
+  instance-prefixed op (`.4`/`.2` generation on `unit-instance`/subst-args,
+  `:1100`), (b) HO instance params and `SUBSET`/`\E`/`\EE` under the wrapper
+  (`.2`), (c) **level preservation** of L2/L3 leaves across `$SubstIn` and
+  temporal op-args at L2/L3 (`.3`, in `l-substin` + the R1.3.2 `arg-op-info`
+  path, which must not flatten a temporal op-arg's level). Confirmed:
+  **approach = extend generation + `l-substin`, no new `$%` member** (the
+  zuse-408 mold-loop reason the reserved-`%apply` encoding exists still binds).
+
+### 4. Byte-stability guard — sem goldens that must NOT move
+
+The 11 existing INSTANCE/subst goldens (`desk/test-data/sem/`): `inst`, `instun`,
+`instimp`, `instlcl`, `instrex`, `apsubst`, `lvlinst`, `lvlinstc`, `lvlinsth`,
+`lvlinstm`, `lvlinstp`; plus the oparg goldens R1.3.3 shares the `$OpArg` path
+with (`bltopargs`, `hoargm`, `ho273`, `hoparam`, `hoparm`, `horemap`, `houn`).
+Each R1.3.3.x adds new focused goldens; these stay byte-identical.
+
+### 5. Census baseline — FROZEN
+
+`python3 tools/tier2.py --check` = `tier-2 differential integrity: OK`; the 8
+R1.3.3 specs sit among the 276/295 subdir divergences (before R1.3.3.1).
+
+## R1.3.3.1 — parametrized + nested instance edges (SHIP-VERIFIED, 2026-08-08)
+
+Measured the real Hoon rejection (probe sem cases driven through `dump-sem`) for
+the two `.1` targets; each exposed a **distinct** gap, both in `semantic.hoon`:
+
+- **Gap A — parametrized-instance parameters.** `Inst(n) == INSTANCE B WITH c <- n,
+  …`: SANY binds `n` in scope for the WITH expressions and **prepends** it to every
+  imported def (`Inst!Op arity=1 param n`, `Inst!Two arity=2 param n,x`). Hoon lost
+  `n` entirely → `4200 Unknown operator: n` on `c <- n`, and imported defs had the
+  wrong arity. Fix: `+unit-instance` now returns the instance's own params
+  (`lhs-params` of the module-def LHS); `+g-instance` adds them to the ctx used for
+  the WITH exprs and **prepends** them (as `spar`) to each imported def with
+  `arity += lent`; `+inst-syms` bumps the imported member arity/`parg`/`weights`
+  by the param count so a reference like `SingleUserP!Init` resolves at arity 1.
+- **Gap B — nested instance member application.** `M!Op(1)` where `M` is an instance
+  inside the instanced module: `+g-opappl` used only the **last** identifier leaf
+  (`Op`) as the operator name, dropping the `M!` prefix → `4200 Unknown operator:
+  Op`. (The 0-ary path `+g-genid` already qualified via `+genid-prefix`.) Fix:
+  `+g-opappl` builds the qualified name the same way. Small, but it is what
+  `StateMachine!Init(UserIDs)` in `SingleUser` needs.
+- **Level-constraint follow-up.** After Gap A, the MODULE line's `lc` gained a
+  spurious `n<=2`: `+l-instance`'s `getSubLCSet` mapping added the substitution
+  expression's level params, and a parametrized instance substitutes its own bound
+  formal param `n`. Bound params are never module-level declarations, so SANY does
+  not surface them there — `lcc`'s subst-mapping loop now skips `%formal-param`
+  keys. (The def line's `lc` was already correct via `l-substin`.)
+
+**Result:** `gh1134/MultiUser` **accepts** (`sany-verdict` %reject→%accept) — the
+census target closes. The tier2-sub run then flagged **two more** now-agreeing
+specs the same fixes closed early (they dropped out of the divergence list):
+- **`gh1134/SingleUser`** — Gap B (`StateMachine!Init(UserIDs)`, a nested instance
+  member through `EXTENDS Base`). Its R1.3.0 `_CONF`/R1.3.4 classification was
+  **wrong**: the cause is the nested-member gap, identical to MultiUser's.
+- **`suite/test203`** — Gap A (`foo(n) == INSTANCE test203a WITH A <- g, b <- n`
+  is a **parametrized** instance; `n` in scope + prepended). An **R1.3.3.4** target
+  (RECURSIVE-under-WITH) closed early by the parametrized-parameter fix; the
+  RECURSIVE operator subst `A <- g` was already carried by the existing `$OpArg`
+  substitution path.
+
+Census: `SUB_BATCH_DIVERGENCES` 19→16 (**279/295 agree**). Two focused sem goldens
+land byte-exact (single imported def each, to sidestep the orthogonal instance-def
+**hash-order** divergence below): `instparm` (Gap A: `Inst(n)` prepends `n`,
+`c <- n` resolves) and `instnest` (Gap B: `M!Op(1)`). All 85 sem goldens `ok=%.y`
+(no regression from the shared `g-opappl`/`inst-syms` paths); the tier2-sub arms'
+only diffs were these three specs dropping out (no false regression — nothing
+newly diverged); `tier2.py --check` byte-reproducible.
+
+**`suite/test219` — NOT closed, and NOT an INSTANCE-substitution gap.** With the
+`.1` fix it still `sany-verdict` %reject, and `analyze-graph` returns `~` with
+**0 semantic errors** — i.e. it fails at **parse/resolve**, not level/semantic. The
+spec is dominated by labels (`lab(x,y,z) :: …`) and `!`-subexpression selectors
+(`!:!++`, `!>>`, `!<<`, `!2!1`) — the unit-3 subexpression-navigation residue.
+Reassigned to **R1.3.5** (`parse-errors` / `!`-nav); its census reason updated.
+
+**Known orthogonal divergence (NOT introduced here, surfaced by probing).** SANY's
+`ModuleNode.getOpDefs()` returns **instance-imported** defs in Java hashtable order
+(`Alpha,Beta,Gamma` → `Beta,Gamma,Alpha`), not source/decl order; the root module's
+own defs stay source-ordered. This only affects a **multi-def-instance sem golden**
+(none existed before; the two new goldens are single-def by design) and never the
+accept/reject verdict the census tests — so it does not block MultiUser. Left as a
+documented `semantic-graph` residual (same class as the C1.7 interning-order
+approved difference), to be settled in R1.3.6 if a multi-def-instance golden is
+wanted (canonicalize both sides in `SemDump`/`dump-sem`).
