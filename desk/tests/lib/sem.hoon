@@ -53,6 +53,44 @@
       '---- MODULE A ----\0a====\0a'
   ==
 ::
+++  test-sem-bltopargs
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Apply arity=3 local=n L0 3.1-3.33'
+        '    param a arity=0 L0 3.7-3.7'
+        '    param Op arity=2 L0 3.10-3.17'
+        '    param b arity=0 L0 3.20-3.20'
+        '    apply Op opkind=FormalParamKind L0 3.26-3.33'
+        '      apply a opkind=FormalParamKind L0 3.29-3.29'
+        '      apply b opkind=FormalParamKind L0 3.32-3.32'
+        '  def Foo arity=0 local=n L0 4.1-4.21'
+        '    apply Apply opkind=UserDefinedOpKind L0 4.8-4.21'
+        '      num 1 L0 4.14-4.14'
+        '      oparg + op=+ arity=2 L0 4.17-4.17'
+        '      num 2 L0 4.20-4.20'
+        '  def Bar arity=0 local=n L0 5.1-5.24'
+        '    apply Apply opkind=UserDefinedOpKind L0 5.8-5.24'
+        '      num 1 L0 5.14-5.14'
+        '      oparg \\union op=\\union arity=2 L0 5.17-5.20'
+        '      num 2 L0 5.23-5.23'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl Apply L0 ml=[3,3,3] w=[1,1,1] mml=[;0,0;] olc=[;TFFFFT;]'
+        'lvl Foo L0'
+        'lvl Bar L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Integers\0aApply(a, Op(_, _), b) == Op(a, b)\0aFoo == Apply(1, +, 2)\0aBar == Apply(1, \\cup, 2)\0a====\0a'
+  ==
+::
 ++  test-sem-casex
   %+  expect-eq
     !>  ^-  wain

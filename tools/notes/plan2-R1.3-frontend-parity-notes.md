@@ -484,3 +484,28 @@ exercises them; not golden-tested).
 
 HOON: `snag`/`i.ks` on a `?~`-narrowed list nest-fails (`mull-grow`, `have %~`);
 use a non-narrowing `(lth (lent ks) n)` guard + `snag` on the plain list.
+
+## R1.3.2.3 — built-in operator as an op-arg (SHIP-VERIFIED, 2026-08-08)
+
+EWD998's `TLCGetAndSet(0, +, …)` / `(4, \cup, …)` rejected (4270/4271) because a
+bare operator argument parses to a **Gen*Op wrapper** (`bare-op-node`,
+`syntax.hoon:1343`: `%n-geninfixop`/`%n-genprefixop`/`%n-genpostfixop`/
+`%n-gennonexpprefixop`) — NOT `%n-generalid` — so `ref-arity`/`oparg-of`/
+`ref-first-order` returned `~` before any lookup. SANY renders `oparg + op=+
+arity=2` and (synonym-resolved) `\cup` → `oparg \union op=\union arity=2`.
+
+**Fix:** new shared **`+arg-op-info`** resolves the operator an argument node
+names — a bare `n-generalid` (existing, with instance prefix) **or** a Gen*Op
+wrapper (name via `+op-of-genop`, which synonym-resolves `\cup`→`\union`) — then
+looks it up in the **context then `builtins`** (a built-in like `\union` isn't
+in the context; `+` is, imported by `EXTENDS Integers`). `ref-arity`/`oparg-of`/
+`ref-first-order` are now thin wrappers over it (built-ins have empty `parg` →
+first-order, so they pass the R1.3.2.1 check). The `$OpArg` carries the resolved
+op's `kind` (`%builtin` for `\union`, `%user-op` for imported `+`), so the
+existing `l-x` `$OpArg` level arm resolves it via `l-resolve`.
+
+New sem golden `bltopargs` (`Apply(a, Op(_,_), b) == Op(a,b)` / `Apply(1, +, 2)`
+/ `Apply(1, \cup, 2)`): `test-sem-bltopargs` **OK** byte-exact — `oparg + op=+
+arity=2`, `oparg \union op=\union arity=2`, `Foo`/`Bar` L0. All 83 sem goldens
+`ok=%.y`. **`EWD998/EWD998` now accepts (0 errors)** — the last LAMBDA-bucket
+spec, and the R1.3.1 residual, closed. Census flip at R1.3.2.4.

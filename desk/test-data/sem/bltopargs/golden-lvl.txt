@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2}
+lvl Apply L0 ml=[3,3,3] w=[1,1,1] mml=[;0,0;] olc=[;TFFFFT;]
+lvl Foo L0
+lvl Bar L0

@@ -1240,27 +1240,50 @@
       ==
   ==
 ::
+++  arg-op-info
+  ::  the operator an argument node names — a bare general identifier
+  ::  (possibly instance-prefixed), or a Gen*Op wrapper for an operator
+  ::  symbol used as an argument (`+`, `\cup`, `-.` — a bare-op-node,
+  ::  syntax.hoon:1343) — resolved in the context then the builtins
+  ::  (a built-in operator like `+`/`\union` is a legal op-arg;
+  ::  R1.3.2.3). ~ for any other expression.
+  |=  [n=node c=ctx]
+  ^-  (unit [nm=@t s=sym])
+  =/  nm=(unit @t)
+    ?:  (is-kind n %n-generalid)
+      =/  ids
+        %+  skim  (kids-of n)
+        |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
+      ?~  ids  ~
+      =/  raw  (leaf-text (rear-node `(list node)`ids))
+      ?:  =('@' raw)  ~
+      =/  pfx  (genid-prefix n)
+      `?~(pfx raw (rap 3 ~[u.pfx raw]))
+    ?.  ?=(%node -.n)  ~
+    ?.  ?=(?(%n-geninfixop %n-genprefixop %n-genpostfixop %n-gennonexpprefixop) kind.n)
+      ~
+    `(op-of-genop n)
+  ?~  nm  ~
+  =/  s  (~(get by c) u.nm)
+  ?^  s  `[u.nm u.s]
+  =/  b  (~(get by builtins) u.nm)
+  ?^  b  `[u.nm u.b]
+  ~
+::
 ++  oparg-of
-  ::  the $OpArg encoding when a node is a bare reference to an
-  ::  operator with arity > 0 (SANY builds an OpArgNode there)
+  ::  the $OpArg encoding when a node is a bare reference to an operator
+  ::  with arity > 0 — a user/imported op or a built-in (SANY builds an
+  ::  OpArgNode there)
   |=  [n=node c=ctx]
   ^-  (unit sem)
-  ?.  (is-kind n %n-generalid)  ~
-  =/  kids  (kids-of n)
-  =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
-  ?~  ids  ~
-  =/  nm  (leaf-text (rear-node `(list node)`ids))
-  ?:  =('@' nm)  ~
-  =/  nm
-    =/  pfx  (genid-prefix n)
-    ?~(pfx nm (rap 3 ~[u.pfx nm]))
-  =/  s  (~(get by c) nm)
-  ?~  s  ~
-  ?:  =(0 arity.u.s)  ~
+  =/  ai  (arg-op-info n c)
+  ?~  ai  ~
+  ?:  =(0 arity.s.u.ai)  ~
+  =/  sp  (span-of:ast n)
   :-  ~
-  :*  %apply  ['$OpArg' kind.u.s]  level.u.s  (span-of:ast n)
-      [[nm | (span-of:ast n)] ~]  ~
-      [[%lit %num (crip (a-co arity.u.s)) (span-of:ast n)] ~]
+  :*  %apply  ['$OpArg' kind.s.u.ai]  level.s.u.ai  sp
+      [[nm.u.ai | sp] ~]  ~
+      [[%lit %num (crip (a-co arity.s.u.ai)) sp] ~]
   ==
 ::
 ++  builtin-apply
@@ -1480,23 +1503,14 @@
   [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
 ::
 ++  ref-arity
-  ::  the referenced operator's arity when a node is a bare (possibly
-  ::  instance-prefixed) symbol reference; ~ for any other expression
+  ::  the referenced operator's arity when a node is a bare symbol
+  ::  reference (identifier or operator symbol); ~ for any other
+  ::  expression
   |=  [n=node c=ctx]
   ^-  (unit @ud)
-  ?.  (is-kind n %n-generalid)  ~
-  =/  ids
-    %+  skim  (kids-of n)
-    |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
-  ?~  ids  ~
-  =/  nm  (leaf-text (rear-node `(list node)`ids))
-  ?:  =('@' nm)  ~
-  =/  nm
-    =/  pfx  (genid-prefix n)
-    ?~(pfx nm (rap 3 ~[u.pfx nm]))
-  =/  s  (~(get by c) nm)
-  ?~  s  ~
-  `arity.u.s
+  =/  ai  (arg-op-info n c)
+  ?~  ai  ~
+  `arity.s.u.ai
 ::
 ++  ref-first-order
   ::  whether a bare operator reference names a FIRST-ORDER operator
@@ -1504,22 +1518,13 @@
   ::  A second-order operator (one with an operator-valued parameter,
   ::  e.g. `D(Op(_))`) cannot be passed as an operator argument: SANY's
   ::  OpDefNode.match rejects it with 4271 even when the arity matches
-  ::  (`D(D)` — R1.3.2.1). ~ when the node is not a resolvable op ref.
+  ::  (`D(D)` — R1.3.2.1). A built-in has no operator-valued parameter,
+  ::  so it is first-order. ~ when the node is not a resolvable op ref.
   |=  [n=node c=ctx]
   ^-  (unit ?)
-  ?.  (is-kind n %n-generalid)  ~
-  =/  ids
-    %+  skim  (kids-of n)
-    |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
-  ?~  ids  ~
-  =/  nm  (leaf-text (rear-node `(list node)`ids))
-  ?:  =('@' nm)  ~
-  =/  nm
-    =/  pfx  (genid-prefix n)
-    ?~(pfx nm (rap 3 ~[u.pfx nm]))
-  =/  s  (~(get by c) nm)
-  ?~  s  ~
-  `(levy parg.u.s |=(a=@ud =(0 a)))
+  =/  ai  (arg-op-info n c)
+  ?~  ai  ~
+  `(levy parg.s.u.ai |=(a=@ud =(0 a)))
 ::
 ++  g-opappl
   ::  Op(args): resolve, check arity (4204 -> nullODN, args unprocessed),
