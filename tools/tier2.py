@@ -72,10 +72,10 @@ def main() -> int:
           "comparator shard reproduce byte-identically from the pins.")
     print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
           "(R1.1.1), TLC verdict/distinct-count (R1.1.2), a 142-spec "
-          "mule-isolated SANY batch (R1.1.3/4, 140/142 agree), a 14-spec "
+          "mule-isolated SANY batch (R1.1.3/4 + R1.3.1, 141/142 agree), a 14-spec "
           "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3, 13/14 agree — the "
           "1 left pins R1.5.x), and a "
-          "295-spec subdir SANY batch (R1.1.6-9, tier2-sub.hoon, 263/295 agree). "
+          "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1, tier2-sub.hoon, 272/295 agree). "
           "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
           "Known divergences: desk/test-data/tier2/divergences.txt.")

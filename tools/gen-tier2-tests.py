@@ -202,6 +202,9 @@ SANY_CURATED = [
      "HourClock"),                                    # accept
     ("examples", EXAMPLES / "specifications/transaction_commit",
      "TCommit"),                                      # accept
+    ("examples", EXAMPLES / "specifications/CigaretteSmokers",
+     "CigaretteSmokers"),                             # accept (R1.3.1: LAMBDA
+    #                                                   in the WU3 graph)
 ]
 
 # Known Hoon<->Java SANY divergences on in-scope specs, surfaced by tier 2 and
@@ -214,11 +217,8 @@ KNOWN_DIVERGENCES = [
      "first-order 1-parameter operator is expected; the Hoon 4271 check "
      "compares arity only, not the argument operator's own parameter order "
      "(a level-higher-order edge — R1.3)"),
-    ("examples", EXAMPLES / "specifications/CigaretteSmokers",
-     "CigaretteSmokers",
-     "Java accepts, Hoon rejects: the spec passes a `LAMBDA` to a higher-order "
-     "operator; LAMBDA is not in the WU3 semantic graph (a unit-3 residue — "
-     "R1.3)"),
+    # CigaretteSmokers closed by R1.3.1 (LAMBDA in the WU3 semantic graph) —
+    # now a tested-green SANY_CURATED arm.
 ]
 
 TEMP_PATH = re.compile(r"/tmp/[^ )]*|(?:jar:)?file:[^ )]*|/mnt/[^ )]*\.tla")
@@ -269,10 +269,9 @@ def sany_batch_modules() -> list:
 # where outcome is `crash` or `hoon=<accept|reject>`; the batch arm asserts the
 # actual divergence list equals this frozen set. Populated from the ship run;
 # grouped reasons live in `divergences.txt`.
-SANY_BATCH_DIVERGENCES = ["BagsTest:hoon=reject", "IllegalOperatorTest:hoon=accept"]
+SANY_BATCH_DIVERGENCES = ["IllegalOperatorTest:hoon=accept"]
 BATCH_REASONS = {
-    "BagsTest": "LAMBDA (`BagOfAll(LAMBDA e : ..)`) not in the WU3 graph — the "
-                "unit-3 residue (R1.3)",
+    # BagsTest closed by R1.3.1 (LAMBDA in the WU3 graph); now agrees.
     "IllegalOperatorTest": "higher-order operator-argument arity edge — the "
                            "4271 check compares arity only (R1.3)",
 }
@@ -347,15 +346,7 @@ SUBDIR_CHUNK = 55
 # (`suite/`, `coverage/`). `hoon=reject` = Java accepts / Hoon rejects (a feature
 # gap); `hoon=accept` = Java rejects / Hoon too lenient.
 SUB_BATCH_DIVERGENCES = [
-    "EWD840/Error02 -> hoon=reject",
-    "EWD840/Error03 -> hoon=reject",
-    "EWD840/MC02 -> hoon=reject",
-    "EWD840/MC02Sim -> hoon=reject",
     "EWD998/EWD998 -> hoon=reject",
-    "ModuleOverwrites/ModuleOverwrites -> hoon=reject",
-    "coverage/F -> hoon=reject",
-    "coverage/K -> hoon=reject",
-    "coverage/L -> hoon=reject",
     "examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject",
     "gh1134/MultiUser -> hoon=reject",
     "gh1134/SingleUser -> hoon=reject",
@@ -363,7 +354,6 @@ SUB_BATCH_DIVERGENCES = [
     "suite/etest16 -> hoon=accept",
     "suite/test10 -> hoon=reject",
     "suite/test16 -> hoon=reject",
-    "suite/test201 -> hoon=reject",
     "suite/test203 -> hoon=reject",
     "suite/test206 -> hoon=reject",
     "suite/test214 -> hoon=accept",
@@ -385,11 +375,8 @@ _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
 _CONF = "SANY conformance edge (front-end semantic/level residue, R1.3)"
 _INST = "INSTANCE ... WITH substitution edge (R1.3)"
 SUB_BATCH_REASONS = {
-    "ModuleOverwrites/ModuleOverwrites": _LAM,
-    "coverage/F": _LAM, "coverage/K": _LAM, "coverage/L": _LAM,
-    "EWD840/Error02": _LAM, "EWD840/Error03": _LAM,
-    "EWD840/MC02": _LAM, "EWD840/MC02Sim": _LAM,
-    "suite/test201": "LAMBDA through an INSTANCE ... WITH (R1.3)",
+    # R1.3.1 closed the LAMBDA specs (ModuleOverwrites, coverage/F,K,L,
+    # EWD840/Error02,Error03,MC02,MC02Sim, suite/test201).
     "suite/test203": "INSTANCE ... WITH over a RECURSIVE definition (R1.3)",
     "suite/test30": _HO, "suite/test999": _HO,
     "gh1134/MultiUser": _INST, "suite/test216": _INST + " (with WF_/temporal)",
@@ -402,7 +389,10 @@ SUB_BATCH_REASONS = {
     "suite/test206": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test219a": _INST + " (with \\E/SUBSET/higher-order)",
     "suite/test10": _CONF,
-    "EWD998/EWD998": _LAM + " (in a `~>`/WF_ liveness spec)",
+    "EWD998/EWD998": "built-in operator (`+`/`\\cup`) passed as an operator "
+                     "argument to TLCGetAndSet (EC 4270/4271); its LAMBDAs are "
+                     "handled by R1.3.1 — a higher-order built-in-op-arg gap, "
+                     "R1.3.2-class",
     "suite/test219": _INST, "suite/test51": _INST + " (with `~>`/higher-order)",
     "suite/test23": _CONF,
 }

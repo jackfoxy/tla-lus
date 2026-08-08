@@ -1023,7 +1023,7 @@ appear silently. The complete list of deliberate skips:
 | definition | why |
 |---|---|
 | `Nat`, `Int`, `Seq(S)` in a value position | non-enumerable descriptors here, `UserValue`s at the pin |
-| any `SelectSeq`/`SortSeq`/`BagOfAll` with a `LAMBDA` argument | LAMBDA is not in the semantic graph yet (unit-3 residue) |
+| any `SelectSeq`/`SortSeq`/`BagOfAll` with a `LAMBDA` argument | the LAMBDA is now in the semantic graph (R1.3.1: `$OpArg`-encoded anonymous OpDefNode, level via `l-def`); *evaluating* a LAMBDA-parameterized StandardModule operator during model-checking remains deferred (`resolve-oparg`) |
 | `1 + "a"` | the pin's message names the Java method signature; normalized here |
 | `Bags!SubBag` applied | its vendored body needs recursive functions and multi-binder set constructors (unit-6.5 residue) |
 | `Print`, `PrintT`, `Any` | typed rejections here (no output channel; `Any` excluded) |

@@ -24,7 +24,7 @@
 ++  test-sany-sub-1
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'EWD840/Error02 -> hoon=reject'  'EWD840/Error03 -> hoon=reject'  'EWD840/MC02 -> hoon=reject'  'EWD840/MC02Sim -> hoon=reject'  'EWD998/EWD998 -> hoon=reject'  'ModuleOverwrites/ModuleOverwrites -> hoon=reject'
+    :~  'EWD998/EWD998 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run
@@ -90,7 +90,7 @@
 ++  test-sany-sub-2
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'coverage/F -> hoon=reject'  'coverage/K -> hoon=reject'  'coverage/L -> hoon=reject'  'examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject'  'gh1134/MultiUser -> hoon=reject'  'gh1134/SingleUser -> hoon=reject'
+    :~  'examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject'  'gh1134/MultiUser -> hoon=reject'  'gh1134/SingleUser -> hoon=reject'
     ==
   !>
   %-  sub-batch-run
@@ -156,7 +156,7 @@
 ++  test-sany-sub-3
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/etest15 -> hoon=reject'  'suite/etest16 -> hoon=accept'  'suite/test10 -> hoon=reject'  'suite/test16 -> hoon=reject'  'suite/test201 -> hoon=reject'  'suite/test203 -> hoon=reject'
+    :~  'suite/etest15 -> hoon=reject'  'suite/etest16 -> hoon=accept'  'suite/test10 -> hoon=reject'  'suite/test16 -> hoon=reject'  'suite/test203 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run
