@@ -763,6 +763,35 @@
       '---- MODULE A ----\0aPr(e) == e\'\0aU(F(_)) == 1\0aV == U(Pr)\0a====\0a'
   ==
 ::
+++  test-sem-illegalop
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def D arity=1 local=n L-1 2.1-2.18'
+        '    param Op arity=1 L-1 2.3-2.7'
+        '    apply Op opkind=FormalParamKind L-1 2.13-2.18'
+        '      num 42 L-1 2.16-2.17'
+        '  def Foo arity=0 local=n L-1 3.1-3.11'
+        '    apply D opkind=UserDefinedOpKind L-1 3.8-3.11'
+        '      oparg D op=D arity=1 L-1 3.10-3.10'
+        'DIAGS'
+        'D 4271 ERROR 3.8-3.11 Argument number 1 to operator \'D\''
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl D L-1 ml=? w=? mml=? olc=?'
+        'lvl Foo L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aD(Op(_)) == Op(42)\0aFoo == D(D)\0a====\0a'
+  ==
+::
 ++  test-sem-infix
   %+  expect-eq
     !>  ^-  wain

@@ -372,3 +372,87 @@ verification + a scope decision on the two named specs.
     same gap. Threading body diags belongs with the built-in-op-arg fix (doing it
     alone would make a `Pairwise(o,v,+)`-in-LAMBDA body falsely reject while SANY
     accepts). Tracked with the EWD998 residual.
+
+---
+
+# R1.3.2 — Higher-order operator-argument edges
+
+Sub-plan: `~/FoxyLabs/tla-lus/R1.3.2-plan.md`. Three HO-argument buckets.
+
+## R1.3.2.0 — kickoff (DOCS/ORACLE ONLY, 2026-08-08)
+
+No ship/generator/census change. Captures the SANY goldens and the exact Hoon
+reject diagnostics for the three specs, confirms the buckets, freezes the
+baseline. Same pattern as R1.3.1.0.
+
+### Oracle + Hoon capture (measured)
+
+**IllegalOperatorTest** (`D(Op(_)) == Op(42)` / `Foo == D(D)`) — Hoon too
+lenient. SANY **rejects**:
+```
+D 4271 ERROR 3.8-3.11  Argument number 1 to operator 'D'
+                       should be a 1-parameter operator.
+```
+Hoon `analyze-graph` errors: **`~`** (accepts — the bug). `D`'s parameter
+`Op(_)` is 1-arity, so `D` is a second-order operator; SANY forbids passing it
+where a first-order 1-param operator is required. The Hoon HO check in
+`+g-opappl` (`semantic.hoon:1464`) compares the argument's **arity** only (both
+`D` and the `Op(_)` slot are arity 1). **Fix (R1.3.2.1):** also require the
+argument operator to be **first-order** — every entry of its `parg`
+(`semantic.hoon:40`) must be 0 — else EC 4271 *"…should be a K-parameter
+operator"* (K = the slot's expected arity).
+
+**test30 / test999** (identical but for the module name) — Hoon too strict.
+SANY **accepts**. Hoon `analyze-graph` errors (both, at `2 ++ (x+3)`, line 23):
+```
+D 4004 ERROR 23.17-23.18  Could not find declaration or definition of symbol '++'.
+D 4004 ERROR 23.16-23.23  Couldn't resolve infix operator symbol `++'.
+```
+Only the **infix** operator constant `_++_` fails; the prefix HO constants
+`P(_,_)`, `Plus(_,_)`, `PLen(_)` (declared the same way) resolve and apply
+fine. **Fix (R1.3.2.2):** link an infix use `a ++ b` to a `CONSTANT _++_`
+declaration (infix-operator-symbol resolution for HO constants).
+
+**EWD998/EWD998** (the R1.3.1 residual, re-scoped here) — Hoon too strict. SANY
+**accepts**. Hoon: 10× EC 4270/4271 on `TLCGetAndSet(0, +, …)` / `(4, \cup, …)`
+— a **built-in** operator as an operator argument; `+oparg-of`/`+ref-arity`
+(`semantic.hoon:1178`/`:1450`) are ctx-keyed and miss built-ins. **Fix
+(R1.3.2.3):** resolve a built-in operator (arity from `builtins`) in an
+operator-argument position so the `$OpArg` is generated.
+
+### Buckets → steps
+
+| bucket | direction | step | specs |
+|---|---|---|---|
+| deep-4271 (arg operator must be first-order) | add reject | R1.3.2.1 | `IllegalOperatorTest` |
+| infix operator constant resolution (`CONSTANT _++_`) | stop rejecting | R1.3.2.2 | `suite/test30`, `suite/test999` |
+| built-in operator as an op-arg | stop rejecting | R1.3.2.3 | `EWD998/EWD998` |
+
+Baseline frozen: `divergences.txt` post-R1.3.1 (1 sany + 1 batch + 1 tlc-batch +
+23 subdir); `tier2.py --check` byte-reproducible.
+
+## R1.3.2.1 — deep-4271 (SHIP-VERIFIED, 2026-08-08)
+
+`D(D)` was accepted because `g-opappl`'s HO branch checks the argument's arity
+only (`D` and the `Op(_)` slot are both arity 1). SANY builds the `OpArgNode`
+(the selector passes — `D` IS an arity-1 operator) but its **match** phase
+rejects a **second-order** operator (one whose own parameter is an operator).
+
+- **`+ref-first-order`** (`semantic.hoon`, beside `ref-arity`): `(unit ?)` —
+  `&` iff every entry of the referenced operator's `parg` is 0 (first-order),
+  `~` when the node is not a resolvable op ref.
+- **`g-opappl` HO branch** restructured: on a matching-arity operator ref, build
+  the `$OpArg` (selector), then — if `ref-first-order` is not `[~ %.y]` — keep
+  the oparg in the tree **and** emit the match-phase `e2` (EC 4271, at the
+  application span `span-of:ast n`): *"Argument number N to operator 'X' should
+  be a K-parameter operator."* The non-matching-arity path (selector fail →
+  `nullODN` + `e1` + `e2`) is unchanged.
+
+Faithful to SANY: the `oparg D op=D arity=1` node **stays** in the tree, the sole
+diagnostic is the match-phase 4271 at the app span (3.8-3.11), and everything
+renders `L-1` (level-check skipped on the generation error). New sem golden
+`illegalop` (`D(Op(_))==Op(42)` / `Foo==D(D)`): `test-sem-illegalop` **OK**
+byte-exact, all 81 sem goldens `ok=%.y` (the `ho*`/`errarity` HO-arg cases
+unaffected — first-order op-args build the oparg exactly as before). `sany-verdict`
+now **rejects** `IllegalOperatorTest` (the `e2` `%error`), agreeing with Java;
+census flip deferred to R1.3.2.4.

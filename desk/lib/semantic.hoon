@@ -1479,6 +1479,29 @@
   ?~  s  ~
   `arity.u.s
 ::
+++  ref-first-order
+  ::  whether a bare operator reference names a FIRST-ORDER operator
+  ::  (every formal parameter is an individual — each `parg` entry 0).
+  ::  A second-order operator (one with an operator-valued parameter,
+  ::  e.g. `D(Op(_))`) cannot be passed as an operator argument: SANY's
+  ::  OpDefNode.match rejects it with 4271 even when the arity matches
+  ::  (`D(D)` — R1.3.2.1). ~ when the node is not a resolvable op ref.
+  |=  [n=node c=ctx]
+  ^-  (unit ?)
+  ?.  (is-kind n %n-generalid)  ~
+  =/  ids
+    %+  skim  (kids-of n)
+    |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
+  ?~  ids  ~
+  =/  nm  (leaf-text (rear-node `(list node)`ids))
+  ?:  =('@' nm)  ~
+  =/  nm
+    =/  pfx  (genid-prefix n)
+    ?~(pfx nm (rap 3 ~[u.pfx nm]))
+  =/  s  (~(get by c) nm)
+  ?~  s  ~
+  `(levy parg.u.s |=(a=@ud =(0 a)))
+::
 ++  g-opappl
   ::  Op(args): resolve, check arity (4204 -> nullODN, args unprocessed),
   ::  then per-position operator-argument arity checks (an operator
@@ -1535,8 +1558,31 @@
     =/  la  ?:(=(expect (lam-arity i.nl)) (lambda-of i.nl c) ~)
     ?^  la  $(nl t.nl, i +(i), out [u.la out])
     =/  ra  (ref-arity i.nl c)
-    =/  oa  ?:(?&(?=(^ ra) =(expect u.ra)) (oparg-of i.nl c) ~)
-    ?^  oa  $(nl t.nl, i +(i), out [u.oa out])
+    =/  arity-ok  &(?=(^ ra) =(expect u.ra))
+    ?:  arity-ok
+      ::  the selector builds the OpArgNode (right arity); a FIRST-ORDER
+      ::  operator is a valid argument, but a SECOND-ORDER operator (an
+      ::  operator-valued parameter, `D(D)`) still fails the match phase
+      ::  with 4271 while the oparg stays in the tree (R1.3.2.1)
+      =/  oa  (oparg-of i.nl c)
+      =/  built  ?~(oa `sem`[%nullodn ~] u.oa)
+      =/  fo  (ref-first-order i.nl c)
+      ?:  ?=([~ %.y] fo)
+        $(nl t.nl, i +(i), out [built out])
+      =/  e2
+        %^  derr  4.271  (span-of:ast n)
+        ;:  weld
+          "Argument number {(a-co +(i))} to operator '{(trip nm)}' "
+          "\0ashould be a {(a-co expect)}-parameter operator."
+        ==
+      %=  $
+        nl   t.nl
+        i    +(i)
+        out  [built out]
+        d2   (weld d2 [e2 ~])
+      ==
+    ::  not a matching-arity operator: the selector fails (4270/4271) and
+    ::  the argument becomes nullODN, then the match phase's 4271 follows
     =/  e1
       ?^  ra
         %^  derr  4.271  (span-of:ast i.nl)
