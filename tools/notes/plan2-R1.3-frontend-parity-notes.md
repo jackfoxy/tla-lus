@@ -981,3 +981,46 @@ error; single-quote the cord (`{` is literal there). (2) The 2-min bash cap can'
 full ship suite (tier2-sub arms ~300s each); use a `run_in_background` until-loop waiter.
 (3) `tmux capture-pane -S -900` missed FAILED lines buried under huge tier2-sub output —
 widen the scrollback or grep the whole buffer.
+
+### R1.3.5.2 — `!`-subexpression selectors, parse layer (SHIP-VERIFIED, 2026-08-09)
+
+**Scope collapsed after measurement.** R1.3.5.0 assumed the `!`-nav grammar was
+missing; it is ~95% present — `general-id-full` (syntax.hoon) already builds the
+idprefix-element chain (`ident!`, `ident(args)!`, `(args)!`, structops `!<<`/`!>>`/
+`!:`/`!123`, final `!@`/operator/identifier) and `label-expr` produces `n-label` with
+the `labelDoesNotChangeParse` check. Probed the CURRENT parser on the three specs:
+- **`test216` already parses** — its divergence is *semantic* (belongs in R1.3.5.3),
+  not parse; the R1.3.5.0 census reason ("parse") was imprecise.
+- **`test206`/`test219`** failed on exactly two constructs, found by AstDump-ing the
+  chains: (1) a trailing **`!(args)`** (`COp(1,2)!(3)`) = an `N_OpArgs` directly under
+  `N_GeneralId`; (2) a mid-chain **operator-symbol selector with args** `!++(9,10)!`.
+
+**Fix (three additions to `general-id-full`, all CST-byte-exact vs AstDump):**
+1. trailing `!(args)` final segment → `[n-idprefix, n-opargs]` general-id.
+2. mid-chain op-symbol element `!op!` / `!op(args)!` via new `+op-sym-tok`/`+op-sel-node`/
+   `+op-sel-mid` (the last is a trailing-bang lookahead that distinguishes a mid-chain
+   selector from a *final* operator like `!++(4,5)`, which stays an `n-opapplication`).
+3. mid-chain **`@`** now emits `n-structop` (was `identifier`) to match SANY — a
+   pre-existing CST inexactness surfaced while byte-checking `COp!@!++`.
+KEY CST FACT (AstDump): a trailing `!ident(args)` / `!op(args)` is `n-opapplication(
+general-id, opargs)` — `ident-expr` already wraps it — whereas a bang **immediately**
+followed by `(args)` is a general-id child. So no "final trailing opargs" change was
+needed (an early wrong hypothesis, corrected by dumping the enclosing node).
+
+**Verified:** committed probe — `parse:syntax` on **test206/test216/test219 all parse
+(`%parses`)**. New hand-written byte-exact CST test `tests/lib/syntax/subexpr-ext.hoon`
+(4 arms: `!(args)`-final, `!op(args)!`-mid, `@`-structop, `!op(args)`-final-opappl) vs
+AstDump — these forms are ABSENT from the pinned upstream corpus
+(`subexpressions.txt` has only `op(a,b)!<<!>>!3!(x,y)!:!@`). No regression: full syntax
+dir (all 30 corpus shards + subexpr-ext), sem (92 goldens), lexer = `ok=%.y`.
+
+**Census unchanged (correct):** .2 is parse-only; test206/216/219 still reject at
+*semantic* (label refs unresolved → R1.3.5.3), so they stay divergent and the tier2-sub
+arms keep matching the census. Only test52 (R1.3.5.1) remains the expected sub-5 flip.
+Ledger `parse-errors` advanced (selector forms now parse byte-exact). No git commit yet.
+
+**GOTCHAS:** (1) `capture-pane` showed STALE identical `-test` output (same µs timings) —
+always C-c + C-a C-k + clear-history and read a FRESH run. (2) misread an AstDump excerpt
+by cutting the sed window above the enclosing `n-opapplication`; always dump from the
+`def` line to see the wrapper. (3) split a multi-form byte-golden into per-def arms so a
+mismatch isolates to one tiny def.

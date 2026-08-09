@@ -1158,12 +1158,16 @@
     =/  elem
       (mk-node:ast %n-idprefixelement ~[(leaf:ast ct) (leaf:ast u.k2)])
     $(s (advance (advance s)), elems [elem elems])
-  ::  ident !  ->  plain element
+  ::  ident !  ->  plain element; a mid-chain `@` is the argument selector
+  ::  (N_StructOp), not an identifier — matches SANY (R1.3.5.2)
   ?:  ?&  =(%identifier kind.u.pk)
           ?=(^ k2)  =(%bang kind.u.k2)
       ==
-    =/  elem
-      (mk-node:ast %n-idprefixelement ~[(leaf:ast u.pk) (leaf:ast u.k2)])
+    =/  hd=node
+      ?:  &(?=(^ elems) =('@' text.u.pk))
+        (tok-node:ast %n-structop u.pk)
+      (leaf:ast u.pk)
+    =/  elem  (mk-node:ast %n-idprefixelement ~[hd (leaf:ast u.k2)])
     $(s (advance (advance s)), elems [elem elems])
   ::  ident ( args ) !  ->  application element
   ?:  ?&  =(%identifier kind.u.pk)
@@ -1209,6 +1213,38 @@
     =/  elem
       (mk-node:ast %n-idprefixelement ~[sop (leaf:ast u.k2)])
     $(s (advance (advance s)), elems [elem elems])
+  ::  operator-symbol selector element `!++!` / `!++(9,10)!`: an infix/
+  ::  prefix/postfix operator used as a mid-chain subexpression selector,
+  ::  with optional arguments, followed by a bang. A final operator (no
+  ::  trailing bang) falls through to the final segment (R1.3.5.2)
+  ?:  ?&  ?=(^ elems)
+          (op-sym-tok u.pk)
+          (op-sel-mid ?~(rest.s ~ t.rest.s))
+      ==
+    =/  opn  (op-sel-node u.pk)
+    =.  s  (advance s)
+    =/  nk  (peek s)
+    ?:  &(?=(^ nk) =(%lbr kind.u.nk))
+      =/  ar  (op-args-tail s)
+      ?:  ?=(%| -.ar)  [%| p.ar]
+      =.  s  s.p.ar
+      =/  bk  (peek s)
+      ?.  &(?=(^ bk) =(%bang kind.u.bk))  [%| (perr-enc s 1)]
+      =/  elem
+        (mk-node:ast %n-idprefixelement ~[opn v.p.ar (leaf:ast u.bk)])
+      $(s (advance s), elems [elem elems])
+    ?.  &(?=(^ nk) =(%bang kind.u.nk))  [%| (perr-enc s 1)]
+    =/  elem  (mk-node:ast %n-idprefixelement ~[opn (leaf:ast u.nk)])
+    $(s (advance s), elems [elem elems])
+  ::  ( args )  as the final segment  ->  COp(1, 2)!(3): a trailing `!(args)`
+  ::  is an N_OpArgs directly under the N_GeneralId (the preceding `!` was
+  ::  consumed with the prior element); the mid-chain `(args)!` form is
+  ::  handled above, so reaching here means no bang follows (R1.3.5.2)
+  ?:  &(=(%lbr kind.u.pk) ?=(^ elems))
+    =/  ar  (op-args-tail s)
+    ?:  ?=(%| -.ar)  [%| p.ar]
+    =/  pfx  (mk-node:ast %n-idprefix (flop elems))
+    [%& (mk-node:ast %n-generalid ~[pfx v.p.ar]) s.p.ar]
   ::  final segment
   =/  fin
     ^-  (each node @t)
@@ -1247,6 +1283,44 @@
   |=  toks=(list token)
   ^-  ?
   ?~  toks  |
+  ?.  =(%lbr kind.i.toks)  |
+  =/  depth  1
+  =/  t  t.toks
+  |-  ^-  ?
+  ?~  t  |
+  ?:  =(0 depth)  =(%bang kind.i.t)
+  ?:  =(%lbr kind.i.t)  $(t t.t, depth +(depth))
+  ?:  =(%rbr kind.i.t)  $(t t.t, depth (dec depth))
+  $(t t.t)
+::
+++  op-sym-tok
+  ::  the token is an infix/prefix/postfix operator symbol, usable as a
+  ::  subexpression selector (`!++`, `!^+`, ...) — R1.3.5.2
+  |=  tok=token
+  ^-  ?
+  ?:  =('-.' text.tok)  &
+  ?=(^ (class-of tok))
+::
+++  op-sel-node
+  ::  the CST node for an operator symbol used as a subexpression selector,
+  ::  by fixity class (mirrors the final-segment / op-ref-operand mapping)
+  |=  tok=token
+  ^-  node
+  =/  cls  (class-of tok)
+  ?:  |(?=([~ %prefix] cls) =('-.' text.tok))
+    (tok-node:ast %n-nonexpprefixop tok)
+  ?:  ?=([~ %postfix] cls)
+    (tok-node:ast %n-postfixop tok)
+  (tok-node:ast %n-infixop tok)
+::
+++  op-sel-mid
+  ::  lookahead from just after an operator token: an optional balanced
+  ::  `(...)` then a bang -> the operator is a mid-chain selector (as
+  ::  opposed to a final operator, which is followed by no bang)
+  |=  toks=(list token)
+  ^-  ?
+  ?~  toks  |
+  ?:  =(%bang kind.i.toks)  &
   ?.  =(%lbr kind.i.toks)  |
   =/  depth  1
   =/  t  t.toks
