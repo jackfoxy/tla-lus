@@ -887,6 +887,34 @@
       '---- MODULE A ----\0aCONSTANT _++_, Plus(_, _)\0aFoo == 2 ++ 3\0aBar == Plus(2, 3)\0a====\0a'
   ==
 ::
+++  test-sem-infixparam
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def TempTest arity=1 local=n L0 2.1-2.22'
+        '    param + arity=2 L0 2.10-2.12'
+        '    apply + opkind=FormalParamKind L0 2.18-2.22'
+        '      num 1 L0 2.18-2.18'
+        '      num 2 L0 2.22-2.22'
+        '  def Foo arity=0 local=n L0 3.1-3.21'
+        '    apply TempTest opkind=UserDefinedOpKind L0 3.8-3.21'
+        '      oparg \\union op=\\union arity=2 L0 3.17-3.20'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl TempTest L0 ml=[3] w=[1] mml=[0,0] olc=[FF]'
+        'lvl Foo L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aTempTest(_+_) == 1 + 2\0aFoo == TempTest(\\cup)\0a====\0a'
+  ==
+::
 ++  test-sem-inst
   %+  expect-eq
     !>  ^-  wain

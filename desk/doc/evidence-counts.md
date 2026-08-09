@@ -12,7 +12,7 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-parse-err-tests.py` | 34 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/parse-err.hoon` |
 | `gen-bnf-manifest.py` | 35 | pass | BNF grammar productions | `desk/tests/lib/bnf.hoon` |
 | `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/modres.hoon` |
-| `gen-sem-tests.py` | 86 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
+| `gen-sem-tests.py` | 87 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/eval.hoon` |
 | `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/stdmods.hoon` |
@@ -28,6 +28,6 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-sim-live-tests.py` | 10 | pass | Temporal property in simulation (LiveCheck.checkTrace) | `desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`` |
 | `gen-sim-stats-tests.py` | 7 | pass | Simulation statistics (SimulationWorkerStatistics) | `desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`` |
 
-Compared cases: **865**.  Oracle-only cases: **27**.
+Compared cases: **866**.  Oracle-only cases: **27**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

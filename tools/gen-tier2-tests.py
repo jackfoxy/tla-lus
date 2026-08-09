@@ -363,8 +363,10 @@ SUB_BATCH_DIVERGENCES = [
     "suite/test219 -> hoon=reject",
     "suite/test219a -> hoon=reject",
     "suite/test23 -> hoon=reject",
-    "suite/test42 -> hoon=reject",
-    "suite/test51 -> hoon=reject",
+    # suite/test51 + suite/test42 closed by R1.3.3.3 (operator-symbol
+    # parameter in a definition LHS: `TempTest(_+_)`, `Foo(a, _--_)`). The
+    # plan's ".3 = temporal under instance" already works; the real gap was
+    # the infix operator parameter. test42 is an R1.3.4 target closed early.
     "suite/test52 -> hoon=reject",
     "suite/test7 -> hoon=reject",
     "suite/test9 -> hoon=reject",
@@ -380,12 +382,16 @@ SUB_BATCH_REASONS = {
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
     # gh1134/MultiUser + gh1134/SingleUser closed by R1.3.3.1 (parametrized-
     # instance parameter scope + nested-instance member `M!Op(..)`).
-    "suite/test216": _INST + " (with WF_/temporal)",
+    # test216 is NOT a temporal-under-instance gap (that already works); it
+    # fails at PARSE on `!`-subexpression selectors (`Thm1!:`/`!<<`/`!2!1`),
+    # the unit-3 `!`-nav residue → R1.3.5.
+    "suite/test216": "labels + `!`-subexpression selectors (parse; R1.3.5)",
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
+    # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
     "suite/test7": _CONF,
     "suite/test9": _CONF,
     "suite/etest16": _CONF, "suite/test16": _CONF,
-    "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
+    "suite/test214": _CONF, "suite/test52": _CONF,
     # SingleLaneBridge + etest15 + test10 closed by R1.3.3.2 (tuple-pattern
     # binders). test206/test219a are NOT the "\E/SUBSET under substitution"
     # gap the plan expected — that already works; both fail on labels /
@@ -401,7 +407,6 @@ SUB_BATCH_REASONS = {
     # `!`-subexpression selectors (`!:!++`, `!>>`, `!2!1`), the unit-3
     # subexpression-navigation residue tracked under R1.3.5.
     "suite/test219": "labels + `!`-subexpression selectors (parse; R1.3.5)",
-    "suite/test51": _INST + " (with `~>`/higher-order)",
     "suite/test23": _CONF,
 }
 

@@ -217,13 +217,17 @@
   |=(k=node &(?=(%leaf -.k) =(%local kind.token.k)))
 ::
 ++  count-params
-  ::  N_IdentLHS parameter count (n-paramdecl / n-identdecl kids)
+  ::  N_IdentLHS parameter count (n-paramdecl / n-identdecl kids, plus
+  ::  operator-symbol params `_+_`/`-._`/`_^` — R1.3.3.3)
   |=  kids=(list node)
   ^-  @ud
   %+  roll  kids
   |=  [k=node acc=@ud]
   ?:  ?|  (is-kind k %n-identdecl)
           (is-kind k %n-paramdecl)
+          (is-kind k %n-infixdecl)
+          (is-kind k %n-prefixdecl)
+          (is-kind k %n-postfixdecl)
       ==
     +(acc)
   acc
@@ -298,19 +302,8 @@
       ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
       `[(leaf-text i.ik) [%constant (us-arity k) | 0 ~ ~] k]
     ::  the operator symbol is a childless tok-node (its text is in the
-    ::  image); position and arity depend on the fixity
-    =/  oi=(unit [nm=@t ary=@ud])
-      =/  ks  (kids-of k)
-      ?:  (is-kind k %n-infixdecl)
-        ?:  (lth (lent ks) 2)  ~
-        `[(resolve-syn (node-text (snag 1 ks))) 2]
-      ?:  (is-kind k %n-prefixdecl)
-        ?:  (lth (lent ks) 1)  ~
-        `[(resolve-syn (node-text (snag 0 ks))) 1]
-      ?:  (is-kind k %n-postfixdecl)
-        ?:  (lth (lent ks) 2)  ~
-        `[(resolve-syn (node-text (snag 1 ks))) 1]
-      ~
+    ::  image); position and arity depend on the fixity (shared +opsym-param)
+    =/  oi  (opsym-param k)
     ?~  oi  ~
     `[nm.u.oi [%constant ary.u.oi | 0 ~ ~] k]
   ~
@@ -502,6 +495,26 @@
   |=  [k=node acc=@ud]
   ?:  &(?=(%leaf -.k) =(%us (leaf-kind k)))  +(acc)  acc
 ::
+++  opsym-param
+  ::  an operator-symbol parameter/constant decl `_+_`/`-._`/`_^` (parsed by
+  ::  +param-decl as n-infixdecl / n-prefixdecl / n-postfixdecl) -> its
+  ::  operator name and arity (infix 2, prefix/postfix 1); the symbol is a
+  ::  childless tok-node whose text is its image (R1.3.2.2 / R1.3.3.3). ~ for
+  ::  any other node
+  |=  k=node
+  ^-  (unit [nm=@t ary=@ud])
+  =/  ks  (kids-of k)
+  ?:  (is-kind k %n-infixdecl)
+    ?:  (lth (lent ks) 2)  ~
+    `[(resolve-syn (node-text (snag 1 ks))) 2]
+  ?:  (is-kind k %n-prefixdecl)
+    ?:  (lth (lent ks) 1)  ~
+    `[(resolve-syn (node-text (snag 0 ks))) 1]
+  ?:  (is-kind k %n-postfixdecl)
+    ?:  (lth (lent ks) 2)  ~
+    `[(resolve-syn (node-text (snag 1 ks))) 1]
+  ~
+::
 ++  lhs-params
   ::  [param-name param-node arity] list from a definition LHS
   |=  lhs=node
@@ -513,10 +526,13 @@
     %+  murn  lk
     |=  k=node
     ^-  (unit [@t node @ud])
-    ?.  (is-kind k %n-identdecl)  ~
-    =/  ik  (kids-of k)
-    ?~  ik  ~
-    `[(leaf-text i.ik) k (us-arity k)]
+    ?:  (is-kind k %n-identdecl)
+      =/  ik  (kids-of k)
+      ?~  ik  ~
+      `[(leaf-text i.ik) k (us-arity k)]
+    ::  an operator-symbol parameter `TempTest(_+_)` binds `+` at arity 2
+    =/  oi  (opsym-param k)
+    ?~(oi ~ `[nm.u.oi k ary.u.oi])
   ::
       %n-infixlhs
     ::  [ident infixop ident] -> the two identifier leaves (arity 0)
@@ -812,13 +828,19 @@
     ?~(t.kids ~ `i.t.kids)
   $(kids t.kids)
 ++  subtree-names-has
-  ::  does any identifier leaf in the subtree equal nm
+  ::  does any identifier leaf or operator symbol in the subtree resolve to
+  ::  nm (so an operator-symbol parameter `_+_` counts as used when its
+  ::  operator appears in the body, e.g. `1 + 2`; an infix/prefix/postfix
+  ::  operator is a childless tok-node carrying its text in the image —
+  ::  R1.3.3.3)
   |=  [n=node nm=@t]
   ^-  ?
   ?:  ?=(%leaf -.n)
-    &(=(%identifier kind.token.n) =(nm text.token.n))
-  %+  lien  (kids-of n)
-  |=(k=node (subtree-names-has k nm))
+    ?|  &(=(%identifier kind.token.n) =(nm text.token.n))
+        =(nm (resolve-syn text.token.n))
+    ==
+  ?:  =(nm (resolve-syn image.n))  &
+  (lien (kids-of n) |=(k=node (subtree-names-has k nm)))
 ::
 ++  num-value
   ::  the numeric literal text under an N_Number / N_Real

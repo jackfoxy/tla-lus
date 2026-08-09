@@ -706,3 +706,48 @@ were these three dropping out (no false regression). `test219a` went 3→1 error
 = `Op!lab` label ref) and `test206` stays parse-blocked — the two nominal .2 targets
 are both **gated on R1.3.5** (`!`-nav), not on substitution; their census reasons
 updated. `tier2.py --check` byte-reproducible.
+
+## R1.3.3.3 — operator-symbol parameter in a definition (SHIP-VERIFIED, 2026-08-08)
+
+Same shape as `.2`: the plan's nominal scope was misdiagnosed. Measured the two
+`.3` targets:
+
+- **"Temporal under instance" already works.** `test51` reaches `Foo1 == TempTest(-+->)`
+  at L3; the temporal/user op-args resolve via the R1.3.2.3 `arg-op-info` path.
+- **The real gap is an operator-symbol PARAMETER in a definition** `TempTest(_+_)`.
+  Measured: `test51` **parses** with **3 sem errors** `4204 The operator TempTest
+  requires 0 arguments` — Hoon computed TempTest's arity as **0**. `test216` fails at
+  **parse** (`!`-subexpression selectors `Thm1!:`/`Thm1!<<`/`Thm1b!2!1` → R1.3.5).
+
+**Root cause.** `+param-decl` parses a def's operator-symbol param `_+_` to the SAME
+`n-infixdecl`/`n-prefixdecl`/`n-postfixdecl` node as a `CONSTANT _++_` (R1.3.2.2), but
+`+count-params` (def arity) counted only `n-identdecl`/`n-paramdecl`, and `+lhs-params`
+(param binding + `parg`) extracted only `n-identdecl` — so the operator param was
+invisible: arity 0, `+` unbound.
+
+**Fix.** New shared `+opsym-param` (operator name + arity from a fixity decl: infix 2,
+prefix/postfix 1) now backs three callers — `+decl-syms` (refactored to it, no behaviour
+change), `+count-params` (now counts the three fixity kinds), `+lhs-params` (binds e.g.
+`+` at arity 2, so the body `1 + 2` resolves and `add-params` seeds the formal at the
+right arity). **Second fix (the `used` flag):** the rendered param level `L0`/`L-1`
+comes from `used.p = (subtree-names-has body <name>)`, which matched only `%identifier`
+leaves; an operator in the body (`1 + 2`) is a **childless tok-node** whose text is in
+the `image`. `+subtree-names-has` now resolves each node's image / leaf text through
+`+resolve-syn`, so an operator-symbol param counts as used and renders `L0` like SANY.
+(All 87 sem goldens pass — the broadened match is `resolve-syn`-guarded, no false hits.)
+
+**Result.** New sem golden `infixparam` (`TempTest(_+_) == 1 + 2` / `Foo == TempTest(\cup)`:
+`param + arity=2`, body `apply + FormalParamKind`, `oparg \union`) byte-exact. Census
+**closed two** — again neither the plan's nominal target:
+- **`suite/test51`** — `TempTest(_+_)` (the `.3` target, via the op-param + the already-
+  working temporal op-args).
+- **`suite/test42`** — `Foo(a, _--_) == a -- 0` (an operator-symbol param mixed with a
+  normal one), an **R1.3.4** target closed early.
+
+Census `SUB_BATCH_DIVERGENCES` 13→11 (**284/295 agree**); tier2-sub diffs were only these
+two dropping out (no false regression). The nominal target `test216` stays parse-blocked
+(`!`-nav → R1.3.5); its census reason updated. `tier2.py --check` byte-reproducible.
+
+NOTE (golden gotcha): an `EXTENDS Integers` in the `infixparam` fixture makes `+` a
+**multiply-defined** symbol (param vs the imported operator) — SANY then REJECTs (EC
+4201). The fixture omits EXTENDS; the body `1 + 2` uses the param `+`, `\cup` is built-in.
