@@ -649,7 +649,7 @@
       %n-prefixexpr
     =/  kids  (kids-of n)
     ?.  =(2 (lent kids))  (max-levels c ~)
-    (op-level (op-of-genop (snag 0 kids)) c ~[(snag 1 kids)])
+    (op-level (canon-prefix-op (op-of-genop (snag 0 kids))) c ~[(snag 1 kids)])
   ::
       %n-postfixexpr
     =/  kids  (kids-of n)
@@ -807,6 +807,16 @@
   =/  kids  (kids-of n)
   ?~  kids  ''
   (resolve-syn (node-text (rear-node kids)))
+::
+++  canon-prefix-op
+  ::  SANY names the prefix operator `-` as `-.` (its distinct prefix-form
+  ::  name in the operator table; the infix `-` is subtraction). Applied
+  ::  wherever a prefix-operator use is resolved so a prefix `-` binds to
+  ::  the `-.` declaration/parameter/definition rather than the infix `-`
+  ::  (test52, R1.3.5.1). Every other operator symbol is already canonical.
+  |=  nm=@t
+  ^-  @t
+  ?:(=(nm '-') '-.' nm)
 ++  tuple-idents
   ::  the identifier [name node] pairs bound by an N_IdentifierTuple
   ::  `<<y, z>>` (nested tuples destructure recursively); SANY binds each
@@ -859,6 +869,15 @@
     ?|  &(=(%identifier kind.token.n) =(nm text.token.n))
         =(nm (resolve-syn text.token.n))
     ==
+  ::  a prefix `-` parses with an `n-infixop` operator child under an
+  ::  `n-prefixexpr` parent, so it is only distinguishable from infix `-`
+  ::  here by the parent kind; canon-prefix-op it so a `-._` parameter
+  ::  counts as used when a prefix `-` appears in the body (test52, R1.3.5.1)
+  ?:  =(%n-prefixexpr kind.n)
+    =/  ks  (kids-of n)
+    ?~  ks  |
+    ?:  =(nm (canon-prefix-op (op-of-genop i.ks)))  &
+    ?~(t.ks | (subtree-names-has i.t.ks nm))
   ?:  =(nm (resolve-syn image.n))  &
   (lien (kids-of n) |=(k=node (subtree-names-has k nm)))
 ::
@@ -1430,7 +1449,7 @@
     =/  kids  (kids-of n)
     ?.  =(2 (lent kids))  [~ ~]
     =/  opnode  (snag 0 kids)
-    =/  opn  (op-of-genop opnode)
+    =/  opn  (canon-prefix-op (op-of-genop opnode))
     =/  s  (~(get by c) opn)
     ?~  s
       :-  ~

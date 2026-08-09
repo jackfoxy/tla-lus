@@ -110,10 +110,10 @@
     [['Naturals' '\\leq' 2] [| 0 |=(a=(list value:v) (compare '\\leq' a))]]
     [['Naturals' '\\geq' 2] [| 0 |=(a=(list value:v) (compare '\\geq' a))]]
     [['Naturals' '..' 2] [| 0 |=(a=(list value:v) (dotdot a))]]
-    ::  unary minus. The pin declares it as `-.` in Integers; the WU3
-    ::  generator names the node `-` with one argument, so the reachable key
-    ::  is [Naturals '-' 1] (C1.2 revisits the naming with the oracle)
-    [['Naturals' '-' 1] [| 0 |=(a=(list value:v) (negate a))]]
+    ::  unary minus. The pin declares it as `-.` in Integers; the generator
+    ::  now canonicalizes a prefix `-` to `-.` (+canon-prefix-op, R1.3.5.1)
+    ::  so the reachable key matches the pin exactly: [Integers '-.' 1]
+    [['Integers' '-.' 1] [| 0 |=(a=(list value:v) (negate a))]]
     ::  Sequences
     [['Sequences' '\\o' 2] [| 0 |=(a=(list value:v) (concat a))]]
     [['Sequences' 'Len' 1] [| 0 |=(a=(list value:v) (seq-len a))]]

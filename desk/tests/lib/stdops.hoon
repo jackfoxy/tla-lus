@@ -59,8 +59,9 @@
   (bind (one "EXTENDS Integers" ~["Expr == 1 + 2"]) '+' 2 %override)
 ::
 ++  test-binding-unary-minus
-  ::  the same identifier at arity 1 is its own registry row
-  (bind (one "EXTENDS Integers" ~["Expr == 0 - 1"]) '-' 1 %override)
+  ::  unary minus canonicalizes to `-.` (the pin's own name in Integers),
+  ::  its own registry row, distinct from the binary `-` at arity 2 (R1.3.5.1)
+  (bind (one "EXTENDS Integers" ~["Expr == -(1)"]) '-.' 1 %override)
 ::
 ++  test-binding-len
   (bind (one "EXTENDS Sequences" ~["Expr == Len(<<1>>)"]) 'Len' 1 %override)

@@ -182,8 +182,10 @@ def check_registry(rows: list) -> list:
     for k in sorted(reg):
         cls = known.get(k)
         if cls is None:
-            # unary minus: the pin declares `-.` in Integers, the generator
-            # names the node `-`; accept the same name at another arity
+            # defensive fallback: accept the same module+name at another
+            # arity. No registry key needs it today — unary minus was keyed
+            # [Naturals '-' 1] before R1.3.5.1 canonicalized the prefix `-`
+            # to `-.`; it is now the pin-exact [Integers '-.' 1] (required).
             if any(m == k[0] and n == k[1] for (m, n, _a) in known):
                 continue
             problems.append(f"registry row {k[0]}!{k[1]}/{k[2]} is not a "

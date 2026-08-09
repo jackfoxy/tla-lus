@@ -843,3 +843,141 @@ with all R1.3.4 edits stashed. The golden is removed rather than kept flaky; the
 RECURSIVE-through-WITH *acceptance* stays covered by `test203` (census). Tracked as a
 `semantic-graph`/`level-constraints` residual for R1.3.6/unit-4 follow-up. `hoinst`
 (the deterministic HO-instance-param lock) is retained.
+
+## R1.3.5 — ledger-residue closure (front-end)
+
+Decomposition plan `~/FoxyLabs/tla-lus/R1.3.5-plan.md` (.0–.8). R1.3.5 is a *mix*:
+6 census specs R1.3.3/.4 measured and reassigned here (real accept/reject tests)
+plus five ledger rows tier-2 never surfaces (`semantic-graph`, `level-constraints`,
+`parse-errors`, `tlc-output-ec`, `tlc-constants`).
+
+### R1.3.5.0 — kickoff (SHIP-VERIFIED oracle measurement, DOCS/ORACLE ONLY, 2026-08-09)
+
+No desk deploy, no ship `-test`, no `semantic.hoon` change (R1.3.x.0 pattern). Ran
+`SemDump` at the pin on all 6 census specs (from the `suite/` dir, deps co-located)
++ raw `tla2sany.SANY` on the reject; scoped the two engine-side ledger rows against
+`src/tlc2/output/EC.java`/`MP.java` and `src/util/TLAConstants.java`. **Census frozen
+unchanged** (6 `SUB_BATCH_DIVERGENCES`, 289/295 agree).
+
+**Baseline census (all `suite/`, java=accept unless noted):** `test52` (hoon=reject),
+`test206` (hoon=reject), `test214` (hoon=accept — java REJECTS), `test216`
+(hoon=reject), `test219` (hoon=reject), `test219a` (hoon=reject).
+
+**Measured, per unit:**
+
+- **`test52` → R1.3.5.1. Wider than the `-`/`-.` naming.** `SemDump` ACCEPT (230
+  lines, 0 diags). SANY canonicalizes the prefix param and its definition to **`-.`**
+  (`param -. arity=1 L0 9.9-9.11`; `apply -. opkind=FormalParamKind`; `def -. arity=1
+  … 13.1-13.26`) — the `-`(port)/`-.`(SANY) split the C1.2 notes flag. **But the spec
+  also passes eleven built-in prefix/postfix/special operators as op-args**, each
+  rendered `oparg NAME op=NAME arity=1`: `[]`,`<>` (10.17/11.17, L3), `ENABLED`
+  (44.17, L1), `UNCHANGED` (47.19, L2), `'` (48.15, L2), `-.`,`^+`,`^*`,`^#` (23–26,
+  L0), `SUBSET`,`UNION`,`DOMAIN` (27–29, L0). R1.3.2.3's `+arg-op-info` resolved
+  **infix** built-ins (`+`,`\cup`); .1 must extend it (or verify coverage) to prefix
+  / postfix / special-form (`ENABLED`/`UNCHANGED`/`'`/`SUBSET`/`UNION`/`DOMAIN`) built-in
+  op-args **and** reconcile `-`/`-.` without breaking the `stdops` registry (the R1.3.4
+  revert cause: `tests/lib/arith` names unary minus `-`). Scope note added to plan .1.
+
+- **`test206`,`test216`,`test219` → R1.3.5.2 (parse); `test219a` → R1.3.5.2/.3 (sem).**
+  `SemDump` ACCEPT for all four in Java (206=1383 ln, 216=1169, 219=8149, 219a=740) —
+  the port rejects at PARSE (206/216/219) or sem (219a `Op!lab`). Two sub-features:
+  - **Label DEFINITIONS** render as tree nodes `label <name> L<lvl> <span>` wrapping the
+    labeled expression: `id(a,b,…) :: expr`, `id :: expr`. E.g. `label lab L0
+    11.23-15.65`, `label label2 L0 15.49-15.64`, `label lab3 L0 35.17-35.28`.
+  - **Subexpression-selector REFERENCES** resolve by **inlining the selected
+    subexpression as an `OpApplNode`**. `Bar == Op(Foo, 9)!lab(1,2,3)` →
+    `def Bar arity=0 L0 40.1-40.28 / apply LAMBDA opkind=UserDefinedOpKind /
+    oparg Foo op=Foo arity=1 / num 9 / num 1 / num 2 / num 3` — the label's params
+    (x,y,z) and enclosing op's args (Foo,9) become the application. Full selector
+    vocabulary observed across 206/216/219/219a: `!name`, `!123` (`!2!1`), `!<<`,
+    `!>>`, `!:`, `!@` (`SOp1a!@`, `COp!@!++`), `!(args)` (`!(3)`, `!(2,2)`), `!lab(args)`
+    (`!lab(1,2,3)`), `!op-symbol` (`!++`, `!:!++`), and chains
+    (`Op(Foo,9)!lab(1,2,3)!:!++(9,4)`, `Inst!Bar4(1)!lab(2)!<<`), incl. **through
+    INSTANCE** (`Inst!Foo`, `J!ThmC!1`, `Foo!Thm2!:`, `I!Thm3!2!2`) and on **theorems**
+    (`Thm1!:`, `Thm1b!2!1`). Note test219a's `!`-nav is mostly commented; its live
+    forms are `Op(Foo,9)!lab(1,2,3)` + `COp!@!++`. .2 = parse the selector/label grammar
+    + `***Parse Error***` bytes (advances `parse-errors`); .3 = sem resolution/inlining
+    (retire `Unknown operator: Op!lab`). Existing `c-labels-003.gold` shows only the
+    "Removing label … would change expression parsing" reject exists today.
+
+- **`test214` → R1.3.5.4. Oracle = exactly ONE error.** `SemDump` renders the graph
+  (`thmdef bar`/`theorem name=bar`/`thmdef xx`/`assumeprove`/`prove`, all L-1) AND a
+  single `DIAGS` line `D 4357 ERROR 10.11-10.14 The only expression allowed as a fact
+  in a HIDE is ` — confirmed by raw `SANY` (`*** Errors: 1`, "…the name of a theorem,
+  assumption, or step."). Only the `TRUE` in `HIDE bar, TRUE` (10.11-10.14) is flagged;
+  the spec's three other `(*ERROR*)` annotations (`bar!1` L7, `USE TRUE` + `xx!1` L13)
+  are **NOT** reported by the semantic phase. So .4 needs: THEOREM-name scoping
+  (`bar`/`xx` reachable as facts), USE/HIDE statement handling, proof steps
+  (`<1>2.`/`<1>3. QED`), and the HIDE-fact restriction reject EC 4357 at the bad-fact
+  span. (`bar!1`/`xx!1` are `!`-nav on theorems — overlaps .2/.3, but are not the
+  flagged error.)
+
+- **`level-constraints` full differential + `recinst` non-determinism → R1.3.5.5.**
+  Unchanged from the R1.3.4 note: the RECURSIVE-op-substituted-through-`WITH` level
+  fixpoint is non-deterministic (`ml=[2]`↔`[3]` on byte-identical committed
+  `semantic.hoon`); the `recinst` golden was withdrawn. .5 also owns `$APSubstIn`
+  implicit-subst rendering, instance-def hash-order, wider `SemDump`/LEVELS projection,
+  and the full re-level differential over the 92 `sem` goldens.
+
+- **`parse-errors` residual → R1.3.5.6.** Manifest: ~100 `expecting` sites on
+  unexercised productions + typed `at` spans; corpus is `gen-parse-err-tests` (34
+  golds). .6 extends it (shares .2's new selector grammar).
+
+- **`tlc-output-ec` + `tlc-constants` → R1.3.5.7.** `EC.java` = **256** codes;
+  `MP.java` gates `-tool` tagging on `TLCGlobals.tool && tool` (6+ sites). Port today:
+  `lib/diagnostics.hoon` is **ordering-only** (75 ln, `code-family` rank contract); the
+  actual EC codes are inline in `semantic.hoon`. .7 = complete the EC/MP taxonomy +
+  `-tool` tag format in `lib/diagnostics`, and port `util.TLAConstants` shared literals.
+
+**Ordering confirmed:** `.1`,`.4`,`.5`,`.7` independent; `.3` needs `.2`; `.6` follows
+`.2`. `.1` is the smallest self-contained closer. Ledger rows stay **partial** (flip is
+the .8 close-out). Oracle scratch dumps in the session scratchpad `r1350/*.sem.txt`;
+regenerable via `java -cp $JAR:tools/oracle/build SemDump <spec>.tla` from the `suite/` dir.
+
+### R1.3.5.1 — prefix/postfix op-args + unary-minus `-`/`-.` (SHIP-VERIFIED, 2026-08-09)
+
+**Measured the real gap first** (committed `dump-sem` probe vs `SemDump` on a minimal
+`EXTENDS TLC`-free repro): the ONLY divergence was the prefix `-` USE. `BoxTest(-._) ==
+-(x=0)` raised `D 4004 @ 4.17 "Couldn't resolve prefix operator symbol `-'"`. Everything
+else the R1.3.5.0 census predicted as a gap **already worked** via R1.3.2.3: the prefix
+param `-._` (named `-.`), the postfix def `^+`, and every built-in/user op-arg —
+`oparg SUBSET`/`-.`/`^+`/`[]` all rendered correctly. So the scope collapsed to the
+`-`/`-.` naming plus its registry reconciliation; no `+arg-op-info` extension needed.
+
+**Root cause: generator and eval-registry were consistently *mis*-named `-`/Naturals.**
+SANY names the prefix operator `-.` (its distinct prefix-form; infix `-` is subtraction);
+the pin declares `-. a == 0 - a` in `Integers`. The port named it `-` in BOTH the graph
+and the `stdops` registry key `[Naturals '-' 1]`, so they matched each other but not the
+pin — canonicalizing only the graph (the R1.3.4 attempt) broke `tests/lib/arith`.
+
+**Fix (surgical, both sides to the pin-exact name):**
+- `semantic.hoon`: new `+canon-prefix-op` (prefix `-`→`-.`, else identity), applied at
+  the `%n-prefixexpr` **generation** arm (`g-x`), the `%n-prefixexpr` **expr-level** arm,
+  and in **`+subtree-names-has`**. KEY PARSE FACT (dumped the Hoon tree to find it): a
+  prefix `-` parses as an **`n-infixop`** (image `-`) child under `n-prefixexpr` — NOT an
+  `n-prefixop` — so it is only distinguishable from infix `-` by the *parent* kind; the
+  `subtree-names-has` canon keys on `%n-prefixexpr` (via `op-of-genop` on kid 0), then
+  recurses only the operand, so a `-._` parameter now reads as used → param level L0 and
+  `alp={(-.,0,x)}` match.
+- `stdops.hoon`: registry key `[Naturals '-' 1]` → `[Integers '-.' 1]` (the pin's own
+  declaration; `binding-of` resolves the canonicalized `-.` to Integers → override).
+- `gen-stdops-tests.py`: the unary-minus special-case in the anti-drift guard is now
+  dead — `[Integers '-.' 1]` is directly a pin `required` operator (inventory row 28);
+  comment updated (defensive fallback, no key uses it).
+- `tests/lib/stdops.hoon`: `test-binding-unary-minus` probed `-`/1 → now `-.`/1
+  (`Expr == -(1)`, EXTENDS Integers) = %override.
+
+**Verified:** real **test52 ACCEPTS** (`sany-verdict` = %accept, committed probe). New
+byte-exact golden `desk/test-data/sem/prefixop` (module A: prefix param `-._`, prefix/
+postfix user defs, built-in `SUBSET`/`[]` + user `-.`/`^+` op-args) matches SemDump tree
++ LEVELS; `gen-sem-tests` 91→92, byte-reproducible (generate-twice-diff clean). Functional
+subset `-test {stdops,arith,sem,node-eval,value}` = **ok=%.y** (no regression from the
+generator or registry change). tier2-sub arms 3/4/6 OK; **sub-5 fails as the expected
+test52 census-flip signal** (flip deferred to the R1.3.5.8 close-out per plan). Ledger
+`semantic-graph`/`level-constraints` stay partial (flip at .8). No git commit yet.
+
+**GOTCHAS this session:** (1) a double-quoted tape golden interpolates `{…}` → syntax
+error; single-quote the cord (`{` is literal there). (2) The 2-min bash cap can't span a
+full ship suite (tier2-sub arms ~300s each); use a `run_in_background` until-loop waiter.
+(3) `tmux capture-pane -S -900` missed FAILED lines buried under huge tier2-sub output —
+widen the scrollback or grep the whole buffer.

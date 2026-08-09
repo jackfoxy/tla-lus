@@ -2364,6 +2364,64 @@
       '---- MODULE A ----\0aFoo == 42\0aBar == "hello"\0a====\0a'
   ==
 ::
+++  test-sem-prefixop
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-11.4'
+        '  var x L1 2.10-2.10'
+        '  def BoxTest arity=1 local=n L1 3.1-3.22'
+        '    param -. arity=1 L0 3.9-3.11'
+        '    apply -. opkind=FormalParamKind L1 3.17-3.22'
+        '      apply = opkind=BuiltInKind L1 3.19-3.21'
+        '        apply x opkind=VariableDeclKind L1 3.19-3.19'
+        '        num 0 L0 3.21-3.21'
+        '  def -. arity=1 local=n L0 4.1-4.11'
+        '    param a arity=0 L0 4.4-4.4'
+        '    apply $SetEnumerate opkind=BuiltInKind L0 4.9-4.11'
+        '      apply a opkind=FormalParamKind L0 4.10-4.10'
+        '  def ^+ arity=1 local=n L0 5.1-5.11'
+        '    param a arity=0 L0 5.1-5.1'
+        '    apply $SetEnumerate opkind=BuiltInKind L0 5.9-5.11'
+        '      apply a opkind=FormalParamKind L0 5.10-5.10'
+        '  def SetOpTest arity=1 local=n L1 6.1-6.29'
+        '    param Foo arity=1 L0 6.11-6.16'
+        '    apply Foo opkind=FormalParamKind L1 6.22-6.29'
+        '      apply $SetEnumerate opkind=BuiltInKind L1 6.26-6.28'
+        '        apply x opkind=VariableDeclKind L1 6.27-6.27'
+        '  def UseSubset arity=0 local=n L1 7.1-7.30'
+        '    apply SetOpTest opkind=UserDefinedOpKind L1 7.14-7.30'
+        '      oparg SUBSET op=SUBSET arity=1 L0 7.24-7.29'
+        '  def UseNeg arity=0 local=n L1 8.1-8.23'
+        '    apply SetOpTest opkind=UserDefinedOpKind L1 8.11-8.23'
+        '      oparg -. op=-. arity=1 L0 8.21-8.22'
+        '  def UsePost arity=0 local=n L1 9.1-9.24'
+        '    apply SetOpTest opkind=UserDefinedOpKind L1 9.12-9.24'
+        '      oparg ^+ op=^+ arity=1 L0 9.22-9.23'
+        '  def UseBoxOp arity=0 local=n L3 10.1-10.23'
+        '    apply BoxTest opkind=UserDefinedOpKind L3 10.13-10.23'
+        '      oparg [] op=[] arity=1 L3 10.21-10.22'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=2} alc={(-.,0)>=3,(Foo,0)>=0}'
+        'lvl BoxTest L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=2} alp={(-.,0,x)}'
+        'lvl -. L0 ml=[2] w=[1]'
+        'lvl ^+ L0 ml=[2] w=[1]'
+        'lvl SetOpTest L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=2} alp={(Foo,0,x)}'
+        'lvl UseSubset L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}'
+        'lvl UseNeg L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}'
+        'lvl UsePost L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}'
+        'lvl UseBoxOp L3 lp={x} lc={x<=2} alc={(-.,0)>=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aBoxTest(-._) == -(x=0)\0a-. a == {a}\0aa ^+ == {a}\0aSetOpTest(Foo(_)) == Foo({x})\0aUseSubset == SetOpTest(SUBSET)\0aUseNeg == SetOpTest(-.)\0aUsePost == SetOpTest(^+)\0aUseBoxOp == BoxTest([])\0a====\0a'
+  ==
+::
 ++  test-sem-quant
   %+  expect-eq
     !>  ^-  wain
