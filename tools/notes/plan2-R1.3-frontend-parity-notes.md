@@ -751,3 +751,43 @@ two dropping out (no false regression). The nominal target `test216` stays parse
 NOTE (golden gotcha): an `EXTENDS Integers` in the `infixparam` fixture makes `+` a
 **multiply-defined** symbol (param vs the imported operator) — SANY then REJECTs (EC
 4201). The fixture omits EXTENDS; the body `1 + 2` uses the param `+`, `\cup` is built-in.
+
+## R1.3.3.4 — RECURSIVE-under-WITH + higher-order instance param (CLOSE-OUT, 2026-08-08)
+
+**No code change.** Both named targets were already closed early:
+- **`suite/test203`** (`foo(n) == INSTANCE test203a WITH A <- g, b <- n` over
+  `RECURSIVE g(_)`) — closed by **R1.3.3.1** (parametrized-instance parameter `n`).
+  The RECURSIVE operator subst `A <- g` was already carried by the existing `$OpArg`
+  substitution path; the only gap was the parametrized param.
+- **`examples/SingleLaneBridge/SingleLaneBridge`** (`RECURSIVE SeqFromSet(_)` + HO
+  op-arg in a `WF_`/`~>` liveness spec) — closed by **R1.3.3.2** (tuple binder
+  `\A <<r,l>> \in CarsRight \X CarsLeft`).
+
+Both were only **accept**-verified through tier2-sub, so this step locks the two named
+mechanisms with **byte-exact sem goldens**:
+- **`recinst`** — RECURSIVE op through WITH + member access: `RECURSIVE g(_)` /
+  `foo(n) == INSTANCE B WITH F <- g, c <- n` / `g(n) == .. foo(n)!Use` (B: `Use == F(c)`).
+  Oracle+Hoon agree byte-exact: `def foo!Use arity=1 param n substin subs=2 [sub F <-
+  oparg g op=g arity=1] [sub c <- n]`, and `def g` recursive.
+- **`hoinst`** — higher-order instance parameter: `Inst(F(_,_)) == INSTANCE B`
+  (B: `Use == F(1,2)`). `def Inst!Use arity=1 param F arity=2 substin subs=1
+  [sub F <- oparg F op=F arity=2]` — the HO instance param `F(_,_)` is captured at
+  arity 2 by `+lhs-params`/`+us-arity` (R1.3.3.1's `spar` path) and prepended by
+  `+g-instance`; the implicit substitution of B's same-named `F(_,_)` renders the
+  `$OpArg`.
+
+All 89 sem goldens `ok=%.y`; no `semantic.hoon` change ⇒ no ship regression beyond the
+two new goldens. No census change (both targets absent since .1/.2; 284/295 agree).
+`tier2.py --check` byte-reproducible.
+
+### R1.3.3 pattern summary (across .1–.4)
+
+Every step's *planned* substitution/temporal mechanism was **measured to already work**;
+the real gaps were orthogonal front-end features that the target specs happened to also
+need: parametrized/nested instances (.1), tuple binders (.2), operator-symbol params (.3).
+Cumulatively R1.3.3 closed **8** census specs — `gh1134/MultiUser`, `gh1134/SingleUser`,
+`suite/test203`, `examples/SingleLaneBridge/SingleLaneBridge`, `suite/etest15`,
+`suite/test10`, `suite/test51`, `suite/test42` — taking the subdir batch from 19→11
+divergences (276→284 of 295 agree). The **remaining** nominal R1.3.3 targets
+(`test206`, `test216`, `test219`, `test219a`) all converge on the **R1.3.5** feature:
+labels + `!`-subexpression selectors (`Thm1!:`, `Op!lab`, `COp!@!++`, `!<<`/`!2!1`).

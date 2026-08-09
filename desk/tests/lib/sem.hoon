@@ -688,6 +688,37 @@
       '---- MODULE A ----\0aVARIABLE x\0aH(F(_), a) == F(a)\0aD(G(_)) == H(G, x)\0a====\0a'
   ==
 ::
+++  test-sem-hoinst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def Inst!Use arity=1 local=n L0 2.1-2.26'
+        '    param F arity=2 L0 2.6-2.11'
+        '    substin subs=1 L0 2.1-2.26'
+        '      sub F <-'
+        '        oparg F op=F arity=2 L0 2.1-2.26'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L0 3.8-3.14'
+        '          num 1 L0 3.10-3.10'
+        '          num 2 L0 3.13-3.13'
+        '  instance name=Inst module=B local=n L0 2.1-2.26'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Inst!Use L0 ml=[3] w=[1] mml=[0,0] olc=[FF]'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aInst(F(_,_)) == INSTANCE B\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT F(_,_)\0aUse == F(1, 2)\0a====\0a'
+  ==
+::
 ++  test-sem-hoparam
   %+  expect-eq
     !>  ^-  wain
@@ -2400,6 +2431,48 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aAp(F(_), x) == F(x)\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN 0 ELSE Ap(R, n - 1)\0a====\0a'
+  ==
+::
+++  test-sem-recinst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def g arity=1 local=n L0 4.1-4.39'
+        '    param n arity=0 L0 4.3-4.3'
+        '    apply $IfThenElse opkind=BuiltInKind L0 4.9-4.39'
+        '      apply = opkind=BuiltInKind L0 4.12-4.16'
+        '        apply n opkind=FormalParamKind L0 4.12-4.12'
+        '        num 0 L0 4.16-4.16'
+        '      num 1 L0 4.23-4.23'
+        '      apply foo!Use opkind=UserDefinedOpKind L0 4.30-4.39'
+        '        apply n opkind=FormalParamKind L0 4.34-4.34'
+        '  def foo!Use arity=1 local=n L0 3.1-3.40'
+        '    param n arity=0 L0 3.5-3.5'
+        '    substin subs=2 L0 3.1-3.40'
+        '      sub F <-'
+        '        oparg g op=g arity=1 L0 3.32-3.32'
+        '      sub c <-'
+        '        apply n opkind=FormalParamKind L0 3.40-3.40'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L0 3.8-3.11'
+        '          apply c opkind=ConstantDeclKind L0 3.10-3.10'
+        '  instance name=foo module=B local=n L0 3.1-3.40'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl g L0 ml=[2] w=[1]'
+        'lvl foo!Use L0 ml=[2] w=[1]'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aRECURSIVE g(_)\0afoo(n) == INSTANCE B WITH F <- g, c <- n\0ag(n) == IF n = 0 THEN 1 ELSE foo(n)!Use\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT F(_), c\0aUse == F(c)\0a====\0a'
   ==
 ::
 ++  test-sem-recmut
