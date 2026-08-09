@@ -23,8 +23,11 @@ stdmods.hoon   dependency-first sem-order, parse cache
 source-path.hoon  the only constructor of a source-ref:   ── unit 10.2
                canonical, escape-free, pinned-revision paths
    │
-semantic.hoon  semantic graph: name resolution, arities,   ── units 6–7
-               builtin table, per-def levels (0/1/2/3)
+semantic.hoon  semantic graph: name resolution, arities,   ── units 6–7,
+               builtin table, per-def levels (0/1/2/3);         R1.3
+               INSTANCE substitution (parametrized/nested/HO
+               params, RECURSIVE-through-WITH), LAMBDA + HO
+               op-args, tuple + operator-symbol binders
    │
 config.hoon    TLC .cfg parse + config-vs-graph validation  ── unit 5 (B4)
                + typed run-spec (vs ConfigDump/FastTool)

@@ -295,6 +295,53 @@ Remaining unit-3 increments (in plan order):
   unused `weights` slot) remains an interim device inside the generator;
   an IR-native @-context replaces it.
 
+### Release R1.3 — front-end parity edges
+
+Release-R1 sub-unit R1.3 drives the SANY front-end census (adversarial
+`suite/`/`coverage/` conformance specs) to agreement. R1.3.1 put **LAMBDA**
+op-args in the graph; R1.3.2 closed the **higher-order operator-argument**
+edges (deep-4271 first-order check, infix/prefix/postfix operator constants
+`_++_`, built-in operators `+`/`\cup` as op-args). R1.3.3 added the
+**INSTANCE and quantifier/parameter** edges:
+
+- **Parametrized instances** `I(x) == INSTANCE M` — the instance's own params
+  are in scope for the `WITH` expressions and are **prepended** to every
+  imported definition (arity grows, `parg`/`weights` follow); higher-order
+  instance params `Inst(F(_,_))` bind at their arity.
+- **Nested instance members** `M!Op(..)` (an instance inside the instanced
+  module) resolve under the fully-qualified name.
+- **RECURSIVE** operators substituted through `INSTANCE..WITH` (`A <- g`) and
+  reached via a member (`foo(n)!Use`) ride the existing `$OpArg` path.
+- **Tuple-pattern binders** `<<y, z>> \in S` bind each identifier
+  individually, in both quantifiers and function definitions.
+- **Operator-symbol parameters** in a definition, `TempTest(_+_)` /
+  `Foo(a, _--_)`, are counted and bound at arity 2/1/1 (shared with the
+  R1.3.2 `CONSTANT _++_` path); an operator used in the body counts toward
+  the param's `used` flag.
+
+A measured finding across R1.3.3: the substitution/temporal *mechanisms* the
+plan anticipated (`\E`/`SUBSET`/higher-order under substitution,
+temporal-under-instance) **already worked** — the generator emits imported
+bodies with the full generator, so any body construct threads through
+`$SubstIn` unchanged. The real gaps were the orthogonal edges above.
+
+**Approved difference — instance-imported definition order.** SANY's
+`ModuleNode.getOpDefs()` returns definitions created by an INSTANCE in Java
+**hashtable** order (`Alpha,Beta,Gamma` → `Beta,Gamma,Alpha`), while the root
+module's own definitions stay in source order. This is a property of the JVM's
+`Hashtable` iteration (UniqueString identity), not of the spec — the same
+class as the C1.7 interning-order finding. It affects only the *ordering* of a
+multi-definition instance's imported defs in a semantic dump, never
+membership, arity, level, body, or the accept/reject verdict. The R1.3.3 sem
+goldens use single-imported-definition instances to stay byte-exact; a
+multi-def-instance golden, if wanted, would canonicalize both sides.
+
+**Residue (R1.3.5).** Four census specs (`suite/test206`, `suite/test216`,
+`suite/test219`, `suite/test219a`) remain divergent — each blocked at the
+**parser** or on a **label / `!`-subexpression selector** (`Thm1!:`,
+`Op!lab`, `COp!@!++`, `!<<`/`!2!1`), the unit-3 subexpression-navigation
+feature tracked under R1.3.5, not on any substitution/temporal edge.
+
 ## Unit 7 (B6) — Safety model checking parity
 
 Work Unit 7 rebuilt the single-worker safety checker to `tlc2.TLC` parity over
