@@ -232,6 +232,16 @@
     +(acc)
   acc
 ::
+++  def-lhs
+  ::  the LHS node of an operator/function definition: the first node kid,
+  ::  skipping a leading LOCAL leaf (`+finish-def` prepends it as a direct
+  ::  kid of the N_OperatorDefinition, ahead of the identlhs — R1.3.4)
+  |=  kids=(list node)
+  ^-  (unit node)
+  ?~  kids  ~
+  ?:  ?=(%node -.i.kids)  `i.kids
+  $(kids t.kids)
+::
 ++  def-signature
   ::  [name kind arity local] from an N_OperatorDefinition /
   ::  N_FunctionDefinition; ~ if not a definition we register
@@ -240,10 +250,14 @@
   ?:  (is-kind nd %n-operatordefinition)
     =/  kids  (kids-of nd)
     ?~  kids  ~
-    =/  lhs  i.kids
-    ?.  ?=(%node -.lhs)  ~
+    =/  ld  (def-lhs kids)
+    ?~  ld  ~
+    =/  lhs  u.ld
+    ?>  ?=(%node -.lhs)
     =/  lk  (kids-of lhs)
-    =/  loc  (has-local lk)
+    ::  the LOCAL leaf is a direct kid of the definition (ahead of the
+    ::  identlhs), not inside the identlhs — check the definition's own kids
+    =/  loc  (has-local kids)
     =/  leaves  (skim lk |=(k=node ?=(%leaf -.k)))
     ?+    kind.lhs  ~
         %n-identlhs
@@ -366,7 +380,8 @@
   ?:  (is-kind nd %n-functiondefinition)  (fcn-level nd c)
   =/  kids  (kids-of nd)
   ?~  kids  0
-  =/  c2  (add-params c (lhs-params i.kids))
+  =/  ld  (def-lhs kids)
+  =/  c2  ?~(ld c (add-params c (lhs-params u.ld)))
   (expr-level (rear-node kids) c2)
 ::
 ++  build-ctx
@@ -695,7 +710,10 @@
   $(kids t.kids)
 ::
 ++  idents-before-colon
-  ::  identifier leaves appearing before the first `:` in a kid list
+  ::  identifier leaves (and tuple-binder idents) appearing before the first
+  ::  `:` in a kid list — a subset-of/CHOOSE binder `<<i, j>>` (an
+  ::  N_IdentifierTuple, one of the direct kids; the range after \in is a
+  ::  nested node and is never descended) binds each ident individually
   |=  kids=(list node)
   ^-  (list [@t node])
   |-  ^-  (list [@t node])
@@ -704,6 +722,8 @@
   ?:  &(?=(%leaf -.k) =(%colon (leaf-kind k)))  ~
   ?:  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))
     [[(leaf-text k) k] $(kids t.kids)]
+  ?:  (is-kind k %n-identifiertuple)
+    (weld (tuple-idents k) $(kids t.kids))
   $(kids t.kids)
 ::
 ++  add-idents
@@ -1891,12 +1911,18 @@
   =/  parts
     =|  out=(list sem)
     =|  ds=(list sdiag)
+    =|  seen=(set @t)
     =/  fs  fields
     |-  ^-  [(list sem) (list sdiag)]
     ?~  fs  [(flop out) ds]
     =/  fk  (kids-of i.fs)
     ?~  fk  $(fs t.fs)
     =/  fname  (leaf-text i.fk)
+    ::  a record constructor / set-of-records rejects a repeated field name
+    ::  at the duplicate's span (SANY EC 4262 — R1.3.4)
+    =/  dup=(list sdiag)
+      ?.  (~(has in seen) fname)  ~
+      [(derr 4.262 (span-of:ast i.fk) "Non-unique fields in constructor.")]~
     =/  gv  (g-x (rear-node fk) c)
     =/  pr=sem
       :*  %apply  ['$Pair' %builtin]  (expr-level i.fs c)  (span-of:ast i.fs)
@@ -1904,7 +1930,7 @@
           :-  [%lit %str fname (span-of:ast i.fk)]
           (drop-nulls ~[r.gv])
       ==
-    $(fs t.fs, out [pr out], ds (weld ds ds.gv))
+    $(fs t.fs, out [pr out], ds :(weld ds dup ds.gv), seen (~(put in seen) fname))
   [`(builtin-apply opn n c [~ ~ -.parts]) +.parts]
 ::
 ++  g-rcd-select
@@ -2080,7 +2106,9 @@
         ==
     ds.gb
   ?~  kids  [~ ~]
-  =/  lhs  i.kids
+  =/  ld  (def-lhs kids)
+  ?~  ld  [~ ~]
+  =/  lhs  u.ld
   =/  body  (rear-node kids)
   =/  params  (lhs-params lhs)
   =/  c2  (add-params c params)

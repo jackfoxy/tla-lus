@@ -1521,6 +1521,34 @@
       '---- MODULE B ----\0abar == 23\0a====\0a'
   ==
 ::
+++  test-sem-localdef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Dbl arity=1 local=y L0 2.1-2.22'
+        '    param f arity=0 L0 2.11-2.11'
+        '    apply $SetEnumerate opkind=BuiltInKind L0 2.17-2.22'
+        '      apply f opkind=FormalParamKind L0 2.18-2.18'
+        '      apply f opkind=FormalParamKind L0 2.21-2.21'
+        '  def Use arity=0 local=n L0 3.1-3.13'
+        '    apply Dbl opkind=UserDefinedOpKind L0 3.8-3.13'
+        '      num 3 L0 3.12-3.12'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Dbl L0 ml=[2] w=[1]'
+        'lvl Use L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aLOCAL Dbl(f) == {f, f}\0aUse == Dbl(3)\0a====\0a'
+  ==
+::
 ++  test-sem-lvlasm
   %+  expect-eq
     !>  ^-  wain
@@ -2362,6 +2390,54 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aNats == \\A n \\in Nat : n > 0\0a====\0a'
   ==
 ::
+++  test-sem-rcddup
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.77'
+        '  def Foo arity=0 local=n L-1 2.1-2.34'
+        '    apply $RcdConstructor opkind=BuiltInKind L-1 2.8-2.34'
+        '      apply $Pair opkind=BuiltInKind L-1 2.9-2.15'
+        '        str a L-1 2.9-2.9'
+        '        num 1 L-1 2.15-2.15'
+        '      apply $Pair opkind=BuiltInKind L-1 2.18-2.24'
+        '        str b L-1 2.18-2.18'
+        '        num 2 L-1 2.24-2.24'
+        '      apply $Pair opkind=BuiltInKind L-1 2.27-2.33'
+        '        str a L-1 2.27-2.27'
+        '        num 1 L-1 2.33-2.33'
+        '  def Bar arity=0 local=n L-1 3.1-3.34'
+        '    apply $SetOfRcds opkind=BuiltInKind L-1 3.8-3.34'
+        '      apply $Pair opkind=BuiltInKind L-1 3.9-3.15'
+        '        str a L-1 3.9-3.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.13-3.15'
+        '          num 1 L-1 3.14-3.14'
+        '      apply $Pair opkind=BuiltInKind L-1 3.18-3.24'
+        '        str b L-1 3.18-3.18'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.22-3.24'
+        '          num 2 L-1 3.23-3.23'
+        '      apply $Pair opkind=BuiltInKind L-1 3.27-3.33'
+        '        str a L-1 3.27-3.27'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.31-3.33'
+        '          num 1 L-1 3.32-3.32'
+        'DIAGS'
+        'D 4262 ERROR 2.27-2.27 Non-unique fields in constructor.'
+        'D 4262 ERROR 3.27-3.27 Non-unique fields in constructor.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L-1'
+        'lvl Bar L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '--------------- MODULE A -----------\0aFoo == [a |-> 1, b |-> 2, a |-> 1]\0aBar == [a : {1}, b : {2}, a : {1}]\0a=============================================================================\0a'
+  ==
+::
 ++  test-sem-recfcn
   %+  expect-eq
     !>  ^-  wain
@@ -2431,48 +2507,6 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aAp(F(_), x) == F(x)\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN 0 ELSE Ap(R, n - 1)\0a====\0a'
-  ==
-::
-++  test-sem-recinst
-  %+  expect-eq
-    !>  ^-  wain
-    :~
-        'ACCEPT'
-        'MODULE A 1.1-5.4'
-        '  def g arity=1 local=n L0 4.1-4.39'
-        '    param n arity=0 L0 4.3-4.3'
-        '    apply $IfThenElse opkind=BuiltInKind L0 4.9-4.39'
-        '      apply = opkind=BuiltInKind L0 4.12-4.16'
-        '        apply n opkind=FormalParamKind L0 4.12-4.12'
-        '        num 0 L0 4.16-4.16'
-        '      num 1 L0 4.23-4.23'
-        '      apply foo!Use opkind=UserDefinedOpKind L0 4.30-4.39'
-        '        apply n opkind=FormalParamKind L0 4.34-4.34'
-        '  def foo!Use arity=1 local=n L0 3.1-3.40'
-        '    param n arity=0 L0 3.5-3.5'
-        '    substin subs=2 L0 3.1-3.40'
-        '      sub F <-'
-        '        oparg g op=g arity=1 L0 3.32-3.32'
-        '      sub c <-'
-        '        apply n opkind=FormalParamKind L0 3.40-3.40'
-        '      in'
-        '        apply F opkind=ConstantDeclKind L0 3.8-3.11'
-        '          apply c opkind=ConstantDeclKind L0 3.10-3.10'
-        '  instance name=foo module=B local=n L0 3.1-3.40'
-        'LEVELS'
-        'lvl MODULE A L-1'
-        'lvl g L0 ml=[2] w=[1]'
-        'lvl foo!Use L0 ml=[2] w=[1]'
-    ==
-  !>
-  %+  dump-sem:semantic  'A'
-  %-  malt
-  ^-  (list [@t @t])
-  :~
-      :-  'A'
-      '---- MODULE A ----\0aRECURSIVE g(_)\0afoo(n) == INSTANCE B WITH F <- g, c <- n\0ag(n) == IF n = 0 THEN 1 ELSE foo(n)!Use\0a====\0a'
-      :-  'B'
-      '---- MODULE B ----\0aCONSTANT F(_), c\0aUse == F(c)\0a====\0a'
   ==
 ::
 ++  test-sem-recmut
@@ -2959,6 +2993,48 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aFoo == \\E <<y, z>> \\in {<<1,2>>} : y = z\0aBar == \\A x \\in {1}, <<y, z>> \\in {<<3,4>>} : (x = y) /\\ (y = z)\0a====\0a'
+  ==
+::
+++  test-sem-tupsub
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Sub arity=0 local=n L0 2.1-2.39'
+        '    apply $SubsetOf opkind=BuiltInKind L0 2.8-2.39'
+        '      bound y L0 2.11-2.11'
+        '      bound z L0 2.14-2.14'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 2.22-2.30'
+        '          apply $Tuple opkind=BuiltInKind L0 2.23-2.29'
+        '            num 1 L0 2.25-2.25'
+        '            num 2 L0 2.27-2.27'
+        '      apply = opkind=BuiltInKind L0 2.34-2.38'
+        '        apply y opkind=FormalParamKind L0 2.34-2.34'
+        '        apply z opkind=FormalParamKind L0 2.38-2.38'
+        '  def Ch arity=0 local=n L0 3.1-3.43'
+        '    apply $BoundedChoose opkind=BuiltInKind L0 3.7-3.43'
+        '      bound i L0 3.16-3.16'
+        '      bound j L0 3.19-3.19'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.27-3.35'
+        '          apply $Tuple opkind=BuiltInKind L0 3.28-3.34'
+        '            num 3 L0 3.30-3.30'
+        '            num 4 L0 3.32-3.32'
+        '      apply = opkind=BuiltInKind L0 3.39-3.43'
+        '        apply i opkind=FormalParamKind L0 3.39-3.39'
+        '        apply j opkind=FormalParamKind L0 3.43-3.43'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={i<=2,j<=2,y<=2,z<=2}'
+        'lvl Sub L0 lc={y<=2,z<=2}'
+        'lvl Ch L0 lc={i<=2,j<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aSub == {<<y, z>> \\in {<<1,2>>} : y = z}\0aCh == CHOOSE <<i, j>> \\in {<<3,4>>} : i = j\0a====\0a'
   ==
 ::
 ++  test-sem-unboundq

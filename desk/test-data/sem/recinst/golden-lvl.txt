@@ -1,4 +1,0 @@
-LEVELS
-lvl MODULE A L-1
-lvl g L0 ml=[2] w=[1]
-lvl foo!Use L0 ml=[2] w=[1]

@@ -75,7 +75,7 @@ def main() -> int:
           "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2, all 142 agree), a 14-spec "
           "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3, 13/14 agree — the "
           "1 left pins R1.5.x), and a "
-          "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3, tier2-sub.hoon, 284/295 agree). "
+          "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3, tier2-sub.hoon, 289/295 agree). "
           "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
           "Known divergences: desk/test-data/tier2/divergences.txt.")

@@ -351,25 +351,29 @@ SUB_BATCH_DIVERGENCES = [
     # classification was wrong — its cause is the nested-member gap.)
     # suite/etest15 + suite/test10 closed by R1.3.3.2 (tuple-pattern binders
     # in function definitions `[<<k,l>> \in Int \X Int |-> ..]`).
-    "suite/etest16 -> hoon=accept",
-    "suite/test16 -> hoon=reject",
+    # R1.3.4 conformance triage closed five: etest16 (duplicate record fields,
+    # EC 4262), test16/test7/test9 (tuple binders in subset-of/set-of-all/
+    # CHOOSE), test23 (LOCAL operator definitions in scope). The measured
+    # cause of each differed from its R1.3.0 `_CONF` label.
+    # test52 is NOT a plain conformance edge: its prefix operator parameter
+    # `BoxTest(-._)` hits the unary-minus naming conflict — SANY names it
+    # `-.` but the port names it `-` for the evaluator registry (Naturals),
+    # so canonicalizing the graph to `-.` breaks arithmetic evaluation.
+    # Reconciling the two names is cross-cutting (generator + stdops) → R1.3.5.
+    "suite/test52 -> hoon=reject",
     # suite/test203 closed by R1.3.3.1: `foo(n) == INSTANCE M WITH A <- g,
     # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
     # early by the parametrized-parameter fix.
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
     "suite/test206 -> hoon=reject",
+    # test214 is NOT a plain conformance edge: rejecting `HIDE bar, TRUE`
+    # (EC 4357) needs USE/HIDE proof-fact validation + theorem-name scoping —
+    # proof-step infrastructure (BY/QED bodies), reassigned to R1.3.5.
     "suite/test214 -> hoon=accept",
     "suite/test216 -> hoon=reject",
     "suite/test219 -> hoon=reject",
     "suite/test219a -> hoon=reject",
-    "suite/test23 -> hoon=reject",
-    # suite/test51 + suite/test42 closed by R1.3.3.3 (operator-symbol
-    # parameter in a definition LHS: `TempTest(_+_)`, `Foo(a, _--_)`). The
-    # plan's ".3 = temporal under instance" already works; the real gap was
-    # the infix operator parameter. test42 is an R1.3.4 target closed early.
-    "suite/test52 -> hoon=reject",
-    "suite/test7 -> hoon=reject",
-    "suite/test9 -> hoon=reject",
+    # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
@@ -388,15 +392,14 @@ SUB_BATCH_REASONS = {
     "suite/test216": "labels + `!`-subexpression selectors (parse; R1.3.5)",
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
-    "suite/test7": _CONF,
-    "suite/test9": _CONF,
-    "suite/etest16": _CONF, "suite/test16": _CONF,
-    "suite/test214": _CONF, "suite/test52": _CONF,
-    # SingleLaneBridge + etest15 + test10 closed by R1.3.3.2 (tuple-pattern
-    # binders). test206/test219a are NOT the "\E/SUBSET under substitution"
-    # gap the plan expected — that already works; both fail on labels /
-    # `!`-subexpression selectors (test206 at PARSE, test219a on `Op!lab`),
-    # the unit-3 `!`-nav residue → R1.3.5.
+    # R1.3.4 closed test7/test9/test16 (tuple binders in subset-of/set-of-all/
+    # CHOOSE), test23 (LOCAL defs), etest16 (dup record fields, EC 4262).
+    # test214 (proof HIDE facts) + test52 (unary-minus `-`/`-.` naming) → R1.3.5.
+    "suite/test214": "USE/HIDE proof-fact validation, EC 4357 (proof steps; R1.3.5)",
+    "suite/test52": "prefix operator param `-._` — unary-minus `-`/`-.` naming (R1.3.5)",
+    # test206/test219a are NOT the "\E/SUBSET under substitution" gap the plan
+    # expected — that already works; both fail on labels / `!`-subexpression
+    # selectors (test206 at PARSE, test219a on `Op!lab`), the R1.3.5 residue.
     "suite/test206": "labels + `!`-subexpression selectors (parse; R1.3.5)",
     "suite/test219a": "label reference `Op!lab` (`!`-nav; R1.3.5)",
     # EWD998/EWD998 closed by R1.3.2.3 (built-in operator `+`/`\cup` as an
@@ -407,7 +410,6 @@ SUB_BATCH_REASONS = {
     # `!`-subexpression selectors (`!:!++`, `!>>`, `!2!1`), the unit-3
     # subexpression-navigation residue tracked under R1.3.5.
     "suite/test219": "labels + `!`-subexpression selectors (parse; R1.3.5)",
-    "suite/test23": _CONF,
 }
 
 
