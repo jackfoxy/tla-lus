@@ -342,14 +342,16 @@ SUBDIR_CHUNK = 55
 # (`suite/`, `coverage/`). `hoon=reject` = Java accepts / Hoon rejects (a feature
 # gap); `hoon=accept` = Java rejects / Hoon too lenient.
 SUB_BATCH_DIVERGENCES = [
-    "examples/SingleLaneBridge/SingleLaneBridge -> hoon=reject",
+    # examples/SingleLaneBridge/SingleLaneBridge closed by R1.3.3.2 (tuple-
+    # pattern binder `\A <<r,l>> \in CarsRight \X CarsLeft`) — an R1.3.3.4
+    # target closed early by the tuple-binder fix.
     # gh1134/MultiUser + gh1134/SingleUser closed by R1.3.3.1: MultiUser via
     # parametrized-instance parameter scope, both via nested-instance member
     # `StateMachine!Init(..)` resolution. (SingleUser's R1.3.0 `_CONF`
     # classification was wrong — its cause is the nested-member gap.)
-    "suite/etest15 -> hoon=reject",
+    # suite/etest15 + suite/test10 closed by R1.3.3.2 (tuple-pattern binders
+    # in function definitions `[<<k,l>> \in Int \X Int |-> ..]`).
     "suite/etest16 -> hoon=accept",
-    "suite/test10 -> hoon=reject",
     "suite/test16 -> hoon=reject",
     # suite/test203 closed by R1.3.3.1: `foo(n) == INSTANCE M WITH A <- g,
     # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
@@ -382,13 +384,15 @@ SUB_BATCH_REASONS = {
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
     "suite/test7": _CONF,
     "suite/test9": _CONF,
-    "suite/etest15": _CONF, "suite/etest16": _CONF, "suite/test16": _CONF,
+    "suite/etest16": _CONF, "suite/test16": _CONF,
     "suite/test214": _CONF, "suite/test42": _CONF, "suite/test52": _CONF,
-    "examples/SingleLaneBridge/SingleLaneBridge":
-        "RECURSIVE + higher-order op-arg (`~>`/WF_ liveness spec) — R1.3",
-    "suite/test206": _INST + " (with \\E/SUBSET/higher-order)",
-    "suite/test219a": _INST + " (with \\E/SUBSET/higher-order)",
-    "suite/test10": _CONF,
+    # SingleLaneBridge + etest15 + test10 closed by R1.3.3.2 (tuple-pattern
+    # binders). test206/test219a are NOT the "\E/SUBSET under substitution"
+    # gap the plan expected — that already works; both fail on labels /
+    # `!`-subexpression selectors (test206 at PARSE, test219a on `Op!lab`),
+    # the unit-3 `!`-nav residue → R1.3.5.
+    "suite/test206": "labels + `!`-subexpression selectors (parse; R1.3.5)",
+    "suite/test219a": "label reference `Op!lab` (`!`-nav; R1.3.5)",
     # EWD998/EWD998 closed by R1.3.2.3 (built-in operator `+`/`\cup` as an
     # operator argument to TLCGetAndSet).
     # test219 is NOT an INSTANCE-substitution gap: R1.3.3.1 landed the

@@ -667,3 +667,42 @@ accept/reject verdict the census tests — so it does not block MultiUser. Left 
 documented `semantic-graph` residual (same class as the C1.7 interning-order
 approved difference), to be settled in R1.3.6 if a multi-def-instance golden is
 wanted (canonicalize both sides in `SemDump`/`dump-sem`).
+
+## R1.3.3.2 — tuple-pattern quantifier binders (SHIP-VERIFIED, 2026-08-08)
+
+Measured the two nominal `.2` targets (`test206`, `test219a`) and found the plan's
+scope was **misdiagnosed**:
+
+- **"\E/SUBSET/higher-order under substitution" already works.** A `psubsub` probe
+  (`I == INSTANCE B WITH v <- x`, B = `Op == \E s \in SUBSET {1,2} : v \in s`) gives
+  **0 Hoon errors** — `+g-instance` generates each imported body with the full
+  generator, so quantifiers/`SUBSET` thread through `$SubstIn` unchanged. No gap.
+- **The real gap is tuple-pattern binders** `<<y, z>> \in S`. Measured: `test206`
+  fails at **parse** (`parse-fail %.y`, 0 sem errors — the `COp!@!++` subexpression
+  selectors, R1.3.5); `test219a` **parses** with **3 sem errors** — `Unknown
+  operator: y`, `Unknown operator: z` (the tuple binder `<<y, z>> \in {<<3,4>>}` on
+  line 10) and `Unknown operator: Op!lab` (a label ref, R1.3.5).
+
+**Fix.** `+qbound-vars` (bound-var collection for `\A`/`\E`, and via `+fcn-level`
+for function definitions) only gathered bare identifier leaves; a tuple binder
+parses to `%n-identifiertuple` (a node), so its idents were dropped. New
+`+tuple-idents` pulls each identifier out (recursing for nested tuples); `+qbound-vars`
+descends into `%n-identifiertuple` and binds each individually — exactly SANY, which
+renders `bound y`/`bound z` (no tuple marker in the SemDump projection). One helper,
+one arm; the fix covers both quantifier and function-def binders.
+
+**Result.** New sem golden `tupbind` (`\E <<y,z>> \in S` + `\A x, <<y,z>> \in S`)
+byte-exact; all 86 sem goldens `ok=%.y`. The tuple-binder fix **closed three census
+specs — none of them the plan's nominal .2 targets**, all closed early because a
+tuple binder was their *only* remaining gap:
+- **`examples/SingleLaneBridge/SingleLaneBridge`** — `\A <<r,l>> \in CarsRight \X
+  CarsLeft`. An **R1.3.3.4** target (RECURSIVE + HO op-arg); those were already
+  carried by the R1.3.1 `$OpArg`/RECURSIVE paths, leaving the tuple binder.
+- **`suite/etest15`**, **`suite/test10`** — tuple binders in **function**
+  definitions (`[<<k,l>> \in Int \X Int |-> ..]`), R1.3.4 targets.
+
+Census `SUB_BATCH_DIVERGENCES` 16→13 (**282/295 agree**); tier2-sub arms' only diffs
+were these three dropping out (no false regression). `test219a` went 3→1 error (last
+= `Op!lab` label ref) and `test206` stays parse-blocked — the two nominal .2 targets
+are both **gated on R1.3.5** (`!`-nav), not on substitution; their census reasons
+updated. `tier2.py --check` byte-reproducible.

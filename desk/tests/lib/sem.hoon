@@ -2811,6 +2811,55 @@
       '---- MODULE A ----\0aCONSTANT c\0aASSUME c = 0\0aASSUME NamedA == c = 1\0aTHEOREM c = 2\0aTHEOREM NamedT == c = 3\0a====\0a'
   ==
 ::
+++  test-sem-tupbind
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Foo arity=0 local=n L0 2.1-2.40'
+        '    apply $BoundedExists opkind=BuiltInKind L0 2.8-2.40'
+        '      bound y L0 2.13-2.13'
+        '      bound z L0 2.16-2.16'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 2.24-2.32'
+        '          apply $Tuple opkind=BuiltInKind L0 2.25-2.31'
+        '            num 1 L0 2.27-2.27'
+        '            num 2 L0 2.29-2.29'
+        '      apply = opkind=BuiltInKind L0 2.36-2.40'
+        '        apply y opkind=FormalParamKind L0 2.36-2.36'
+        '        apply z opkind=FormalParamKind L0 2.40-2.40'
+        '  def Bar arity=0 local=n L0 3.1-3.64'
+        '    apply $BoundedForall opkind=BuiltInKind L0 3.8-3.64'
+        '      bound x L0 3.11-3.11'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.17-3.19'
+        '          num 1 L0 3.18-3.18'
+        '      bound y L0 3.24-3.24'
+        '      bound z L0 3.27-3.27'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.35-3.43'
+        '          apply $Tuple opkind=BuiltInKind L0 3.36-3.42'
+        '            num 3 L0 3.38-3.38'
+        '            num 4 L0 3.40-3.40'
+        '      apply \\land opkind=BuiltInKind L0 3.47-3.64'
+        '        apply = opkind=BuiltInKind L0 3.48-3.52'
+        '          apply x opkind=FormalParamKind L0 3.48-3.48'
+        '          apply y opkind=FormalParamKind L0 3.52-3.52'
+        '        apply = opkind=BuiltInKind L0 3.59-3.63'
+        '          apply y opkind=FormalParamKind L0 3.59-3.59'
+        '          apply z opkind=FormalParamKind L0 3.63-3.63'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=3,y<=3,y<=3,z<=3,z<=3}'
+        'lvl Foo L0 lc={y<=3,z<=3}'
+        'lvl Bar L0 lc={x<=3,y<=3,z<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aFoo == \\E <<y, z>> \\in {<<1,2>>} : y = z\0aBar == \\A x \\in {1}, <<y, z>> \\in {<<3,4>>} : (x = y) /\\ (y = z)\0a====\0a'
+  ==
+::
 ++  test-sem-unboundq
   %+  expect-eq
     !>  ^-  wain

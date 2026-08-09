@@ -771,8 +771,23 @@
   =/  kids  (kids-of n)
   ?~  kids  ''
   (resolve-syn (node-text (rear-node kids)))
+++  tuple-idents
+  ::  the identifier [name node] pairs bound by an N_IdentifierTuple
+  ::  `<<y, z>>` (nested tuples destructure recursively); SANY binds each
+  ::  individually (rendered as separate `bound` entries)
+  |=  n=node
+  ^-  (list [@t node])
+  %-  zing
+  %+  turn  (kids-of n)
+  |=  k=node
+  ^-  (list [@t node])
+  ?:  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))  ~[[(leaf-text k) k]]
+  ?:  (is-kind k %n-identifiertuple)  (tuple-idents k)
+  ~
+::
 ++  qbound-vars
-  ::  bound variable [name node] pairs before the \in in an N_QuantBound
+  ::  bound variable [name node] pairs before the \in in an N_QuantBound;
+  ::  a tuple binder `<<y, z>> \in S` binds each identifier individually
   |=  qb=node
   ^-  (list [@t node])
   =/  ks  (kids-of qb)
@@ -782,6 +797,8 @@
   ?:  &(?=(%leaf -.k) =(%t-in (leaf-kind k)))  ~
   ?:  &(?=(%leaf -.k) =(%identifier (leaf-kind k)))
     [[(leaf-text k) k] $(ks t.ks)]
+  ?:  (is-kind k %n-identifiertuple)
+    (weld (tuple-idents k) $(ks t.ks))
   $(ks t.ks)
 ::
 ++  qbound-range
