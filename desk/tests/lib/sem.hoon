@@ -1140,6 +1140,68 @@
       '---- MODULE C ----\0aVARIABLE x\0aI == INSTANCE B WITH y <- x, c <- 2\0a====\0a'
   ==
 ::
+++  test-sem-instsel
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Foo!Op arity=1 local=n L0 2.1-2.30'
+        '    param y arity=0 L0 4.4-4.4'
+        '    substin subs=1 L0 2.1-2.30'
+        '      sub D <-'
+        '        num 42 L0 2.29-2.30'
+        '      in'
+        '        apply $Tuple opkind=BuiltInKind L0 4.10-4.17'
+        '          apply D opkind=ConstantDeclKind L0 4.12-4.12'
+        '          apply y opkind=FormalParamKind L0 4.15-4.15'
+        '  def Ref arity=0 local=n L0 3.1-3.17'
+        '    apply $Nop opkind=BuiltInKind L0 3.8-3.17'
+        '      substin subs=1 L0 2.1-2.30'
+        '        sub D <-'
+        '          num 42 L0 2.29-2.30'
+        '        in'
+        '          apply = opkind=BuiltInKind L0 3.17-3.21'
+        '            apply D opkind=ConstantDeclKind L0 3.17-3.17'
+        '            apply D opkind=ConstantDeclKind L0 3.21-3.21'
+        '  def Ref2 arity=0 local=n L0 4.1-4.19'
+        '    apply $Nop opkind=BuiltInKind L0 4.9-4.19'
+        '      substin subs=1 L0 2.1-2.30'
+        '        sub D <-'
+        '          num 42 L0 2.29-2.30'
+        '        in'
+        '          apply D opkind=ConstantDeclKind L0 3.17-3.17'
+        '  def Ref3 arity=0 local=n L0 5.1-5.20'
+        '    apply LAMBDA opkind=UserDefinedOpKind L0 5.9-5.20'
+        '      num 7 L0 5.16-5.16'
+        '  thmdef Foo!Thm2 local=n L0 2.1-2.30'
+        '    apsubstin subs=1 L0 2.1-2.30'
+        '      sub D <-'
+        '        num 42 L0 2.29-2.30'
+        '      in'
+        '        apply = opkind=BuiltInKind L0 3.17-3.21'
+        '          apply D opkind=ConstantDeclKind L0 3.17-3.17'
+        '          apply D opkind=ConstantDeclKind L0 3.21-3.21'
+        '  instance name=Foo module=B local=n L0 2.1-2.30'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo!Op L0 ml=[2] w=[1]'
+        'lvl Ref L0'
+        'lvl Ref2 L0'
+        'lvl Ref3 L0'
+        'lvl Foo!Thm2 L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aFoo == INSTANCE B WITH D <- 42\0aRef == Foo!Thm2!:\0aRef2 == Foo!Thm2!<<\0aRef3 == Foo!Op(7)!>>\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT D\0aTHEOREM Thm2 == D = D\0aOp(y) == <<D, y>>\0a====\0a'
+  ==
+::
 ++  test-sem-instun
   %+  expect-eq
     !>  ^-  wain
@@ -3355,6 +3417,77 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aCONSTANT c\0aASSUME c = 0\0aASSUME NamedA == c = 1\0aTHEOREM c = 2\0aTHEOREM NamedT == c = 3\0a====\0a'
+  ==
+::
+++  test-sem-thmsel
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-10.4'
+        '  var x L1 3.10-3.10'
+        '  def Init arity=0 local=n L1 5.1-5.14'
+        '    apply $Nop opkind=BuiltInKind L1 5.9-5.14'
+        '      apply \\in opkind=BuiltInKind L1 4.17-4.26'
+        '        apply x opkind=VariableDeclKind L1 4.17-4.17'
+        '        apply .. opkind=UserDefinedOpKind L0 4.23-4.26'
+        '          num 0 L0 4.23-4.23'
+        '          num 3 L0 4.26-4.26'
+        '  def Inv arity=0 local=n L1 6.1-6.14'
+        '    apply $Nop opkind=BuiltInKind L1 6.8-6.14'
+        '      apply x opkind=VariableDeclKind L1 4.17-4.17'
+        '  def Inv2 arity=0 local=n L0 7.1-7.15'
+        '    apply $Nop opkind=BuiltInKind L0 7.9-7.15'
+        '      apply .. opkind=UserDefinedOpKind L0 4.23-4.26'
+        '        num 0 L0 4.23-4.23'
+        '        num 3 L0 4.26-4.26'
+        '  def Prop arity=0 local=n L1 9.1-9.17'
+        '    apply $Nop opkind=BuiltInKind L1 9.9-9.17'
+        '      apply x opkind=VariableDeclKind L1 8.27-8.27'
+        '  thmdef Thm1 local=n L1 4.1-4.26'
+        '    apply \\in opkind=BuiltInKind L1 4.17-4.26'
+        '      apply x opkind=VariableDeclKind L1 4.17-4.17'
+        '      apply .. opkind=UserDefinedOpKind L0 4.23-4.26'
+        '        num 0 L0 4.23-4.23'
+        '        num 3 L0 4.26-4.26'
+        '  thmdef Thm1b local=n L1 8.1-8.31'
+        '    apply \\land opkind=BuiltInKind L1 8.18-8.31'
+        '      apply = opkind=BuiltInKind L1 8.18-8.22'
+        '        apply x opkind=VariableDeclKind L1 8.18-8.18'
+        '        num 1 L0 8.22-8.22'
+        '      apply < opkind=UserDefinedOpKind L1 8.27-8.31'
+        '        apply x opkind=VariableDeclKind L1 8.27-8.27'
+        '        num 3 L0 8.31-8.31'
+        '  theorem name=Thm1 L1 4.1-4.26'
+        '    apply \\in opkind=BuiltInKind L1 4.17-4.26'
+        '      apply x opkind=VariableDeclKind L1 4.17-4.17'
+        '      apply .. opkind=UserDefinedOpKind L0 4.23-4.26'
+        '        num 0 L0 4.23-4.23'
+        '        num 3 L0 4.26-4.26'
+        '  theorem name=Thm1b L1 8.1-8.31'
+        '    apply \\land opkind=BuiltInKind L1 8.18-8.31'
+        '      apply = opkind=BuiltInKind L1 8.18-8.22'
+        '        apply x opkind=VariableDeclKind L1 8.18-8.18'
+        '        num 1 L0 8.22-8.22'
+        '      apply < opkind=UserDefinedOpKind L1 8.27-8.31'
+        '        apply x opkind=VariableDeclKind L1 8.27-8.27'
+        '        num 3 L0 8.31-8.31'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,x<=2}'
+        'lvl Init L1 lp={x} lc={x<=2}'
+        'lvl Inv L1 lp={x} lc={x<=3}'
+        'lvl Inv2 L0'
+        'lvl Prop L1 lp={x} lc={x<=3}'
+        'lvl Thm1 L1 lp={x} lc={x<=2}'
+        'lvl Thm1b L1 lp={x} lc={x<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aTHEOREM Thm1 == x \\in 0..3\0aInit == Thm1!:\0aInv == Thm1!<<\0aInv2 == Thm1!>>\0aTHEOREM Thm1b == x = 1 /\\ x < 3\0aProp == Thm1b!2!1\0a====\0a'
   ==
 ::
 ++  test-sem-tupbind

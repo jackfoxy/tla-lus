@@ -2785,10 +2785,60 @@
   =/  hit  (find-let-op i.args.s nm)
   ?^(hit hit $(args.s t.args.s))
 ::
+++  is-sel-marker
+  ::  a selector encoded as a structural marker (`@`/`<<`/`>>`/`:`/`(` or a
+  ::  positional index) rather than an identifier/operator name (R1.3.5.3.6)
+  |=  s=@t
+  ^-  ?
+  ?|  =('@' s)  =('<<' s)  =('>>' s)  =(':' s)  =('(' s)
+      ?=(^ (rush s dem))
+  ==
+::
+++  resolve-base
+  ::  the longest leading `!`-joined run of *name* selectors that is a
+  ::  registered def/theorem — an instance member `Foo!Thm2` is one flat
+  ::  registry entry spanning several selectors (R1.3.5.3.6). Returns the
+  ::  name and how many selectors it consumed
+  |=  [names=(list @t) reg=(map @t defentry)]
+  ^-  (unit [nm=@t n=@ud])
+  =/  i=@ud  0
+  =/  acc=@t  ''
+  =/  best=(unit [@t @ud])  ~
+  |-  ^-  (unit [@t @ud])
+  ?~  names  best
+  ?:  (is-sel-marker i.names)  best
+  =/  nm  ?:(=('' acc) i.names (rap 3 ~[acc '!' i.names]))
+  =/  best2  ?^((~(get by reg) nm) `[nm +(i)] best)
+  $(names t.names, acc nm, i +(i), best best2)
+::
+++  substin-parts
+  ::  the [module subst-names subst-exprs inner-body level span] of a
+  ::  $SubstIn / $APSubstIn reserved apply (an instance-member body) — the
+  ::  level/span are read while the node is narrowed to %apply (R1.3.5.3.6)
+  |=  s=sem
+  ^-  (unit [mod=@t names=(list sbind) exprs=(list sem) inner=sem lvl=@ud at=sspan])
+  ?.  ?=(%apply -.s)  ~
+  =/  m  (anysubstin-mod name.op.s)
+  ?~  m  ~
+  =/  ns  (lent ubound.s)
+  =/  bl  (slag ns `(list sem)`args.s)
+  ?~  bl  ~
+  `[u.m ubound.s (scag ns `(list sem)`args.s) i.bl lvl.s at.s]
+::
+++  rewrap-substin
+  ::  wrap a navigated inner node back in a $SubstIn with the instance's
+  ::  substitution — selectorToNode always produces a SubstInNode (not
+  ::  APSubstInNode) for the selected subexpression (R1.3.5.3.6)
+  |=  [mod=@t names=(list sbind) exprs=(list sem) node=sem lvl=@ud at=sspan]
+  ^-  sem
+  =/  nm  (crip (weld "$SubstIn:" (trip mod)))
+  [%apply [nm %builtin] lvl at names ~ (weld-sems exprs [node ~])]
+::
 ++  resolve-one
-  ::  Generator.selectorToNode for a pure label chain (.3.2): sel[0] is the
-  ::  base op, sel[1..] label selectors; wrap the selected node in $Nop at
-  ::  the reference span, keeping the selected node's original spans
+  ::  Generator.selectorToNode: resolve a $Sel placeholder — the base op
+  ::  (possibly a multi-selector instance member), navigation, and the
+  ::  $Nop / apply-LAMBDA / oparg-LAMBDA result, re-wrapping a through-
+  ::  instance selection in $SubstIn (R1.3.5.3.2-.6)
   |=  [s=sem reg=(map @t defentry)]
   ^-  sem
   ?.  ?=(%apply -.s)  [%nullodn ~]
@@ -2798,14 +2848,21 @@
     ?~  ub  ~
     [name.i.ub $(ub t.ub)]
   ?~  names  [%nullodn ~]
-  =/  base  (~(get by reg) i.names)
-  ?~  base  [%nullodn ~]
-  ?~  body.u.base  [%nullodn ~]
+  =/  bf  (resolve-base names reg)
+  ?~  bf  [%nullodn ~]
+  =/  be  (~(get by reg) nm.u.bf)
+  ?~  be  [%nullodn ~]
+  ?~  body.u.be  [%nullodn ~]
+  =/  bbody  u.body.u.be
+  =/  rest  (slag n.u.bf `(list @t)`names)
+  ::  a through-instance base is a $SubstIn/$APSubstIn wrapper: navigate its
+  ::  INNER body, re-wrap the result in a $SubstIn (R1.3.5.3.6)
+  =/  sp  (substin-parts bbody)
   =/  nav
-    =/  cur=sem  u.body.u.base
-    =/  cnt=@ud  (lent params.u.base)
+    =/  cur=sem  ?~(sp bbody inner.u.sp)
+    =/  cnt=@ud  (lent params.u.be)
     =/  at=?  |
-    =/  nv  t.names
+    =/  nv  rest
     |-  ^-  [ok=? cur=sem cnt=@ud at=?]
     ?~  nv  [& cur cnt at]
     =/  sel  i.nv
@@ -2849,8 +2906,12 @@
         [[%lit %num (crip (a-co cnt.nav)) at.s] ~]
     ==
   ?~  args.s
-    ::  pure navigation (.3.2) -> $Nop wrapping the selected node
-    [%apply ['$Nop' %builtin] (sem-lvl cur.nav) at.s ~ ~ [cur.nav ~]]
+    ::  pure navigation (.3.2) -> $Nop wrapping the selected node; a
+    ::  through-instance selection re-wraps the node in $SubstIn first (.3.6)
+    =/  wrapped=sem
+      ?~  sp  cur.nav
+      (rewrap-substin mod.u.sp names.u.sp exprs.u.sp cur.nav lvl.u.sp at.u.sp)
+    [%apply ['$Nop' %builtin] (sem-lvl wrapped) at.s ~ ~ [wrapped ~]]
   ::  parametric label (.3.3) -> apply LAMBDA to the collected args
   =/  lv
     =/  al=(list sem)  args.s

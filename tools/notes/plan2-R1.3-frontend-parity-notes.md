@@ -1261,3 +1261,41 @@ existing untouched); `-test {sem,node-eval,value,stdops}` = `ok=%.y`; the .3.4 `
 `CHOOSE x : P` g-choose bug (from .3.4) — needed before test206/219a close (.3.6/.3.7). No git commit.
 
 NEXT R1.3.5.3.6: through-INSTANCE + theorem/proof-step selectors (`SubstInNode`, `Thm1!:`).
+
+### R1.3.5.3.6 — through-INSTANCE + theorem/proof-step selectors (SHIP-VERIFIED, 2026-08-10)
+
+Two aspects, both measured against SemDump:
+- **Theorem-base selectors** (`Thm1!:`, `Thm1!<<`, `Thm1b!2!1`) — ALREADY worked: `+bodymap`
+  registers thmdefs (name→body), so a theorem base navigates like any def (`test-thm` byte-
+  exact with no code change).
+- **Through-INSTANCE** (`Foo!Thm2!:`, `Foo!Thm2!<<`, `Foo!Op(7)!>>`): the base is the FLAT
+  instance-member name (`Foo!Thm2`, already a registered thmdef whose body is an `apsubstin`
+  from R1.3.3); the selectors navigate its INNER body and the result is re-wrapped in a
+  `substin` (SubstInNode, NEVER APSubstInNode — Generator.selectorToNode:1945).
+
+Pieces (semantic.hoon):
+- `+resolve-base` — the base is the LONGEST leading `!`-joined run of *name* selectors that is
+  a registered def/theorem (`+is-sel-marker` stops the join at a structural selector). So
+  `Foo!Thm2!:` resolves base `Foo!Thm2` (2 selectors), remaining `[:]`.
+- `+substin-parts` (extracts `[mod names exprs inner lvl at]` from a `$SubstIn`/`$APSubstIn`
+  apply, reading lvl/at while narrowed to %apply) + `+rewrap-substin` (rebuilds as
+  `$SubstIn:<mod>` around the navigated node).
+- `resolve-one`: base via `resolve-base`; navigate the substin INNER body; the `$Nop` result
+  re-wraps in `$SubstIn`; the LAMBDA/oparg results elide the substitution (as SemDump does).
+
+VERIFIED: byte-exact goldens `sem/thmsel` (theorem-base) + `sem/instsel` (2-module: `Foo!Thm2!:`
+→ `$Nop / substin(D<-42) / D=D`, `Foo!Thm2!<<` → `$Nop / substin / D`, `Foo!Op(7)!>>` → `apply
+LAMBDA / num 7`). gen-sem 98→100 byte-reproducible (98 existing untouched); `-test {sem,
+node-eval,value,stdops}` = `ok=%.y`. Census unchanged (census flip is the .3.7 close-out).
+
+RESIDUALS for .3.7 (census flip): (1) the unbounded `CHOOSE x : P` g-choose bug (from .3.4) —
+blocks test206/219a and, via INSTANCE, test219. (2) inherited-instance-member generation
+(`Foo!\leq` when the instanced module EXTENDS Integers) is a pre-existing R1.3.3 ordering/
+content difference — surfaced in the first `instsel` draft (used a minimal non-EXTENDS `insta`
+to isolate .3.6); may affect test216 (test216a). (3) full LEVELS differential on the inlined
+selection nodes. (4) label-arity EC 4337 (from .3.3). No git commit. HOON: a `?~`-narrowed
+`(unit tuple)`'s field access wants the level/span read while narrowed (folded into
+`substin-parts`), not a separate `sem-at` on the un-narrowed body.
+
+NEXT R1.3.5.3.7: close-out — the unbounded-CHOOSE fix + census flip (test206/216/219/219a) +
+LEVELS + ledger/docs.

@@ -1,0 +1,7 @@
+LEVELS
+lvl MODULE A L-1
+lvl Foo!Op L0 ml=[2] w=[1]
+lvl Ref L0
+lvl Ref2 L0
+lvl Ref3 L0
+lvl Foo!Thm2 L0
