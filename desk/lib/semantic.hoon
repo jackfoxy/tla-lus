@@ -1651,6 +1651,76 @@
     (sel-item-of i.ek oargs)
   (snoc pre (sel-item-of fin ~))
 ::
+++  attach-targs
+  ::  attach an enclosing application's trailing opargs to the final
+  ::  selector (`Op(Foo,9)!lab` + `(1,2,3)` -> the label's args) — R1.3.5.3.3
+  |=  [sels=(list sel-item) targs=(list node)]
+  ^-  (list sel-item)
+  ?~  targs  sels
+  ?~  sels  sels
+  ?~  t.sels  ~[i.sels(args targs)]
+  [i.sels $(sels t.sels)]
+::
+++  weld-sems
+  ::  hand-rolled weld over a (list sem): a wet gate over the recursive sem
+  ::  mold mint-vains (zuse-408) — R1.3.5.3.3
+  |=  [a=(list sem) b=(list sem)]
+  ^-  (list sem)
+  ?~  a  b
+  [i.a $(a t.a)]
+::
+++  gen-sel-args
+  ::  generate one selector's argument expressions; `parg` gives the target
+  ::  operator's per-position expected arities (a nonzero position takes an
+  ::  operator argument -> oparg), ~ for a plain individual list. Reuses the
+  ::  +g-opappl per-position logic; built forward (no flop over a sem list)
+  ::  R1.3.5.3.3
+  |=  [args=(list node) parg=(list @ud) c=ctx]
+  ^-  [out=(list sem) ds=(list sdiag)]
+  =/  i=@ud  0
+  |-  ^-  [out=(list sem) ds=(list sdiag)]
+  ?~  args  [~ ~]
+  =/  one
+    ^-  [r=(unit sem) ds=(list sdiag)]
+    =/  oa  ?:((gth (at-or parg i 0) 0) (oparg-of i.args c) ~)
+    ?^  oa  [`u.oa ~]
+    =/  g  (g-x i.args c)
+    [r.g ds.g]
+  =/  rest  $(args t.args, i +(i))
+  :-  ?~(r.one out.rest [u.r.one out.rest])
+  (weld ds.one ds.rest)
+::
+++  g-sel
+  ::  build a $Sel placeholder for a subexpression-selector general-id
+  ::  `gid` (with optional trailing opargs `targs` from an enclosing
+  ::  application). Generates each selector's args — the base (sel[0])
+  ::  HO-aware via its `parg`, the rest as individuals — and carries the
+  ::  flat argument list for +resolve-sels. .3.3 handles pure %name (label)
+  ::  chains; ~ (fall through) for anything else (R1.3.5.3.3)
+  |=  [gid=node targs=(list node) at=sspan c=ctx]
+  ^-  gout
+  =/  sels  (attach-targs (sel-of gid) targs)
+  ?.  &((gth (lent sels) 1) (levy sels |=(i=sel-item ?=(%name kind.i))))
+    [~ ~]
+  ?~  sels  [~ ~]
+  =/  base-parg
+    =/  bs  (~(get by c) nm.i.sels)
+    ?~(bs ~ parg.u.bs)
+  =/  gen
+    =/  first  &
+    =/  sl=(list sel-item)  sels
+    |-  ^-  [out=(list sem) ds=(list sdiag)]
+    ?~  sl  [~ ~]
+    =/  ga  (gen-sel-args args.i.sl ?:(first base-parg ~) c)
+    =/  rest  $(sl t.sl, first |)
+    [(weld-sems out.ga out.rest) (weld ds.ga ds.rest)]
+  =/  ub=(list sbind)
+    =/  uq=(list sel-item)  sels
+    |-  ^-  (list sbind)
+    ?~  uq  ~
+    [[nm.i.uq | at.i.uq] $(uq t.uq)]
+  [`[%apply ['$Sel' %builtin] 0 at ub ~ out.gen] ds.gen]
+::
 ++  genid-prefix
   ::  the ident!ident!.. prefix of a general identifier, as 'I!J!'
   |=  n=node
@@ -1698,14 +1768,10 @@
     [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
   ::  an unresolved subexpression selector (a non-empty `!`-prefix that is
   ::  not an in-scope instance member) -> a $Sel placeholder for the
-  ::  post-generation resolver. .3.2 handles a pure %name (label) chain with
-  ::  no arguments; arg-carrying / structural selectors stay a 4200 reject
-  ::  here (R1.3.5.3.2)
-  =/  sels  (sel-of n)
-  ?:  ?&  (gth (lent sels) 1)
-          (levy sels |=(i=sel-item &(?=(%name kind.i) ?=(~ args.i))))
-      ==
-    [`(sel-placeholder sels (span-of:ast n)) ~]
+  ::  post-generation resolver (+g-sel builds it for a pure %name/label
+  ::  chain; structural/other selectors still fall through to 4200 here)
+  =/  gs  (g-sel n ~ (span-of:ast n) c)
+  ?^  r.gs  gs
   :-  `[%nullodn ~]
   [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
 ::
@@ -1757,6 +1823,12 @@
     ?~(pfx raw (rap 3 ~[u.pfx raw]))
   =/  s  (~(get by c) nm)
   ?~  s
+    ::  a parametric subexpression selector `Op(..)!lab(1,2,3)`: the base +
+    ::  navigation are in `gid`, the final selector's args are this
+    ::  application's opargs -> route to +g-sel (R1.3.5.3.3)
+    =/  targs  (skim (kids-of args-node) |=(k=node ?=(%node -.k)))
+    =/  gs  (g-sel gid targs (span-of:ast n) c)
+    ?^  r.gs  gs
     :-  `[%nullodn ~]
     [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
   =/  arg-exprs  (skim (kids-of args-node) |=(k=node ?=(%node -.k)))
@@ -2586,18 +2658,6 @@
     $(el t.el, a (snoc a i.el))
   $(ex t.ex, cacc cacc2, vacc vacc2)
 ::
-++  sel-placeholder
-  ::  the reserved $Sel %apply the resolver (+resolve-sels) consumes: one
-  ::  ubound entry per selector name. .3.2 emits it only for a pure %name
-  ::  (label) chain with no arguments (R1.3.5.3.2)
-  |=  [sels=(list sel-item) at=sspan]
-  ^-  sem
-  =/  ub=(list sbind)
-    |-  ^-  (list sbind)
-    ?~  sels  ~
-    [[nm.i.sels | at.i.sels] $(sels t.sels)]
-  [%apply ['$Sel' %builtin] 0 at ub ~ ~]
-::
 ++  sem-lvl
   |=  s=sem
   ^-  @ud
@@ -2653,13 +2713,28 @@
   ?~  names  [%nullodn ~]
   =/  base  (~(get by reg) i.names)
   ?.  ?=([~ ~ *] base)  [%nullodn ~]
-  =/  cur=sem  u.u.base
-  |-  ^-  sem
-  ?~  t.names
-    [%apply ['$Nop' %builtin] (sem-lvl cur) at.s ~ ~ [cur ~]]
-  =/  lbl  (find-label cur i.t.names)
-  ?~  lbl  [%nullodn ~]
-  $(t.names t.t.names, cur u.lbl)
+  =/  found
+    =/  cur=sem  u.u.base
+    =/  nv  t.names
+    |-  ^-  (unit sem)
+    ?~  nv  `cur
+    =/  lbl  (find-label cur i.nv)
+    ?~  lbl  ~
+    $(nv t.nv, cur u.lbl)
+  ?~  found  [%nullodn ~]
+  ?~  args.s
+    ::  pure navigation (.3.2) -> $Nop wrapping the selected node, keeping
+    ::  its original spans
+    [%apply ['$Nop' %builtin] (sem-lvl u.found) at.s ~ ~ [u.found ~]]
+  ::  parametric (.3.3): the labeled subexpression as an anonymous LAMBDA
+  ::  operator applied to the collected args (base args ++ selector args);
+  ::  SemDump elides the LAMBDA body, so this renders `apply LAMBDA` + args
+  =/  lv
+    =/  al=(list sem)  args.s
+    |-  ^-  @ud
+    ?~  al  0
+    (max (sem-lvl i.al) $(al t.al))
+  [%apply ['LAMBDA' %user-op] lv at.s ~ ~ args.s]
 ::
 ++  rsel-list
   |=  [l=(list sem) reg=(map @t (unit sem))]
@@ -2685,7 +2760,9 @@
     s(lets nl, body ?~(body.s ~ `(rsel-sem u.body.s reg)))
   ::
       %apply
-    ?:  =('$Sel' name.op.s)  (resolve-one s reg)
+    ?:  =('$Sel' name.op.s)
+      ::  resolve any nested $Sel in the selector args first (R1.3.5.3.3)
+      (resolve-one s(args (rsel-list args.s reg)) reg)
     =/  br=(list sem-bound)
       |-  ^-  (list sem-bound)
       ?~  bound.s  ~

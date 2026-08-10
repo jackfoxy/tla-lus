@@ -1260,6 +1260,64 @@
       '---- MODULE A ----\0aEXTENDS Integers\0aOp == lab :: 42\0aBar == Op!lab\0a====\0a'
   ==
 ::
+++  test-sem-labelrefarg
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def Op arity=2 local=n L0 3.1-3.98'
+        '    param Arg arity=1 L0 3.4-3.9'
+        '    param p arity=0 L0 3.12-3.12'
+        '    apply $BoundedForall opkind=BuiltInKind L0 3.18-3.98'
+        '      bound x L0 3.21-3.21'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.27-3.32'
+        '          num 1 L0 3.28-3.28'
+        '          num 2 L0 3.31-3.31'
+        '      bound y L0 3.37-3.37'
+        '      bound z L0 3.40-3.40'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.48-3.57'
+        '          apply $Tuple opkind=BuiltInKind L0 3.49-3.56'
+        '            num 3 L0 3.51-3.51'
+        '            num 4 L0 3.54-3.54'
+        '      label lab L0 3.61-3.98'
+        '        apply + opkind=UserDefinedOpKind L0 3.77-3.98'
+        '          apply + opkind=UserDefinedOpKind L0 3.77-3.94'
+        '            apply + opkind=UserDefinedOpKind L0 3.77-3.90'
+        '              apply + opkind=UserDefinedOpKind L0 3.77-3.86'
+        '                apply Arg opkind=FormalParamKind L0 3.77-3.82'
+        '                  num 1 L0 3.81-3.81'
+        '                apply p opkind=FormalParamKind L0 3.86-3.86'
+        '              apply x opkind=FormalParamKind L0 3.90-3.90'
+        '            apply y opkind=FormalParamKind L0 3.94-3.94'
+        '          apply z opkind=FormalParamKind L0 3.98-3.98'
+        '  def Foo arity=1 local=n L0 4.1-4.15'
+        '    param u arity=0 L0 4.5-4.5'
+        '    apply * opkind=UserDefinedOpKind L0 4.11-4.15'
+        '      num 2 L0 4.11-4.11'
+        '      apply u opkind=FormalParamKind L0 4.15-4.15'
+        '  def Bar arity=0 local=n L0 5.1-5.30'
+        '    apply LAMBDA opkind=UserDefinedOpKind L0 5.8-5.30'
+        '      oparg Foo op=Foo arity=1 L0 5.11-5.13'
+        '      num 9 L0 5.16-5.16'
+        '      num 1 L0 5.23-5.23'
+        '      num 2 L0 5.26-5.26'
+        '      num 3 L0 5.29-5.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,x<=3,y<=3,z<=3}'
+        'lvl Op L0 ml=[2,2] w=[1,1] mml=[0;] olc=[FF;] lc={x<=3,y<=3,z<=3}'
+        'lvl Foo L0 ml=[3] w=[0]'
+        'lvl Bar L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Integers\0aOp(Arg(_), p) == \\A x \\in {1, 2}, <<y, z>> \\in {<<3, 4>>} : lab(x, y, z) :: Arg(1) + p + x + y + z\0aFoo(u) == 2 * u\0aBar == Op(Foo, 9)!lab(1, 2, 3)\0a====\0a'
+  ==
+::
 ++  test-sem-lamact
   %+  expect-eq
     !>  ^-  wain

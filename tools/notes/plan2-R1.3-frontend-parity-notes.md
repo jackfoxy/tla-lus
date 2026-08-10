@@ -1146,3 +1146,42 @@ reject — arg-carrying label refs are .3.3). HOON: `resolve-one` took `s=sem`; 
 
 NEXT R1.3.5.3.3: label refs WITH args (`!lab(1,2,3)`) — carry generated selector args in the
 `$Sel` placeholder, substitute the label's params → `apply LAMBDA`; closes test219a's label half.
+
+### R1.3.5.3.3 — label reference resolution (SHIP-VERIFIED, build 576, 2026-08-09)
+
+Parametric label refs on the .3.2 skeleton. KEY CST FACT: `Op(Foo,9)!lab(1,2,3)` is
+`n-opapplication[ generalid[Op(Foo,9)!lab], opargs(1,2,3) ]` — the BASE args (Foo,9) ride
+in the idprefix element, the LABEL args (1,2,3) are the enclosing application's opargs. So
+the parametric case routes through **g-opappl** (not g-genid), and the trailing opargs
+attach to the final selector. Target render (SemDump ELIDES the LAMBDA body): `apply LAMBDA
+opkind=UserDefinedOpKind` + args = base args ++ label args, where an operator-valued base
+arg becomes an `oparg` (Op's param `Arg(_)` → `oparg Foo`).
+
+Pieces (semantic.hoon):
+- **`+g-sel`** — shared placeholder builder for both g-genid (bare, `targs=~`) and g-opappl
+  (parametric, `targs`=the application opargs): `+attach-targs` puts `targs` on the final
+  selector; generates each selector's args — the base (sel[0]) HO-aware via its `parg`
+  (`+gen-sel-args`, reusing `oparg-of`), the rest as individuals — and carries the flat arg
+  list in the `$Sel` placeholder (ubound=names, args=flat generated args).
+- **routing**: g-genid `?~ s` → `(g-sel n ~ …)`; g-opappl `?~ s` → `(g-sel gid targs …)`;
+  both fall through to 4200 when g-sel returns `~` (not a pure %name chain).
+- **`+resolve-one`** extended: navigate labels (`+find-label`); if the placeholder has args
+  → `apply LAMBDA` (`['LAMBDA' %user-op]`, level = max arg level) applied to them; else the
+  .3.2 `$Nop`. `+rsel-sem` resolves nested `$Sel` in the placeholder args first.
+
+VERIFIED: byte-exact golden `sem/labelrefarg` (`Op(Foo,9)!lab(1,2,3)` → `apply LAMBDA /
+oparg Foo / num 9 / num 1 / num 2 / num 3`, L0) + `sem/labelref` (.3.2) both green; gen-sem
+94→95 byte-reproducible (diff = ONLY the new case). `-test {sem,node-eval,value,stdops}` =
+`ok=%.y` (g-opappl routing doesn't touch existing specs — instance members are IN ctx so
+never reach the `?~ s` g-sel path). Census UNCHANGED: test219a still rejects (`COp!@!++` =
+`!@`/op-symbol → .3.4/.3.5); the parametric-label MECHANISM is proven, spec-flip is .3.6.
+
+RESIDUALS (documented): (1) label arity mismatch `!lab` on a 3-param label → SANY EC 4337;
+not emitted yet (test219a's active ref has the correct count) — .3.6/.3.7. (2) LAMBDA level
+= max-arg-level approximation (exact for constant args); refine in .3.7 if a variable-carrying
+ref needs it. HOON: `flop`/`weld` over a `(list sem)` mint-vain (zuse-408) — built forward
+with hand-rolled `+weld-sems`; a `?~ args.s`-narrowed list must be widened (`=/ al=(list sem)`)
+before its own `?~`; `(gth (lent x) 1)` does NOT narrow `x` for `i.x` (need `?~ x`). No git commit.
+
+NEXT R1.3.5.3.4: `!@` (argument selector → `oparg LAMBDA`) + `!<op-symbol>` (`!++`, nested
+LET operator); then .3.5 structural / through-INSTANCE.
