@@ -1024,3 +1024,90 @@ always C-c + C-a C-k + clear-history and read a FRESH run. (2) misread an AstDum
 by cutting the sed window above the enclosing `n-opapplication`; always dump from the
 `def` line to see the wrapper. (3) split a multi-form byte-golden into per-def arms so a
 mismatch isolates to one tiny def.
+
+### R1.3.5.3.0 — kickoff (oracle measurement, DOCS/ORACLE ONLY, 2026-08-09)
+
+No code, no desk deploy, no ship `-test`; census frozen (R1.3.x.0 pattern). Read SANY's
+`Selector`/`genIdToSelector`/`selectorToNode` and `SemDump`ed one resolved case per
+resolution mode. Scratch goldens in `r1350/{nav,nav2}.sem.txt` + `r1350/test206.sem.txt`,
+regenerable via `java -cp $JAR:tools/oracle/build SemDump <spec>.tla`.
+
+**Selector interface (the .3.2 increment boundary).** `genIdToSelector`
+(`Generator.java:503`) walks `n-idprefix` elements + the final into a `Selector` =
+parallel `ops`/`opNames`/`args`/`STN` arrays; each element's kind code (`:331-336`,
+`:409-470`):
+
+    NameSel=-1   identifier / operator-symbol / proof-step  (`!Foo`, `!lab`, `!++`)
+    NullSel=-2   a `(...)` selector                          (`!(args)`)
+    GGSel =-3    `>>`      LLSel=-4  `<<`      ColonSel=-5  `:`      AtSel=-6  `@`
+    N>=0         a positional selector `!N`  (an N_StructOp whose child is a number)
+
+`selectorToNode` (`:619-2041`, 1422 lines) is a two-phase state machine over that list:
+**FollowingLabels** (peel leading `NameSel`s that match a `LabelNode` of the current
+definition) → **FindingSubExpr** (navigate the operator's body per the codes above).
+
+**Resolution mode → SemDump shape (MEASURED — the per-increment acceptance targets):**
+
+| mode | selector | SemDump render | port reuse |
+|---|---|---|---|
+| label DEFINITION | `lab :: e` | `label <name> L<lvl> <span>` tree node | NEW node (see mold below) |
+| label REFERENCE | `Op(Foo,9)!lab(1,2,3)` | `apply LAMBDA opkind=UserDefinedOpKind` + `oparg`/args | `$OpArg`/LAMBDA (R1.3.1/.2) |
+| body `!:` / parametric `!(args)` | `Foo(5)!:`, `Def13!(42)!>>` | `apply LAMBDA opkind=UserDefinedOpKind` + args | LAMBDA |
+| structural nav `!N`/`!<<`/`!>>` | `Def10!2`, `Def4!<<!<<` | `apply $Nop opkind=BuiltInKind` wrapping the **selected subexpr with its ORIGINAL spans** | `$Nop` builtin |
+| argument selector `!@` | `OOp2(SOp1a!@,2,2)` | `oparg LAMBDA op=LAMBDA arity=N` | `$OpArg`/`resolve-oparg` |
+| through-INSTANCE | `Inst!Foo(..)`, `Foo!Thm2!:` | `substin subs=N` wrapping the inlined node | `$SubstIn`/`l-substin` (R1.3.3) |
+
+**KEY FEASIBILITY FINDING:** every inlining OUTPUT shape is already expressible with
+existing port machinery — `$Nop` (navigation), `LAMBDA`/`$OpArg` (parametric/label/`!@`),
+`$SubstIn` (through-instance). So .3 builds the **selector walk + resolver** (the missing
+`selectorToNode`) and **one new node** (the label); it does NOT need new IR value shapes.
+`$Nop` wraps a pure navigation selection and PRESERVES the source subexpression's spans
+(the render points back to the original location, e.g. `A == Def10!2` → `apply $Nop /
+num 2 L0 3.15-3.15`).
+
+**LABEL MOLD DECISION (freeze):** encode the label with the **reserved-`%apply` trick**,
+`%apply ['$Label' %builtin] lvl span [[name | span] ~] ~ [body]` — a `$Label`-special
+render arm emits `label <name> L<lvl> <span>` (exactly as `$OpArg` renders `oparg`). This
+reuses the existing recursive `%apply` union and **dodges the zuse-408 recursive-mold
+loop** a new `+$ label` variant would trigger; it is the proven `$OpArg`/`$SubstIn`
+pattern. (`.3.1` may revisit only if the label needs a field `%apply` can't carry.)
+
+**Goldens to preserve:** all **92** `tests/lib/sem` goldens byte-identical (none contain
+labels). **12 carry `substin`** (R1.3.3 INSTANCE subst) — `.3.5`'s through-INSTANCE
+selector work extends the `$SubstIn` path and MUST leave those 12 unchanged (per-def
+byte-diff after each `.3.5` edit).
+
+**Census baseline (frozen, unchanged in .0):** `SUB_BATCH_DIVERGENCES` carries
+`suite/test206`, `test216`, `test219`, `test219a` (all `hoon=reject`: they parse after
+R1.3.5.2, reject at semantic) + the R1.3.5.1 `test52` deferral. `.3` flips the four
+`!`-nav specs at `.3.6`.
+
+**Increment map (from the modes above):** .3.1 label generation (`label` nodes appear) →
+.3.2 selector infra + label-ref resolution (`FollowingLabels`) → .3.3 structural nav
+(`$Nop`, `FindingSubExpr`) → .3.4 `!@`/op-symbol → .3.5 through-INSTANCE + on-theorem
+(`substin`) → .3.6 levels + census flip. Plan `~/FoxyLabs/tla-lus/R1.3.5.3-plan.md`.
+
+### R1.3.5.3.1 — label generation (SHIP-VERIFIED, build 570, 2026-08-09)
+
+Labels were PARSED (`n-label`) but never generated — `g-x` had no `%n-label` arm, so a
+labeled body silently dropped to `[~ ~]`. Now generated via the kickoff's reserved-`%apply`
+`$Label` encoding (NO new recursive `+$` variant → dodges zuse-408):
+- **`+g-label`** (semantic.hoon, by `builtin-apply`): from `n-label` = `[target :: body]`,
+  emits `[%apply ['$Label' %builtin] (expr-level n) span [[name | span] ~] ~ [body-sem]]`;
+  `+label-name` reads the label name off the target (a bare general-id `lab ::` or an
+  application head `lab(x) ::`). `g-x` `%n-label` arm dispatches to it.
+- **`expr-level` `%n-label` arm**: level = the labeled body's level (level-transparent),
+  matching `label lab L0` where the body is L0.
+- **`render-sem` `$Label` arm** (by the `$OpArg`/`$NewSymb` special-cases): emits
+  `label <name> L<lvl> <span>` + the body child at `+(d)` — byte-identical to SANY's
+  LabelNode projection. The `$Label` apply is otherwise level-transparent, so `l-x`
+  traverses its single body arg with no change (LEVELS match).
+
+Labels appear inside quantifier/CHOOSE/def-body positions (the body IS a label, or a
+quantifier body is a label). NO resolution of label REFERENCES yet — `Op!lab` still
+rejects (that is R1.3.5.3.2). VERIFIED: new byte-exact golden `desk/test-data/sem/label`
+(`Op(p) == \A x \in {1,2} : lab(x) :: x + p` + `Simple == lab2 :: TRUE`) matches SemDump
+tree + LEVELS; `gen-sem-tests` 92→93, byte-reproducible (regen diff = ONLY the new case,
+so the 92 existing goldens are untouched). `-test {sem,node-eval,value,stdops,arith}` =
+`ok=%.y` (no regression from the shared g-x/expr-level/render edits). Census unchanged
+(the four `!`-nav specs still reject at semantic — label refs are .3.2). No git commit yet.

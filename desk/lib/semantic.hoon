@@ -676,6 +676,10 @@
     ::  extended context); approximate with the body node's own level
     (max-levels c ~[(rear-node (kids-of n))])
   ::
+      %n-label
+    ::  a labeled expression has the level of its labeled body (R1.3.5.3.1)
+    (max-levels c ~[(rear-node (kids-of n))])
+  ::
       ?(%n-boundquant %n-unboundquant %n-unboundorboundchoose %n-subsetof %n-setofall)
     (max-levels c (skim (kids-of n) |=(k=node ?=(%node -.k))))
   ::
@@ -1385,6 +1389,38 @@
   ^-  sem
   [%apply [opn %builtin] (expr-level n c) (span-of:ast n) ub.kids bs.kids as.kids]
 ::
+++  label-name
+  ::  the name of a label target: `lab ::` (a bare general-id) or
+  ::  `lab(x) ::` (an application whose head is the general-id) — SANY
+  ::  renders the LabelNode as `label <name>` (R1.3.5.3.1)
+  |=  n=node
+  ^-  @t
+  =/  gid  ?:((is-kind n %n-opapplication) (snag 0 (kids-of n)) n)
+  =/  ids
+    %+  skim  (kids-of gid)
+    |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k))))
+  ?~(ids '' (leaf-text (rear-node `(list node)`ids)))
+::
+++  g-label
+  ::  a labeled expression `target :: body` -> the reserved $Label %apply
+  ::  (kickoff decision): the label name rides in the ubound, the labeled
+  ::  body is the single arg. A $Label render arm emits `label <name>`
+  ::  (mirrors $OpArg), dodging a recursive-mold `+$` variant. Resolution
+  ::  of label REFERENCES is R1.3.5.3.2 (R1.3.5.3.1)
+  |=  [n=node c=ctx]
+  ^-  gout
+  =/  kids  (kids-of n)
+  ?~  kids  [~ ~]
+  =/  nm  (label-name i.kids)
+  =/  gb  (g-x (rear-node kids) c)
+  =/  sp  (span-of:ast n)
+  :_  ds.gb
+  :-  ~
+  :*  %apply  ['$Label' %builtin]  (expr-level n c)  sp
+      [[nm | sp] ~]  ~
+      [?~(r.gb [%nullodn ~] u.r.gb) ~]
+  ==
+::
 ++  g-x
   ::  generate one expression node (Generator.generateExpression)
   |=  [n=node c=ctx]
@@ -1514,6 +1550,9 @@
   ::
       %n-letin
     (g-letin n c)
+  ::
+      %n-label
+    (g-label n c)
   ::
       %n-subsetof
     (g-subsetof n c)
@@ -5094,6 +5133,12 @@
       :_  ~
       %+  line  d
       "oparg {(trip nm)} op={(trip nm)} arity={(trip ary)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
+    ?:  =('$Label' name.op.s)
+      ::  reserved $Label %apply: name in the ubound, labeled body the arg
+      ::  (R1.3.5.3.1)
+      =/  nm  ?~(ubound.s '' name.i.ubound.s)
+      :-  (line d "label {(trip nm)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}")
+      ?~(args.s ~ (render-sem i.args.s +(d) mask))
     ?:  =('$NewSymb' name.op.s)
       =/  nm  ?~(ubound.s '' name.i.ubound.s)
       ~[(line d "newsymb {(trip nm)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}")]

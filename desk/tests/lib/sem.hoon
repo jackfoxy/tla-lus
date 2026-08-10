@@ -1199,6 +1199,40 @@
       '---- MODULE A ----\0aCONSTANT P, a, b\0aPick == IF P THEN a ELSE b\0a====\0a'
   ==
 ::
+++  test-sem-label
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Op arity=1 local=n L0 3.1-3.42'
+        '    param p arity=0 L0 3.4-3.4'
+        '    apply $BoundedForall opkind=BuiltInKind L0 3.10-3.42'
+        '      bound x L0 3.13-3.13'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 3.19-3.24'
+        '          num 1 L0 3.20-3.20'
+        '          num 2 L0 3.23-3.23'
+        '      label lab L0 3.28-3.42'
+        '        apply + opkind=UserDefinedOpKind L0 3.38-3.42'
+        '          apply x opkind=FormalParamKind L0 3.38-3.38'
+        '          apply p opkind=FormalParamKind L0 3.42-3.42'
+        '  def Simple arity=0 local=n L0 4.1-4.22'
+        '    label lab2 L0 4.11-4.22'
+        '      apply TRUE opkind=BuiltInKind L0 4.19-4.22'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2,x<=3}'
+        'lvl Op L0 ml=[2] w=[1] lc={x<=3}'
+        'lvl Simple L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Integers\0aOp(p) == \\A x \\in {1, 2} : lab(x) :: x + p\0aSimple == lab2 :: TRUE\0a====\0a'
+  ==
+::
 ++  test-sem-lamact
   %+  expect-eq
     !>  ^-  wain
