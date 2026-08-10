@@ -1185,3 +1185,44 @@ before its own `?~`; `(gth (lent x) 1)` does NOT narrow `x` for `i.x` (need `?~ 
 
 NEXT R1.3.5.3.4: `!@` (argument selector → `oparg LAMBDA`) + `!<op-symbol>` (`!++`, nested
 LET operator); then .3.5 structural / through-INSTANCE.
+
+### R1.3.5.3.4 — argument (`!@`) + operator-symbol (`!++`) selectors (SHIP-VERIFIED, 2026-08-10)
+
+Both resolve to `oparg LAMBDA arity=N` (reusing the `$OpArg` encoding); the work is
+computing N by accumulating a param count during navigation (Generator.java:1296/970/1083):
+base-op params + the bound vars a node binds when the selector is `!@` + nested-LET-op
+params for `!<op-symbol>`. Targets (measured): `SOp1a!@` → `oparg LAMBDA arity=2`
+(SOp1a's `a` + its subsetof's bound `x`); `COp!@!++` → `arity=5` (COp's `q,p` + bound `x`
++ the LET `a ++ b`).
+
+Pieces (semantic.hoon):
+- registry now carries params: `+$ defentry [body params]`; `+bodymap` returns
+  `(map @t defentry)` (threaded through `resolve-one`/`rsel-sem`/`rsel-list`).
+- `+bound-count` = a node's bound vars (`bound` for a bounded binder, `ubound` for an
+  unbounded one — count both). `+find-let-op` = the first `%letin`-defined op named `nm`
+  (hand-rolled, like `+find-label`).
+- `resolve-one` navigation now threads `[cur cnt at]`: `!@` (encoded `'@'` in the
+  placeholder) adds `(bound-count cur)` and sets `at`; a name selector tries `find-label`,
+  else `find-let-op` (adds its param count). If `at` → `oparg LAMBDA arity=cnt`.
+- `g-sel` gate widened to `?(%name %at)`; `+g-sel-of-arg` + a g-opappl arg-loop fallback
+  (before the 4270/4271) route a subexpression-selector *argument* (`OOp2(SOp1a!@,..)`)
+  to the placeholder instead of erroring — this is where `!@` args actually appear.
+
+BUG FIXED (found via a direct `find-let-op` probe): `+op-of-genop` returns `''` on a bare
+`n-infixop` tok-node (it reads `rear-node kids`, but a tok-node has no kids), so the `!++`
+selector name was empty. `+sel-item-of` now reads the name with `+node-text` (handles both
+a leaf and a childless op node).
+
+VERIFIED: byte-exact golden `sem/selat` (`SOp1a!@` arity 2, `COp!@!++` arity 5); gen-sem
+95→96 byte-reproducible (95 existing untouched); `-test {sem,node-eval,value,stdops}` =
+`ok=%.y`. Census unchanged (test219a still has structural / through-INSTANCE selectors).
+
+RESIDUAL (pre-existing, unrelated to .3.4): `CHOOSE x : P` (unbounded) is mis-generated as
+`$BoundedChoose` with `x` in `bound` instead of `$UnboundedChoose`/`ubound` — surfaced when
+the first `selat` draft used unbounded CHOOSE (arity was right since `bound-count` reads
+both, but the render differed). The REAL test219a `COp` uses unbounded CHOOSE, so this
+g-choose bug must be fixed before test219a closes (.3.6/close-out); `selat` uses a bounded
+`\A` to isolate the .3.4 mechanism. HOON: `op-of-genop` vs `node-text` on op tok-nodes. No git commit.
+
+NEXT R1.3.5.3.5: structural navigation (`FindingSubExpr`: `!1`/`!<<`/`!>>`/`!:`/`!(args)`
+→ `apply $Nop`) — the `Def1..Def23` corpus; then .3.6 through-INSTANCE.

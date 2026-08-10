@@ -1166,6 +1166,9 @@
       args=(list node)
       at=sspan
   ==
+::  a subexpression selector's base lookup: the operator's body and its
+::  own formal parameters (for the LAMBDA arity count) — R1.3.5.3.4
++$  defentry  [body=(unit sem) params=(list spar)]
 +$  sem-module
   $:  name=@t
       at=sspan
@@ -1629,8 +1632,11 @@
       ?:  =('>>' img)  %gg
       ?:(=(':' img) %colon %at)
     [kd 0 '' ~ (span-of:ast sel)]
-  ::  an identifier or operator symbol -> NameSel
-  [%name 0 (op-of-genop sel) oargs (span-of:ast sel)]
+  ::  an identifier or operator symbol -> NameSel. A bare operator tok-node
+  ::  (`!++` = a childless n-infixop) carries its text in the image, so read
+  ::  it with +node-text (op-of-genop, meant for Gen*Op wrappers, returns ''
+  ::  on a childless op node) — R1.3.5.3.4
+  [%name 0 (resolve-syn (node-text sel)) oargs (span-of:ast sel)]
 ::
 ++  sel-of
   ::  Generator.genIdToSelector: a general-id's N_IdPrefix elements plus
@@ -1700,7 +1706,7 @@
   |=  [gid=node targs=(list node) at=sspan c=ctx]
   ^-  gout
   =/  sels  (attach-targs (sel-of gid) targs)
-  ?.  &((gth (lent sels) 1) (levy sels |=(i=sel-item ?=(%name kind.i))))
+  ?.  &((gth (lent sels) 1) (levy sels |=(i=sel-item ?=(?(%name %at) kind.i))))
     [~ ~]
   ?~  sels  [~ ~]
   =/  base-parg
@@ -1718,8 +1724,24 @@
     =/  uq=(list sel-item)  sels
     |-  ^-  (list sbind)
     ?~  uq  ~
-    [[nm.i.uq | at.i.uq] $(uq t.uq)]
+    ::  `!@` (AtSel) has no name — encode it as '@' for the resolver
+    =/  nm  ?:(?=(%at kind.i.uq) '@' nm.i.uq)
+    [[nm | at.i.uq] $(uq t.uq)]
   [`[%apply ['$Sel' %builtin] 0 at ub ~ out.gen] ds.gen]
+::
+++  g-sel-of-arg
+  ::  a $Sel placeholder if a node is a subexpression selector used as an
+  ::  operator argument: a general-id with a non-empty `!`-prefix (`SOp1a!@`)
+  ::  or such an application (`Op(..)!lab(..)`) — R1.3.5.3.4
+  |=  [n=node c=ctx]
+  ^-  gout
+  ?:  (is-kind n %n-generalid)
+    (g-sel n ~ (span-of:ast n) c)
+  ?.  (is-kind n %n-opapplication)  [~ ~]
+  =/  kids  (kids-of n)
+  ?.  =(2 (lent kids))  [~ ~]
+  =/  targs  (skim (kids-of (snag 1 `(list node)`kids)) |=(k=node ?=(%node -.k)))
+  (g-sel (snag 0 `(list node)`kids) targs (span-of:ast n) c)
 ::
 ++  genid-prefix
   ::  the ident!ident!.. prefix of a general identifier, as 'I!J!'
@@ -1889,6 +1911,11 @@
         out  [built out]
         d2   (weld d2 [e2 ~])
       ==
+    ::  a subexpression-selector argument (`SOp1a!@`, `COp!@!++`) resolves
+    ::  to an `oparg LAMBDA` via the post-pass, not a plain op ref (R1.3.5.3.4)
+    =/  gsel  (g-sel-of-arg i.nl c)
+    ?^  r.gsel
+      $(nl t.nl, i +(i), out [u.r.gsel out], ds (weld ds ds.gsel))
     ::  not a matching-arity operator: the selector fails (4270/4271) and
     ::  the argument becomes nullODN, then the match phase's 4271 follows
     =/  e1
@@ -2674,16 +2701,16 @@
   ::  the base of a subexpression selector is looked up here (it carries
   ::  the body, unlike ctx's sym)
   |=  m=sem-module
-  ^-  (map @t (unit sem))
-  =|  r=(map @t (unit sem))
+  ^-  (map @t defentry)
+  =|  r=(map @t defentry)
   =.  r
-    |-  ^-  (map @t (unit sem))
+    |-  ^-  (map @t defentry)
     ?~  defs.m  r
-    $(defs.m t.defs.m, r (~(put by r) name.i.defs.m body.i.defs.m))
-  |-  ^-  (map @t (unit sem))
+    $(defs.m t.defs.m, r (~(put by r) name.i.defs.m [body.i.defs.m params.i.defs.m]))
+  |-  ^-  (map @t defentry)
   ?~  thmdefs.m  r
   =/  nm  name.i.thmdefs.m
-  $(thmdefs.m t.thmdefs.m, r ?~(nm r (~(put by r) u.nm body.i.thmdefs.m)))
+  $(thmdefs.m t.thmdefs.m, r ?~(nm r (~(put by r) u.nm [body.i.thmdefs.m ~])))
 ::
 ++  find-label
   ::  the first $Label node named `nm` within a sem tree (hand-rolled; a
@@ -2698,11 +2725,45 @@
   =/  hit  (find-label i.args.s nm)
   ?^(hit hit $(args.s t.args.s))
 ::
+++  bound-count
+  ::  the number of variables a node binds (its quantifier/CHOOSE/function
+  ::  binders) — the params an `!@`/`!(args)` selection accumulates when the
+  ::  current subexpression has bound variables (Generator.java:1296, R1.3.5.3.4)
+  |=  s=sem
+  ^-  @ud
+  ?.  ?=(%apply -.s)  0
+  ::  a bounded binder carries its vars in `bound`, an unbounded one
+  ::  (`CHOOSE x : P`, `\E x : P`) in `ubound` — count both (R1.3.5.3.4)
+  =/  n  (lent ubound.s)
+  =/  bl  bound.s
+  |-  ^-  @ud
+  ?~  bl  n
+  (add (lent vars.i.bl) $(bl t.bl))
+::
+++  find-let-op
+  ::  the first LET-defined operator named `nm` within a sem tree — the
+  ::  target of a `!<op-symbol>` selector like `!++` (analogous to
+  ::  +find-label but over `%letin` lets; hand-rolled) — R1.3.5.3.4
+  |=  [s=sem nm=@t]
+  ^-  (unit sem-def)
+  ?:  ?=(%letin -.s)
+    =/  hit
+      |-  ^-  (unit sem-def)
+      ?~  lets.s  ~
+      ?:(=(nm name.i.lets.s) `i.lets.s $(lets.s t.lets.s))
+    ?^  hit  hit
+    ?~(body.s ~ (find-let-op u.body.s nm))
+  ?.  ?=(%apply -.s)  ~
+  |-  ^-  (unit sem-def)
+  ?~  args.s  ~
+  =/  hit  (find-let-op i.args.s nm)
+  ?^(hit hit $(args.s t.args.s))
+::
 ++  resolve-one
   ::  Generator.selectorToNode for a pure label chain (.3.2): sel[0] is the
   ::  base op, sel[1..] label selectors; wrap the selected node in $Nop at
   ::  the reference span, keeping the selected node's original spans
-  |=  [s=sem reg=(map @t (unit sem))]
+  |=  [s=sem reg=(map @t defentry)]
   ^-  sem
   ?.  ?=(%apply -.s)  [%nullodn ~]
   =/  names=(list @t)
@@ -2712,23 +2773,37 @@
     [name.i.ub $(ub t.ub)]
   ?~  names  [%nullodn ~]
   =/  base  (~(get by reg) i.names)
-  ?.  ?=([~ ~ *] base)  [%nullodn ~]
-  =/  found
-    =/  cur=sem  u.u.base
+  ?~  base  [%nullodn ~]
+  ?~  body.u.base  [%nullodn ~]
+  =/  nav
+    =/  cur=sem  u.body.u.base
+    =/  cnt=@ud  (lent params.u.base)
+    =/  at=?  |
     =/  nv  t.names
-    |-  ^-  (unit sem)
-    ?~  nv  `cur
+    |-  ^-  [ok=? cur=sem cnt=@ud at=?]
+    ?~  nv  [& cur cnt at]
+    ?:  =('@' i.nv)
+      ::  `!@`: add the current node's bound vars; mark operator-argument
+      $(nv t.nv, cnt (add cnt (bound-count cur)), at &)
+    ::  a name: a label, else a nested LET operator (`!++`)
     =/  lbl  (find-label cur i.nv)
-    ?~  lbl  ~
-    $(nv t.nv, cur u.lbl)
-  ?~  found  [%nullodn ~]
+    ?^  lbl  $(nv t.nv, cur u.lbl)
+    =/  lop  (find-let-op cur i.nv)
+    ?~  lop  [| cur cnt at]
+    =/  d  u.lop
+    $(nv t.nv, cnt (add cnt (lent params.d)), cur ?~(body.d [%nullodn ~] u.body.d))
+  ?.  ok.nav  [%nullodn ~]
+  ?:  at.nav
+    ::  operator-argument selection (.3.4): the subexpression as an operator
+    ::  argument -> `oparg LAMBDA arity=N`, reusing the $OpArg encoding
+    :*  %apply  ['$OpArg' %user-op]  (sem-lvl cur.nav)  at.s
+        [['LAMBDA' | at.s] ~]  ~
+        [[%lit %num (crip (a-co cnt.nav)) at.s] ~]
+    ==
   ?~  args.s
-    ::  pure navigation (.3.2) -> $Nop wrapping the selected node, keeping
-    ::  its original spans
-    [%apply ['$Nop' %builtin] (sem-lvl u.found) at.s ~ ~ [u.found ~]]
-  ::  parametric (.3.3): the labeled subexpression as an anonymous LAMBDA
-  ::  operator applied to the collected args (base args ++ selector args);
-  ::  SemDump elides the LAMBDA body, so this renders `apply LAMBDA` + args
+    ::  pure navigation (.3.2) -> $Nop wrapping the selected node
+    [%apply ['$Nop' %builtin] (sem-lvl cur.nav) at.s ~ ~ [cur.nav ~]]
+  ::  parametric label (.3.3) -> apply LAMBDA to the collected args
   =/  lv
     =/  al=(list sem)  args.s
     |-  ^-  @ud
@@ -2737,7 +2812,7 @@
   [%apply ['LAMBDA' %user-op] lv at.s ~ ~ args.s]
 ::
 ++  rsel-list
-  |=  [l=(list sem) reg=(map @t (unit sem))]
+  |=  [l=(list sem) reg=(map @t defentry)]
   ^-  (list sem)
   ?~  l  ~
   [(rsel-sem i.l reg) $(l t.l)]
@@ -2745,7 +2820,7 @@
 ++  rsel-sem
   ::  replace every $Sel placeholder in a sem tree with its resolution
   ::  (hand-rolled recursion over the sem mold — R1.3.5.3.2)
-  |=  [s=sem reg=(map @t (unit sem))]
+  |=  [s=sem reg=(map @t defentry)]
   ^-  sem
   ?-    -.s
       %lit      s
