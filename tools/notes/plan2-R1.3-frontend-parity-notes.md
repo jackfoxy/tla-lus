@@ -1448,3 +1448,31 @@ importing def where SANY drops it. Neither affects accept/reject. The minimal .1
 kept constant-free/instance-free to avoid asserting these; the imported-theorem scoping is
 covered by the test216 accept probe instead. Census NOT edited (flip is the .4 close-out);
 test216 stays in SUB_BATCH_DIVERGENCES, mechanism-verified.
+
+### R1.3.5.4.2 — proof-step body handling (SHIP-VERIFIED, NO code change, 2026-08-10)
+
+Like R1.3.5.2, the layer was already present — **no `semantic.hoon` change**. Confirmed by
+measurement + a new golden:
+
+- The parser already builds the full proof CST (`proof-prod`/`use-hide-unit`/`step-prod`/
+  `qed-step`, `syntax.hoon:2512+`): `n-proof`/`n-terminalproof`/`n-proofstep`/`n-qedstep`/
+  `n-useorhide`.
+- `+g-thm` takes the theorem BODY (first `%node` kid) and **drops** the trailing proof
+  node; the theorem span is `(span-of:ast u)` = the whole unit, so it already INCLUDES the
+  proof (oracle: `theorem name=Bar 5.1-8.11` spans through QED). `+gen-module`'s walk
+  **skips** any unit that is not def/theorem/assumption/recursive/instance — so top-level
+  `n-useorhide` units are silently dropped. Net: proofs + USE/HIDE emit no graph nodes, no
+  LEVELS entries, no diagnostics — exactly SANY's SemDump non-projection (`SemDump.java:260`
+  renders `getTheorem()` only, never `getProof()`).
+
+VERIFIED: new byte-exact golden `desk/test-data/sem/pfthm/A.tla` (`THEOREM Foo == c=0 /
+OBVIOUS`; `THEOREM Bar == c=1 / <1>1. c=1 OBVIOUS / <1>2. QED`; top-level `USE Foo` /
+`HIDE Bar`) — port == oracle, both render body-only thmdef/theorem (span incl. proof),
+ACCEPT 0 diags, own-theorem lp/lc correct (`lvl Foo L0 lp={c} lc={c<=2}`). gen-sem 101→102,
+full `-test /tests/lib/sem` `ok=%.y`. test214 re-probed = `%accept, sem-diags=0` (the proof
+step `<1>2. USE TRUE,bar,xx,xx!1` is never walked, so its 3 non-HIDE (*ERROR*)s stay
+unflagged — matching the oracle). Probe removed.
+
+Consequence for .3: the ONLY work to flip test214 is walking the TOP-LEVEL `n-useorhide`
+units in `+gen-module` + the EC 4357 HIDE-fact check. The proof steps are irrelevant to the
+4357 (USE facts are unchecked; proof-step facts are never reached). Census NOT edited.

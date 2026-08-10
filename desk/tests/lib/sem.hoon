@@ -2545,6 +2545,43 @@
       '---- MODULE A ----\0aFoo == 42\0aBar == "hello"\0a====\0a'
   ==
 ::
+++  test-sem-pfthm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-11.4'
+        '  const c arity=0 L0 2.10-2.10'
+        '  thmdef Foo local=n L0 3.1-4.9'
+        '    apply = opkind=BuiltInKind L0 3.16-3.20'
+        '      apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '      num 0 L0 3.20-3.20'
+        '  thmdef Bar local=n L0 5.1-8.11'
+        '    apply = opkind=BuiltInKind L0 5.16-5.20'
+        '      apply c opkind=ConstantDeclKind L0 5.16-5.16'
+        '      num 1 L0 5.20-5.20'
+        '  theorem name=Foo L0 3.1-4.9'
+        '    apply = opkind=BuiltInKind L0 3.16-3.20'
+        '      apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '      num 0 L0 3.20-3.20'
+        '  theorem name=Bar L0 5.1-8.11'
+        '    apply = opkind=BuiltInKind L0 5.16-5.20'
+        '      apply c opkind=ConstantDeclKind L0 5.16-5.16'
+        '      num 1 L0 5.20-5.20'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=2}'
+        'lvl Foo L0 lp={c} lc={c<=2}'
+        'lvl Bar L0 lp={c} lc={c<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT c\0aTHEOREM Foo == c = 0\0a  OBVIOUS\0aTHEOREM Bar == c = 1\0a  <1>1. c = 1\0a    OBVIOUS\0a  <1>2. QED\0aUSE Foo\0aHIDE Bar\0a====\0a'
+  ==
+::
 ++  test-sem-prefixop
   %+  expect-eq
     !>  ^-  wain
