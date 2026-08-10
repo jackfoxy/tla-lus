@@ -3419,6 +3419,36 @@
       '---- MODULE A ----\0aCONSTANT c\0aASSUME c = 0\0aASSUME NamedA == c = 1\0aTHEOREM c = 2\0aTHEOREM NamedT == c = 3\0a====\0a'
   ==
 ::
+++  test-sem-thmscope
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Bar arity=0 local=n L0 3.1-3.10'
+        '    apply Foo opkind=ThmOrAssumpDefKind L0 3.8-3.10'
+        '  def Qux arity=0 local=n L0 4.1-4.12'
+        '    apply $Nop opkind=BuiltInKind L0 4.8-4.12'
+        '      apply TRUE opkind=BuiltInKind L0 2.16-2.19'
+        '  thmdef Foo local=n L0 2.1-2.19'
+        '    apply TRUE opkind=BuiltInKind L0 2.16-2.19'
+        '  theorem name=Foo L0 2.1-2.19'
+        '    apply TRUE opkind=BuiltInKind L0 2.16-2.19'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Bar L0'
+        'lvl Qux L0'
+        'lvl Foo L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aTHEOREM Foo == TRUE\0aBar == Foo\0aQux == Foo!:\0a====\0a'
+  ==
+::
 ++  test-sem-thmsel
   %+  expect-eq
     !>  ^-  wain

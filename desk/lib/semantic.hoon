@@ -336,6 +336,44 @@
   ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
   `[(leaf-text i.ik) [%user-op (us-arity k) | 0 ~ ~]]
 ::
+++  thm-signature
+  ::  a NAMED THEOREM/ASSUMPTION binds a thmdef the way a definition binds
+  ::  an operator: the name resolves as a 0-ary ThmOrAssumpDefKind
+  ::  reference (retiring 4200 on bare theorem-name uses like `Thm1`,
+  ::  `Thm1!:`); level (placeholder 0 here) is filled by +thm-level in the
+  ::  caller. ~ for an unnamed THEOREM/ASSUME (R1.3.5.4.1)
+  |=  nd=node
+  ^-  (unit dsig)
+  ?.  ?|((is-kind nd %n-theorem) (is-kind nd %n-assumption))  ~
+  =/  kids  (kids-of nd)
+  =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
+  ?~  ids  ~
+  `[(leaf-text i.ids) [%thm-assump 0 | 0 ~ ~] (has-local kids)]
+::
+++  thm-level
+  ::  the level of a named theorem/assumption body, matching the level
+  ::  SANY records on its ThmOrAssumpDefNode: the body expression's level,
+  ::  or (for ASSUME/PROVE) the max over its items with NEW symbols scoping
+  ::  forward (mirrors +g-assumeprove's level fold)
+  |=  [nd=node c=ctx]
+  ^-  @ud
+  =/  bs  (skim (kids-of nd) |=(k=node ?=(%node -.k)))
+  ?~  bs  0
+  =/  body  i.bs
+  ?.  (is-kind body %n-assumeprove)  (expr-level body c)
+  =/  ks  (kids-of body)
+  =/  c2  c
+  =/  lvl=@ud  0
+  |-  ^-  @ud
+  ?~  ks  lvl
+  =/  k  i.ks
+  ?:  ?=(%leaf -.k)  $(ks t.ks)
+  ?:  (is-kind k %n-newsymb)
+    =/  nn  (newsymb-name k)
+    ?~  nn  $(ks t.ks)
+    $(ks t.ks, c2 (~(put by c2) nm.u.nn [%new-constant 0 | 0 ~ ~]))
+  $(ks t.ks, lvl (max lvl (expr-level k c2)))
+::
 ++  put-syms
   ::  explicit fold; +roll would discard the seeded accumulator
   |=  [c=ctx syms=(list [@t sym])]
@@ -360,7 +398,11 @@
   %+  murn  ~(tap by bctx)
   |=  [opn=@t s=sym]
   ^-  (unit [@t sym])
-  ?.  =(%user-op kind.s)  ~
+  ::  imported definitions (%user-op) and named theorems/assumptions
+  ::  (%thm-assump) both become prefixed instance members; a bare `Thm2`
+  ::  from an unnamed INSTANCE resolves as a ThmOrAssumpDefKind ref
+  ::  (R1.3.5.4.1)
+  ?.  ?|(=(%user-op kind.s) =(%thm-assump kind.s))  ~
   =/  s2  s(level (max level.s sub-lvl))
   =.  arity.s2  (add nparams arity.s2)
   =.  parg.s2  (weld pargs parg.s2)
@@ -422,11 +464,21 @@
   =?  exported  ?&(?=(^ iu) !local.u.iu)
     (put-syms exported (inst-syms u.iu deps full))
   =/  ds  (def-signature u)
-  ?~  ds  $(units t.units)
-  =/  s2=sym  s.u.ds
-  =.  level.s2  (def-level u full)
-  =.  full  (~(put by full) name.u.ds s2)
-  =?  exported  !local.u.ds  (~(put by exported) name.u.ds s2)
+  ?^  ds
+    =/  s2=sym  s.u.ds
+    =.  level.s2  (def-level u full)
+    =.  full  (~(put by full) name.u.ds s2)
+    =?  exported  !local.u.ds  (~(put by exported) name.u.ds s2)
+    $(units t.units)
+  ::  a NAMED THEOREM/ASSUMPTION registers its name as a 0-ary
+  ::  ThmOrAssumpDefKind symbol so bare references (`Thm1`, `Thm1!:`)
+  ::  resolve instead of raising 4200 (R1.3.5.4.1)
+  =/  ts  (thm-signature u)
+  ?~  ts  $(units t.units)
+  =/  s2=sym  s.u.ts
+  =.  level.s2  (thm-level u full)
+  =.  full  (~(put by full) name.u.ts s2)
+  =?  exported  !local.u.ts  (~(put by exported) name.u.ts s2)
   $(units t.units)
 ::
 ++  export-ctx

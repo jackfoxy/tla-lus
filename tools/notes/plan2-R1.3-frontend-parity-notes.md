@@ -1353,3 +1353,98 @@ So the census outcome of R1.3.5.3: **test219a closed**; test206/216/217/219 kept
 documented divergences whose residual is R1.3.3 instance-member arity/level + theorem
 scoping, none of them `!`-nav. tier2-sub's only remaining FAIL is sub-5 (the R1.3.5.1
 `test52` flip, deferred to the R1.3.5.8 parent close-out).
+
+### R1.3.5.4.0 — kickoff / oracle freeze (DOCS/ORACLE ONLY, 2026-08-10)
+
+No desk deploy, no ship `-test`, no `semantic.hoon` change (R1.3.x.0 pattern). Ran
+`SemDump` at the pin (`4ba7d8811`) on the two R1.3.5.4 census specs; scratch dumps in the
+session scratchpad `r1354/{FREEZE.md,test214.sem.txt,test216.sem.txt}`. Census frozen
+unchanged (test214 hoon=accept, test216 hoon=reject; still in `SUB_BATCH_DIVERGENCES`).
+
+- **test214 (`general/tests`) — ACCEPT + exactly ONE error (26 ln).** Graph = 2 thmdefs +
+  2 theorems only (`thmdef bar`/`thmdef xx`/`theorem name=bar`/`theorem name=xx`, all L-1);
+  DIAGS = **exactly** `D 4357 ERROR 10.11-10.14 The only expression allowed as a fact in a
+  HIDE is `. The top-level `USE bar,bar!1` unit, the `HIDE` unit, and the proof
+  `<1>2. USE… / <1>3. QED` render **no** nodes; the 3 non-HIDE (*ERROR*) annots
+  (`bar!1` L7, `USE TRUE`+`xx!1` L13) are **NOT** semantic-phase errors. LEVELS = MODULE/
+  bar/xx (L-1). Port baseline (unchanged from §R1.3.5.3.7): hoon **ACCEPTS** (drops proof +
+  USE/HIDE). → .3 adds exactly the one EC 4357.
+
+- **test216 (`suite`) — ACCEPT, no diags (1169 ln).** 23 `thmdef` + 5 `theorem name=`.
+  Named-theorem scoping shape: def `thmdef <name> local=<y|n> L<lvl> <span>`
+  (`getThmOrAssDefs`), stmt `theorem [name=<name>] L<lvl> <span>` (`getTheorems`, body via
+  `getTheorem()`); a **bare theorem reference** resolves to `apply <Name>
+  opkind=ThmOrAssumpDefKind` (Init L16: `apply Thm1 opkind=ThmOrAssumpDefKind`); `Thm1!:`/
+  `Thm1!<<`/`Thm1!>>` inline the body under `$Nop` — already produced by the R1.3.5.3
+  `!`-nav resolver **once the name is scoped**. Port baseline (unchanged): hoon **REJECTS**
+  with **8× EC 4200 `Unknown operator Thm1/Thm2`** — the bare theorem-name-scoping gap;
+  `!`-nav is already built (.3.6), only the name binding is missing → .1 flips it with no
+  selector code.
+
+- **EC 4357 rule frozen** (`UseOrHideNode.java:95-107`): **HIDE only**
+  (`getKind()==UseKind → return`); per fact that is an OpAppl whose
+  `operator.getKind() != ThmOrAssumpDefKind` → error at the fact span. SemDump first-line
+  message (trailing space): `The only expression allowed as a fact in a HIDE is ` (the
+  `\nthe name of a theorem, assumption, or step.` continuation is dropped by SemDump's
+  first-line normalization). A ThmOrAssumpDef-named fact (`bar`) is OK; a builtin OpAppl
+  (`TRUE`) is flagged — so .3 keys the check on the .1 scoping.
+
+- **Theorem-name scoping frozen** (`processTheorem`, `Generator.java:5544`): a named
+  THEOREM/ASSUME binds `new ThmOrAssumpDefNode(name)`; two consequences .1 must produce —
+  (a) name reachable as an operator (retires EC 4200, renders `opkind=ThmOrAssumpDefKind`),
+  (b) name valid as a HIDE/USE fact (the EC 4357 discriminator). Port scaffolding already
+  present: `sem-module` carries `thmdefs`/`assumes`/`theorems` (`semantic.hoon:1178-1180`),
+  opkind map has `%thm-assump → 'ThmOrAssumpDefKind'` (`:140`), name→body registry over
+  thmdefs (`:2723-2736`) feeds the resolver; the missing piece is resolving a bare
+  theorem-name reference against that scope during operator lookup.
+
+- **PLAN CORRECTION — proof-step bodies are NOT in the SemDump projection.**
+  `SemDump.java:260-266` projects theorems via `t.getTheorem()` (statement body) and
+  **never** `t.getProof()`; proof steps, LeafProof, and USE/HIDE units emit no graph nodes
+  and no LEVELS entries. So R1.3.5.4.2 is a **walk + level** pass only (parse-attached
+  proofs must level-check and raise no spurious diagnostics so the top-level HIDE is
+  reached) — there is nothing to project. Corrected in `R1.3.5.4-plan.md` (.0/.2 rows,
+  "SANY's rule" §, "SANY LOC" — .2 downgraded L→M).
+
+**Ordering confirmed:** .1 (scoping, closes test216 via existing `!`-nav) → .2 (proof
+walk/level, no output) → .3 (EC 4357, closes test214) → .4 (flip). Ledger `semantic-graph`
+stays partial (flip is .8). Oracle regenerable: `java -cp $JAR:tools/oracle/build SemDump
+<spec>.tla` from the spec dir (test214 = general/tests, test216 = suite).
+
+### R1.3.5.4.1 — theorem-name scoping (SHIP-VERIFIED build 611, 2026-08-10)
+
+Retires EC 4200 on bare theorem/assumption references so **test216 flips 8× EC 4200 →
+ACCEPT (0 sem/lvl diags)**. Mechanism, all in `semantic.hoon`:
+
+- **`+thm-signature`** (new): a NAMED `%n-theorem`/`%n-assumption` → `(unit dsig)`
+  `[name [%thm-assump 0 | 0 ~ ~] local]` (first identifier leaf = name; arity 0; `has-local`).
+- **`+thm-level`** (new): body level = `expr-level` of the body node, or (ASSUME/PROVE) the
+  max over items with NEW symbols scoping forward (mirrors `+g-assumeprove`'s level fold).
+- **`+build-ctx`**: after the `?^ ds` def-signature arm, an `else` arm registers the
+  thm-signature into `full` (and `exported` when non-local) with `level = (thm-level u full)`
+  — so `+g-genid`'s `(~(get by c) nm)` resolves a bare `Thm1`/`bar` to
+  `apply <N> opkind=ThmOrAssumpDefKind` (the `%thm-assump → 'ThmOrAssumpDefKind'` opkind map
+  was already present). A def and a theorem are disjoint unit kinds, so the arm split is safe.
+- **`+inst-syms`**: filter widened `?|(=(%user-op kind.s) =(%thm-assump kind.s))` so an
+  INSTANCE also imports named theorems/assumptions as prefixed members. Once theorems live
+  in the instanced module's `exported` ctx (above), a bare `Thm2` from `INSTANCE test216a`
+  or `ThmC3` from `INSTANCE test216c` resolves (the 2 residual 4200s after the own-module
+  fix). Nonparametrized instance ⇒ arity stays 0.
+
+VERIFIED: a scratch `sany-verdict`+`analyze-graph` probe on the real test216 (+deps
+216a/b/c, built from the suite `.tla`) went `%reject`(8×4200) → `%accept`(0 diags); probe
+removed. New byte-exact sem golden `desk/test-data/sem/thmscope/A.tla` (`THEOREM Foo == TRUE`
+/ `Bar == Foo` / `Qux == Foo!:` — own bare ref renders ThmOrAssumpDefKind + `!:` inlines);
+gen-sem 100→101, full `-test /tests/lib/sem` `ok=%.y` (no regression, incl. all instance
+goldens after the inst-syms change).
+
+**Deferred to R1.3.5.5 (level-constraint projection, non-census, surfaced by the thmscope
+golden):** (1) an OWN-module theorem reference does not propagate the theorem body's lp/lc
+constraints, because thmdef oplevs are registered (`l-module-core` twalk, ~:5104) AFTER the
+regular defs (dwalk) that may reference them — a source-order/fixpoint gap (imported
+theorems via apsubstin DO carry lp/lc). (2) `$APSubstIn` does not discharge a substituted
+constant's constraint: `INSTANCE B WITH c <- 0` still renders `lc={c<=2}`/`lp={c}` on the
+importing def where SANY drops it. Neither affects accept/reject. The minimal .1 golden was
+kept constant-free/instance-free to avoid asserting these; the imported-theorem scoping is
+covered by the test216 accept probe instead. Census NOT edited (flip is the .4 close-out);
+test216 stays in SUB_BATCH_DIVERGENCES, mechanism-verified.
