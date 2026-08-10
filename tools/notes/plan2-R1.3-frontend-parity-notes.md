@@ -1111,3 +1111,38 @@ tree + LEVELS; `gen-sem-tests` 92→93, byte-reproducible (regen diff = ONLY the
 so the 92 existing goldens are untouched). `-test {sem,node-eval,value,stdops,arith}` =
 `ok=%.y` (no regression from the shared g-x/expr-level/render edits). Census unchanged
 (the four `!`-nav specs still reject at semantic — label refs are .3.2). No git commit yet.
+
+### R1.3.5.3.2 — selector infrastructure + resolver skeleton (SHIP-VERIFIED, build 572, 2026-08-09)
+
+The shared foundation for all of `!`-nav resolution. **Architecture decision: POST-PASS**
+(not inline-threaded) — `gen-module` folds accumulating `defs` (with bodies) but g-def→
+g-x→g-genid only receive `ctx` (no body); threading a registry through ~30 arms is a wide
+change, and the port already separates generate/level passes. So resolution runs once over
+the completed `sem-module`, consistent with that structure.
+
+Pieces (all in semantic.hoon):
+- **`+sel-of`** (port of `Generator.genIdToSelector`): a general-id → `(list sel-item)`,
+  `sel-item = [kind num nm args at]`, kind ∈ %name/%null(`!(args)`)/%gg/%ll/%colon/%at/%pos;
+  `sel[0]` is the base op, `sel[1..]` navigation. `+sel-item-of`/`+oparg-nodes`/`+structop-num`
+  classify each element. Non-recursive mold (holds CST `node`s, not `sem`).
+- **routing** in `g-genid`: on flat-name lookup FAILURE (so the R1.3.3 `M!Op` instance-member
+  path — which IS in `ctx` — is untouched) AND a non-empty `!`-prefix, emit a `$Sel`
+  placeholder via `+sel-placeholder`. **.3.2 gate: pure %name chain, no args** (a bare
+  label chain); arg-carrying/structural selectors stay a 4200 reject → census unchanged.
+- **`+resolve-sels`** (the post-pass, wired at `gen-module`'s return so every caller —
+  render + level-check — sees resolved graphs): `+bodymap` (name→body over defs+thmdefs),
+  `+rsel-sem`/`+rsel-list` (hand-rolled walk replacing `$Sel`, since wet gates fuse-loop the
+  recursive `sem` mold), `+resolve-one` (base body → navigate label selectors via
+  `+find-label` → wrap in `$Nop` at the reference span, KEEPING the selected node's original
+  spans), `+sem-lvl`.
+
+VERIFIED: byte-exact golden `desk/test-data/sem/labelref` (`Op == lab :: 42` / `Bar ==
+Op!lab` → `apply $Nop / label lab / num 42`, `$Nop` at the ref span 4.8, inner at 3.7) =
+SemDump; `gen-sem` 93→94 byte-reproducible (regen diff = ONLY the new case → the 93 existing
+untouched, so `+resolve-sels` is a faithful NO-OP for selector-free specs). `-test
+{sem,node-eval,value,stdops}` = `ok=%.y`. Census unchanged (the four `!`-nav specs still
+reject — arg-carrying label refs are .3.3). HOON: `resolve-one` took `s=sem`; accessing
+`ubound.s` needs `?> ?=(%apply -.s)` first (union field). No git commit yet.
+
+NEXT R1.3.5.3.3: label refs WITH args (`!lab(1,2,3)`) — carry generated selector args in the
+`$Sel` placeholder, substitute the label's params → `apply LAMBDA`; closes test219a's label half.

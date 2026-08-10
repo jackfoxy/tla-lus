@@ -1,0 +1,9 @@
+ACCEPT
+MODULE A 1.1-5.4
+  def Op arity=0 local=n L0 3.1-3.15
+    label lab L0 3.7-3.15
+      num 42 L0 3.14-3.15
+  def Bar arity=0 local=n L0 4.1-4.13
+    apply $Nop opkind=BuiltInKind L0 4.8-4.13
+      label lab L0 3.7-3.15
+        num 42 L0 3.14-3.15

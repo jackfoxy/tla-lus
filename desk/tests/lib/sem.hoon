@@ -1233,6 +1233,33 @@
       '---- MODULE A ----\0aEXTENDS Integers\0aOp(p) == \\A x \\in {1, 2} : lab(x) :: x + p\0aSimple == lab2 :: TRUE\0a====\0a'
   ==
 ::
+++  test-sem-labelref
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Op arity=0 local=n L0 3.1-3.15'
+        '    label lab L0 3.7-3.15'
+        '      num 42 L0 3.14-3.15'
+        '  def Bar arity=0 local=n L0 4.1-4.13'
+        '    apply $Nop opkind=BuiltInKind L0 4.8-4.13'
+        '      label lab L0 3.7-3.15'
+        '        num 42 L0 3.14-3.15'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={n<=2}'
+        'lvl Op L0'
+        'lvl Bar L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Integers\0aOp == lab :: 42\0aBar == Op!lab\0a====\0a'
+  ==
+::
 ++  test-sem-lamact
   %+  expect-eq
     !>  ^-  wain

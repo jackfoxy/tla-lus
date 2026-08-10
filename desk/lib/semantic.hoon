@@ -1154,6 +1154,18 @@
       ::  Java method to the module that declares the operator
       origin=@t
   ==
+::  one subexpression-selector step (Generator.Selector), from +sel-of.
+::  Not recursive (it holds raw CST `node`s, not `sem`), so a plain mold.
+::  sel[0] is the base operator; sel[1..] the navigation. kind: %name (an
+::  identifier/operator/label), %null (a `(args)` selector), %gg/%ll `>>`/
+::  `<<`, %colon `:`, %at `@`, %pos (a positional `!N`, N in `num`)
++$  sel-item
+  $:  kind=?(%name %null %gg %ll %colon %at %pos)
+      num=@ud
+      nm=@t
+      args=(list node)
+      at=sspan
+  ==
 +$  sem-module
   $:  name=@t
       at=sspan
@@ -1586,6 +1598,59 @@
     [`(builtin-apply (action-op n) n c [~ ~ rs.g]) ds.g]
   ==
 ::
+++  oparg-nodes
+  ::  the expression argument nodes inside an N_OpArgs `(a, b, ..)`
+  |=  n=node
+  ^-  (list node)
+  (skim (kids-of n) |=(k=node ?=(%node -.k)))
+::
+++  structop-num
+  ::  the positional index of an N_StructOp `!N` (its number-literal child)
+  |=  n=node
+  ^-  @ud
+  =/  k  (kids-of n)
+  ?~  k  0
+  =/  nk  (kids-of i.k)
+  ?~  nk  0
+  (rash (leaf-text i.nk) dem)
+::
+++  sel-item-of
+  ::  classify one selector node (+ its `(args)`) into a sel-item
+  |=  [sel=node oargs=(list node)]
+  ^-  sel-item
+  ?:  (is-kind sel %n-opargs)
+    [%null 0 '' (oparg-nodes sel) (span-of:ast sel)]
+  ?:  (is-kind sel %n-structop)
+    ?^  (kids-of sel)
+      [%pos (structop-num sel) '' ~ (span-of:ast sel)]
+    =/  img  (node-text sel)
+    =/  kd
+      ?:  =('<<' img)  %ll
+      ?:  =('>>' img)  %gg
+      ?:(=(':' img) %colon %at)
+    [kd 0 '' ~ (span-of:ast sel)]
+  ::  an identifier or operator symbol -> NameSel
+  [%name 0 (op-of-genop sel) oargs (span-of:ast sel)]
+::
+++  sel-of
+  ::  Generator.genIdToSelector: a general-id's N_IdPrefix elements plus
+  ::  the final selector -> the selector list (R1.3.5.3.2)
+  |=  n=node
+  ^-  (list sel-item)
+  =/  kids  (kids-of n)
+  ?~  kids  ~
+  =/  pfx  i.kids
+  =/  fin  ?~(t.kids i.kids i.t.kids)
+  =/  pre
+    %+  turn  (kids-of pfx)
+    |=  e=node
+    ^-  sel-item
+    =/  ek  (kids-of e)
+    ?~  ek  [%name 0 '' ~ *sspan]
+    =/  oargs  ?:(=(3 (lent ek)) (oparg-nodes (snag 1 `(list node)`ek)) ~)
+    (sel-item-of i.ek oargs)
+  (snoc pre (sel-item-of fin ~))
+::
 ++  genid-prefix
   ::  the ident!ident!.. prefix of a general identifier, as 'I!J!'
   |=  n=node
@@ -1629,10 +1694,20 @@
     =/  pfx  (genid-prefix n)
     ?~(pfx nm (rap 3 ~[u.pfx nm]))
   =/  s  (~(get by c) nm)
-  ?~  s
-    :-  `[%nullodn ~]
-    [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
-  [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
+  ?^  s
+    [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
+  ::  an unresolved subexpression selector (a non-empty `!`-prefix that is
+  ::  not an in-scope instance member) -> a $Sel placeholder for the
+  ::  post-generation resolver. .3.2 handles a pure %name (label) chain with
+  ::  no arguments; arg-carrying / structural selectors stay a 4200 reject
+  ::  here (R1.3.5.3.2)
+  =/  sels  (sel-of n)
+  ?:  ?&  (gth (lent sels) 1)
+          (levy sels |=(i=sel-item &(?=(%name kind.i) ?=(~ args.i))))
+      ==
+    [`(sel-placeholder sels (span-of:ast n)) ~]
+  :-  `[%nullodn ~]
+  [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
 ::
 ++  ref-arity
   ::  the referenced operator's arity when a node is a bare symbol
@@ -2511,6 +2586,137 @@
     $(el t.el, a (snoc a i.el))
   $(ex t.ex, cacc cacc2, vacc vacc2)
 ::
+++  sel-placeholder
+  ::  the reserved $Sel %apply the resolver (+resolve-sels) consumes: one
+  ::  ubound entry per selector name. .3.2 emits it only for a pure %name
+  ::  (label) chain with no arguments (R1.3.5.3.2)
+  |=  [sels=(list sel-item) at=sspan]
+  ^-  sem
+  =/  ub=(list sbind)
+    |-  ^-  (list sbind)
+    ?~  sels  ~
+    [[nm.i.sels | at.i.sels] $(sels t.sels)]
+  [%apply ['$Sel' %builtin] 0 at ub ~ ~]
+::
+++  sem-lvl
+  |=  s=sem
+  ^-  @ud
+  ?-  -.s
+    %lit      0
+    %atref    lvl.s
+    %nullodn  0
+    %letin    lvl.s
+    %apply    lvl.s
+  ==
+::
+++  bodymap
+  ::  name -> definition/theorem body, over a module's own defs + thmdefs;
+  ::  the base of a subexpression selector is looked up here (it carries
+  ::  the body, unlike ctx's sym)
+  |=  m=sem-module
+  ^-  (map @t (unit sem))
+  =|  r=(map @t (unit sem))
+  =.  r
+    |-  ^-  (map @t (unit sem))
+    ?~  defs.m  r
+    $(defs.m t.defs.m, r (~(put by r) name.i.defs.m body.i.defs.m))
+  |-  ^-  (map @t (unit sem))
+  ?~  thmdefs.m  r
+  =/  nm  name.i.thmdefs.m
+  $(thmdefs.m t.thmdefs.m, r ?~(nm r (~(put by r) u.nm body.i.thmdefs.m)))
+::
+++  find-label
+  ::  the first $Label node named `nm` within a sem tree (hand-rolled; a
+  ::  wet gate over the recursive sem mold fuse-loops — R1.3.5.3.2)
+  |=  [s=sem nm=@t]
+  ^-  (unit sem)
+  ?.  ?=(%apply -.s)  ~
+  ?:  ?&  =('$Label' name.op.s)  ?=(^ ubound.s)  =(nm name.i.ubound.s)  ==
+    `s
+  |-  ^-  (unit sem)
+  ?~  args.s  ~
+  =/  hit  (find-label i.args.s nm)
+  ?^(hit hit $(args.s t.args.s))
+::
+++  resolve-one
+  ::  Generator.selectorToNode for a pure label chain (.3.2): sel[0] is the
+  ::  base op, sel[1..] label selectors; wrap the selected node in $Nop at
+  ::  the reference span, keeping the selected node's original spans
+  |=  [s=sem reg=(map @t (unit sem))]
+  ^-  sem
+  ?.  ?=(%apply -.s)  [%nullodn ~]
+  =/  names=(list @t)
+    =/  ub  ubound.s
+    |-  ^-  (list @t)
+    ?~  ub  ~
+    [name.i.ub $(ub t.ub)]
+  ?~  names  [%nullodn ~]
+  =/  base  (~(get by reg) i.names)
+  ?.  ?=([~ ~ *] base)  [%nullodn ~]
+  =/  cur=sem  u.u.base
+  |-  ^-  sem
+  ?~  t.names
+    [%apply ['$Nop' %builtin] (sem-lvl cur) at.s ~ ~ [cur ~]]
+  =/  lbl  (find-label cur i.t.names)
+  ?~  lbl  [%nullodn ~]
+  $(t.names t.t.names, cur u.lbl)
+::
+++  rsel-list
+  |=  [l=(list sem) reg=(map @t (unit sem))]
+  ^-  (list sem)
+  ?~  l  ~
+  [(rsel-sem i.l reg) $(l t.l)]
+::
+++  rsel-sem
+  ::  replace every $Sel placeholder in a sem tree with its resolution
+  ::  (hand-rolled recursion over the sem mold — R1.3.5.3.2)
+  |=  [s=sem reg=(map @t (unit sem))]
+  ^-  sem
+  ?-    -.s
+      %lit      s
+      %atref    s
+      %nullodn  s
+      %letin
+    =/  nl=(list sem-def)
+      |-  ^-  (list sem-def)
+      ?~  lets.s  ~
+      :_  $(lets.s t.lets.s)
+      i.lets.s(body ?~(body.i.lets.s ~ `(rsel-sem u.body.i.lets.s reg)))
+    s(lets nl, body ?~(body.s ~ `(rsel-sem u.body.s reg)))
+  ::
+      %apply
+    ?:  =('$Sel' name.op.s)  (resolve-one s reg)
+    =/  br=(list sem-bound)
+      |-  ^-  (list sem-bound)
+      ?~  bound.s  ~
+      :_  $(bound.s t.bound.s)
+      %=  i.bound.s
+        range  ?~(range.i.bound.s ~ `(rsel-sem u.range.i.bound.s reg))
+      ==
+    s(args (rsel-list args.s reg), bound br)
+  ==
+::
+++  resolve-sels
+  ::  the post-generation resolution pass (Generator.selectorToNode): the
+  ::  module's def/theorem bodies with every $Sel placeholder resolved.
+  ::  Runs at the end of +gen-module so all callers (render, level-check)
+  ::  see resolved graphs (R1.3.5.3.2)
+  |=  m=sem-module
+  ^-  sem-module
+  =/  reg  (bodymap m)
+  =/  ndefs=(list sem-def)
+    |-  ^-  (list sem-def)
+    ?~  defs.m  ~
+    :_  $(defs.m t.defs.m)
+    i.defs.m(body ?~(body.i.defs.m ~ `(rsel-sem u.body.i.defs.m reg)))
+  =/  do-thm
+    |=  l=(list sem-thm)
+    ^-  (list sem-thm)
+    ?~  l  ~
+    :_  $(l t.l)
+    i.l(body ?~(body.i.l ~ `(rsel-sem u.body.i.l reg)))
+  m(defs ndefs, thmdefs (do-thm thmdefs.m), assumes (do-thm assumes.m), theorems (do-thm theorems.m))
+::
 ++  gen-module
   ::  the root module's semantic graph, with duplicate-definition
   ::  recovery (keep the first, 4201 error + 4801 warning per repeat),
@@ -2650,6 +2856,7 @@
       snames  ?.(&(secopen ?=(^ r.gd)) snames [name.u.dsg snames])
     ==
   =/  wk  walk
+  %-  resolve-sels
   :*  (module-name tree)
       (span-of:ast tree)
       consts
