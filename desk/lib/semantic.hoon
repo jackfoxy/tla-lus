@@ -2046,12 +2046,18 @@
   =/  rng=(unit node)
     ?~  mbs  ~
     (maybebound-range i.mbs)
-  =/  bounded  ?=(^ mbs)
+  ::  `CHOOSE x : P` still parses an (empty) N_MaybeBound, so its mere
+  ::  presence is not `\in`-bounded — key on an actual range (R1.3.5.3.7)
+  =/  bounded  ?=(^ rng)
   =/  opn=@t  ?:(bounded '$BoundedChoose' '$UnboundedChoose')
   =/  c2  (add-idents c vars)
+  ::  an UNBOUNDED CHOOSE names its bound symbol at the CHOOSE keyword span
+  ::  (SANY, unlike unbounded \E/\A which use the variable span) — R1.3.5.3.7
+  =/  ch-span  (span-of:ast (snag 0 `(list node)`kids))
   =/  sbinds
     %+  turn  vars
-    |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
+    |=  [vn=@t vnode=node]
+    `sbind`[vn | ?:(bounded (span-of:ast vnode) ch-span)]
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   =/  gx  (g-x (rear-node kids) c2)
   :-  :-  ~

@@ -219,7 +219,7 @@
 ++  test-sany-sub-4
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test206 -> hoon=reject'  'suite/test214 -> hoon=accept'  'suite/test216 -> hoon=reject'  'suite/test219 -> hoon=reject'  'suite/test219a -> hoon=reject'
+    :~  'suite/test206 -> hoon=reject'  'suite/test214 -> hoon=accept'  'suite/test216 -> hoon=reject'  'suite/test217 -> hoon=accept'  'suite/test219 -> hoon=reject'
     ==
   !>
   %-  sub-batch-run

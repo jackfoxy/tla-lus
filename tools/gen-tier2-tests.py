@@ -371,9 +371,26 @@ SUB_BATCH_DIVERGENCES = [
     # proof-step infrastructure (BY/QED bodies), reassigned to R1.3.5.
     "suite/test214 -> hoon=accept",
     "suite/test216 -> hoon=reject",
+    # test217 is the OTHER direction (hoon=accept / java=reject): a
+    # parametrized-instance MEMBER APPLICATION `I(x')!Foo` — the instance-element
+    # arg `x'` (action level) must be APPLIED to the member `I!Foo` (SANY: a
+    # level error, EC 2xxx); the port drops the arg (`apply I!Foo`, no args,
+    # L0) so it under-checks and accepts. Same instance-member gap as test206/
+    # test219 (this is its level-error variant), R1.3.3 follow-up — NOT `!`-nav.
+    "suite/test217 -> hoon=accept",
     "suite/test219 -> hoon=reject",
-    "suite/test219a -> hoon=reject",
+    # test219a CLOSED by R1.3.5.3 (`!`-subexpression navigation): label refs,
+    # structural/@/op-symbol selectors, and the unbounded-CHOOSE fix (.3.7).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
+    # test206/test216/test219 STILL diverge, but NOT on `!`-nav (that mechanism
+    # is complete — test219a accepts): the residuals are separate gaps ->
+    #   test206: parametrized-instance member application arity
+    #            `Inst2(COp!@!++)!Foo(1,2,3,4,5)` (the instance-param arg is not
+    #            counted; EC 4204) — R1.3.3 instance-member follow-up.
+    #   test219: same class, x18 (`I(x)!OOp2`, `L!Inst2!Foo`, ... EC 4204) —
+    #            parametrized/nested-instance member arity, R1.3.3 follow-up.
+    #   test216: bare THEOREM-name references used as operators (`Thm1`, `Thm2`;
+    #            EC 4200) — theorem-name scoping, the same gap as test214.
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
@@ -389,7 +406,8 @@ SUB_BATCH_REASONS = {
     # test216 is NOT a temporal-under-instance gap (that already works); it
     # fails at PARSE on `!`-subexpression selectors (`Thm1!:`/`!<<`/`!2!1`),
     # the unit-3 `!`-nav residue → R1.3.5.
-    "suite/test216": "labels + `!`-subexpression selectors (parse; R1.3.5)",
+    "suite/test216": "bare THEOREM-name refs used as operators (`Thm1`/`Thm2`, EC 4200) — theorem-name scoping, R1.3.3/test214 follow-up (`!`-nav done, R1.3.5.3)",
+    "suite/test217": "parametrized-instance member application `I(x')!Foo` — the instance-element arg is dropped, so the level error is under-checked (hoon=accept vs java=reject) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)",
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
     # R1.3.4 closed test7/test9/test16 (tuple binders in subset-of/set-of-all/
@@ -400,8 +418,7 @@ SUB_BATCH_REASONS = {
     # test206/test219a are NOT the "\E/SUBSET under substitution" gap the plan
     # expected — that already works; both fail on labels / `!`-subexpression
     # selectors (test206 at PARSE, test219a on `Op!lab`), the R1.3.5 residue.
-    "suite/test206": "labels + `!`-subexpression selectors (parse; R1.3.5)",
-    "suite/test219a": "label reference `Op!lab` (`!`-nav; R1.3.5)",
+    "suite/test206": "parametrized-instance member application arity `Inst2(COp!@!++)!Foo(..)` (EC 4204) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)",
     # EWD998/EWD998 closed by R1.3.2.3 (built-in operator `+`/`\cup` as an
     # operator argument to TLCGetAndSet).
     # test219 is NOT an INSTANCE-substitution gap: R1.3.3.1 landed the
@@ -409,7 +426,7 @@ SUB_BATCH_REASONS = {
     # still fails at PARSE — it is dominated by labels (`lab(x,y,z) ::`) and
     # `!`-subexpression selectors (`!:!++`, `!>>`, `!2!1`), the unit-3
     # subexpression-navigation residue tracked under R1.3.5.
-    "suite/test219": "labels + `!`-subexpression selectors (parse; R1.3.5)",
+    "suite/test219": "parametrized/nested-instance member application arity `I(x)!OOp2`/`L!Inst2!Foo` (EC 4204, x18) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)",
 }
 
 

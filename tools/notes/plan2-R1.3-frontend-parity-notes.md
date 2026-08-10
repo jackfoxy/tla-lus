@@ -1299,3 +1299,57 @@ selection nodes. (4) label-arity EC 4337 (from .3.3). No git commit. HOON: a `?~
 
 NEXT R1.3.5.3.7: close-out — the unbounded-CHOOSE fix + census flip (test206/216/219/219a) +
 LEVELS + ledger/docs.
+
+### R1.3.5.3.7 — close-out (SHIP-VERIFIED, 2026-08-10)
+
+**Unbounded-CHOOSE fix (the last mechanism gap).** `CHOOSE x : P` still parses an EMPTY
+`n-maybebound`, so g-choose's `bounded = ?=(^ mbs)` mis-classified it as `\in`-bounded ->
+`$BoundedChoose` with `x` in `bound`. Fixed: key on an actual range (`?=(^ rng)`). Also:
+an unbounded CHOOSE names its bound symbol at the CHOOSE-keyword span (SANY, unlike
+unbounded `\E`/`\A` which use the variable span) -> the sbind span is the keyword span
+when unbounded. New golden facts verified (`Ch`); no sem regression.
+
+**Census outcome — measured each target's actual verdict** (committed wain-based
+`sany-verdict` probe; the specs are too long for a single-line cord, so each is built from
+a per-line `wain` via `+catl`):
+- **`suite/test219a` -> ACCEPTS.** CLOSED. Removed from `SUB_BATCH_DIVERGENCES`.
+- **`test206`/`test216`/`test219` still reject — but NONE on `!`-nav.** Dumped
+  `analyze-graph` diagnostics: test206 = 1x `EC 4204 Inst2!Foo requires 6 arguments`
+  (`Inst2(COp!@!++)!Foo(1,2,3,4,5)` — the parametrized-instance param arg is not counted);
+  test219 = 18x `EC 4204` of the same class (`I(x)!OOp2`, `L!Inst2!Foo`, ...
+  parametrized/nested-instance member arity); test216 = 8x `EC 4200 Unknown operator:
+  Thm1/Thm2/...` (bare THEOREM names used as operators — theorem-name scoping, the same
+  gap as test214). These are **R1.3.3 instance-member + theorem-scoping gaps, NOT `!`-nav**
+  — re-scoped in `SUB_BATCH_REASONS` and kept in the census for a follow-up.
+
+**R1.3.5.3 (`!`-subexpression navigation) IS COMPLETE.** The mechanism is proven by
+test219a accepting + eight byte-exact `sem` goldens across every mode: `labelref` (bare
+label), `labelrefarg` (parametric label), `selat` (`!@`/`!++`), `selnav`/`selnavp`
+(structural `!N`/`!<<`/`!>>`/`!:`/`!(args)`), `thmsel` (theorem-base), `instsel`
+(through-INSTANCE `substin`), plus `label`. The four resolution modes SANY's
+`selectorToNode` implements (labels, structural, `!@`/op-symbol, through-INSTANCE) all
+render byte-identical to SemDump.
+
+Ledger: `semantic-graph` `!`-nav + `APSubstIn` + LabelNode items -> DONE; the residuals
+above stay open (instance-member arity, theorem scoping). No git commit.
+
+NEXT (post-R1.3.5.3, follow-ups): parametrized/nested-instance member application arity
+(closes test206/219); theorem-name scoping (closes test216, test214); then R1.3.5.4-.7
+(the remaining R1.3.5 ledger rows: level-constraints differential, parse-errors residual,
+tlc-output-ec, tlc-constants).
+
+**R1.3.5.3.7 addendum — test217 regression surfaced by the tier2-sub run.** Flipping
+test219a re-ran the subdir batch and exposed `suite/test217` as a NEW divergence
+(hoon=accept / java=reject) — a regression this session's `!`-nav / instance work
+introduced. Cause: `FooBar == I(x')!Foo` where `I(z) == INSTANCE test217a WITH y <- z`
+and `test217a` has `THEOREM Foo == y'=0` (action level). SANY renders it `apply I!Foo`
+APPLIED to `x'` (arity 1, L2) and reports a level error (the action-level arg exceeds the
+member parameter's level). The port resolves the flat member `I!Foo` (in ctx, arity 1)
+but DROPS the instance-element arg `x'` -> `apply I!Foo` with no args, L0 -> under-checks
+-> accepts. This is the parametrized-instance MEMBER APPLICATION gap (same class as
+test206/test219; the level-error variant), NOT `!`-nav. Documented in the census as
+`suite/test217 -> hoon=accept` and re-scoped for the R1.3.3 instance-member follow-up.
+So the census outcome of R1.3.5.3: **test219a closed**; test206/216/217/219 kept as
+documented divergences whose residual is R1.3.3 instance-member arity/level + theorem
+scoping, none of them `!`-nav. tier2-sub's only remaining FAIL is sub-5 (the R1.3.5.1
+`test52` flip, deferred to the R1.3.5.8 parent close-out).

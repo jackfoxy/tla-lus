@@ -14,8 +14,8 @@ tlc-batch	Github725d -> Error: primed variable is unassigned in the successor st
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
 # 6 disagree with Java (289/295 agree):
 subdir-batch	suite/test52 -> hoon=reject	prefix operator param `-._` — unary-minus `-`/`-.` naming (R1.3.5)
-subdir-batch	suite/test206 -> hoon=reject	labels + `!`-subexpression selectors (parse; R1.3.5)
+subdir-batch	suite/test206 -> hoon=reject	parametrized-instance member application arity `Inst2(COp!@!++)!Foo(..)` (EC 4204) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)
 subdir-batch	suite/test214 -> hoon=accept	USE/HIDE proof-fact validation, EC 4357 (proof steps; R1.3.5)
-subdir-batch	suite/test216 -> hoon=reject	labels + `!`-subexpression selectors (parse; R1.3.5)
-subdir-batch	suite/test219 -> hoon=reject	labels + `!`-subexpression selectors (parse; R1.3.5)
-subdir-batch	suite/test219a -> hoon=reject	label reference `Op!lab` (`!`-nav; R1.3.5)
+subdir-batch	suite/test216 -> hoon=reject	bare THEOREM-name refs used as operators (`Thm1`/`Thm2`, EC 4200) — theorem-name scoping, R1.3.3/test214 follow-up (`!`-nav done, R1.3.5.3)
+subdir-batch	suite/test217 -> hoon=accept	parametrized-instance member application `I(x')!Foo` — the instance-element arg is dropped, so the level error is under-checked (hoon=accept vs java=reject) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)
+subdir-batch	suite/test219 -> hoon=reject	parametrized/nested-instance member application arity `I(x)!OOp2`/`L!Inst2!Foo` (EC 4204, x18) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)
