@@ -1,0 +1,13 @@
+LEVELS
+lvl MODULE A L-1 lc={i<=3,n<=2}
+lvl Da L0
+lvl A L0
+lvl Db L0
+lvl B L0
+lvl C L0
+lvl Dc L0
+lvl D L0
+lvl Dd L0
+lvl E L0
+lvl Df L0 lc={i<=3}
+lvl G L0 lc={i<=3}

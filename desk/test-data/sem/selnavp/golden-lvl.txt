@@ -1,0 +1,8 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,x<=3}
+lvl Dg L0 ml=[3] w=[0]
+lvl A L0
+lvl Dh L0 lc={x<=3}
+lvl B L0
+lvl Di L0
+lvl C L0

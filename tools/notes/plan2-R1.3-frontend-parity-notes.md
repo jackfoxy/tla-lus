@@ -1226,3 +1226,38 @@ g-choose bug must be fixed before test219a closes (.3.6/close-out); `selat` uses
 
 NEXT R1.3.5.3.5: structural navigation (`FindingSubExpr`: `!1`/`!<<`/`!>>`/`!:`/`!(args)`
 → `apply $Nop`) — the `Def1..Def23` corpus; then .3.6 through-INSTANCE.
+
+### R1.3.5.3.5 — structural navigation (`FindingSubExpr`) (SHIP-VERIFIED, 2026-08-10)
+
+The `N_StructOp` / `N_OpArgs` selectors over a definition body, all measured against
+SemDump: `!N` → arg N, `!<<` → arg 1, `!>>` → arg 2 (ArgNum, 1-indexed), `!:` → the whole
+current node, `!(args)` → parametric. A no-param navigation wraps the selected node in
+`apply $Nop` (KEEPING its original spans); a parametric one (`!(args)`, or a `!:` on a
+def that has base args) is `apply LAMBDA` + the args.
+
+Pieces (semantic.hoon):
+- `+nth-arg` (1-indexed arg of an `%apply`, bounds-checked).
+- g-sel gate widened to `?(%name %at %ll %gg %colon %pos %null)`; each selector encoded in
+  the placeholder ubound by a marker — `<<`/`>>`/`:`/`@`/`(` or a decimal positional index
+  (identifiers/op-symbols never collide with those).
+- `resolve-one` navigation: `<<`→1, `>>`→2, a decimal→that index (via `nth-arg`); `!:`
+  no-ops; `!@`/`!(args)` add `(bound-count cur)` to the LAMBDA param count AND descend into
+  the quantified body (`nth-arg cur 1`) so a following structural selector indexes the body
+  (`!@` also sets the operator-argument flag). Result: `at` → `oparg LAMBDA arity=cnt`; else
+  args → `apply LAMBDA`; else `apply $Nop`.
+
+BUG FIXED: g-genid bailed (`?~ ids [~ ~]`) on a structural-*final* selector (`Da!2`,
+`Db!<<`) because the final child is a structop, not an identifier leaf — now routes to
+`+g-sel` there too. Also corrected in .5: `!@`/`!(args)` must DESCEND into the binder body
+(they previously just skipped), else a trailing `!>>` indexed the binder wrapper (1 arg)
+and nulled out.
+
+VERIFIED: two byte-exact goldens — `sem/selnav` (`!2` on a tuple/set, `!<<`/`!>>` on infix,
+chained `!>>!<<`, `!<<` on `$FcnApply`) and `sem/selnavp` (`Dg(5)!:` → `apply LAMBDA`,
+`Dh!(2)!>>` → `apply LAMBDA`, `Di!:` → `apply $Nop`). gen-sem 96→98 byte-reproducible (96
+existing untouched); `-test {sem,node-eval,value,stdops}` = `ok=%.y`; the .3.4 `selat`
+(`!@`/`!++`) still byte-exact (the descend change didn't regress it). Census unchanged
+(test206 also needs through-INSTANCE selectors → .3.6). RESIDUAL still open: the unbounded
+`CHOOSE x : P` g-choose bug (from .3.4) — needed before test206/219a close (.3.6/.3.7). No git commit.
+
+NEXT R1.3.5.3.6: through-INSTANCE + theorem/proof-step selectors (`SubstInNode`, `Thm1!:`).

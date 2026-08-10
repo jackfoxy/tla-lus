@@ -1706,7 +1706,9 @@
   |=  [gid=node targs=(list node) at=sspan c=ctx]
   ^-  gout
   =/  sels  (attach-targs (sel-of gid) targs)
-  ?.  &((gth (lent sels) 1) (levy sels |=(i=sel-item ?=(?(%name %at) kind.i))))
+  ?.  ?&  (gth (lent sels) 1)
+          (levy sels |=(i=sel-item ?=(?(%name %at %ll %gg %colon %pos %null) kind.i)))
+      ==
     [~ ~]
   ?~  sels  [~ ~]
   =/  base-parg
@@ -1724,8 +1726,19 @@
     =/  uq=(list sel-item)  sels
     |-  ^-  (list sbind)
     ?~  uq  ~
-    ::  `!@` (AtSel) has no name — encode it as '@' for the resolver
-    =/  nm  ?:(?=(%at kind.i.uq) '@' nm.i.uq)
+    ::  encode the selector kind for the resolver: a structural selector
+    ::  has no name, so use its marker (`@`/`<<`/`>>`/`:`) or a decimal
+    ::  positional index (identifiers/op-symbols never collide) — R1.3.5.3.5
+    =/  nm
+      ?-  kind.i.uq
+        %name   nm.i.uq
+        %at     '@'
+        %ll     '<<'
+        %gg     '>>'
+        %colon  ':'
+        %pos    (scot %ud num.i.uq)
+        %null   '('
+      ==
     [[nm | at.i.uq] $(uq t.uq)]
   [`[%apply ['$Sel' %builtin] 0 at ub ~ out.gen] ds.gen]
 ::
@@ -1772,7 +1785,11 @@
   ^-  gout
   =/  kids  (kids-of n)
   =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
-  ?~  ids  [~ ~]
+  ?~  ids
+    ::  no identifier final (a structural-final subexpression selector like
+    ::  `Da!2`/`Db!<<`) -> try the $Sel resolver (R1.3.5.3.5)
+    =/  gs  (g-sel n ~ (span-of:ast n) c)
+    ?^(r.gs gs [~ ~])
   =/  idn  (rear-node `(list node)`ids)
   =/  nm  (leaf-text idn)
   ?:  =('@' nm)
@@ -2725,6 +2742,15 @@
   =/  hit  (find-label i.args.s nm)
   ?^(hit hit $(args.s t.args.s))
 ::
+++  nth-arg
+  ::  the n-th argument (1-indexed) of an application node, for a
+  ::  positional / `!<<` / `!>>` structural selector (R1.3.5.3.5)
+  |=  [s=sem n=@ud]
+  ^-  (unit sem)
+  ?.  ?=(%apply -.s)  ~
+  ?:  |(=(0 n) (gth n (lent args.s)))  ~
+  `(snag (dec n) `(list sem)`args.s)
+::
 ++  bound-count
   ::  the number of variables a node binds (its quantifier/CHOOSE/function
   ::  binders) — the params an `!@`/`!(args)` selection accumulates when the
@@ -2782,13 +2808,35 @@
     =/  nv  t.names
     |-  ^-  [ok=? cur=sem cnt=@ud at=?]
     ?~  nv  [& cur cnt at]
-    ?:  =('@' i.nv)
-      ::  `!@`: add the current node's bound vars; mark operator-argument
-      $(nv t.nv, cnt (add cnt (bound-count cur)), at &)
+    =/  sel  i.nv
+    ?:  |(=('@' sel) =('(' sel))
+      ::  `!@` / `!(args)` on a binder: add its bound vars to the LAMBDA
+      ::  param count and descend into the quantified body (arg 1), so a
+      ::  following structural selector indexes the body; `!@` also marks the
+      ::  result an operator argument (`oparg LAMBDA`) — R1.3.5.3.4/.5
+      =/  b  (nth-arg cur 1)
+      %=  $
+        nv   t.nv
+        cnt  (add cnt (bound-count cur))
+        at   |(at =('@' sel))
+        cur  ?~(b cur u.b)
+      ==
+    ?:  =(':' sel)
+      ::  `!:` selects the whole current node — no navigation
+      $(nv t.nv)
+    ::  a structural selector: `!<<` -> arg 1, `!>>` -> arg 2, `!N` -> arg N
+    =/  idx=(unit @ud)
+      ?:  =('<<' sel)  `1
+      ?:  =('>>' sel)  `2
+      (rush sel dem)
+    ?^  idx
+      =/  a  (nth-arg cur u.idx)
+      ?~  a  [| cur cnt at]
+      $(nv t.nv, cur u.a)
     ::  a name: a label, else a nested LET operator (`!++`)
-    =/  lbl  (find-label cur i.nv)
+    =/  lbl  (find-label cur sel)
     ?^  lbl  $(nv t.nv, cur u.lbl)
-    =/  lop  (find-let-op cur i.nv)
+    =/  lop  (find-let-op cur sel)
     ?~  lop  [| cur cnt at]
     =/  d  u.lop
     $(nv t.nv, cnt (add cnt (lent params.d)), cur ?~(body.d [%nullodn ~] u.body.d))
