@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "}" at line 2, column 12 and token "\\in" 
+
+Residual stack trace follows:
+ExtendableExpr starting at line 2, column 12.
+Expression starting at line 2, column 12.
+Some { } form starting at line 2, column 6.
+ExtendableExpr starting at line 2, column 6.
+Expression starting at line 2, column 6.
+
+%%

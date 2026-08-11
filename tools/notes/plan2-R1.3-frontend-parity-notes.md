@@ -1653,3 +1653,87 @@ VERIFIED (all all-empty LEVELS, matching oracle): new goldens `desk/test-data/se
 Foo/Bar/Qux + this instance) also passes (tested, then dropped as redundant with thmscope).
 gen-sem 105→107, full `-test /tests/lib/sem` `ok=%.y`, no regression. No code change; the two
 goldens lock the discharge for both substin kinds.
+
+### R1.3.5.5.4 — instance-def hash-order + wider LEVELS projection (AUDIT, NO code change, 2026-08-11)
+
+Both items resolve without code.
+
+- **Instance-def hash-order** — reproduced: `INSTANCE B WITH k<-0` over B `Alpha..Epsilon`
+  (all `== k`) → oracle def order `Delta,Epsilon,Beta,Gamma,Alpha` (Java `Hashtable`
+  iteration by UniqueString identity) vs the port's source order. Recorded as an
+  **approved-difference** (already documented at `compatibility.md:328-337`): cosmetic —
+  affects only the ORDER of a multi-def instance's imported defs in a dump, never
+  membership/arity/level/body/verdict. Canonicalizing would require partitioning
+  `getOpDefs()` into own (source-order) vs imported (SubstIn-bodied) and sorting only the
+  latter on BOTH sides (SANY interleaves them), high fiddliness for a cosmetic gain — so no
+  multi-def-instance golden; single-def-instance goldens (instparm/instnest/instsel/...)
+  stay byte-exact.
+- **Wider LEVELS projection** — audited COMPLETE. `+lvl-line-def` emits every field
+  `SemDump.java` does: `L<lvl>`, `ml=[]/w=[]` (arity>0), `mml=[]/olc=[]` (has-op-param), and
+  `(lvl-segs lp lc ac ap nlp)` → `lp/lc/alc/alp/nlp`. Field coverage across the sem goldens:
+  mml/olc ×21, alc ×5, alp ×4, nlp ×25, ml ×40, lp ×56, lc ×80 — every field exercised and
+  byte-matched. No missing projection code, no new golden needed.
+
+R1.3.5.5 residue after .1-.4: only the **full re-level differential** (.5.5, the close-out)
++ the ledger flip remain; the level-constraint VALUES (recinst RECURSIVE-through-WITH,
+own-theorem-ref, substituted-constant discharge) are fixed, projection is complete, and the
+one ordering divergence is a documented approved-difference.
+
+### R1.3.5.5.5 — full re-level differential + close-out (SHIP-VERIFIED, 2026-08-11)
+
+= UNIT R1.3.5.5 COMPLETE. The `level-constraints` ledger row flips **partial → parity**.
+
+- **Differential:** the sem corpus (107 goldens) compares the full `LEVELS` section byte-for-
+  byte against `SemDump`; all pass, so the re-level differential is clean. The `.1`-`.3`
+  fixes (recinst RECURSIVE-through-WITH, own-theorem-ref pre-seed, substituted-constant
+  discharge) and `.4` projection audit are all captured by dedicated goldens
+  (`recinst`/`thmreflvl`/`apsubdis`/`subdis`).
+- **No-regression:** full `-test /=tla-lus=/tests` → **OK 1515 / FAILED 1**; the one FAILED
+  is `tier2-sub` sub-5 (`test52`, the R1.3.5.1 flip deferred to R1.3.5.8), NOT a level
+  change. Every leveling-sensitive dir green — sem (135 arms), lvl (18), node-eval (37),
+  value (1) — and tier2-sub sub-1/2/3/4/6 OK, so the `+l-substin` `alp-lc` / `+l-instance`
+  formal-param skip / thmdef pre-seed did not flip any SANY accept/reject verdict across the
+  295-spec subdir batch. `tier2.py --check` byte-reproducible (290/295, census untouched).
+- **Ledger/docs:** `parity-manifest.md` `level-constraints` → **parity** (rationale records
+  the three value fixes + complete projection; sole residual = the instance-def hash-order
+  approved-difference); the `semantic-graph` residual updated (level-constraint items done,
+  only EC 4204 instance-member arity `test206`/`test217`/`test219` remains, an R1.3.3
+  follow-up). `compatibility.md` hash-order approved-difference already covers the ordering.
+
+R1.3.5.5 done: RECURSIVE-op-through-WITH levels fixed + deterministic, own-theorem-ref lp/lc,
+substituted-constant discharge, projection complete, differential clean, `level-constraints`
+at parity. Remaining R1.3.5 units: `.6` parse-errors, `.7` tlc-output-ec/tlc-constants, `.8`
+census close-out (incl. the deferred test52).
+
+### R1.3.5.6.0 — parse-errors kickoff / differential (DOCS/ORACLE ONLY, 2026-08-11)
+
+NOTE: "R1.3.5.5.6" in the request = R1.3.5.6 (the R1.3.5.5 sub-plan ended at .5). R1.3.5.6
+(`parse-errors` residual) DECOMPOSED into `~/FoxyLabs/tla-lus/R1.3.5.6-plan.md` (.0-.5).
+
+Differential: added 10 malformed `.tla` to `desk/test-data/parse-err/boundary/` targeting
+unexercised productions, `gen-parse-err-tests`, ship-tested `(dump-err:syntax)` vs
+`ParseErrDump`. **6/10 already byte-exact** (the port's `+perr`/`+bpa`/`+stack-tape` machinery
+is broadly correct — e.g. `x == 1 +` matches exactly incl. the ExtendableExpr/Expression/
+Definition/Module-body stack). The 4 divergent, in four classes:
+
+1. **Missing `+bpa` stack entry** — `x == \A i`: SANY stack top-5 = `Quant Bound`/`Quantified
+   form`/`Expression`/`Definition`/`Module body`; port omits `Quant Bound`, so the window
+   shifts and shows a spurious trailing `Module definition`. → .6.1.
+2. **`Encountered` grouping+span** — `INSTANCE` alone: `Was expecting` matches, but SANY
+   `Encountered "INSTANCE ====" at line 2, column 1 and token "----"` (production-start token
+   grouped, production span) vs port `Encountered "====" at line 3, column 1 and token
+   "INSTANCE"` (raw next token, own span). → .6.2.
+3. **Module-body routing** — `THEOREM` alone: SANY reports at module-body level (`Was
+   expecting "LOCAL, INSTANCE, …"`, stack Module body/Module definition); port parses THEOREM
+   as an expression start (ExtendableExpr/Expression) and emits no `Was expecting`. → .6.3.
+4. **Grammar-level recovery point** — `f[x \in S] ==`: SANY expects `==== or more Module
+   body` at `f`; port parses it as a def and fails later at `====`. → .6.4.
+
+Reverted the 10 probe fixtures (suite back to 34 goldens green). The ~12 module-level
+expecting strings (`+set-exp`/`body-expecting`) + the block renderer are correct; the work is
+extending `+bpa` push sites, the encountered-assembly, and keyword-unit routing, then
+exhaustive per-production fixture coverage (~100 sites). Sub-plan .1 stack / .2 encountered /
+.3 routing / .4 long-tail+grammar / .5 ledger flip. STALE ledger note to fix in .5:
+`parse-errors` row still says `test206/216/219 fail at parse` — R1.3.5.2/.3 closed the
+`!`-nav parse layer; they now diverge at SEMANTIC (instance-member arity). No code/census
+change this step.
