@@ -3476,6 +3476,37 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT c\0aTHEOREM ASSUME NEW CONSTANT d, c = 1 PROVE c + d = d + c\0aTHEOREM Named == ASSUME c = 2 PROVE c = 2\0a====\0a'
   ==
 ::
+++  test-sem-thmreflvl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  const c arity=0 L0 2.10-2.10'
+        '  def Bar arity=0 local=n L0 4.1-4.10'
+        '    apply Foo opkind=ThmOrAssumpDefKind L0 4.8-4.10'
+        '  thmdef Foo local=n L0 3.1-3.20'
+        '    apply = opkind=BuiltInKind L0 3.16-3.20'
+        '      apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '      num 0 L0 3.20-3.20'
+        '  theorem name=Foo L0 3.1-3.20'
+        '    apply = opkind=BuiltInKind L0 3.16-3.20'
+        '      apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '      num 0 L0 3.20-3.20'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={c} lc={c<=2}'
+        'lvl Bar L0 lp={c} lc={c<=2}'
+        'lvl Foo L0 lp={c} lc={c<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT c\0aTHEOREM Foo == c = 0\0aBar == Foo\0a====\0a'
+  ==
+::
 ++  test-sem-thms
   %+  expect-eq
     !>  ^-  wain

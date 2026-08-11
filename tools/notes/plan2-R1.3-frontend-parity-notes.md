@@ -1617,3 +1617,22 @@ mutual-recursion spec `g(n) == foo(n)!Use` has its LEVELS fixed too (measured `m
 face immediately before `~(` parses `=~` as the tissig rune (`lc=~(tap...)` → syntax error);
 `%Foo` with uppercase is not a valid `@tas`; cast list-typed `?~` results explicitly
 (`=/ qs=(list lkey)`) or `t.qs` mint-`-find`s.
+
+### R1.3.5.5.2 — own-theorem-reference lp/lc (SHIP-VERIFIED, 2026-08-11)
+
+`THEOREM Foo == c=0` / `Bar == Foo` → oracle `lvl Bar lp={c} lc={c<=2}`; port rendered
+`lvl Bar` empty because `+l-module-core` levels all defs (dwalk) before the theorem
+definitions (twalk, ~:5181), so `Foo`'s oplev was absent when `Bar` (a def whose body is a
+bare `apply Foo opkind=ThmOrAssumpDefKind`) was levelled — it inherited no constraints.
+
+FIX: after the level env `e` is built and before the dwalk, a pre-seed pass folds each named
+`thmdef` into `ops.e` — `(l-thm i.tl e)` then the same oplev construction the twalk uses
+(`:* lvl ok 0 | ~ ~ ~ ~ ~  lp lc ac ap all nlp ~ ==`). A def in the dwalk now reads the
+theorem's lp/lc; the twalk still runs afterwards and registers the FINAL oplevs (so a
+theorem body that references a def is still computed correctly there — the pre-seed only
+serves def→theorem inheritance, and for a constant/var-bodied theorem the two agree).
+
+VERIFIED: new byte-exact golden `desk/test-data/sem/thmreflvl` (`lvl {MODULE,Bar,Foo}
+lp={c} lc={c<=2}`); full `-test /tests/lib/sem` `ok=%.y`, 104→105, no regression on the
+theorem goldens (thms/thmscope/thmsel/thmap) or the module-line constraint aggregation.
+This is the item .4.1's `thmscope` golden was kept constant-free to avoid.

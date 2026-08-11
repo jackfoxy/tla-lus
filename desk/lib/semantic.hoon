@@ -5057,6 +5057,31 @@
         c
         mlevs.dv
     ==
+  ::  a named THEOREM/ASSUMPTION whose level constraints a later definition
+  ::  inherits (`THEOREM Foo == c=0` / `Bar == Foo`) must be in scope when
+  ::  that definition is levelled — SANY processes the module in source
+  ::  order, but the port levels all defs (dwalk) before the theorem
+  ::  definitions (twalk). Pre-seed each thmdef's oplev here so a def can
+  ::  read its lp/lc; twalk still registers the final oplevs (R1.3.5.5.2)
+  =.  e
+    =/  eo  e
+    =/  tl  thmdefs.m
+    |-  ^-  lenv
+    ?~  tl  eo
+    ?~  name.i.tl  $(tl t.tl)
+    =/  gt  (l-thm i.tl eo)
+    ?~  name.th.gt  $(tl t.tl)
+    %=  $
+      tl   t.tl
+      eo   %_  eo
+               ops
+             %+  ~(put by ops.eo)  u.name.th.gt
+             ^-  oplev
+             :*  lvl.r.gt  ok.r.gt  0  |  ~  ~  ~  ~  ~
+                 lp.r.gt  lc.r.gt  ac.r.gt  ap.r.gt  all.r.gt  nlp.r.gt  ~
+             ==
+           ==
+    ==
   ::  definitions
   =/  dwalk
     =|  out=(list sem-def)
