@@ -3754,6 +3754,35 @@
     ?:  ?|(?=(^ (sub-idx op.i.ps)) ?=(^ (sub-idx par.i.ps)))
       $(ps t.ps)
     $(ps t.ps, acc (~(put in acc) i.ps))
+  ::  getSubLCSet argLevelParam bound at the DEFINITION level: a body
+  ::  argLevelParam [op i par] whose operator `op` is substituted by an
+  ::  operator argument (a definition, e.g. a RECURSIVE op through WITH)
+  ::  becomes a level constraint `par' <= op.maxLevels[i]`, where par' is
+  ::  the substituting expression's level params (or par itself when it is
+  ::  not substituted). Unlike the module-scope instance-node bound this
+  ::  KEEPS the def's own formal params, so the imported operator's
+  ::  argument maxLevels tighten (recinst `foo!Use ml=[2]`; R1.3.5.5.1)
+  =/  subx  (scag nsubs args.s)
+  =/  alp-lc
+    =/  acc  `(map lkey @ud)`~
+    =/  ps  ~(tap in ap.r.gb)
+    |-  ^-  (map lkey @ud)
+    ?~  ps  acc
+    =/  ap  i.ps
+    =/  sio  (sub-idx op.ap)
+    ?~  sio  $(ps t.ps)
+    ?:  (gte u.sio (lent subx))  $(ps t.ps)
+    =/  od  (oparg-def (snag u.sio subx) e)
+    ?~  od  $(ps t.ps)
+    =/  mlevel  (mxl-of ol.u.od i.ap)
+    =/  qs=(list lkey)
+      =/  sip  (sub-idx par.ap)
+      ?~(sip ~[par.ap] ~(tap in lp:(sub-r u.sip)))
+    =/  acc2
+      |-  ^-  (map lkey @ud)
+      ?~  qs  acc
+      $(qs t.qs, acc (lc-put acc i.qs mlevel))
+    $(ps t.ps, acc acc2)
   ::  allParams/nonLeibnizParams: start from the body's sets; each
   ::  substituted parameter present in allParams is replaced by the
   ::  substituting expression's allParams (its nonLeibnizParams join
@@ -3791,7 +3820,7 @@
       $(hl t.hl, acc (~(del in acc) i.hl))
     $(nl t.nl, i +(i), all2 all3, nlp2 nlp3)
   :*  s(lvl lvl, args (weld out.gsub ~[s.gb]))
-      [lvl &(ok.rs.gsub ok.r.gb) lp2 lc2 ac2 ap2 -.anl +.anl]
+      [lvl &(ok.rs.gsub ok.r.gb) lp2 (lc-uni lc2 alp-lc) ac2 ap2 -.anl +.anl]
       (weld ds.gsub ds.gb)
   ==
 ::
@@ -4746,6 +4775,12 @@
     =/  lcc2
       |-  ^-  (map lkey @ud)
       ?~  qs  lcc
+      ::  a bound formal param is never a module-level declaration, so it
+      ::  does not surface in the instance node's module-scope constraints
+      ::  (matching the constant/variable-param lcc block above and SANY;
+      ::  R1.3.5.5.1 — otherwise a RECURSIVE-op-through-WITH bound param `n`
+      ::  leaks as a spurious module `lc={n<=2}`)
+      ?:  =(%formal-param kind.i.qs)  $(qs t.qs)
       $(qs t.qs, lcc (lc-put lcc i.qs mlevel))
     $(al t.al, lcc lcc2)
   ::  plus each substitution expression's own level constraints

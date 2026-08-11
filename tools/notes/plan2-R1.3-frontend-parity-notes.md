@@ -1547,3 +1547,73 @@ mechanism = theorem-name scoping (.4.1) + proofs walk clean/no projection (.4.2)
 fact validation (.4.3); no regression (etest5 pre-existing). Remaining R1.3.5 census
 residue (test52/206/217/219/etest5) is R1.3.3-arity + unary-minus + nonexistent-module,
 none owned by R1.3.5.4.
+
+### R1.3.5.5.0 — kickoff / level-constraints measurement (DOCS/ORACLE ONLY, 2026-08-10)
+
+R1.3.5.5 (`level-constraints` full differential) DECOMPOSED into
+`~/FoxyLabs/tla-lus/R1.3.5.5-plan.md` (.0-.5). No census spec — it is the
+`level-constraints` ledger `partial → parity` push. In every finding the GRAPH (node)
+projection matches byte-exact; only the `LEVELS` section diverges.
+
+- **recinst reproduced (the anchor).** Re-added `desk/test-data/sem/recinst`
+  (`RECURSIVE g(_)` / `foo(n) == INSTANCE B WITH F <- g, c <- n` / `g(n) == foo(n)!Use`;
+  B: `CONSTANT c`,`CONSTANT F(_)`,`Use == F(c)`), gen-sem, ship-tested → **FAILED on
+  LEVELS only**: oracle `lvl foo!Use L0 ml=[2] w=[1]` + no module lc; port `ml=[3]` +
+  spurious `lvl MODULE A L-1 lc={n<=2}`. The bound formal param `n` leaks into module
+  scope and `foo!Use`'s arg max-level over-counts by one. Matches the withdrawn-golden
+  symptom (`ml=[2]↔[3]`). Reverted recinst (back to 103 goldens) to keep the suite green;
+  .5.1 restores it deterministically. Locus: `+rec-seed` (:4414) × `+l-substin`/getSubLCSet
+  (:3664, :4687-4755) — the RECURSIVE `oparg g` substituted through WITH re-enters the
+  level fixpoint, which is not order-invariant (a `~(tap by)` accumulator).
+- **Own-theorem-ref lp/lc (from .4.1).** `THEOREM Foo == c=0` / `Bar == Foo` → oracle
+  `lvl Bar lp={c} lc={c<=2}`, port empty. Cause: `+l-module-core` registers thmdef oplevs
+  in the twalk (:5104) AFTER the dwalk defs that reference them → .5.2 pre-seeds them.
+- **$APSubstIn substituted-constant discharge (from .4.1).** `INSTANCE B WITH c<-0` (B
+  refs its own `c`) → SANY discharges `c`, port still renders `lc={c<=2}`/`lp={c}` on the
+  importer → .5.3 extends the R1.3.3.1 formal-param-skip discharge to substituted keys.
+- **Instance-def hash-order** (existing approved-difference, .5.4) + **wider LEVELS
+  projection** (.5.4) + **full re-level differential** over the corpus (.5.5).
+
+Reusable: the R1.3.3.1 `%formal-param` skip in getSubLCSet (:3458/:3549/:3600) — .1 and .3
+extend the SAME discharge rule; the `lres`/`oplev` algebra + LEVELS renderer are correct
+(values wrong, not rendering). Sub-plan order .1(anchor+discharge) → .3(reuses) → .2(indep)
+→ .4/.5(projection+differential close-out). No code/census change this step.
+
+### R1.3.5.5.1 — recinst RECURSIVE-op-through-WITH LEVELS (SHIP-VERIFIED, 2026-08-11)
+
+The anchor. Two symptoms on recinst: `foo!Use ml=[3]` (oracle `[2]`) + spurious module
+`lc={n<=2}`. Graph matched; LEVELS diverged. ROOT CAUSE (found by tracing `+l-def`'s
+`lc.r.gb` for foo!Use = **empty**): the constraint comes from the operator argument `g`
+(RECURSIVE, seeded `maxLevels=[2]`) substituted for B's `F` in `Use == F(c)`. The body
+carries an argLevelParam `[F 0 c]`; `+l-substin`'s `ap2` **dropped** it (op is a subst
+param) instead of turning it into a level constraint, and the module-scope value was
+computed separately by `+l-instance` and leaked (missing formal-param skip).
+
+- **Fix (a) — `+l-substin` `alp-lc`** (feeds the DEF's lc): for each body argLevelParam
+  `[op i par]` whose `op` is a substituted param resolving (via `+oparg-def` on the
+  substituting expr) to an operator DEFINITION, add `par' <= (mxl-of op.oplev i)` where
+  `par'` = the substituting expr's `lp` for `par` (or `par` itself if unsubstituted).
+  KEEPS formal params, so `foo!Use`'s param `n` gets `n<=2` → `+l-def` `maxl` = min(3,2) =
+  2 → `ml=[2]`. Merged as `(lc-uni lc2 alp-lc)` in the returned lres.
+- **Fix (b) — `+l-instance` argLevelParam `lcc`** (the module-scope instance-node
+  constraints): added the R1.3.3.1 `?: =(%formal-param kind.i.qs) skip` (the constant/
+  variable-param block already had it) → the bound param `n` no longer surfaces as module
+  `lc={n<=2}`.
+
+Deterministic: the constraint is read directly from `g`'s seeded oplev (`rec-seed`
+maxLevels [2]), replacing the order-dependent accumulation that produced the withdrawn
+golden's `ml=[2]↔[3]` flip. `snames` (adding instance members to the open RECURSIVE
+section) was explored and REVERTED — it did not change the result (the fix is in the
+constraint computation, and it introduced a graph diff), confirming the section-membership
+theory was wrong.
+
+VERIFIED: `desk/test-data/sem/recinst` restored byte-exact (`lvl {g,foo!Use,Bar} ml=[2]`,
+no module lc); full `-test /tests/lib/sem` `ok=%.y`, 103→104, **no regression on any
+instance golden** (instparm/instnest/instsel/hoinst/tupsub/...). **Golden uses a VARIANT**
+(`foo == INSTANCE B WITH F<-g` non-parametrized; `Bar(x) == foo!Use(x)`): the original
+mutual-recursion spec `g(n) == foo(n)!Use` has its LEVELS fixed too (measured `ml=[2]`), but
+`foo(n)!Use` is exactly the **test217** instance-element-arg application the port drops
+(graph diverges) — a pre-existing R1.3.3 gap, so the byte-exact golden avoids it. HOON: a
+face immediately before `~(` parses `=~` as the tissig rune (`lc=~(tap...)` → syntax error);
+`%Foo` with uppercase is not a valid `@tas`; cast list-typed `?~` results explicitly
+(`=/ qs=(list lkey)`) or `t.qs` mint-`-find`s.

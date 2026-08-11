@@ -2810,6 +2810,46 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aAp(F(_), x) == F(x)\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN 0 ELSE Ap(R, n - 1)\0a====\0a'
   ==
 ::
+++  test-sem-recinst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  def g arity=1 local=n L0 5.1-5.12'
+        '    param n arity=0 L0 5.3-5.3'
+        '    apply g opkind=UserDefinedOpKind L0 5.9-5.12'
+        '      apply n opkind=FormalParamKind L0 5.11-5.11'
+        '  def foo!Use arity=1 local=n L0 3.1-3.29'
+        '    param x arity=0 L0 3.5-3.5'
+        '    substin subs=1 L0 3.1-3.29'
+        '      sub F <-'
+        '        oparg g op=g arity=1 L0 3.29-3.29'
+        '      in'
+        '        apply F opkind=ConstantDeclKind L0 3.11-3.14'
+        '          apply x opkind=FormalParamKind L0 3.13-3.13'
+        '  def Bar arity=1 local=n L0 4.1-4.20'
+        '    param x arity=0 L0 4.5-4.5'
+        '    apply foo!Use opkind=UserDefinedOpKind L0 4.11-4.20'
+        '      apply x opkind=FormalParamKind L0 4.19-4.19'
+        '  instance name=foo module=B local=n L0 3.1-3.29'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl g L0 ml=[2] w=[1]'
+        'lvl foo!Use L0 ml=[2] w=[1]'
+        'lvl Bar L0 ml=[2] w=[1]'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aRECURSIVE g(_)\0afoo == INSTANCE B WITH F <- g\0aBar(x) == foo!Use(x)\0ag(n) == g(n)\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT F(_)\0aUse(x) == F(x)\0a====\0a'
+  ==
+::
 ++  test-sem-recmut
   %+  expect-eq
     !>  ^-  wain
