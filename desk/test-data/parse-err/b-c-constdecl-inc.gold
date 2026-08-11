@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Was expecting "Identifier, _ or prefix op"
+Encountered "====" at line 3, column 1 and token "," 
+
+Residual stack trace follows:
+Constant declaration items starting at line 3, column 1.
+Parameter declaration starting at line 2, column 1.
+Module body starting at line 2, column 1.
+Module definition starting at line 1, column 1.
+
+%%

@@ -1689,6 +1689,8 @@
   ::  ident | ident(_,..) | _ op _ | _ op | op _
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's expecting set at a parameter declaration (R1.3.5.6.1)
+  =.  s  (set-exp s 'Identifier, _ or prefix op')
   =/  pk  (peek s)
   ?~  pk  [%| (perr-enc s 1)]
   =/  cls  (class-of u.pk)
@@ -2165,6 +2167,9 @@
   ::  (ident (, ident)* | identtuple) \in expr -> N_QuantBound
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's QuantBound production entry (residual stack `Quant Bound`);
+  ::  popped on success in +finish-quant-bound (R1.3.5.6.1)
+  =.  s  (bpa s 'Quant Bound')
   =|  kids=(list node)
   =/  pk  (peek s)
   ?:  &(?=(^ pk) =(%lab kind.u.pk))
@@ -2192,7 +2197,7 @@
   =/  er  (expression s.p.nr)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  (epa s.p.er)
   %+  mk-node:ast  %n-quantbound
   (flop [v.p.er (leaf:ast v.p.nr(kind %t-in)) kids])
 ::
@@ -2238,6 +2243,10 @@
   ?>  ?=(^ pk)
   =/  kw  (leaf:ast u.pk)
   =.  s  (advance s)
+  ::  SANY reports an unbounded binder under the same QuantBound production
+  ::  as a bounded one (residual stack `Quant Bound`); popped on success
+  ::  (R1.3.5.6.1)
+  =.  s  (bpa s 'Quant Bound')
   =|  kids=(list node)
   =.  kids  [kw kids]
   |-  ^-  (pres node)
@@ -2254,7 +2263,7 @@
   =/  er  (expression s.p.cr)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  (epa s.p.er)
   %+  mk-node:ast  %n-unboundquant
   (flop [v.p.er (leaf:ast v.p.cr) kids])
 ::
@@ -2414,6 +2423,12 @@
   =|  kids=(list node)
   =.  kids  [lsb kids]
   |-  ^-  (pres node)
+  ::  SANY wraps each field at the field name: a `name |-> value`
+  ::  record-constructor field in a Field Value production, a `name : set`
+  ::  set-of-records field in a Field Set production (residual stack
+  ::  `Field Value`/`Field Set`); popped once the value/set parses
+  ::  (R1.3.5.6.1)
+  =.  s  (bpa s ?:(=(%mapto sep) 'Field Value' 'Field Set'))
   =/  ir  (eat s %identifier)
   ?:  ?=(%| -.ir)  [%| p.ir]
   =.  s  s.p.ir
@@ -2421,7 +2436,7 @@
   ?:  ?=(%| -.sr)  [%| p.sr]
   =/  er  (expression s.p.sr)
   ?:  ?=(%| -.er)  [%| p.er]
-  =.  s  s.p.er
+  =.  s  (epa s.p.er)
   =/  field
     %+  mk-node:ast  fieldk
     ~[(leaf:ast v.p.ir) (leaf:ast v.p.sr) v.p.er]
@@ -2468,6 +2483,11 @@
   =|  kids=(list node)
   =.  kids  [(leaf:ast v.p.br) kids]
   |-  ^-  (pres node)
+  ::  SANY wraps each `[expr,..]`/`.field` selector after the `!` in an
+  ::  Except Component production (residual stack `Except Component`, at
+  ::  the selector); popped once the component parses (the enclosing
+  ::  Except Spec resets the stack on success anyway) (R1.3.5.6.1)
+  =.  s  (bpa s 'Except Component')
   =/  pk  (peek s)
   ?:  &(?=(^ pk) =(%lsb kind.u.pk))
     =.  s  (advance s)
@@ -2486,7 +2506,7 @@
     ?:  ?=(%| -.rr)  [%| p.rr]
     =.  s  s.p.rr
     =.  ck  [(leaf:ast v.p.rr) ck]
-    ^$(kids [(mk-node:ast %n-exceptcomponent (flop ck)) kids], s s)
+    ^$(kids [(mk-node:ast %n-exceptcomponent (flop ck)) kids], s (epa s))
   ?:  &(?=(^ pk) =(%dot kind.u.pk))
     =.  s  (advance s)
     =/  ak  (peek s)
@@ -2498,7 +2518,7 @@
     =/  comp
       %+  mk-node:ast  %n-exceptcomponent
       ~[(leaf:ast u.pk) (leaf:ast v.p.ir)]
-    $(kids [comp kids])
+    $(kids [comp kids], s (epa s))
   ::  = expr terminates the spec (retagged t-equal)
   =/  qr  (eat s %equals)
   ?:  ?=(%| -.qr)  [%| p.qr]
@@ -3285,26 +3305,35 @@
   ::  CONSTANT(S) param-decl (, param-decl)*
   |=  s=pst
   ^-  (pres node)
+  ::  SANY: the whole unit is a Parameter declaration, each comma-item a
+  ::  Constant declaration items production (residual stack); popped once
+  ::  each item / the unit parses (R1.3.5.6.1)
+  =.  s  (bpa s 'Parameter declaration')
   =/  kr  (eat s %constant)
   ?:  ?=(%| -.kr)  [%| p.kr]
   =.  s  s.p.kr
   =|  kids=(list node)
   =.  kids  [(mk-node:ast %n-consdecl ~[(leaf:ast v.p.kr)]) kids]
   |-  ^-  (pres node)
+  =.  s  (bpa s 'Constant declaration items')
   =/  dr  (param-decl s)
   ?:  ?=(%| -.dr)  [%| p.dr]
-  =.  s  s.p.dr
+  =.  s  (epa s.p.dr)
   =.  kids  [v.p.dr kids]
   =/  ck  (peek s)
   ?:  &(?=(^ ck) =(%comma kind.u.ck))
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
-  [%& (mk-node:ast %n-paramdeclaration (flop kids)) s]
+  [%& (mk-node:ast %n-paramdeclaration (flop kids)) (epa s)]
 ::
 ++  decl-list
   ::  KEYWORD ident (, ident)* as [kw-leaf ident comma ident ...]
   |=  [s=pst kw=@tas kind=@tas wrap=?]
   ^-  (pres node)
+  ::  SANY names the VARIABLE(S) unit a `variable declaration` production
+  ::  (residual stack); popped on success (R1.3.5.6.1)
+  =/  vardecl  =(%variable kw)
+  =?  s  vardecl  (bpa s 'variable declaration')
   =/  kr  (eat s kw)
   ?:  ?=(%| -.kr)  [%| p.kr]
   =.  s  s.p.kr
@@ -3323,6 +3352,7 @@
   ?:  &(?=(^ ck) =(%comma kind.u.ck))
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
+  =?  s  vardecl  (epa s)
   [%& (mk-node:ast kind (flop kids)) s(exp '')]
 ::
 ++  body-unit

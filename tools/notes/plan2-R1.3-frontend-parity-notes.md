@@ -1737,3 +1737,32 @@ exhaustive per-production fixture coverage (~100 sites). Sub-plan .1 stack / .2 
 `parse-errors` row still says `test206/216/219 fail at parse` — R1.3.5.2/.3 closed the
 `!`-nav parse layer; they now diverge at SEMANTIC (instance-member arity). No code/census
 change this step.
+
+### R1.3.5.6.1 — bpa stack-entry coverage: expression + declaration (SHIP-VERIFIED, 2026-08-11)
+
+Audited SANY residual-stack production names (batch of ~45 malformed inputs through
+`ParseErrDump`, `^…starting at` extracted) vs the port's `+bpa` set. Pushed the missing
+EXPRESSION + DECLARATION production entries (each with pop-on-success or the enclosing
+production's `stk0` reset; byte-exact vs `ParseErrDump`):
+
+- **Quant Bound** — `+quant-bound2` (bounded, also feeds SetOfAll `{e : qb}`) AND
+  `+unbound-quant` (SANY reports an unbounded `\A i` binder under the same QuantBound
+  production; the port's `match-fcn-const` splits bounded/unbounded early, so BOTH paths push).
+- **Field Value** / **Field Set** — `+record-fields`, per field at the field name, keyed on
+  `sep` (`|->` → Field Value / rcd-constructor, `:` → Field Set / set-of-records).
+- **Except Component** — `+except-spec`, per `![expr,..]`/`.field` selector; the enclosing
+  Except Spec resets `stk` to `stk0` on success, so only the error path matters.
+- **Parameter declaration** + **Constant declaration items** — `+constant-decl` (unit + each
+  comma item) — plus the `+param-decl` set-exp `"Identifier, _ or prefix op"`.
+- **variable declaration** — `+decl-list` (only when `kw=%variable`).
+
+New boundary fixtures: c-forall-inc/c-setofall-inc/c-fieldval-inc/c-setofrcd-inc/c-except-{comp,
+bang,comp2}/c-vardecl-inc/c-constdecl-inc. gen-parse-err 34→43; full `-test /tests/lib/parse-err`
+`ok=%.y`, no regression. bpa/epa/set-exp mutate only `stk`/`exp` (read by `+perr` on error) —
+successful-parse CST unchanged, so no parser/sem regression.
+
+REMAINING audit names moved to **.6.3** (coupled to keyword-unit routing — whether the port
+even enters them): `Instance`/`NonLocalInstance`/`Substitution` (instance) and `Theorem`/
+`Proof`/`Step`/`UseOrHideOrBy` (proof/theorem). HOON: `bpa` returns `pst`, so pop via
+`=?  s  cond  (epa s)` or `(epa s.p.er)` at the success return; `bpa` clears `exp`, so a
+following `set-exp` (e.g. param-decl) must come AFTER the bpa push.
