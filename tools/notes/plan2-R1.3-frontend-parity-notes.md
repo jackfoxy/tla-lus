@@ -1766,3 +1766,56 @@ even enters them): `Instance`/`NonLocalInstance`/`Substitution` (instance) and `
 `Proof`/`Step`/`UseOrHideOrBy` (proof/theorem). HOON: `bpa` returns `pst`, so pop via
 `=?  s  cond  (epa s)` or `(epa s.p.er)` at the success return; `bpa` clears `exp`, so a
 following `set-exp` (e.g. param-decl) must come AFTER the bpa push.
+
+### R1.3.5.6.2 — Encountered grouping analysis, MERGED into .6.3 (2026-08-11)
+
+Read SANY's exact algorithm (`ParseExceptionExtended.getShortMessage`, parser/):
+```
+maxSize = max length over e.expectedTokenSequences
+echo = join " " of maxSize token images starting at e.currentToken.next
+       (a kind==0 token renders as tokenImage[0] = "<EOF>")
+position = e.currentToken.next .beginLine/.beginColumn
+token    = e.currentToken.image           (the last successfully matched token)
+```
+Mapped to the port's `+encountered`: position = `(peek-pos s)` = currentToken.next ✓;
+token = `last.s` image = currentToken.image ✓; echo = `n` token images from `rest.s` (head =
+currentToken.next) ✓ START but the port fixes **n=1** at all 41 `+perr-enc` sites, while SANY
+uses maxSize. So, given identical routing, the ONLY divergence is the echo COUNT.
+
+Broad scan (18 malformed inputs): multi-token echoes appear for EXACTLY four inputs —
+`INSTANCE`/`THEOREM`/`ASSUME`/`LOCAL` each immediately followed by `====` → `"KW ===="` @ 2.1,
+token `"----"`, maxSize=2. All four are bare module-body keyword units where SANY did NOT
+consume the keyword (currentToken = the header `----`, next = the keyword) — i.e. every
+multi-token-echo case is ALSO a .6.3 keyword-unit ROUTING divergence (the port consumes the
+keyword and fails later at `====`, position 3.1, echo 1). There is NO pure echo-count case
+(maxSize>1 with correct routing). CONCLUSION: the maxSize echo is inseparable from the routing
+fix → .6.2 MERGES into .6.3, which must (a) not consume the keyword (fail at module-body), then
+(b) echo maxSize=2 at the module-body level (a per-`perr-enc`-site `n`). No standalone code.
+
+### R1.3.5.6.3 — keyword-unit routing + Encountered echo + entered-unit stack (SHIP-VERIFIED, 2026-08-11)
+
+**Routing (the core .6.2+.6.3 divergence).** New `+body-end-ahead` (the token after the
+current keyword is `%end-module`/EOF): in `+body-unit`, a bare `THEOREM`/`ASSUME` at the body
+end takes `[%| (perr-brk s 2)]` (fail the Unit choice at module-body, keyword UNCONSUMED,
+maxSize=2 echo `"KW ===="`) instead of entering the unit; `INSTANCE` additionally requires a
+`%identifier` next (so `INSTANCE +` also fails at body — matches SANY). LOCAL already did this
+(`perr-brk s 2` at :3396). The `+perr-brk s 2` mechanism (maxSize=2, currentToken.next
+position, currentToken.image token) was already present — the merged .6.2 echo needed no new
+code, just routing to it. Fixtures c-{instance,theorem,assume,local}-bare + c-instance-plus,
+byte-exact.
+
+**Entered-unit stack productions** (push at entry, pop on success): `Theorem` (`+theorem-unit`,
+both returns), `Instance` (`+instance-unit`), `NonLocalInstance` (`+noninst`, both returns),
+`Substitution` (`+substitution`). Verified present in the expected stacks; c-thm-body-inc
+(`THEOREM x`) byte-exact. 43→49 goldens; parse-err + syntax-CST green (routing change did not
+regress successful parses — bpa/set-exp/routing-guard are error-path-only for VALID units,
+which still route via the identifier/non-end-module lookahead).
+
+**SURFACED, deferred to .6.4:** (1) a GENERAL **expression-entry** divergence — when a called
+expression is EMPTY (first token can't start one, e.g. substitution RHS `<-` then `====`),
+SANY sets `Was expecting "Expression or Op. Symbol"` and reports at the CALLER's level without
+pushing `ExtendableExpr`/`Expression`; the port enters `+expression` (pushing them) and lacks
+the expecting. This blocks the instance-sub fixtures even though their Substitution/
+NonLocalInstance/Instance bpa entries are correct + already in the stack. Contrast `x == 1 +`
+(expression STARTED, mid-expr failure) which matches — so the fix is guarding the empty-start
+case at expression entry. (2) proof productions `Proof`/`Step`/`UseOrHideOrBy`.

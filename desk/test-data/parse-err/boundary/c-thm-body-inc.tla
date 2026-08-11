@@ -1,0 +1,3 @@
+---- MODULE t ----
+THEOREM x
+====

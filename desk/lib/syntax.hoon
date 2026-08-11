@@ -1727,6 +1727,9 @@
   ::  THEOREM/PROPOSITION [name ==] (expr | AssumeProve) [Proof]
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's Theorem production (residual stack); popped on success
+  ::  (R1.3.5.6.3)
+  =.  s  (bpa s 'Theorem')
   =/  pk  (peek s)
   ?>  ?=(^ pk)
   =/  kw  (leaf:ast u.pk)
@@ -1747,11 +1750,11 @@
     ~[kw n.u.named d.u.named v.p.er]
   =/  nx  (peek s)
   ?.  &(?=(^ nx) (begins-proof s u.nx))
-    [%& (mk-node:ast %n-theorem kids) s]
+    [%& (mk-node:ast %n-theorem kids) (epa s)]
   =/  pr  (proof-prod s)
   ?:  ?=(%| -.pr)  [%| p.pr]
   :-  %&
-  :_  s.p.pr
+  :_  (epa s.p.pr)
   (mk-node:ast %n-theorem (snoc kids v.p.pr))
 ::
 ++  named-head
@@ -3179,6 +3182,9 @@
   ::  INSTANCE name [WITH substitution (, substitution)*]
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's NonLocalInstance production (residual stack); popped on
+  ::  success (R1.3.5.6.3)
+  =.  s  (bpa s 'NonLocalInstance')
   =/  kr  (eat s %instance)
   ?:  ?=(%| -.kr)  [%| p.kr]
   =/  nr  (eat s.p.kr %identifier)
@@ -3188,7 +3194,7 @@
   =.  kids  [(leaf:ast v.p.nr) (leaf:ast v.p.kr) ~]
   =/  wk  (peek s)
   ?.  &(?=(^ wk) =(%with kind.u.wk))
-    [%& (mk-node:ast %n-nonlocalinstance (flop kids)) s]
+    [%& (mk-node:ast %n-nonlocalinstance (flop kids)) (epa s)]
   =.  kids  [(leaf:ast u.wk) kids]
   =.  s  (advance s)
   |-  ^-  (pres node)
@@ -3200,12 +3206,15 @@
   ?:  &(?=(^ ck) =(%comma kind.u.ck))
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
-  [%& (mk-node:ast %n-nonlocalinstance (flop kids)) s]
+  [%& (mk-node:ast %n-nonlocalinstance (flop kids)) (epa s)]
 ::
 ++  substitution
   ::  (ident | op) <- expr -> N_Substitution
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's Substitution production (residual stack); popped on success
+  ::  (R1.3.5.6.3)
+  =.  s  (bpa s 'Substitution')
   =/  pk  (peek s)
   ?~  pk  [%| (perr-enc s 1)]
   =/  cls  (class-of u.pk)
@@ -3226,13 +3235,16 @@
   =/  er  (expression s.p.ar)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  (epa s.p.er)
   (mk-node:ast %n-substitution ~[p.target (leaf:ast v.p.ar) v.p.er])
 ::
 ++  instance-unit
   ::  [LOCAL] INSTANCE .. -> N_Instance wrapper
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's Instance production wraps the NonLocalInstance (residual
+  ::  stack); popped on success (R1.3.5.6.3)
+  =.  s  (bpa s 'Instance')
   =/  lcl=(unit node)
     =/  pk  (peek s)
     ?.  &(?=(^ pk) =(%local kind.u.pk))  ~
@@ -3241,7 +3253,7 @@
   =/  nr  (noninst s)
   ?:  ?=(%| -.nr)  [%| p.nr]
   :-  %&
-  :_  s.p.nr
+  :_  (epa s.p.nr)
   %+  mk-node:ast  %n-instance
   ?~(lcl ~[v.p.nr] ~[u.lcl v.p.nr])
 ::
@@ -3355,6 +3367,15 @@
   =?  s  vardecl  (epa s)
   [%& (mk-node:ast kind (flop kids)) s(exp '')]
 ::
+++  body-end-ahead
+  ::  the token after the current keyword is the module end (====) or EOF
+  ::  — a bare keyword unit (`THEOREM`/`ASSUME`) at the body's end, which
+  ::  SANY fails at the Unit choice rather than inside the unit (R1.3.5.6.3)
+  |=  s=pst
+  ^-  ?
+  =/  n2=(unit token)  ?~(rest.s ~ ?~(t.rest.s ~ `i.t.rest.s))
+  ?|(?=(~ n2) =(%end-module kind.u.n2))
+::
 ++  body-unit
   |=  s=pst
   ^-  (pres node)
@@ -3376,9 +3397,14 @@
     (const-decl s)
     ::
       ?(%assume %assumption)
+    ::  a bare ASSUME/THEOREM at the very end of the body fails the Unit
+    ::  choice at the module-body level (SANY: `Encountered "ASSUME ===="`,
+    ::  keyword unconsumed) rather than inside the unit (R1.3.5.6.3)
+    ?:  (body-end-ahead s)  [%| (perr-brk s 2)]
     (assumption-unit s)
     ::
       ?(%theorem %proposition)
+    ?:  (body-end-ahead s)  [%| (perr-brk s 2)]
     (theorem-unit s)
     ::
       ?(%use %hide)
@@ -3387,7 +3413,12 @@
       ?(%instance %local)
     ::  LOCAL INSTANCE or LOCAL definition; anything else after LOCAL
     ::  fails the Unit choice exactly as SANY's LOOKAHEAD(2) does
-    ?:  =(%instance kind.u.pk)  (instance-unit s)
+    ::  INSTANCE needs a module-name identifier next; else it fails the
+    ::  Unit choice at the body level, keyword unconsumed (R1.3.5.6.3)
+    =/  n2i=(unit token)  ?~(rest.s ~ ?~(t.rest.s ~ `i.t.rest.s))
+    ?:  =(%instance kind.u.pk)
+      ?:  ?&(?=(^ n2i) =(%identifier kind.u.n2i))  (instance-unit s)
+      [%| (perr-brk s 2)]
     =/  n2=(unit token)  ?~(rest.s ~ ?~(t.rest.s ~ `i.t.rest.s))
     ?:  &(?=(^ n2) =(%instance kind.u.n2))
       (instance-unit s)

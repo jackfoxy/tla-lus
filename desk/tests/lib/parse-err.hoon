@@ -134,6 +134,11 @@
     !>  'REJECT\0aLexical error at line 2, column 9.  Encountered: "\\n" (10), after : "?"\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE Test ----\0aFoo == ?\0a====\0a'))
 ::
+++  test-b-c-assume-bare
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "ASSUME ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aASSUME\0a====\0a'))
+::
 ++  test-b-c-constdecl-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aWas expecting "Identifier, _ or prefix op"\0aEncountered "====" at line 3, column 1 and token "," \0a\0aResidual stack trace follows:\0aConstant declaration items starting at line 3, column 1.\0aParameter declaration starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
@@ -164,6 +169,21 @@
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "i" \0a\0aResidual stack trace follows:\0aQuant Bound starting at line 2, column 9.\0aQuantified form starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == \\A i\0a====\0a'))
 ::
+++  test-b-c-instance-bare
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "INSTANCE ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE\0a====\0a'))
+::
+++  test-b-c-instance-plus
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "INSTANCE +" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE +\0a====\0a'))
+::
+++  test-b-c-local-bare
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "LOCAL ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aLOCAL\0a====\0a'))
+::
 ++  test-b-c-setofall-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "i" \0a\0aResidual stack trace follows:\0aQuant Bound starting at line 2, column 11.\0aSome { } form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0a\0a%%'
@@ -173,6 +193,16 @@
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token ":" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aField Set starting at line 2, column 14.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a : S, b :\0a====\0a'))
+::
+++  test-b-c-theorem-bare
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "THEOREM ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM\0a====\0a'))
+::
+++  test-b-c-thm-body-inc
+  %+  expect-eq
+    !>  'ACCEPT'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM x\0a====\0a'))
 ::
 ++  test-b-c-vardecl-inc
   %+  expect-eq
