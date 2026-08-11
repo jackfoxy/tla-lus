@@ -1636,3 +1636,20 @@ VERIFIED: new byte-exact golden `desk/test-data/sem/thmreflvl` (`lvl {MODULE,Bar
 lp={c} lc={c<=2}`); full `-test /tests/lib/sem` `ok=%.y`, 104→105, no regression on the
 theorem goldens (thms/thmscope/thmsel/thmap) or the module-line constraint aggregation.
 This is the item .4.1's `thmscope` golden was kept constant-free to avoid.
+
+### R1.3.5.5.3 — $APSubstIn substituted-constant discharge (SHIP-VERIFIED, NO code change, 2026-08-11)
+
+Fresh measurement: the substituted-constant discharge is ALREADY correct — the `.4.1`/`.5.0`
+note (`INSTANCE B WITH c<-0` renders `lc={c<=2}`) did **not** reproduce. `+l-substin`'s `lc2`
+maps each body constraint keyed by a substituted param to the substituting expression's level
+params (`sub-r(si).lp`); `c <- 0` substitutes `c` with a `num` whose lp is empty, so the `c`
+constraint drops. The `lc={c<=2}` seen at .4.1 was the **own-theorem-ref inheritance** bug
+(`Baz == Thm`, Thm imported) fixed by **R1.3.5.5.2**'s pre-seed — `Baz` now inherits `Thm`'s
+already-discharged oplev (empty), not a stale/undischarged one.
+
+VERIFIED (all all-empty LEVELS, matching oracle): new goldens `desk/test-data/sem/apsubdis`
+(theorem / `$APSubstIn`: `INSTANCE B WITH c<-0` over B `THEOREM Thm == c=1` / `Baz == Thm`) +
+`subdis` (def / `$SubstIn`: B `Use == c=1` / `Baz == Use`); the full .4.1 spec (thmscope's
+Foo/Bar/Qux + this instance) also passes (tested, then dropped as redundant with thmscope).
+gen-sem 105→107, full `-test /tests/lib/sem` `ok=%.y`, no regression. No code change; the two
+goldens lock the discharge for both substin kinds.

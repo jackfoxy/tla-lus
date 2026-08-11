@@ -5,6 +5,39 @@
 /=  semantic  /lib/semantic
 |%
 ::
+++  test-sem-apsubdis
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Baz arity=0 local=n L0 3.1-3.10'
+        '    apply Thm opkind=ThmOrAssumpDefKind L0 3.8-3.10'
+        '  thmdef Thm local=n L0 2.1-2.22'
+        '    apsubstin subs=1 L0 2.1-2.22'
+        '      sub c <-'
+        '        num 0 L0 2.22-2.22'
+        '      in'
+        '        apply = opkind=BuiltInKind L0 3.16-3.20'
+        '          apply c opkind=ConstantDeclKind L0 3.16-3.16'
+        '          num 1 L0 3.20-3.20'
+        '  instance module=B local=n L0 2.1-2.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Baz L0'
+        'lvl Thm L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aINSTANCE B WITH c <- 0\0aBaz == Thm\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c\0aTHEOREM Thm == c = 1\0a====\0a'
+  ==
+::
 ++  test-sem-apsubst
   %+  expect-eq
     !>  ^-  wain
@@ -3422,6 +3455,39 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+  ==
+::
+++  test-sem-subdis
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Use arity=0 local=n L0 2.1-2.22'
+        '    substin subs=1 L0 2.1-2.22'
+        '      sub c <-'
+        '        num 0 L0 2.22-2.22'
+        '      in'
+        '        apply = opkind=BuiltInKind L0 3.8-3.12'
+        '          apply c opkind=ConstantDeclKind L0 3.8-3.8'
+        '          num 1 L0 3.12-3.12'
+        '  def Baz arity=0 local=n L0 3.1-3.10'
+        '    apply Use opkind=UserDefinedOpKind L0 3.8-3.10'
+        '  instance module=B local=n L0 2.1-2.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Use L0'
+        'lvl Baz L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aINSTANCE B WITH c <- 0\0aBaz == Use\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT c\0aUse == c = 1\0a====\0a'
   ==
 ::
 ++  test-sem-thmap
