@@ -2503,6 +2503,44 @@
   =/  lvl  ?~(body 0 (expr-level u.body c))
   [[nm | lvl (span-of:ast u) r.gb] ds.gb]
 ::
+++  hide-facts
+  ::  the fact nodes of a USE/HIDE unit: the %node kids ahead of the
+  ::  DEF(S) keyword (facts precede the optional `DEF targets` list)
+  |=  kids=(list node)
+  ^-  (list node)
+  =|  out=(list node)
+  |-  ^-  (list node)
+  ?~  kids  (flop out)
+  =/  k  i.kids
+  ?:  &(?=(%leaf -.k) =(%df (leaf-kind k)))  (flop out)
+  ?:  ?=(%node -.k)  $(kids t.kids, out [k out])
+  $(kids t.kids)
+::
+++  g-usehide
+  ::  a USE/HIDE unit contributes no graph node (SANY's SemDump projects
+  ::  neither). A HIDE's facts must each name a theorem, assumption, or
+  ::  proof step: a fact that resolves to an OpApplNode whose operator is
+  ::  not a ThmOrAssumpDef draws EC 4357 (UseOrHideNode.validate; USE
+  ::  facts are unchecked). R1.3.5.4.3
+  |=  [u=node c=ctx]
+  ^-  (list sdiag)
+  =/  kids  (kids-of u)
+  ?~  kids  ~
+  ?.  &(?=(%leaf -.i.kids) =('HIDE' (leaf-text i.kids)))  ~
+  %-  zing
+  %+  turn  (hide-facts t.kids)
+  |=  f=node
+  ^-  (list sdiag)
+  =/  g  (g-x f c)
+  =/  bad
+    ?~  r.g  ~
+    ?.  ?=(%apply -.u.r.g)  ~
+    ?:  =(%thm-assump kind.op.u.r.g)  ~
+    :_  ~
+    %^    derr  4.357  (span-of:ast f)
+    "The only expression allowed as a fact in a HIDE is "
+  (weld ds.g bad)
+::
 ++  g-instance
   ::  an INSTANCE unit: one imported definition per (non-local) operator
   ::  defined in the instanced module, its body wrapped in $substin over
@@ -3129,6 +3167,10 @@
         insts    [inst.gi insts]
         ds       (weld ds ds.gi)
       ==
+    ::  USE/HIDE units contribute no graph node; a HIDE validates its
+    ::  facts (EC 4357), a USE is unchecked (R1.3.5.4.3)
+    ?:  (is-kind u %n-useorhide)
+      $(us t.us, ds (weld ds (g-usehide u c)))
     ?.  ?|  (is-kind u %n-operatordefinition)
             (is-kind u %n-functiondefinition)
         ==

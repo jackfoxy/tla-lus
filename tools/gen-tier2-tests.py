@@ -361,16 +361,23 @@ SUB_BATCH_DIVERGENCES = [
     # so canonicalizing the graph to `-.` breaks arithmetic evaluation.
     # Reconciling the two names is cross-cutting (generator + stdops) → R1.3.5.
     "suite/test52 -> hoon=reject",
+    # etest5 `IF M!Init ...` references a member of a NONEXISTENT module M;
+    # SANY rejects (EC 4200 `Unknown operator: Init` at the selector), the port
+    # under-rejects (`M!Init` resolves to the local `Init` def, ignoring the
+    # unknown instance prefix) and accepts. PRE-EXISTING (accepts on 624cae35,
+    # before R1.3.5.4) — a nonexistent-module member-ref gap surfaced by the
+    # R1.3.5.4 tier2-sub run, NOT introduced by it; not `!`-nav/proof. → R1.3.6.
+    "suite/etest5 -> hoon=accept",
     # suite/test203 closed by R1.3.3.1: `foo(n) == INSTANCE M WITH A <- g,
     # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
     # early by the parametrized-parameter fix.
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
     "suite/test206 -> hoon=reject",
-    # test214 is NOT a plain conformance edge: rejecting `HIDE bar, TRUE`
-    # (EC 4357) needs USE/HIDE proof-fact validation + theorem-name scoping —
-    # proof-step infrastructure (BY/QED bodies), reassigned to R1.3.5.
-    "suite/test214 -> hoon=accept",
-    "suite/test216 -> hoon=reject",
+    # test214 + test216 CLOSED by R1.3.5.4 (theorem-name scoping + USE/HIDE
+    # EC 4357 fact validation): test216 now accepts (bare `Thm1`/`Thm2` refs
+    # resolve as ThmOrAssumpDefKind, .4.1); test214 now rejects with exactly
+    # EC 4357 on `HIDE bar, TRUE` (.4.3). Proofs walk clean without projection
+    # (.4.2, SemDump renders getTheorem() only).
     # test217 is the OTHER direction (hoon=accept / java=reject): a
     # parametrized-instance MEMBER APPLICATION `I(x')!Foo` — the instance-element
     # arg `x'` (action level) must be APPLIED to the member `I!Foo` (SANY: a
@@ -382,15 +389,15 @@ SUB_BATCH_DIVERGENCES = [
     # test219a CLOSED by R1.3.5.3 (`!`-subexpression navigation): label refs,
     # structural/@/op-symbol selectors, and the unbounded-CHOOSE fix (.3.7).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
-    # test206/test216/test219 STILL diverge, but NOT on `!`-nav (that mechanism
-    # is complete — test219a accepts): the residuals are separate gaps ->
+    # test216 CLOSED by R1.3.5.4.1 (bare THEOREM-name refs `Thm1`/`Thm2` now
+    # resolve as ThmOrAssumpDefKind). test206/test219 STILL diverge, but NOT on
+    # `!`-nav (that mechanism is complete — test219a accepts): the residuals are
+    # separate gaps ->
     #   test206: parametrized-instance member application arity
     #            `Inst2(COp!@!++)!Foo(1,2,3,4,5)` (the instance-param arg is not
     #            counted; EC 4204) — R1.3.3 instance-member follow-up.
     #   test219: same class, x18 (`I(x)!OOp2`, `L!Inst2!Foo`, ... EC 4204) —
     #            parametrized/nested-instance member arity, R1.3.3 follow-up.
-    #   test216: bare THEOREM-name references used as operators (`Thm1`, `Thm2`;
-    #            EC 4200) — theorem-name scoping, the same gap as test214.
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
@@ -403,18 +410,16 @@ SUB_BATCH_REASONS = {
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
     # gh1134/MultiUser + gh1134/SingleUser closed by R1.3.3.1 (parametrized-
     # instance parameter scope + nested-instance member `M!Op(..)`).
-    # test216 is NOT a temporal-under-instance gap (that already works); it
-    # fails at PARSE on `!`-subexpression selectors (`Thm1!:`/`!<<`/`!2!1`),
-    # the unit-3 `!`-nav residue → R1.3.5.
-    "suite/test216": "bare THEOREM-name refs used as operators (`Thm1`/`Thm2`, EC 4200) — theorem-name scoping, R1.3.3/test214 follow-up (`!`-nav done, R1.3.5.3)",
+    # test216 closed by R1.3.5.4.1 (theorem-name scoping).
     "suite/test217": "parametrized-instance member application `I(x')!Foo` — the instance-element arg is dropped, so the level error is under-checked (hoon=accept vs java=reject) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)",
     # test43 closed by R1.3.2.3 (SortSeq with built-in `<`/`>`/`\leq` op-args).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
     # R1.3.4 closed test7/test9/test16 (tuple binders in subset-of/set-of-all/
     # CHOOSE), test23 (LOCAL defs), etest16 (dup record fields, EC 4262).
-    # test214 (proof HIDE facts) + test52 (unary-minus `-`/`-.` naming) → R1.3.5.
-    "suite/test214": "USE/HIDE proof-fact validation, EC 4357 (proof steps; R1.3.5)",
+    # test214 closed by R1.3.5.4.3 (USE/HIDE EC 4357). test52 (unary-minus
+    # `-`/`-.` naming) → R1.3.5.
     "suite/test52": "prefix operator param `-._` — unary-minus `-`/`-.` naming (R1.3.5)",
+    "suite/etest5": "`M!Init` member of a nonexistent module M — port resolves to the local `Init` def and under-rejects (SANY: EC 4200 Unknown operator); pre-existing (before R1.3.5.4), not `!`-nav/proof → R1.3.6",
     # test206/test219a are NOT the "\E/SUBSET under substitution" gap the plan
     # expected — that already works; both fail on labels / `!`-subexpression
     # selectors (test206 at PARSE, test219a on `Op!lab`), the R1.3.5 residue.

@@ -336,11 +336,18 @@ membership, arity, level, body, or the accept/reject verdict. The R1.3.3 sem
 goldens use single-imported-definition instances to stay byte-exact; a
 multi-def-instance golden, if wanted, would canonicalize both sides.
 
-**Residue (R1.3.5).** Four census specs (`suite/test206`, `suite/test216`,
-`suite/test219`, `suite/test219a`) remain divergent — each blocked at the
-**parser** or on a **label / `!`-subexpression selector** (`Thm1!:`,
-`Op!lab`, `COp!@!++`, `!<<`/`!2!1`), the unit-3 subexpression-navigation
-feature tracked under R1.3.5, not on any substitution/temporal edge.
+**Residue (R1.3.5).** After R1.3.5.1–.4, four census specs remain divergent:
+`suite/test52` (prefix-`-._` / unary-minus `-`→`-.` naming reconciled with the
+evaluator's StandardModule registry), `suite/test206` + `suite/test219`
+(parametrized/nested-instance member-application arity `Inst2(COp!@!++)!Foo(..)`
+— the instance-param arg is uncounted, EC 4204), and `suite/test217` (the same
+gap's level-error variant — the instance-element arg `x'` is dropped so the
+level error under-checks, hoon=accept). R1.3.5.3 closed `test219a` (`!`-sub­
+expression navigation: labels, structural/`@`/op-symbol selectors, unbounded
+`CHOOSE`); R1.3.5.4 closed `test216` (bare THEOREM-name scoping →
+`ThmOrAssumpDefKind`) and `test214` (USE/HIDE fact validation, EC 4357). The
+four remaining are the R1.3.3 instance-member-arity follow-ups plus the
+unary-minus naming — not `!`-nav or proof.
 
 ## Unit 7 (B6) — Safety model checking parity
 

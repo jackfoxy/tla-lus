@@ -566,6 +566,31 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aFac[n \\in Nat] == n\0a====\0a'
   ==
 ::
+++  test-sem-hidefact
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  thmdef Foo local=n L-1 2.1-2.19'
+        '    apply TRUE opkind=BuiltInKind L-1 2.16-2.19'
+        '  theorem name=Foo L-1 2.1-2.19'
+        '    apply TRUE opkind=BuiltInKind L-1 2.16-2.19'
+        'DIAGS'
+        'D 4357 ERROR 3.11-3.14 The only expression allowed as a fact in a HIDE is'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Foo L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aTHEOREM Foo == TRUE\0aHIDE Foo, TRUE\0a====\0a'
+  ==
+::
 ++  test-sem-ho273
   %+  expect-eq
     !>  ^-  wain

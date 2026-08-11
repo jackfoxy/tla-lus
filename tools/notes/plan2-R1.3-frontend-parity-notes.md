@@ -1476,3 +1476,74 @@ unflagged — matching the oracle). Probe removed.
 Consequence for .3: the ONLY work to flip test214 is walking the TOP-LEVEL `n-useorhide`
 units in `+gen-module` + the EC 4357 HIDE-fact check. The proof steps are irrelevant to the
 4357 (USE facts are unchecked; proof-step facts are never reached). Census NOT edited.
+
+### R1.3.5.4.3 — USE/HIDE fact validation, EC 4357 (SHIP-VERIFIED build 619, 2026-08-10)
+
+**test214 flips hoon=accept → hoon=reject with EXACTLY one EC 4357 @ 10.11-10.14** — the
+census target. Mechanism, all in `semantic.hoon`:
+
+- **`+hide-facts`** (new): the fact nodes of a USE/HIDE unit = the `%node` kids ahead of the
+  `%df` (DEF/DEFS) keyword leaf (facts precede the optional `DEF targets` list; comma/kw are
+  leaves, skipped).
+- **`+g-usehide`** (new): returns `(list sdiag)`, no graph node (SANY projects neither USE
+  nor HIDE). Fires only when the first kid is the `HIDE` keyword leaf. Each fact is resolved
+  via `+g-x`; if the result is an `%apply` whose `kind.op` ≠ `%thm-assump`, emit
+  `derr 4.357 (span-of f) "The only expression allowed as a fact in a HIDE is "` (trailing
+  space — SANY's first-line message; the `\nthe name of…` continuation is dropped by the
+  first-line normalization both sides share). A ThmOrAssumpDef-named fact (`bar`, scoped by
+  .1) passes; a builtin OpAppl (`TRUE`) is flagged; a non-`%apply` fact (a literal) is not
+  flagged (SANY guards on `OpApplKind`). `g-x`'s own resolution diagnostics are threaded too
+  (empty for test214's `bar`/`TRUE`). USE units are skipped (facts unchecked).
+- **`+gen-module` walk**: new arm `?: (is-kind u %n-useorhide) $(us t.us, ds (weld ds
+  (g-usehide u c)))` ahead of the def/function filter (the walk's `c` is the full-ctx, so
+  `bar` resolves to `%thm-assump` from .1).
+
+VERIFIED: probe on real test214 → `verdict=%reject sem-diags=1`, the single diag
+`code=4.357 at=10.11-10.14 msg='The only expression allowed as a fact in a HIDE is '` —
+byte-identical to the oracle `D 4357 ERROR 10.11-10.14 …`. The 3 non-HIDE (*ERROR*)s stay
+unflagged (USE facts + proof-step USE are never checked). Probe removed. New byte-exact sem
+golden `desk/test-data/sem/hidefact/A.tla` (`THEOREM Foo == TRUE` / `HIDE Foo, TRUE` → Foo
+OK, TRUE → 4357; dump header `ACCEPT` + DIAGS, per `SemDump`). gen-sem 102→103, full
+`-test /tests/lib/sem` `ok=%.y` no regression — pfthm's `HIDE Bar` (Bar a theorem) correctly
+draws no 4357. Census NOT edited (flip is the .4 close-out); test214 stays hoon=accept in
+`SUB_BATCH_DIVERGENCES`, mechanism-verified as reject.
+
+### R1.3.5.4.4 — R1.3.5.4 close-out (census flip + ledger, 2026-08-10)
+
+Census flip for the two R1.3.5.4 targets, plus a discovered pre-existing divergence.
+
+- **Census:** removed `suite/test214` + `suite/test216` from `SUB_BATCH_DIVERGENCES`/
+  `SUB_BATCH_REASONS` (`gen-tier2-tests.py`); `gen-tier2-tests.py` regenerated the shards;
+  `tier2.py --check` byte-reproducible. Ship-run (full suite) **sub-4 OK** — test214 now
+  rejects (EC 4357), test216 now accepts, both agree with the pinned Java.
+- **Discovered pre-existing divergence — `suite/etest5`.** The .4 tier2-sub run surfaced
+  `sub-3` failing on `suite/etest5` (`IF M!Init …`, a member of a NONEXISTENT module M):
+  hoon **accepts** (0 diags), SANY **rejects** (`D 4200 Unknown operator: Init` at the
+  selector span). **Proved PRE-EXISTING**: deploying `624cae35` (R1.3.5.3.7, before .4) and
+  probing → still `%accept`. etest5 was never in the census (0 hits in the pre-.4
+  divergences), so `sub-3` had been silently red since before .4; the §R1.3.5.3.7 "only
+  sub-5 fails" note was unverified (no full tier2-sub run there). Root: `M!Init` isn't in
+  ctx, falls to the selector resolver, and resolves to the local `Init` def ignoring the
+  unknown instance prefix → under-rejects. NOT `!`-nav/proof, NOT introduced by .4 —
+  **added to the census** (`suite/etest5 -> hoon=accept`) with an R1.3.6 pointer, so the
+  census is truthful and `sub-3` is accounted for. Divergences 4→5 (290/295 agree).
+- **Sole remaining tier2-sub failure: `sub-5` / `suite/test52`** — the R1.3.5.1 unary-minus
+  fix flipped test52 to hoon=accept (== Java), but its census removal is one of the six
+  entries the parent plan explicitly defers to **R1.3.5.8** (and R1.3.5.3-plan's verification
+  section already notes "the full suite's ok=%.n will carry the R1.3.5.1 test52 sub-5 flip
+  until the R1.3.5.8 census close-out"). So the full suite stays `ok=%.n` solely from this
+  documented deferral; every other arm (incl. sub-3 etest5 now tracked, sub-4 test214/216)
+  is green.
+- **Ledger/docs:** `parity-manifest.md` `semantic-graph` residual advanced (theorem-name
+  scoping + USE/HIDE EC 4357 + BY/QED proofs-walk-clean now listed done; EC 4204 instance-
+  member arity + level-constraint propagation + hash-order + wider projection remain, still
+  `partial`); `compatibility.md` R1.3.5 residue rewritten to the current four census specs
+  (test52/206/217/219) + the etest5 discovery, noting R1.3.5.3 closed test219a and R1.3.5.4
+  closed test214/test216. `tier2.py` description 289→290/295. port-map R1.3.5 row deferred
+  to the R1.3.5 close-out (.8, which owns full census reconciliation incl. test52).
+
+R1.3.5.4 COMPLETE: test214 (EC 4357 reject) + test216 (accept) closed and ship-verified;
+mechanism = theorem-name scoping (.4.1) + proofs walk clean/no projection (.4.2) + USE/HIDE
+fact validation (.4.3); no regression (etest5 pre-existing). Remaining R1.3.5 census
+residue (test52/206/217/219/etest5) is R1.3.3-arity + unary-minus + nonexistent-module,
+none owned by R1.3.5.4.
