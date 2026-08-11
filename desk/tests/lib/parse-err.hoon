@@ -144,6 +144,11 @@
     !>  'REJECT\0a***Parse Error***\0aWas expecting "Identifier, _ or prefix op"\0aEncountered "====" at line 3, column 1 and token "," \0a\0aResidual stack trace follows:\0aConstant declaration items starting at line 3, column 1.\0aParameter declaration starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aCONSTANT a,\0a====\0a'))
 ::
+++  test-b-c-defnst-sub-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Expression or Op. Symbol"\0aEncountered "====" at line 3, column 1 and token "<-" \0a\0aResidual stack trace follows:\0aSubstitution starting at line 2, column 24.\0aNonLocalInstance starting at line 2, column 8.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aFoo == INSTANCE M WITH a <-\0a====\0a'))
+::
 ++  test-b-c-except-bang
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "!" \0a\0aResidual stack trace follows:\0aExcept Component starting at line 3, column 1.\0aExcept Spec starting at line 2, column 16.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
@@ -168,6 +173,16 @@
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "i" \0a\0aResidual stack trace follows:\0aQuant Bound starting at line 2, column 9.\0aQuantified form starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == \\A i\0a====\0a'))
+::
+++  test-b-c-inst-sub-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Expression or Op. Symbol"\0aEncountered "====" at line 3, column 1 and token "<-" \0a\0aResidual stack trace follows:\0aSubstitution starting at line 2, column 17.\0aNonLocalInstance starting at line 2, column 1.\0aInstance starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE M WITH a <-\0a====\0a'))
+::
+++  test-b-c-inst-sub2-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Expression or Op. Symbol"\0aEncountered "====" at line 3, column 1 and token "<-" \0a\0aResidual stack trace follows:\0aSubstitution starting at line 2, column 25.\0aNonLocalInstance starting at line 2, column 1.\0aInstance starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE M WITH a <- 1, b <-\0a====\0a'))
 ::
 ++  test-b-c-instance-bare
   %+  expect-eq

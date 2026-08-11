@@ -3232,6 +3232,12 @@
   =.  s  (advance s)
   =/  ar  (eat s %substitute)
   ?:  ?=(%| -.ar)  [%| p.ar]
+  ::  a bare `<-` at the body end reports the missing RHS at the
+  ::  Substitution level with `Expression or Op. Symbol`, rather than
+  ::  entering the Expression production (SANY; R1.3.5.6.4)
+  =/  rpk  (peek s.p.ar)
+  ?:  ?|(?=(~ rpk) =(%end-module kind.u.rpk))
+    [%| (perr-enc (set-exp s.p.ar 'Expression or Op. Symbol') 1)]
   =/  er  (expression s.p.ar)
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&

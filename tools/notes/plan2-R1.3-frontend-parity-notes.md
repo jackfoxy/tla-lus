@@ -1819,3 +1819,33 @@ the expecting. This blocks the instance-sub fixtures even though their Substitut
 NonLocalInstance/Instance bpa entries are correct + already in the stack. Contrast `x == 1 +`
 (expression STARTED, mid-expr failure) which matches — so the fix is guarding the empty-start
 case at expression entry. (2) proof productions `Proof`/`Step`/`UseOrHideOrBy`.
+
+### R1.3.5.6.4 — expression-entry (partial) + remaining long-tail (SHIP-VERIFIED, 2026-08-11)
+
+**(a) Expression-entry divergence — resolved TARGETED, not global.** A global guard at
+`+expression` entry (`?~ pk0 || %end-module → report at caller without pushing Expression/
+ExtendableExpr`) REGRESSED the .6.1 field/except goldens + a corpus original: SANY
+**context-dependently** enters the Expression production — a record Field Value / Except
+Component RHS at `====` DOES push `ExtendableExpr`/`Expression` (their goldens have it), but a
+Substitution RHS does NOT (reports at the Substitution level). So the guard must be per-caller.
+Reverted the global guard; added it ONLY in `+substitution`: after `<-`, if the next token is
+`%end-module`/EOF, `[%| (perr-enc (set-exp s 'Expression or Op. Symbol') 1)]` at the
+Substitution level. Closes the instance-sub cases (their `Substitution`/`NonLocalInstance`/
+`Instance` bpa entries from .6.3 were already correct): c-inst-sub-inc / c-inst-sub2-inc /
+c-defnst-sub-inc byte-exact, 49→52 goldens, no regression.
+
+**REMAINING (the .6-parse-errors long tail, not done):**
+- (b) proof `+bpa` entries `Proof` (proof-prod @ the proof-start), `Step` (step-prod/qed-step
+  @ each step), `UseOrHideOrBy` (use-hide-by @ BY/USE/HIDE) — measured stacks (`THEOREM x==1
+  PROOF <1>1` → Step 2.22/Proof 2.16/Theorem 2.1; `... OBVIOUS BY` → UseOrHideOrBy 2.16/Proof
+  2.16/Theorem 2.1); the proof-prod machinery is plv-wrapped with step-list/qed/terminal
+  branches, so pushes+pops need care.
+- (c) per-production recovery points (`f[x \in S] ==` — SANY expects `==== or more Module
+  body` at `f`, the port parses it as a def and fails later).
+- (d) EXHAUSTIVE sweep: a boundary fixture per remaining grammar production + fix straggler
+  byte-diffs — this is the bulk of the ledger's "~100 expecting sites" and the gate for the
+  .6.5 `parse-errors partial→parity` flip.
+
+parse-errors ledger now covers: expression + declaration stack productions (.6.1),
+keyword-unit routing + maxSize echo (.6.2/.6.3), instance stack + substitution-RHS (.6.3/.6.4a)
+— still `partial` pending (b)/(c)/(d).
