@@ -386,18 +386,31 @@ membership, arity, level, body, or the accept/reject verdict. The R1.3.3 sem
 goldens use single-imported-definition instances to stay byte-exact; a
 multi-def-instance golden, if wanted, would canonicalize both sides.
 
-**Residue (R1.3.5).** After R1.3.5.1–.4, four census specs remain divergent:
-`suite/test52` (prefix-`-._` / unary-minus `-`→`-.` naming reconciled with the
-evaluator's StandardModule registry), `suite/test206` + `suite/test219`
-(parametrized/nested-instance member-application arity `Inst2(COp!@!++)!Foo(..)`
-— the instance-param arg is uncounted, EC 4204), and `suite/test217` (the same
-gap's level-error variant — the instance-element arg `x'` is dropped so the
-level error under-checks, hoon=accept). R1.3.5.3 closed `test219a` (`!`-sub­
-expression navigation: labels, structural/`@`/op-symbol selectors, unbounded
-`CHOOSE`); R1.3.5.4 closed `test216` (bare THEOREM-name scoping →
-`ThmOrAssumpDefKind`) and `test214` (USE/HIDE fact validation, EC 4357). The
-four remaining are the R1.3.3 instance-member-arity follow-ups plus the
-unary-minus naming — not `!`-nav or proof.
+**R1.3.5 close-out (R1.3.5.8).** R1.3.5 is complete across its eight increments:
+.1 prefix/postfix op-args + unary-minus `-`→`-.` reconciliation (`prefixop`), .2/.3
+`!`-subexpression navigation (parse + semantic, `test219a` closed), .4 BY/QED proof
+steps + USE/HIDE fact validation + theorem-name scoping (`test214`/`test216` closed),
+.5 the full `level-constraints` differential (`recinst`/`thmreflvl`/`subdis`,
+`level-constraints → parity`), .6 the `parse-errors` residual sweep (`→ parity`), .7
+the `tlc-output-ec` EC/MP renderer + `tlc-constants` TLAConstants lib (both `→ parity`).
+Four of the five R1.3.5 ledger rows are now `parity`.
+
+Two residuals are **census-tracked and carried to R1.3.6** (neither is R1.3.5's to
+close — both were re-scoped out during the units):
+
+- `suite/test52` — prefix/postfix operators as arguments with `-._`/`^+`/`^*`/`^#`
+  and ASSUME-level evaluation (`Print`, `SUBSET`/`UNION`/`DOMAIN` as op-args). The
+  `prefixop` naming reconciliation landed in R1.3.5.1, but the full accept path is
+  evaluator-level op-arg work beyond the front-end census unit; parked, hoon=reject.
+- `suite/test206`/`test217`/`test219` — parametrized/nested-instance member-application
+  arity (`Inst2(COp!@!++)!Foo(..)`, `I(x')!Foo`, EC 4204): the instance-element/param
+  argument is uncounted, so arity/level under-checks. This is the **R1.3.3
+  instance-member follow-up** and is the sole residual keeping `semantic-graph` at
+  `partial`; not `!`-nav (that mechanism is complete — `test219a` accepts).
+
+Both remain in `tier2/divergences.txt` (census-tracked, so no silent regression); the
+`tier2.py --check` census reproduces byte-identically (290/295 subdir agree). `test52`
+is the sole `-test /=tla-lus=/tests` failure (`tier2-sub/test-sany-sub-5`).
 
 ## Unit 7 (B6) — Safety model checking parity
 

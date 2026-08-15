@@ -2136,3 +2136,18 @@ R1.3.5-plan.md: R1.3.5.0/.1/.3/.4/.5 (verified done via git log + [[tla-lus-port
 .7; only R1.3.5.8 (census close-out incl. deferred test52) remains. Notes §R1.3.5.7.0–.4.
 NEXT: R1.3.5.8 (delete the 6 closed census entries, regen tier2, flip remaining ledger rows,
 resolve/park test52; full suite + tier2 green).
+
+### R1.3.5.8 — census/docs close-out (2026-08-15)
+
+= UNIT R1.3.5 COMPLETE (.0–.8). Census/docs close-out, no new feature work (feature residuals
+belong to other units). The 3 closed census specs (test214/216/219a) are already out of
+`SUB_BATCH_DIVERGENCES`; `tier2.py --check` reproduces byte-identically (290/295 subdir agree).
+Ledger: level-constraints/parse-errors/tlc-output-ec/tlc-constants at `parity` (.5/.6/.7);
+`semantic-graph` stays `partial` — its sole residual (EC 4204 instance-member arity,
+test206/217/219) is a R1.3.3 follow-up carried to R1.3.6, not R1.3.5's. `suite/test52`
+(prefix/postfix op-args + ASSUME-eval) parked, census-tracked, sole `-test` failure. Rewrote
+compatibility.md "R1.3.5 close-out". Marked R1.3.5-plan.md .0–.8 all ✅.
+
+Also marked the parent `~/FoxyLabs/tla-lus/R1.3-R1.5-plan.md`: R1.5.0–.7 and R1.3.0–.5 all ✅
+(committed increments per git log); only **R1.3.6** (front-end SANY census close-out) remains —
+blocked on the same test52 + EC 4204 residuals. NEXT (project): R1.3.6.
