@@ -1944,3 +1944,34 @@ box/diamond subscripts + LAMBDA×2. Three fixes:
 
 Both/all byte-exact; parse-err 79/79 `ok=%.y`; `tests/lib/syntax` CST green; no existing golden
 changed bytes (fairness.tla `WF_3` preserved). NEXT: R1.3.5.6.4.4 (module-level + proof/theorem).
+
+### R1.3.5.6.4.4 — module-level + proof/theorem (SHIP-VERIFIED, 2026-08-14)
+
+8 fixtures: RECURSIVE, EXTENDS, `THEOREM a PROVE`, `INSTANCE M WITH`, `THEOREM x==1 PROOF
+<1>1`, `... OBVIOUS BY`, `... PROOF`, `THEOREM ASSUME x PROVE`. (USE/HIDE/`... BY` alone all
+ACCEPT -- no error fixture.) 79→87 goldens. Differential: EXTENDS / THEOREM-PROVE /
+INSTANCE-WITH already byte-exact (the last via .6.4a subst-RHS guard); **6 diverged** = the
+plan's RECURSIVE + proof trio + ASSUME-PROVE. All were MISSING residual-stack frames (the
+deferred proof bpa work); fixes push+pop the SANY production frames:
+
+- **recursive-prod**: push `Recursive` at entry + `Constant declaration items` per item
+  (mirrors const-decl's `Parameter declaration`/items), pop each via epa + `(epa s)` on success.
+- **assume-prove**: push `Assume-Prove` (at the ASSUME, after the label branch), pop via stk0.
+- **proof-prod**: push `Proof` at entry, single `(epa s)` on the sole success return.
+- **step-prod**: push `Step` at entry (stk0 save), pop on all 3 success returns; NEW body guard
+  in the assert-step arm -- no SUFFICES and a body token that starts neither AssumeProve nor an
+  expression => `[%| (perr-enc (set-exp s 'proof step') 1)]` without entering Expression.
+- **step-start**: `set-exp 'Step number'` at entry (the missing-step-number expectation).
+- **use-hide-by**: push `UseOrHideOrBy` at entry (stk0 save), pop on both success returns.
+
+`OBVIOUS BY` routes through proof-prod's k2=BY branch into use-hide-by, which rejects OBVIOUS
+(not by/use/hide) -- now with Proof+UseOrHideOrBy frames. All frame pushes are error-path-only:
+valid proofs/theorems restore stk0 on success (CST green, incl. proof specs).
+
+**DEFERRED to .5**: `RECURSIVE f(` -- a genuine recovery-point (SANY multi-token echo `( ====`
+@2.12, unwinds to just Module definition); belongs with the .5 recovery-point sweep, not a
+frame fix. 
+
+parse-err 87/87 `ok=%.y`; `tests/lib/syntax` CST green; no existing golden changed bytes.
+NEXT: R1.3.5.6.4.5 (recovery-points incl. `RECURSIVE f(`/`f[x\in S]==` + exhaustive completion
++ parse-errors partial→parity close-out).

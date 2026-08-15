@@ -139,6 +139,11 @@
     !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "ASSUME ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aASSUME\0a====\0a'))
 ::
+++  test-b-c-assume-prove
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "PROVE" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aAssume-Prove starting at line 2, column 9.\0aTheorem starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM ASSUME x PROVE\0a====\0a'))
+::
 ++  test-b-c-box-sub-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "]_" \0a\0aResidual stack trace follows:\0arestricted form of expression starting at line 3, column 1.\0aSome [] Form starting at line 2, column 8.\0aExtendableExpr starting at line 2, column 8.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0a\0a%%'
@@ -219,6 +224,11 @@
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "\\\\E" \0a\0aResidual stack trace follows:\0aQuantified form starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == \\E\0a====\0a'))
 ::
+++  test-b-c-extends-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Identifier"\0aEncountered "====" at line 3, column 1 and token "EXTENDS" \0a\0aResidual stack trace follows:\0aExtends starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aEXTENDS\0a====\0a'))
+::
 ++  test-b-c-fcnconstr-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "|->" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
@@ -274,6 +284,11 @@
     !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "INSTANCE +" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE +\0a====\0a'))
 ::
+++  test-b-c-instance-with
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "WITH" \0a\0aResidual stack trace follows:\0aSubstitution starting at line 3, column 1.\0aNonLocalInstance starting at line 2, column 1.\0aInstance starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aINSTANCE M WITH\0a====\0a'))
+::
 ++  test-b-c-lambda-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aWas expecting "Expression or Instance"\0aEncountered "LAMBDA" at line 2, column 6 and token "==" \0a\0aResidual stack trace follows:\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
@@ -294,10 +309,30 @@
     !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "LOCAL ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aLOCAL\0a====\0a'))
 ::
+++  test-b-c-obvious-by
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "OBVIOUS" at line 2, column 16 and token "1" \0a\0aResidual stack trace follows:\0aUseOrHideOrBy starting at line 2, column 16.\0aProof starting at line 2, column 16.\0aTheorem starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM x == 1 OBVIOUS BY\0a====\0a'))
+::
+++  test-b-c-proof-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Step number"\0aEncountered "====" at line 3, column 1 and token "PROOF" \0a\0aResidual stack trace follows:\0aStep starting at line 3, column 1.\0aProof starting at line 2, column 16.\0aTheorem starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM x == 1 PROOF\0a====\0a'))
+::
+++  test-b-c-proof-step
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "proof step"\0aEncountered "====" at line 3, column 1 and token "<1>1" \0a\0aResidual stack trace follows:\0aStep starting at line 2, column 22.\0aProof starting at line 2, column 16.\0aTheorem starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM x == 1 PROOF <1>1\0a====\0a'))
+::
 ++  test-b-c-record-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "1" \0a\0aResidual stack trace follows:\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a |-> 1\0a====\0a'))
+::
+++  test-b-c-recursive-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "Identifier, _ or prefix op"\0aEncountered "====" at line 3, column 1 and token "RECURSIVE" \0a\0aResidual stack trace follows:\0aConstant declaration items starting at line 3, column 1.\0aRecursive starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aRECURSIVE\0a====\0a'))
 ::
 ++  test-b-c-setof-filter
   %+  expect-eq
@@ -328,6 +363,11 @@
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "THEOREM ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM\0a====\0a'))
+::
+++  test-b-c-theorem-prove
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "==== or more Module body"\0aEncountered "PROVE" at line 2, column 11 and token "a" \0a\0aResidual stack trace follows:\0aModule definition starting at line 1, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM a PROVE\0a====\0a'))
 ::
 ++  test-b-c-thm-body-inc
   %+  expect-eq

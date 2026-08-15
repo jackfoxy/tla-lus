@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "OBVIOUS" at line 2, column 16 and token "1" 
+
+Residual stack trace follows:
+UseOrHideOrBy starting at line 2, column 16.
+Proof starting at line 2, column 16.
+Theorem starting at line 2, column 1.
+Module body starting at line 2, column 1.
+Module definition starting at line 1, column 1.
+
+%%

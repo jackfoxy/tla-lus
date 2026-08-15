@@ -1,0 +1,3 @@
+---- MODULE t ----
+THEOREM ASSUME x PROVE
+====

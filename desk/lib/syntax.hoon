@@ -2660,6 +2660,9 @@
   |=  s=pst
   ^-  (pres node)
   =.  plv.s  [~ plv.s]
+  ::  SANY's Proof production (residual stack, at the proof start); popped
+  ::  on success (R1.3.5.6.4.4)
+  =.  s  (bpa s 'Proof')
   =/  res
     ^-  (pres node)
     =/  k1  (peek s)
@@ -2708,12 +2711,14 @@
   ?:  ?=(%| -.res)  res
   =.  s  s.p.res
   =.  plv.s  ?~(plv.s ~ t.plv.s)
-  [%& v.p.res s]
+  [%& v.p.res (epa s)]
 ::
 ++  step-start
   ::  consume a step token: level check + canonical image
   |=  s=pst
   ^-  (each [n=node tok=token s=pst] @t)
+  ::  SANY expects a `Step number` here (R1.3.5.6.4.4)
+  =.  s  (set-exp s 'Step number')
   =/  pk  (peek s)
   ?~  pk  [%| (perr-enc s 1)]
   ?.  (~(has in step-kinds) kind.u.pk)
@@ -2783,9 +2788,12 @@
   ==
 ::
 ++  step-prod
-  ::  Step(): step number + body + optional proof
+  ::  Step(): step number + body + optional proof.  SANY's Step production
+  ::  (residual stack, at the step number); popped on success (R1.3.5.6.4.4)
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'Step')
   =/  st  (step-start s)
   ?:  ?=(%| -.st)  [%| p.st]
   =.  s  s.p.st
@@ -2798,7 +2806,7 @@
     =/  br  (def-step s)
     ?:  ?=(%| -.br)  [%| p.br]
     :-  %&
-    :_  s.p.br
+    :_  s.p.br(stk stk0, exp '')
     (mk-node:ast %n-proofstep ~[n.p.st v.p.br])
   =/  body
     ^-  (pres node)
@@ -2809,6 +2817,18 @@
         `(leaf:ast u.pk)
       =?  s  ?=(^ suf)  (advance s)
       =/  bk  (peek s)
+      ::  no SUFFICES and the body can start neither an AssumeProve nor an
+      ::  expression: SANY reports `proof step` without entering Expression
+      ::  (R1.3.5.6.4.4)
+      ?:  ?&  ?=(~ suf)
+              ?|  ?=(~ bk)
+                  ?&  !=(%assume kind.u.bk)
+                      !=(%boxassume kind.u.bk)
+                      !(expr-start kind.u.bk)
+                  ==
+              ==
+          ==
+        [%| (perr-enc (set-exp s 'proof step') 1)]
       =/  br
         ^-  (pres node)
         ?:  ?&  ?=(^ bk)
@@ -2876,13 +2896,13 @@
     ==
   =/  nx  (peek s)
   ?.  &(?=(^ nx) (begins-proof s u.nx))
-    [%& (mk-node:ast %n-proofstep ~[n.p.st v.p.body]) s]
+    [%& (mk-node:ast %n-proofstep ~[n.p.st v.p.body]) s(stk stk0, exp '')]
   ?.  may2
     [%| (perr-enc s 1)]
   =/  pr  (proof-prod s)
   ?:  ?=(%| -.pr)  [%| p.pr]
   :-  %&
-  :_  s.p.pr
+  :_  s.p.pr(stk stk0, exp '')
   (mk-node:ast %n-proofstep ~[n.p.st v.p.body v.p.pr])
 ::
 ++  def-step
@@ -2949,6 +2969,10 @@
   ::  (MODULE id | expr) list and optional DEF(S) list
   |=  s=pst
   ^-  (pres node)
+  ::  SANY's UseOrHideOrBy production (residual stack, at the proof start);
+  ::  popped on success (R1.3.5.6.4.4)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'UseOrHideOrBy')
   =|  kids=(list node)
   =/  kind=@tas  %n-useorhide
   =/  k1  (peek s)
@@ -2997,7 +3021,7 @@
   ::  DEF(S) section
   =/  dk  (peek s)
   ?.  &(?=(^ dk) =(%df kind.u.dk))
-    [%& (mk-node:ast kind (flop kids)) s]
+    [%& (mk-node:ast kind (flop kids)) s(stk stk0, exp '')]
   =.  kids  [(leaf:ast u.dk) kids]
   =.  s  (advance s)
   |-  ^-  (pres node)
@@ -3007,7 +3031,7 @@
   =.  kids  (welp (flop v.p.tr) kids)
   =/  ck  (peek s)
   ?.  &(?=(^ ck) =(%comma kind.u.ck))
-    [%& (mk-node:ast kind (flop kids)) s]
+    [%& (mk-node:ast kind (flop kids)) s(stk stk0, exp '')]
   =.  kids  [`node`(leaf:ast u.ck) kids]
   $(s (advance s))
 ::
@@ -3052,6 +3076,10 @@
   ?~  kw  [%| (perr-enc s 1)]
   ?.  ?=(?(%assume %boxassume) kind.u.kw)
     [%| (perr-enc s 1)]
+  ::  SANY's Assume-Prove production (residual stack, at the ASSUME);
+  ::  popped on success (R1.3.5.6.4.4)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'Assume-Prove')
   =.  s  (advance s)
   =|  kids=(list node)
   =.  kids  [(leaf:ast u.kw) kids]
@@ -3072,7 +3100,7 @@
   =/  er  (expression (advance s))
   ?:  ?=(%| -.er)  [%| p.er]
   :-  %&
-  :_  s.p.er
+  :_  s.p.er(stk stk0, exp '')
   (mk-node:ast %n-assumeprove (flop [v.p.er kids]))
 ::
 ++  ap-item
@@ -3162,24 +3190,28 @@
   $(t t.t.t)
 ::
 ++  recursive-prod
-  ::  RECURSIVE opdecl (, opdecl)*
+  ::  RECURSIVE opdecl (, opdecl)*.  SANY's Recursive production wraps the
+  ::  whole unit; each item is a Constant declaration items production
+  ::  (residual stack); popped once each item parses (R1.3.5.6.4.4)
   |=  s=pst
   ^-  (pres node)
+  =.  s  (bpa s 'Recursive')
   =/  kr  (eat s %recursive)
   ?:  ?=(%| -.kr)  [%| p.kr]
   =.  s  s.p.kr
   =|  kids=(list node)
   =.  kids  [(leaf:ast v.p.kr) kids]
   |-  ^-  (pres node)
+  =.  s  (bpa s 'Constant declaration items')
   =/  dr  (param-decl s)
   ?:  ?=(%| -.dr)  [%| p.dr]
-  =.  s  s.p.dr
+  =.  s  (epa s.p.dr)
   =.  kids  [v.p.dr kids]
   =/  ck  (peek s)
   ?:  &(?=(^ ck) =(%comma kind.u.ck))
     =.  kids  [(leaf:ast u.ck) kids]
     $(s (advance s))
-  [%& (mk-node:ast %n-recursive (flop kids)) s]
+  [%& (mk-node:ast %n-recursive (flop kids)) (epa s)]
 ::
 ++  op-decl
   ::  ident or ident(_,..,_) as N_IdentDecl
