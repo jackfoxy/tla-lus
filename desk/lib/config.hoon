@@ -3,6 +3,7 @@
 /=  eval  /lib/eval
 /=  sem-lib  /lib/semantic
 /=  k  /lib/constants
+/=  diag  /lib/diagnostics
 |%
 ::  TLC .cfg processing (PORT-COMPLETION-PLAN-2 unit 5).
 ::
@@ -133,23 +134,13 @@
   (lth i.la i.lb)
 ::
 ++  emsg
-  ::  render a CFG_* (5002-5006) message; arg is the keyword or symbol
+  ::  render a CFG_* (5002-5006) message body through the shared MP renderer
+  ::  (+ec-body:diag) -- single source of truth with lib/diagnostics; byte-
+  ::  identical to MP.getMessage0 (R1.3.5.7.3). `arg` is the keyword/symbol
+  ::  (the %2% param; unused by 5002).
   |=  [code=@ud line=@ud arg=@t]
   ^-  @t
-  =/  pre
-    %+  rap  3
-    :~  'TLC found an error in the configuration file at line '
-        (num-cord line)  '\0a'
-    ==
-  ?:  =(code 5.003)
-    (rap 3 ~[pre 'The keyword ' arg ' was not followed by an identifier.'])
-  ?:  =(code 5.004)
-    (rap 3 ~[pre 'The keyword ' arg ' appeared twice.'])
-  ?:  =(code 5.005)
-    (rap 3 ~[pre 'Expected an identifier after ' arg '.'])
-  ?:  =(code 5.006)
-    (rap 3 ~[pre 'It was expecting ' arg ', but did not find it.'])
-  pre
+  (ec-body:diag code ~[(num-cord line) arg])
 ::
 ++  ed  |=([c=@ud l=@ud a=@t] ^-(cfg-diag [c l (emsg c l a)]))
 ::

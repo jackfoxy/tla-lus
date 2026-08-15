@@ -2087,3 +2087,36 @@ nest-fails (cat's first arg is the bloq, not a fold operand). Purely additive to
 (new arms; existing ordering arms + consumers unchanged). tlc-output-ec still `partial` (renderer
 done; engine wiring is .7.3). Notes §R1.3.5.7.2. NEXT: R1.3.5.7.3 (wire check/job/config emit
 sites through +mp-message + the -tool run mode; differential over the mc/safety corpus).
+
+### R1.3.5.7.3 — engine wiring: single renderer + -tool serializer (SHIP-VERIFIED, 2026-08-15)
+
+Two pieces, both low-risk (plain output byte-identical; safety/cfg suites green):
+
+1. **De-dup / single source of truth.** `config.hoon +emsg` (the hand-rolled CFG_* 5002-5006
+   template builder) now routes through `+ec-body:diag` — `(ec-body:diag code ~[(num-cord line)
+   arg])`. Byte-identical to the old inline text (verified: cfg/cfg-val/cfg-runspec green), so
+   the CFG message bodies now come from the same MP mirror as everything else. Added `%5.005`
+   (CFG_EXPECT_ID) to `+ec-body` for completeness.
+
+2. **-tool serializer wired to the typed contract.** New `+diag-render [diagnostic tool]` +
+   `+severity-class` in `lib/diagnostics.hoon`. The port already emits EC-coded errors as typed
+   `diagnostic` nouns (`[[%tlc code] %error/%warning stage message ...]` — config via
+   job.hoon:1053, ASSUME via assume-fail, verdicts via check) whose `message` holds the MP
+   getMessage0 body. `diag-render` serializes any such noun to its MP line: plain = class prefix
+   + body (+ WARNING `-nowarning` hint), tool = the `@!@!@STARTMSG code:class @!@!@\n body \n
+   @!@!@ENDMSG code @!@!@` wrapper. Because `-tool` has NO class prefix, the stored body + wrapper
+   == MP's -tool output exactly (no re-render needed).
+
+Differential: `gen-mp-tests.py` now emits diag-render arms too (construct the typed diagnostic
+carrying the MP body, compare to MPDump) — 28 vectors x 4 (mp-message + diag-render, both modes)
+= 112-case `tests/lib/mp.hoon`, all byte-exact `ok=%.y`. HOON: the shard needs `/- *tla-lus` for
+the `diagnostic` mold.
+
+SCOPE / the -tool "run mode": the port is a Gall agent — its machine-readable output contract is
+the typed `diagnostic` noun delivered as an event, NOT CLI stdout. So there is no run-request
+`tool` flag threading @!@!@ through a stdout stream (nothing consumes it); `diag-render`'s `tool`
+param IS the on-demand toggle for any consumer wanting the CLI serialization. The full
+verdict-path CLI-stdout interleaving (STARTMSG/ENDMSG around MP calls, raw state dumps between)
+has no consumer in the port and is left as a documented approved-difference (finalized in .7.4).
+tlc-output-ec stays `partial` pending the .7.4 flip. Notes §R1.3.5.7.3. NEXT: R1.3.5.7.4
+(close-out: tlc-output-ec partial->parity + the approved-difference doc; full suite + tier2).

@@ -154,6 +154,7 @@
       %5.002  (mp-subst 'TLC found an error in the configuration file at line %1%\0a' params)
       %5.003  (mp-subst 'TLC found an error in the configuration file at line %1%\0aThe keyword %2% was not followed by an identifier.' params)
       %5.004  (mp-subst 'TLC found an error in the configuration file at line %1%\0aThe keyword %2% appeared twice.' params)
+      %5.005  (mp-subst 'TLC found an error in the configuration file at line %1%\0aExpected an identifier after %2%.' params)
       %5.006  (mp-subst 'TLC found an error in the configuration file at line %1%\0aIt was expecting %2%, but did not find it.' params)
   ==
 ::
@@ -164,6 +165,38 @@
     %1  'Error: '
     %2  'TLC Bug: '
     %3  'Warning: '
+  ==
+::
+++  severity-class
+  ::  MP message class for a diagnostic severity (NONE=0 ERROR=1 WARNING=3)
+  |=  s=severity
+  ^-  @ud
+  ?-  s
+    %error    1
+    %warning  3
+    %info     0
+  ==
+::
+++  diag-render
+  ::  serialize a typed `diagnostic` to its MP.getMessage line (R1.3.5.7.3):
+  ::  `message` already holds the getMessage0 body, so plain adds the class
+  ::  prefix (+ a WARNING -nowarning hint) and tool wraps it in the
+  ::  @!@!@STARTMSG/ENDMSG frame with the code:class.  The structured noun is
+  ::  the port's primary machine contract; this is the on-demand text form.
+  |=  [d=diagnostic tool=?]
+  ^-  @t
+  =/  cls   (severity-class severity.d)
+  =/  code  num.code.d
+  ?.  tool
+    =/  hint=@t
+      ?:  =(cls 3)  '\0a(Use the -nowarning option to disable this warning.)'
+      ''
+    (rap 3 ~[(mp-class-prefix cls) message.d hint])
+  %-  crip
+  ;:  weld
+    "@!@!@STARTMSG "  (a-co:co code)  ":"  (a-co:co cls)  " @!@!@\0a"
+    (trip message.d)
+    "\0a@!@!@ENDMSG "  (a-co:co code)  " @!@!@"
   ==
 ::
 ++  mp-message
