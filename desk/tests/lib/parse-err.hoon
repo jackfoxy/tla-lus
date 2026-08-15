@@ -179,10 +179,35 @@
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "!" \0a\0aResidual stack trace follows:\0aExcept Component starting at line 3, column 1.\0aExcept Spec starting at line 2, column 26.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a EXCEPT ![1] = 2, !\0a====\0a'))
 ::
+++  test-b-c-except-eq
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "=" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aExcept Spec starting at line 2, column 16.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a EXCEPT !.b =\0a====\0a'))
+::
+++  test-b-c-except-idx
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aWas expecting "= or ,"\0aEncountered "====" at line 3, column 1 and token "]" \0a\0aResidual stack trace follows:\0aExcept Spec starting at line 2, column 16.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a EXCEPT ![1]\0a====\0a'))
+::
+++  test-b-c-except-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "EXCEPT" \0a\0aResidual stack trace follows:\0aExcept Spec starting at line 3, column 1.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a EXCEPT\0a====\0a'))
+::
 ++  test-b-c-exists-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "\\\\E" \0a\0aResidual stack trace follows:\0aQuantified form starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == \\E\0a====\0a'))
+::
+++  test-b-c-fcnconstr-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "|->" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [n \\in S |->\0a====\0a'))
+::
+++  test-b-c-fcnset-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "->" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [S ->\0a====\0a'))
 ::
 ++  test-b-c-fieldval-inc
   %+  expect-eq
@@ -239,6 +264,16 @@
     !>  'REJECT\0a***Parse Error***\0aWas expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"\0aEncountered "LOCAL ====" at line 2, column 1 and token "----" \0a\0aResidual stack trace follows:\0aModule body starting at line 2, column 1.\0aModule definition starting at line 1, column 1.\0a\0a%%'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aLOCAL\0a====\0a'))
 ::
+++  test-b-c-record-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "1" \0a\0aResidual stack trace follows:\0aSome [] Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == [a |-> 1\0a====\0a'))
+::
+++  test-b-c-setof-filter
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token ":" \0a\0aResidual stack trace follows:\0aExtendableExpr starting at line 3, column 1.\0aExpression starting at line 3, column 1.\0aSome { } form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == {x \\in S :\0a====\0a'))
+::
 ++  test-b-c-setofall-inc
   %+  expect-eq
     !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "i" \0a\0aResidual stack trace follows:\0aQuant Bound starting at line 2, column 11.\0aSome { } form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0a\0a%%'
@@ -258,6 +293,11 @@
   %+  expect-eq
     !>  'ACCEPT'
   !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0aTHEOREM x\0a====\0a'))
+::
+++  test-b-c-tuple-inc
+  %+  expect-eq
+    !>  'REJECT\0a***Parse Error***\0aEncountered "====" at line 3, column 1 and token "a" \0a\0aResidual stack trace follows:\0aSome << -- >> or >>_ Form starting at line 2, column 6.\0aExtendableExpr starting at line 2, column 6.\0aExpression starting at line 2, column 6.\0aDefinition starting at line 2, column 1.\0aModule body starting at line 2, column 1.\0a\0a%%'
+  !>  (wall-cord (dump-err:syntax '---- MODULE t ----\0ax == <<a\0a====\0a'))
 ::
 ++  test-b-c-vardecl-inc
   %+  expect-eq

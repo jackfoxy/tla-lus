@@ -1891,3 +1891,28 @@ Both byte-exact; parse-err 60/60 `ok=%.y`; `tests/lib/syntax` CST green (shared 
 `op-or-fun-def`/`unbound-quant` touched, error-path-only — no valid-parse regression). No
 existing golden changed bytes. Renamed fixtures to the `.6.x` `c-*` convention, which revived
 the stale orphan goldens `b-c-{choose,letin,if-noelse}-inc.gold`.
+
+### R1.3.5.6.4.2 — collections + EXCEPT recovery (SHIP-VERIFIED, 2026-08-14)
+
+8 boundary fixtures (`boundary/c-{fcnconstr-inc,fcnset-inc,tuple-inc,record-inc,setof-filter,
+except-inc,except-eq,except-idx}.tla`): `[n \in S |->` / `[S ->` / `<<a` / `[a |-> 1` /
+`{x \in S :` / `[a EXCEPT` / `[a EXCEPT !.b =` / `[a EXCEPT ![1]`. 60→68 goldens. Differential:
+**6 already byte-exact** (all collections + bare EXCEPT), **2 diverged** = the plan's predicted
+`!.b =` + `![1]`.
+
+Both EXCEPT divergences shared one root cause plus one extra. `+except-spec` pushed the
+`Except Component` frame at the TOP of every selector-loop iteration, including the terminal
+iteration that turns out to be the `= or ,` decision point (≥1 component already parsed, next
+tok not a selector) — so the port kept a spurious `Except Component` on the stack that SANY had
+popped. But the FIRST component after `!` is mandatory (SANY pushes Except Component even for a
+bare `!` at end — see c-except-bang / c-except-comp2, which have it with NO "Was expecting").
+FIX: push `Except Component` via `=?` guarded on `|(first sel)` where `first = ?=([* ~] kids)`
+(only the `!` leaf so far) and `sel` = next tok is `[`/`.`; NOT at the post-component decision
+point. SECOND, `![1]` alone needs `Was expecting "= or ,"`: added `=? s &(!first !sel)
+(set-exp s '= or ,')` right before the `= ` eat (error-path-only — a successful `=` / a deeper
+value-expr failure clears it via the expression's own bpa, so except-eq stays expectation-less).
+
+Both byte-exact; parse-err 68/68 `ok=%.y`; `tests/lib/syntax` CST green (except-spec is
+error-path-only for valid EXCEPTs); no existing golden changed bytes. `c-*` naming revived the
+orphan goldens `b-c-{except-inc,fcnconstr-inc}.gold`. NEXT: R1.3.5.6.4.3 (temporal/fairness +
+LAMBDA + special ops).

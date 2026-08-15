@@ -2493,10 +2493,14 @@
   |-  ^-  (pres node)
   ::  SANY wraps each `[expr,..]`/`.field` selector after the `!` in an
   ::  Except Component production (residual stack `Except Component`, at
-  ::  the selector); popped once the component parses (the enclosing
-  ::  Except Spec resets the stack on success anyway) (R1.3.5.6.1)
-  =.  s  (bpa s 'Except Component')
+  ::  the selector); popped once the component parses (R1.3.5.6.1).  The
+  ::  first component after `!` is mandatory, so the frame is pushed on the
+  ::  first iteration or whenever a selector begins -- but NOT at the
+  ::  `= or ,` decision point after >=1 component (R1.3.5.6.4.2)
   =/  pk  (peek s)
+  =/  sel=?  ?&(?=(^ pk) ?|(=(%lsb kind.u.pk) =(%dot kind.u.pk)))
+  =/  first=?  ?=([* ~] kids)
+  =?  s  |(first sel)  (bpa s 'Except Component')
   ?:  &(?=(^ pk) =(%lsb kind.u.pk))
     =.  s  (advance s)
     =|  ck=(list node)
@@ -2527,7 +2531,9 @@
       %+  mk-node:ast  %n-exceptcomponent
       ~[(leaf:ast u.pk) (leaf:ast v.p.ir)]
     $(kids [comp kids], s (epa s))
-  ::  = expr terminates the spec (retagged t-equal)
+  ::  = expr terminates the spec (retagged t-equal); after >=1 component the
+  ::  decision point expects `= or ,` (R1.3.5.6.4.2)
+  =?  s  &(!first !sel)  (set-exp s '= or ,')
   =/  qr  (eat s %equals)
   ?:  ?=(%| -.qr)  [%| p.qr]
   =/  er  (expression s.p.qr)
