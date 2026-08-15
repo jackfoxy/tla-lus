@@ -1975,3 +1975,38 @@ frame fix.
 parse-err 87/87 `ok=%.y`; `tests/lib/syntax` CST green; no existing golden changed bytes.
 NEXT: R1.3.5.6.4.5 (recovery-points incl. `RECURSIVE f(`/`f[x\in S]==` + exhaustive completion
 + parse-errors partial→parity close-out).
+
+### R1.3.5.6.4.5 — recovery-points + exhaustive completion + close-out (SHIP-VERIFIED, 2026-08-14)
+
+= UNIT R1.3.5.6 COMPLETE. parse-errors ledger `partial → PARITY`.
+
+**Recovery-points → approved-difference (not fixed).** `f[x \in S] ==` / `g[..] ==` /
+`RECURSIVE f(` / `x == f(` / `x == [a]_v v` / empty def `x ==`: SANY uses JavaCC syntactic
+LOOKAHEAD to reject a whole module-body unit and unwind to `Was expecting "==== or more Module
+body"` at an arbitrary recovery point (the module header). The port parses the unit greedily and
+reports the PRECISE semantic failure point (empty RHS / incomplete param decl) — strictly more
+useful; reproducing SANY's unwind needs full-unit backtracking to emit a worse message.
+Documented in compatibility.md (Unit P2-2) + the parity-manifest row. Not added as goldens
+(they'd fail the byte-exact suite by design).
+
+**Exhaustive sweep.** Added 12 byte-exact fixtures for the remaining operator/module/collection
+productions: `/\`/`=>`/`~`/`\cup`/`\X`/`..`/`=` operator edges, `f[` application, `a.` record
+access, `CONSTANT x ,`, bare `AXIOM`, `{a \in}` set filter. One straggler: `x == f[` (empty
+application index) — port entered Expression for the index; SANY reports at `Some [] Form`.
+FIX: `+sbracket-args` guards the arg with `!(expr-start …)` → per-caller `perr-enc` without
+entering Expression (.6.4a pattern). 87→99 goldens.
+
+**Orphan cleanup.** Removed 4 dead committed goldens with no inputs: `b-c-{def-empty,fcndef-inc}`
+(recovery-point approved-differences) + `b-c-{instance-noname,theorem-inc}` (exact dups of
+c-instance-bare/c-theorem-bare). Revived `c-setof-bad` with an input.
+
+**Close-out.** parity-manifest `parse-errors` row `partial → parity` (count 34→99), stale
+`test206/216/219 fail at parse` clause corrected (they diverge at *semantic* EC 4204 since
+R1.3.5.2/.3, tracked under semantic-graph; the correct ids are test206/**217**/219).
+`check-parity.py --check` well-formed. Full `-test /=tla-lus=/tests`: `ok=%.n` with the SOLE
+failure `test52` (R1.3.5.8-deferred, the .5.5 baseline — ZERO regression from .6.1–.5).
+`tier2.py --check`: byte-reproducible (census untouched, exit 0). parse-err suite 99/99 green;
+tests/lib/syntax CST green.
+
+R1.3.5.6 DONE — clears the parse-errors residue. R1.3.5 remaining: R1.3.5.7 (tlc-output-ec +
+tlc-constants), R1.3.5.8 (census close-out incl. the deferred test52).

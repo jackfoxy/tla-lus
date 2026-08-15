@@ -1045,6 +1045,11 @@
   =|  kids=(list node)
   =.  kids  [(leaf:ast v.p.lr) kids]
   |-  ^-  (pres node)
+  ::  an empty argument reports at the enclosing `Some [] Form` level
+  ::  without entering Expression (per-caller, R1.3.5.6.4.5)
+  =/  pk  (peek s)
+  ?:  ?|(?=(~ pk) !(expr-start kind.u.pk))
+    [%| (perr-enc s 1)]
   =/  er  (expression s)
   ?:  ?=(%| -.er)  [%| p.er]
   =.  s  s.p.er

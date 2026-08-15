@@ -65,21 +65,35 @@ case plus hand-written malformed modules; oracle
   engine's `%parse` stage emits these diagnostics as events, so a rejected
   submission carries SANY's exact error text on the wire.
 
-Known limitations (tracked; each is a `partial` rationale in
-`parity-manifest.md`):
+The `expecting` state and residual-stack production frames are now ported for
+every grammar area the extended corpus exercises — R1.3.5.6.1–.5 swept
+expression/control-flow, collections + EXCEPT, temporal/fairness, LAMBDA,
+module-level, and proof/theorem productions to byte-exact `Was expecting`
+strings and `bpa` stack entries (see `parity-manifest.md` `parse-errors` =
+`parity`).
 
-- The `expecting` state is ported for the productions the corpus exercises
-  (module frame, body/unit dispatch, declarations, definitions); the
-  remaining ~100 assignment sites in less-traveled productions render
-  without a `Was expecting` line until fixtures cover them.
-- Multi-token `Encountered` echoes reproduce the observed JavaCC
-  lookahead-failure sites (unit dispatch, named-theorem-after-nested-module);
-  an unported site would echo one token where JavaCC echoes several.
+Approved differences and residues (tracked in `parity-manifest.md`):
+
+- **Module-body LOOKAHEAD recovery points (approved difference).** SANY's
+  module body uses JavaCC syntactic LOOKAHEAD to decide whether a unit starts;
+  when a would-be unit fails to parse as a whole, SANY rejects it *before*
+  entering the production and unwinds to the module-body choice, reporting
+  `Was expecting "==== or more Module body"` at an arbitrary recovery point
+  (the module header token). The port instead parses the unit greedily and
+  reports the **precise** failure point. Measured cases: `f[x \in S] ==` /
+  `g[x \in S, y \in T] ==` (SANY: `Encountered "f" … token "----"`, stack just
+  `Module definition`; port: empty-RHS `Encountered "===="` with the full
+  Definition stack), `RECURSIVE f(` (SANY multi-token echo `( ====` @ the `(`;
+  port: `Identifier, _ or prefix op` inside `Constant declaration items`),
+  `x == f(`, `x == [a]_v v`, and the empty definition RHS `x ==`. The port's
+  message is strictly more precise; reproducing SANY's unwind would require
+  full-unit backtracking at the module-body level to emit a *less* useful
+  error. Verdict-level parity is unaffected (both REJECT).
 - Diagnostics carry the message and fatality but `at` spans are not yet
   populated (`(unit loc)` stays `~`); the message text embeds the positions.
-- Error recovery is fail-fast: SANY accumulates multiple `PErrors` entries
-  only via non-throwing pushes (`finalReduce`, fairness, `!.@`), which is
-  reproduced; JavaCC-level resynchronization does not exist in either
+- Error recovery is otherwise fail-fast: SANY accumulates multiple `PErrors`
+  entries only via non-throwing pushes (`finalReduce`, fairness, `!.@`), which
+  is reproduced; JavaCC-level resynchronization does not exist in either
   implementation.
 
 ## Unit 5 — Module resolution
