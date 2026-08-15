@@ -2151,3 +2151,54 @@ compatibility.md "R1.3.5 close-out". Marked R1.3.5-plan.md .0–.8 all ✅.
 Also marked the parent `~/FoxyLabs/tla-lus/R1.3-R1.5-plan.md`: R1.5.0–.7 and R1.3.0–.5 all ✅
 (committed increments per git log); only **R1.3.6** (front-end SANY census close-out) remains —
 blocked on the same test52 + EC 4204 residuals. NEXT (project): R1.3.6.
+
+### R1.3.6 — front-end census close-out (PARTIAL, SHIP-VERIFIED, 2026-08-15)
+
+**test52 CLOSED (de-censused).** The persistent `tier2-sub/test-sany-sub-5` failure was a STALE
+census entry, not a bug: the arm recomputes the divergence set live and compares to the hardcoded
+`SUB_BATCH_DIVERGENCES`; sub-5 actual was empty (port agrees with Java on test52) while the census
+expected `test52 -> hoon=reject`. R1.3.5.1's `prefixop` reconciliation had already fixed test52's
+SANY verdict; it was never de-censused. Removed test52 from `SUB_BATCH_DIVERGENCES`/`SUB_BATCH_REASONS`
+in gen-tier2-tests.py, regenerated (divergences.txt + tier2-sub.hoon, sub-5 expected now `~`),
+`tier2.py --check` byte-reproducible, `tier2-sub` all 6 arms GREEN on ship (rev 678). Since test52
+was the SOLE `-test /tests` failure all session and only tier2-sub.hoon changed, **the full suite is
+now green.**
+
+**NOT fully closed (blocks R1.3.6 + semantic-graph parity).** The front-end census still carries 4
+real verdict divergences (census-tracked, arms pass because they MATCH the census — not
+approved-differences): `suite/etest5` (`M!Init` member of a nonexistent module — the port resolves
+to the local `Init` and under-rejects; SANY EC 4200), and `suite/test206`/`test217`/`test219`
+(EC 4204 instance-member-application arity — the instance-element/param arg is uncounted). The latter
+three are the R1.3.3 instance-member follow-up and keep `semantic-graph` at `partial`. Both need
+targeted semantic instance-member resolution/arity work (feature, not close-out) — deferred, so
+R1.3.6 stays PARTIAL. compatibility.md "R1.3.6 de-censused test52" recorded.
+
+Also marked R1-release-work-breakdown.md: R1.0 ✅ (its table row; R1.1.0–.9 already ✅). R1.3/R1.5
+top-level stay unmarked — R1.3's `semantic-graph` (EC 4204) and R1.5's `tlc-coverage` remain partial.
+
+### R1.3.7.0 — kickoff: instance-member arity/level + nonexistent-module (2026-08-15)
+
+Docs/oracle only. Dumped `SemDump` (tree + DIAGS + LEVELS) for the 4 census specs from the
+`test-model/suite` dir (`java -cp <jar>:<abs build> SemDump <spec>.tla`). FROZEN oracle behavior
+— and it REFINES the plan: cause A is NOT one symmetric threading gap, it SPLITS by EC + direction:
+
+| spec | SANY verdict | SANY DIAGS | port | root |
+|---|---|---|---|---|
+| test206 | ACCEPT | none (0 diags) | reject | **A-arity**: spurious **EC 4204** on `Inst2(COp!@!++)!Foo(..)` — port OVER-counts the member arity (conflates the parametrized instance's own op-arg with Foo's args) |
+| test219 | ACCEPT | none | reject | **A-arity** ×18: same, + nesting `L!Inst2!Foo` |
+| test217 | reject | **2× EC 4205** `Level error in applying operator I!Foo` @12.11 / @13.9 | accept | **A-level**: `I(x')!Foo` — `I!Foo` is an arity-1 `ThmOrAssumpDefKind` operator (I's formal `z`); applying it to `x'` (L2) must level-check → 4205. Port DROPS the instance-arg level |
+| etest5 | reject | **1× EC 4200** `Unknown operator: `Init'` @13.17 | accept | **B**: `M!Init` for nonexistent M — SANY makes it `nullODN`; port falls through to the local `Init` def |
+
+KEY: A-arity (206/219) is an OVER-reject (port emits a 4204 SANY doesn't); A-level (217) is an
+UNDER-reject (port misses SANY's 4205). Opposite directions, different code paths (arity check
+`semantic.hoon:~1894` vs the `apsubstin`/`l-substin` level path — the thmdef `I!Foo` renders as
+`apsubstin subs=1 ... sub y <- z`, then `apply I!Foo ... apply ' apply x` at the call site). So
+per the plan's contingency, **split .1 into .1a (A-arity, 4204) and .1b (A-level, 4205)**.
+
+Byte-stable regression set (instance/substitution/level sem goldens that run through the same
+`l-substin`/g-instance/arity machinery): apsubdis apsubst hoinst inst instimp instlcl instnest
+instparm instrex instsel instun lvlinst lvlinstc lvlinsth lvlinstm lvlinstp recinst subdis (18).
+
+Synthetic repros to materialize in .1 (isolate each): a parametrized instance `I(op)` whose
+member is applied to args (4204); `I(prime-var)!Arity0Member` (4205); `M!x` for undeclared M
+(4200). The 4 real specs are the primary differential goldens. NEXT: R1.3.7.1a (EC 4204 arity).

@@ -395,22 +395,24 @@ steps + USE/HIDE fact validation + theorem-name scoping (`test214`/`test216` clo
 the `tlc-output-ec` EC/MP renderer + `tlc-constants` TLAConstants lib (both `→ parity`).
 Four of the five R1.3.5 ledger rows are now `parity`.
 
-Two residuals are **census-tracked and carried to R1.3.6** (neither is R1.3.5's to
-close — both were re-scoped out during the units):
+**R1.3.6 de-censused `suite/test52`.** The R1.3.5.1 `prefixop` reconciliation had in
+fact already fixed test52's SANY verdict (the port now accepts it, agreeing with Java);
+the stale census entry was the sole remaining `-test` failure (`tier2-sub/test-sany-sub-5`
+measured hoon==java). R1.3.6 removed it from `SUB_BATCH_DIVERGENCES`, so the full suite is
+now green.
 
-- `suite/test52` — prefix/postfix operators as arguments with `-._`/`^+`/`^*`/`^#`
-  and ASSUME-level evaluation (`Print`, `SUBSET`/`UNION`/`DOMAIN` as op-args). The
-  `prefixop` naming reconciliation landed in R1.3.5.1, but the full accept path is
-  evaluator-level op-arg work beyond the front-end census unit; parked, hoon=reject.
+One residual keeps `semantic-graph` at `partial`, census-tracked and owned outside R1.3.5:
+
 - `suite/test206`/`test217`/`test219` — parametrized/nested-instance member-application
   arity (`Inst2(COp!@!++)!Foo(..)`, `I(x')!Foo`, EC 4204): the instance-element/param
   argument is uncounted, so arity/level under-checks. This is the **R1.3.3
-  instance-member follow-up** and is the sole residual keeping `semantic-graph` at
-  `partial`; not `!`-nav (that mechanism is complete — `test219a` accepts).
+  instance-member follow-up**; not `!`-nav (that mechanism is complete — `test219a`
+  accepts). `suite/etest5` (an `M!Init` member of a nonexistent module — the port
+  resolves to the local `Init` and under-rejects) is a separate module-resolution gap,
+  also census-tracked.
 
-Both remain in `tier2/divergences.txt` (census-tracked, so no silent regression); the
-`tier2.py --check` census reproduces byte-identically (290/295 subdir agree). `test52`
-is the sole `-test /=tla-lus=/tests` failure (`tier2-sub/test-sany-sub-5`).
+These remain in `tier2/divergences.txt` (census-tracked, so no silent regression); the
+`tier2.py --check` census reproduces byte-identically.
 
 ## Unit 7 (B6) — Safety model checking parity
 

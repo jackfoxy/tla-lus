@@ -12,8 +12,7 @@
 tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	a LET-wrapped primed variable as the `=` LHS inside ENABLED is not recognized as assignable (R1.5.x)
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
-# 5 disagree with Java (290/295 agree):
-subdir-batch	suite/test52 -> hoon=reject	prefix operator param `-._` — unary-minus `-`/`-.` naming (R1.3.5)
+# 4 disagree with Java (291/295 agree):
 subdir-batch	suite/etest5 -> hoon=accept	`M!Init` member of a nonexistent module M — port resolves to the local `Init` def and under-rejects (SANY: EC 4200 Unknown operator); pre-existing (before R1.3.5.4), not `!`-nav/proof → R1.3.6
 subdir-batch	suite/test206 -> hoon=reject	parametrized-instance member application arity `Inst2(COp!@!++)!Foo(..)` (EC 4204) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)
 subdir-batch	suite/test217 -> hoon=accept	parametrized-instance member application `I(x')!Foo` — the instance-element arg is dropped, so the level error is under-checked (hoon=accept vs java=reject) — R1.3.3 follow-up (`!`-nav done, R1.3.5.3)

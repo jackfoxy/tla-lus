@@ -355,12 +355,10 @@ SUB_BATCH_DIVERGENCES = [
     # EC 4262), test16/test7/test9 (tuple binders in subset-of/set-of-all/
     # CHOOSE), test23 (LOCAL operator definitions in scope). The measured
     # cause of each differed from its R1.3.0 `_CONF` label.
-    # test52 is NOT a plain conformance edge: its prefix operator parameter
-    # `BoxTest(-._)` hits the unary-minus naming conflict — SANY names it
-    # `-.` but the port names it `-` for the evaluator registry (Naturals),
-    # so canonicalizing the graph to `-.` breaks arithmetic evaluation.
-    # Reconciling the two names is cross-cutting (generator + stdops) → R1.3.5.
-    "suite/test52 -> hoon=reject",
+    # test52 CLOSED by R1.3.5.1 (prefix/postfix op-args + unary-minus `-`→`-.`
+    # reconciliation, `prefixop`): the port's SANY verdict now AGREES with Java
+    # (accept). De-censused in R1.3.6 (2026-08-15) after the tier2-sub arm
+    # measured hoon==java (sub-5 actual empty). [was: "suite/test52 -> hoon=reject"]
     # etest5 `IF M!Init ...` references a member of a NONEXISTENT module M;
     # SANY rejects (EC 4200 `Unknown operator: Init` at the selector), the port
     # under-rejects (`M!Init` resolves to the local `Init` def, ignoring the
@@ -416,9 +414,8 @@ SUB_BATCH_REASONS = {
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
     # R1.3.4 closed test7/test9/test16 (tuple binders in subset-of/set-of-all/
     # CHOOSE), test23 (LOCAL defs), etest16 (dup record fields, EC 4262).
-    # test214 closed by R1.3.5.4.3 (USE/HIDE EC 4357). test52 (unary-minus
-    # `-`/`-.` naming) → R1.3.5.
-    "suite/test52": "prefix operator param `-._` — unary-minus `-`/`-.` naming (R1.3.5)",
+    # test214 closed by R1.3.5.4.3 (USE/HIDE EC 4357). test52 closed by
+    # R1.3.5.1 (prefixop), de-censused R1.3.6.
     "suite/etest5": "`M!Init` member of a nonexistent module M — port resolves to the local `Init` def and under-rejects (SANY: EC 4200 Unknown operator); pre-existing (before R1.3.5.4), not `!`-nav/proof → R1.3.6",
     # test206/test219a are NOT the "\E/SUBSET under substitution" gap the plan
     # expected — that already works; both fail on labels / `!`-subexpression

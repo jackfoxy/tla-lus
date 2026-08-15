@@ -286,8 +286,7 @@
 ++  test-sany-sub-5
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test52 -> hoon=reject'
-    ==
+    ~
   !>
   %-  sub-batch-run
   ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])
