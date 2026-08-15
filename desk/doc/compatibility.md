@@ -111,6 +111,42 @@ omitted from the normalized form:
 - **Volatile UIDs** — SANY assigns global sequential node IDs that depend on
   load order and the built-in operator table; they carry no semantic content
   and are excluded.
+
+## Unit P2-7 — TLC output (EC/MP) parity
+
+`lib/diagnostics.hoon` ports `tlc2.output.MP.getMessage` byte-for-byte over the
+**reachable EC set** — every error/warning code the ported config + semantic +
+safety + liveness engine can emit (TLC `2104`/`2105`/`2107`/`2110`/`2116`/`2222`/
+`2227`–`2233`/`2237`/`2257`/`2259`/`2272`/`2279`/`2281` and CFG `5001`–`5006`):
+
+- `+ec-body` is the `getMessage0` per-code template switch (`%N%` placeholders,
+  arity-dependent branches for `2116`/`2228`); `+mp-subst`/`+mp-replace` reproduce
+  `MP.replaceString` (replace `%<i>%` with the i-th parameter, ascending).
+- `+mp-message [class code params tool]` wraps the body: `-tool` renders the
+  `@!@!@STARTMSG <code>:<class> @!@!@` / body / `@!@!@ENDMSG <code> @!@!@` machine
+  frame; non-tool renders the class prefix (`Error: `/`Warning: `/…) plus, for a
+  WARNING, the `\n(Use the -nowarning option to disable this warning.)` hint.
+- The message **class** per code (`ERROR`=1, `WARNING`=3) is taken from the Java
+  `printError`/`printWarning` call sites.
+- The oracle is `tools/oracle/MPDump.java` (dumps `getMessage` in both modes from
+  the pinned jar); `tools/gen-mp-tests.py` drives 112 differential cases.
+
+EC codes surface as typed `diagnostic` nouns — `[[%tlc code] severity stage
+message …]`, emitted by `config.hoon` (CFG family), `assume-fail` (`2104`/`2105`),
+and the `check.hoon` verdict path — whose `message` holds the MP body. `+diag-render
+[diagnostic tool]` serializes any such noun to its plain or `-tool` MP line on
+demand; `config.hoon`'s CFG diagnostics route their body through the same `+ec-body`,
+so there is a single MP source of truth.
+
+**Approved difference — the CLI `-tool` stream.** `tlc2.TLC -tool` emits a stdout
+stream that interleaves STARTMSG/ENDMSG-wrapped `MP.getMessage` calls with raw
+state/statistics lines, for the Toolbox to parse. The port is a Gall agent: its
+machine-readable contract is the typed `diagnostic` **event** (structurally richer
+than the `@!@!@` text), so no run mode threads that stdout stream — nothing would
+consume it. Every individual message's exact `-tool` bytes remain reproducible via
+`+diag-render`/`+mp-message` (proven by the 112-case differential); only the
+whole-run stdout interleaving is out of scope.
+
 ## Unit 7 — Level checking
 
 Levels (0 constant / 1 state / 2 action / 3 temporal) are now computed and

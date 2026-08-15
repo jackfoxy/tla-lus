@@ -2120,3 +2120,19 @@ verdict-path CLI-stdout interleaving (STARTMSG/ENDMSG around MP calls, raw state
 has no consumer in the port and is left as a documented approved-difference (finalized in .7.4).
 tlc-output-ec stays `partial` pending the .7.4 flip. Notes §R1.3.5.7.3. NEXT: R1.3.5.7.4
 (close-out: tlc-output-ec partial->parity + the approved-difference doc; full suite + tier2).
+
+### R1.3.5.7.4 — close-out (SHIP-VERIFIED, 2026-08-15)
+
+= UNIT R1.3.5.7 COMPLETE. `tlc-output-ec` `partial → PARITY` (tlc-constants flipped in .7.1).
+Manifest row rewritten (gen-mp-tests 112 + gen-mc-tests 5, the reachable EC set both modes),
+with the CLI-stdout `-tool` interleaving documented as `approved-difference` (no consumer in the
+Gall port; the typed `diagnostic` event is the machine contract, and every message's exact
+`-tool` bytes are reproducible via `+diag-render`). compatibility.md gained "Unit P2-7 — TLC
+output (EC/MP) parity" (the renderer + the approved-difference). check-parity.py --check
+well-formed (parity 58→59). Full `-test /=tla-lus=/tests`: `ok=%.n`, SOLE failure
+`tier2-sub/test-sany-sub-5` = `test52` (R1.3.5.8-deferred baseline — ZERO regression from
+.7.1–.3). `tier2.py --check`: byte-reproducible (census OK, 0 drift). Also marked complete in
+R1.3.5-plan.md: R1.3.5.0/.1/.3/.4/.5 (verified done via git log + [[tla-lus-port-status]]) and
+.7; only R1.3.5.8 (census close-out incl. deferred test52) remains. Notes §R1.3.5.7.0–.4.
+NEXT: R1.3.5.8 (delete the 6 closed census entries, regen tier2, flip remaining ledger rows,
+resolve/park test52; full suite + tier2 green).
