@@ -2202,3 +2202,31 @@ instparm instrex instsel instun lvlinst lvlinstc lvlinsth lvlinstm lvlinstp reci
 Synthetic repros to materialize in .1 (isolate each): a parametrized instance `I(op)` whose
 member is applied to args (4204); `I(prime-var)!Arity0Member` (4205); `M!x` for undeclared M
 (4200). The 4 real specs are the primary differential goldens. NEXT: R1.3.7.1a (EC 4204 arity).
+
+### R1.3.7.1a — instance-member application arity, EC 4204 (SHIP-VERIFIED, 2026-08-15)
+
+**Root cause (measured, not guessed).** `+g-instance` imports a parametrized instance's members
+with the instance parameters PREPENDED — `Inst2(A5(_,_,_,_,_)) == INSTANCE test206a` gives
+`Inst2!Foo` `arity = |iparams| + |Foo| = 1+5 = 6` (`semantic.hoon:~2698`, `(add (lent iparams)
+arity.base)`). SANY agrees exactly (`SemDump`: `def Inst2!Foo arity=6`). The bug was at the CALL
+SITE: for `Inst2(COp!@!++)!Foo(1,2,3,4,5)` the port counted only the 5 arguments in the
+application's own args-node — the instance argument `COp!@!++` sits in the general-id's
+`n-idprefixelement` (`ident ( args ) !`) and was DROPPED by `+genid-prefix` (which harvests only
+the names). 5 ≠ 6 → spurious EC 4204. SANY's tree confirms the shape: `apply Inst2!Foo` with SIX
+children — `oparg LAMBDA op=LAMBDA arity=5` (from `COp!@!++`) then the five nums.
+
+**Fix.** New `+genid-prefix-args` (beside `+genid-prefix`) collects each prefix element's argument
+expressions in prefix order; `+g-opapply` welds them onto the application's own args before the
+arity comparison. One weld — the arity/level/oparg machinery downstream is unchanged, so nested
+(`L!Inst2!Foo`) and higher-order-arg forms fall out for free.
+
+**Verification.** sem suite 135/135 `ok=%.y` — all 18 frozen instance/level goldens (apsubdis
+apsubst hoinst inst instimp instlcl instnest instparm instrex instsel instun lvlinst lvlinstc
+lvlinsth lvlinstm lvlinstp recinst subdis) byte-identical. tier2-sub: sub-4's live divergence set
+went `{test206, test217, test219}` → `{test217}` — **test206 + test219 now agree with Java**;
+sub-1/2/3/5/6 all OK (no collateral). De-censused test206/test219 from `SUB_BATCH_DIVERGENCES`,
+regenerated (census 4 → **2** subdir divergences: etest5, test217), redeployed.
+
+Remaining for R1.3.7: `.1b` test217 (EC 4205 level — the instance arg's LEVEL, a different path:
+`I(x')!Foo` must level-check `x'` against `I!Foo`'s formal), `.2` etest5 (EC 4200) + census/ledger
+close-out. NEXT: R1.3.7.1b.

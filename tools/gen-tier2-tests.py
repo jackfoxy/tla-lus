@@ -370,7 +370,6 @@ SUB_BATCH_DIVERGENCES = [
     # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
     # early by the parametrized-parameter fix.
     # test30/test999 closed by R1.3.2.2 (infix operator constants).
-    "suite/test206 -> hoon=reject",
     # test214 + test216 CLOSED by R1.3.5.4 (theorem-name scoping + USE/HIDE
     # EC 4357 fact validation): test216 now accepts (bare `Thm1`/`Thm2` refs
     # resolve as ThmOrAssumpDefKind, .4.1); test214 now rejects with exactly
@@ -383,19 +382,16 @@ SUB_BATCH_DIVERGENCES = [
     # L0) so it under-checks and accepts. Same instance-member gap as test206/
     # test219 (this is its level-error variant), R1.3.3 follow-up — NOT `!`-nav.
     "suite/test217 -> hoon=accept",
-    "suite/test219 -> hoon=reject",
     # test219a CLOSED by R1.3.5.3 (`!`-subexpression navigation): label refs,
     # structural/@/op-symbol selectors, and the unbounded-CHOOSE fix (.3.7).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).
-    # test216 CLOSED by R1.3.5.4.1 (bare THEOREM-name refs `Thm1`/`Thm2` now
-    # resolve as ThmOrAssumpDefKind). test206/test219 STILL diverge, but NOT on
-    # `!`-nav (that mechanism is complete — test219a accepts): the residuals are
-    # separate gaps ->
-    #   test206: parametrized-instance member application arity
-    #            `Inst2(COp!@!++)!Foo(1,2,3,4,5)` (the instance-param arg is not
-    #            counted; EC 4204) — R1.3.3 instance-member follow-up.
-    #   test219: same class, x18 (`I(x)!OOp2`, `L!Inst2!Foo`, ... EC 4204) —
-    #            parametrized/nested-instance member arity, R1.3.3 follow-up.
+    # test216 CLOSED by R1.3.5.4.1 (bare THEOREM-name refs resolve as
+    # ThmOrAssumpDefKind). test206 + test219 CLOSED by R1.3.7.1a: a
+    # parametrized-instance member application `Inst2(COp!@!++)!Foo(1..5)` /
+    # `I(x)!OOp2` / `L!Inst2!Foo` supplies the INSTANCE arguments in the leading
+    # positions the import prepended (+g-instance adds |iparams| to the member
+    # arity), so +genid-prefix-args now welds the `M(args)!` prefix arguments
+    # onto the application's own — retiring the spurious EC 4204.
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"

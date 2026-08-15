@@ -1829,6 +1829,32 @@
   ?~  parts  ~
   `(rap 3 `(list @t)`parts)
 ::
+++  genid-prefix-args
+  ::  the argument expressions carried by a general identifier's `M(args)!`
+  ::  prefix elements, in prefix order.  A parametrized instance imports its
+  ::  members with the instance parameters PREPENDED (`Inst2!Foo` arity =
+  ::  |iparams| + |Foo|, see +g-instance), and SANY's application supplies
+  ::  the instance argument in that leading position — so an application
+  ::  `Inst2(COp)!Foo(1..5)` has SIX arguments, not five (R1.3.7.1a)
+  |=  n=node
+  ^-  (list node)
+  =/  kids  (kids-of n)
+  =/  pfxs  (skim kids |=(k=node (is-kind k %n-idprefix)))
+  ?~  pfxs  ~
+  %-  zing
+  %+  turn  `(list node)`(kids-of i.pfxs)
+  |=  e=node
+  ^-  (list node)
+  ?.  (is-kind e %n-idprefixelement)  ~
+  ::  the element's opargs node (`ident ( args ) !`); its expression kids
+  ::  are the actual arguments
+  %-  zing
+  %+  turn  `(list node)`(kids-of e)
+  |=  k=node
+  ^-  (list node)
+  ?.  ?=(%node -.k)  ~
+  (skim (kids-of k) |=(a=node ?=(%node -.a)))
+::
 ++  g-genid
   ::  0-ary reference; @ resolves to the innermost EXCEPT spec (level
   ::  and span travel in the ctx '@' pseudo-entry); an unknown symbol
@@ -1922,7 +1948,13 @@
     ?^  r.gs  gs
     :-  `[%nullodn ~]
     [(derr 4.200 (span-of:ast idn) "Unknown operator: `{(trip nm)}'.")]~
-  =/  arg-exprs  (skim (kids-of args-node) |=(k=node ?=(%node -.k)))
+  ::  a parametrized-instance member application `I(iargs)!Op(args)` supplies
+  ::  the instance arguments in the LEADING positions the import prepended
+  ::  (+g-instance adds |iparams| to the member arity), so they join the
+  ::  application's own arguments here (R1.3.7.1a)
+  =/  arg-exprs
+    %+  weld  (genid-prefix-args gid)
+    (skim (kids-of args-node) |=(k=node ?=(%node -.k)))
   ?.  |(variadic.u.s =(arity.u.s (lent arg-exprs)))
     :-  `[%nullodn ~]
     :_  ~
