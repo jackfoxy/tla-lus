@@ -72,4 +72,118 @@
   ^-  (list binding)
   %+  sort  bs
   |=([a=binding b=binding] (aor var.a var.b))
+::
+::  +|  TLC Output Rendering (tlc2.output.MP.getMessage, R1.3.5.7.2)
+::
+::    Byte-exact port of MP.getMessage(class, code, params, tool) over the
+::    reachable EC set (see parity-manifest `tlc-output-ec`). Message classes:
+::    NONE=0 ERROR=1 TLCBUG=2 WARNING=3.
+::
+++  mp-replace
+  ::  replace every occurrence of `nee` in `hay` with `rep`
+  |=  [hay=tape nee=tape rep=tape]
+  ^-  tape
+  =/  nl  (lent nee)
+  |-  ^-  tape
+  =/  ix  (find nee hay)
+  ?~  ix  hay
+  ;:  weld
+    (scag u.ix hay)  rep  $(hay (slag (add u.ix nl) hay))
+  ==
+::
+++  mp-subst
+  ::  MP.replaceString: replace %<i>% (all occurrences) with the i-th param,
+  ::  i ascending
+  |=  [tmpl=@t params=(list @t)]
+  ^-  @t
+  =/  i=@ud  1
+  =/  t=tape  (trip tmpl)
+  |-  ^-  @t
+  ?~  params  (crip t)
+  =/  ph=tape  :(weld "%" (a-co:co i) "%")
+  $(t (mp-replace t ph (trip i.params)), params t.params, i +(i))
+::
+++  temporal-many
+  ::  MP TLC_TEMPORAL_PROPERTY_VIOLATED with >1 property: builds the
+  ::  "Temporal properties %1%, %2%, and %3% were violated.\n" template
+  |=  n=@ud
+  ^-  @t
+  =/  i=@ud  1
+  =/  parts=tape  ""
+  |-  ^-  @t
+  ?:  (gth i n)
+    (crip :(weld "Temporal properties " parts " were violated.\0a"))
+  =/  sep=tape
+    ?:  =(i 1)  ""
+    ?:  (lth i n)  ", "
+    ?:(=(n 2) " and " ", and ")
+  $(parts :(weld parts sep "%" (a-co:co i) "%"), i +(i))
+::
+++  ec-body
+  ::  getMessage0(code, params) with %N% substitution; arity-dependent codes
+  ::  branch on the param count
+  |=  [code=@ud params=(list @t)]
+  ^-  @t
+  =/  n  (lent params)
+  ?+    code  ~|([%unmapped-ec code] !!)
+      %2.104  (mp-subst 'Assumption %1% is false.' params)
+      %2.105  (mp-subst 'Evaluating assumption %1% failed.\0a%2%' params)
+      %2.107  (mp-subst 'Invariant %1% is violated by the initial state:\0a%2%' params)
+      %2.110  (mp-subst 'Invariant %1% is violated.' params)
+      %2.116
+    ?:  =(n 1)  (mp-subst 'Temporal property %1% was violated.\0a' params)
+    ?:  =(n 0)  'Temporal properties were violated.\0a'
+    (mp-subst (temporal-many n) params)
+      %2.222  (mp-subst 'The constant parameter %1% is not assigned a value by the configuration file.' params)
+      %2.227  'The configuration file cannot specify both INIT/NEXT and SPECIFICATION fields.'
+      %2.228
+    ?:  =(n 2)  (mp-subst 'TLC requires %1% not to take any argument, but one was given: %2%' params)
+    (mp-subst 'TLC requires %1% not to take any argument.' params)
+      %2.229  (mp-subst 'The %1% %2% specified in the configuration file\0ais not defined in the specification.' params)
+      %2.230  (mp-subst 'The %1% of %2% is equal to %3%' params)
+      %2.231  'The configuration file did not specify the initial state predicate.'
+      %2.232  'The configuration file did not specify the next state predicate.'
+      %2.233  (mp-subst 'The %1% %2% cannot be a constant.' params)
+      %2.237  (mp-subst 'The spec is trivially false because %1% is false.' params)
+      %2.257  'The stuttering counterexample above may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided, so TLC permits infinite stuttering. To rule out such counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable fairness constraint (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
+      %2.259  (mp-subst 'The stuttering counterexample above may be caused by the absence of a fairness constraint in the behavior specification %1% defined at %2%. To rule out such counterexamples, conjoin a suitable fairness constraint to %1% (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).' params)
+      %2.272  (mp-subst 'The formula %1% at %2% is an action-level formula (i.e., it contains no temporal operators). Only temporal-level (or state-level) formulas are allowed under PROPERTY or PROPERTIES. To check that action %1% holds in *every* step of the behavior, define a temporal property: Let A be the formula at %2%; rewrite A as [][A]_v, where v is a state function (typically the tuple of variables) (compare page 90 of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).' params)
+      %2.279  'Declaring symmetry during liveness checking is dangerous. It might cause TLC to miss violations of the stated liveness properties. Please check liveness without symmetry defined.'
+      %2.281  (mp-subst 'The configuration file substitutes constant %1% with non-constant %2%%3%' params)
+      %5.001  (mp-subst 'TLC encountered the following error when trying to read the configuration file %1%:\0a%2%' params)
+      %5.002  (mp-subst 'TLC found an error in the configuration file at line %1%\0a' params)
+      %5.003  (mp-subst 'TLC found an error in the configuration file at line %1%\0aThe keyword %2% was not followed by an identifier.' params)
+      %5.004  (mp-subst 'TLC found an error in the configuration file at line %1%\0aThe keyword %2% appeared twice.' params)
+      %5.006  (mp-subst 'TLC found an error in the configuration file at line %1%\0aIt was expecting %2%, but did not find it.' params)
+  ==
+::
+++  mp-class-prefix
+  |=  class=@ud
+  ^-  @t
+  ?+  class  ''
+    %1  'Error: '
+    %2  'TLC Bug: '
+    %3  'Warning: '
+  ==
+::
+++  mp-message
+  ::  MP.getMessage: tool=%.y renders the @!@!@STARTMSG/ENDMSG machine
+  ::  wrapper, %.n the class prefix + body
+  |=  [class=@ud code=@ud params=(list @t) tool=?]
+  ^-  @t
+  =/  body  (ec-body code params)
+  ?.  tool
+    ::  non-tool post-processing: a WARNING appends the -nowarning hint
+    ::  (MP warningHistory.isEmpty, always true for a standalone render)
+    =/  hint=@t
+      ?:  =(class 3)
+        '\0a(Use the -nowarning option to disable this warning.)'
+      ''
+    (rap 3 ~[(mp-class-prefix class) body hint])
+  %-  crip
+  ;:  weld
+    "@!@!@STARTMSG "  (a-co:co code)  ":"  (a-co:co class)  " @!@!@\0a"
+    (trip body)
+    "\0a@!@!@ENDMSG "  (a-co:co code)  " @!@!@"
+  ==
 --

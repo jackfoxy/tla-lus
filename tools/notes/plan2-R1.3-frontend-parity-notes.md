@@ -2010,3 +2010,80 @@ tests/lib/syntax CST green.
 
 R1.3.5.6 DONE — clears the parse-errors residue. R1.3.5 remaining: R1.3.5.7 (tlc-output-ec +
 tlc-constants), R1.3.5.8 (census close-out incl. the deferred test52).
+
+### R1.3.5.7.0 — kickoff: tlc-output-ec + tlc-constants scope (2026-08-15)
+
+= R1.3.5.6 DONE (parse-errors parity). Starting R1.3.5.7 (`tlc-output-ec`/`tlc-constants`,
+the last front-end ledger rows). DECOMPOSED into `~/FoxyLabs/tla-lus/R1.3.5.7-plan.md`
+(.0 kickoff / .1 TLAConstants / .2 EC-taxonomy+MP-renderer / .3 engine-wiring / .4 close-out).
+
+**Oracle harness built.** `tools/oracle/MPDump.java` (compiled to build/) dumps
+`MP.getMessage(ERROR, code, {P1,P2,P3}, tool)` in BOTH modes per argv code. Confirms the
+`-tool` protocol byte-for-byte:
+```
+@!@!@STARTMSG <code>:<class> @!@!@
+<body, %N% → param>
+@!@!@ENDMSG <code> @!@!@
+```
+non-tool = class prefix (`Error: `/`TLC Bug: `/`State `/`Warning: `) + body. DELIM `@!@!@`,
+classes NONE=0 ERROR=1 TLCBUG=2 WARNING=3. Body = `getMessage0`'s per-code template switch.
+
+**Reachable EC set** (codes the ported engine actually emits — check.hoon/job.hoon/config.hoon):
+TLC 2104/2105/2107/2110/2116/2222/2227-2233/2237/2257/2259/2272/2279/2281, config
+5001/5002/5003/5004/5006. (SANY 4xxx are the semantic-graph row, rendered there; not here.)
+Parity is over THIS reachable set, not all 257 EC.java codes — taxonomy complete, templates
+filled for the reachable subset.
+
+**Gap measured.** The port emits diagnostics INLINE as human-readable `"Error: …"` cords in
+check.hoon/job.hoon (no EC taxonomy struct, no MP renderer, no `-tool` wrapper, no TLAConstants
+lib; `@!@!@` count = 0 across desk/lib). NOTABLE: several inline strings ALREADY byte-match MP's
+PLAIN body — e.g. job.hoon:1408 `Error: Invariant {vname} is violated.` == MP 2110 plain
+`Error: Invariant P1 is violated.`. So the plain-form bodies are largely correct already; the
+work is (1) the `-tool` `@!@!@` wrapper, (2) centralizing into an EC `code→[class template]`
+map + `+mp-message` renderer (param `%N%` subst), (3) the `util.TLAConstants` lib. Docs/oracle
+only; no code/golden change. NEXT: R1.3.5.7.1 (TLAConstants lib).
+
+### R1.3.5.7.1 — TLAConstants lib (SHIP-VERIFIED, 2026-08-15)
+
+`tlc-constants` `partial → PARITY`. Created `desk/lib/constants.hoon` — the authoritative
+byte-exact Hoon mirror of `util.TLAConstants`'s IN-SCOPE members (KeyWords, BuiltInModules/
+Operators `TLC`/`Toolbox`/`Permutations`, base TLA syntax literals `SPACE`/`CR`/`SEP`/`EQ`/
+`ARROW`/`DEFINES`/tuple/prime/`/\`/`\/`/`~`/`<>[]`/`[]<>`/brackets/`TRUE`/`FALSE`/…), with a
+header ACCOUNTING manifest: every non-ported member is an explicitly-excluded Toolbox/trace-
+explorer/CLI-driver class (ANSI, Files=MC.tla/.cfg gen, Schemes, TraceExplore, LoggingAtoms,
+Toolbox formatting atoms) — no consumer in the ported tla2sany+tlc2-core surface.
+
+Evidence-driven scope: measured cross-lib duplication of these literals = **none** (config
+section keywords live only in config.hoon; `TLC`/`Permutations` appear as operator/module
+refs handled by the stdops registry, not shared string constants). So the lib is the parity
+*accounting artifact* (single source + exclusion manifest), not a de-dup refactor. Routed
+config.hoon's `keywords` table TLAConstants.KeyWords entries through `k` (`/= k /lib/constants`)
+to make the lib live + prove byte-identity; the config plurals (`CONSTANTS`… wait, CONSTANTS IS
+in TLAConstants; the plurals INVARIANTS/CONSTRAINTS/PROPERTIES and TLC-internal _PERIODIC/
+_RL_REWARD/_POSSIBLE/CHECK_DEADLOCK not in TLAConstants) stay literal. Build clean (rev 670,
+constants.hoon added); cfg/cfg-val/cfg-runspec suites green (byte-identical, 34 cfg goldens
+unchanged). Manifest row `partial → parity` (lib/* → lib/constants); check-parity well-formed
+(parity 57→58). Notes §R1.3.5.7.1. NEXT: R1.3.5.7.2 (EC taxonomy + MP.getMessage renderer).
+
+### R1.3.5.7.2 — EC taxonomy + MP.getMessage renderer (SHIP-VERIFIED, 2026-08-15)
+
+Added to `lib/diagnostics.hoon` the byte-exact port of `tlc2.output.MP.getMessage`:
+`+ec-body` (the `getMessage0` per-code template switch over the reachable EC set, with `%N%`
+placeholders), `+mp-subst`/`+mp-replace` (MP.replaceString: replace `%<i>%` with the i-th
+param, ascending), `+temporal-many` (the 2116 multi-property join), `+mp-class-prefix`, and
+`+mp-message [class code params tool]` — tool=%.y renders the `@!@!@STARTMSG <code>:<class>
+@!@!@\n<body>\n@!@!@ENDMSG <code> @!@!@` wrapper, %.n the class prefix + body + (for WARNING)
+the `\n(Use the -nowarning option to disable this warning.)` post-hint.
+
+Reachable codes covered (28): TLC 2104/2105/2107/2110/2116(arity 0/1/many)/2222/2227/2228(arity
+1/2)/2229/2230/2231/2232/2233/2237/2257/2259/2272/2279/2281 + CFG 5001-5006. Classes: 2257/
+2259/2279 = WARNING(3), rest ERROR(1) (measured from the printWarning vs printError call sites).
+
+Harness: `tools/oracle/MPDump.java` extended to take `class:code:p1|p2|...` vectors + both
+modes; `tools/gen-mp-tests.py` (28 vectors → 56-case shard `tests/lib/mp.hoon`). All 56 byte-
+exact vs MPDump (`ok=%.y`). HOON gotchas: @ud literals >=1000 need dot separators (`2.104` in
+the generated shard, via `hoon_num`); multi-cord concat is `(rap 3 ~[a b c])` — `:(cat 3 ...)`
+nest-fails (cat's first arg is the bloq, not a fold operand). Purely additive to diagnostics.hoon
+(new arms; existing ordering arms + consumers unchanged). tlc-output-ec still `partial` (renderer
+done; engine wiring is .7.3). Notes §R1.3.5.7.2. NEXT: R1.3.5.7.3 (wire check/job/config emit
+sites through +mp-message + the -tool run mode; differential over the mc/safety corpus).

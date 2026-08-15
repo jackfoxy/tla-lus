@@ -2,6 +2,7 @@
 /=  lex  /lib/lexer
 /=  eval  /lib/eval
 /=  sem-lib  /lib/semantic
+/=  k  /lib/constants
 |%
 ::  TLC .cfg processing (PORT-COMPLETION-PLAN-2 unit 5).
 ::
@@ -88,10 +89,12 @@
   ^-  (set @t)
   %-  sy
   ^-  (list @t)
-  :~  'CONSTANT'  'CONSTANTS'  'CONSTRAINT'  'CONSTRAINTS'
-      'ACTION_CONSTRAINT'  'ACTION_CONSTRAINTS'
-      'INVARIANT'  'INVARIANTS'  'INIT'  'NEXT'  'VIEW'  'SYMMETRY'
-      'SPECIFICATION'  'PROPERTY'  'PROPERTIES'  'ALIAS'
+  ::  the TLAConstants.KeyWords members route through /lib/constants (`k`);
+  ::  the plurals and TLC-internal sections (not in TLAConstants) stay literal
+  :~  constant:k  constants:k  'CONSTRAINT'  'CONSTRAINTS'
+      action-constraint:k  'ACTION_CONSTRAINTS'
+      invariant:k  'INVARIANTS'  init:k  next:k  view:k  symmetry:k
+      specification:k  property:k  'PROPERTIES'  'ALIAS'
       'POSTCONDITION'  'POSTCONDITIONS'  '_PERIODIC'  '_RL_REWARD'
       '_POSSIBLE'  'CHECK_DEADLOCK'
   ==
