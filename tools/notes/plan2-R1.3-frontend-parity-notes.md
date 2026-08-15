@@ -1849,3 +1849,19 @@ c-defnst-sub-inc byte-exact, 49→52 goldens, no regression.
 parse-errors ledger now covers: expression + declaration stack productions (.6.1),
 keyword-unit routing + maxSize echo (.6.2/.6.3), instance stack + substitution-RHS (.6.3/.6.4a)
 — still `partial` pending (b)/(c)/(d).
+
+### R1.3.5.6.4 sub-plan decision — DECOMPOSED (broad differential, 2026-08-11)
+
+Q: should R1.3.5.6.4 have a sub-plan? Ran a broad differential — 49 malformed inputs across
+the grammar as boundary fixtures, gen-parse-err, ship-tested vs ParseErrDump: **13 diverge /
+36 already byte-exact** (~27%). The 13, by area: `\E`/`LET` (expr/control-flow), `[a EXCEPT
+!.b =`/`[a EXCEPT ![1]` (EXCEPT recovery), `WF_v`/`[][a]_`/`<><<a>>_` (temporal/fairness),
+`LAMBDA`/`LAMBDA a`, `RECURSIVE`/`RECURSIVE f(` (module-level), `THEOREM a PROVE`/`USE`
+(proof/theorem). So the remainder is a full grammar SWEEP: ~15-20 divergence fixes + ~40-60
+fixtures + proof bpa + recovery-points — one repeated pattern (bpa/set-exp/routing, byte-match
+ParseErrDump) at scale, a few trickier (LAMBDA/fairness/RECURSIVE/proof). Large + multi-area →
+YES, sub-plan. Wrote `~/FoxyLabs/tla-lus/R1.3.5.6.4-plan.md` (.0 kickoff done; .1 expr/control-
+flow, .2 collections+EXCEPT, .3 temporal/fairness/LAMBDA, .4 module-level+proof, .5 recovery-
+points+exhaustive+close-out/ledger flip). Reverted the 49 probe fixtures (suite back to 52
+goldens green). Also — RESUMED the tla-zod ship after a session-teardown kill (`tmux
+new-session -d -s tla-zod -x 220 -y 50` + vere resume, ~20s, no pill; clean stop, no lock).
