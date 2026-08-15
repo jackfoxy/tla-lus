@@ -1499,7 +1499,7 @@
     =/  pk  (peek s)
     ?:  &(?=(^ pk) =(%recursive kind.u.pk))
       (recursive-prod s)
-    (op-or-fun-def s)
+    (op-or-fun-def s 'Let Definitions')
   ?:  ?=(%| -.dr)
     ?~  defs  [%| p.dr]
     ::  no more definitions: expect IN
@@ -1572,15 +1572,17 @@
 ::
 ::
 ++  op-or-fun-def
-  ::  identifier LHS with optional (params); == Expression or INSTANCE
-  |=  s=pst
+  ::  identifier LHS with optional (params); == Expression or INSTANCE.
+  ::  `lbl` names the residual-stack frame: `Definition` at module level,
+  ::  `Let Definitions` inside a LET (R1.3.5.6.4.1)
+  |=  [s=pst lbl=@t]
   ^-  (pres node)
   =/  lcl=(unit node)
     =/  pk  (peek s)
     ?.  &(?=(^ pk) =(%local kind.u.pk))  ~
     `(leaf:ast u.pk)
   =?  s  ?=(^ lcl)  (advance s)
-  =.  s  (bpa s 'Definition')
+  =.  s  (bpa s lbl)
   ::  prefix operator definition: op ident == e
   =/  p0  (peek s)
   =/  c0  ?~(p0 ~ (class-of u.p0))
@@ -2248,8 +2250,11 @@
   =.  s  (advance s)
   ::  SANY reports an unbounded binder under the same QuantBound production
   ::  as a bounded one (residual stack `Quant Bound`); popped on success
-  ::  (R1.3.5.6.1)
-  =.  s  (bpa s 'Quant Bound')
+  ::  (R1.3.5.6.1).  SANY enters QuantBound only once a bound variable
+  ::  actually starts, so a bare `\A`/`\E` at end pushes nothing
+  ::  (R1.3.5.6.4.1)
+  =/  pk2  (peek s)
+  =?  s  &(?=(^ pk2) =(%identifier kind.u.pk2))  (bpa s 'Quant Bound')
   =|  kids=(list node)
   =.  kids  [kw kids]
   |-  ^-  (pres node)
@@ -2866,7 +2871,7 @@
   =|  ds=(list node)
   =?  ds  ?=(^ dfl)  [u.dfl ds]
   |-  ^-  (pres node)
-  =/  dr  (op-or-fun-def s)
+  =/  dr  (op-or-fun-def s 'Definition')
   ?:  ?=(%| -.dr)
     ?~  ds  [%| p.dr]
     [%& (mk-node:ast %n-defstep (flop ds)) s]
@@ -3388,7 +3393,7 @@
   =/  pk  (peek s)
   ?~  pk  [%| (perr-enc s 1)]
   ?+    kind.u.pk
-      (op-or-fun-def s)
+      (op-or-fun-def s 'Definition')
     ::
       ?(%bm0 %bm1 %bm2)
     (module-prod s)
@@ -3429,7 +3434,7 @@
     ?:  &(?=(^ n2) =(%instance kind.u.n2))
       (instance-unit s)
     ?:  (def-ahead ?~(rest.s ~ t.rest.s))
-      (op-or-fun-def s)
+      (op-or-fun-def s 'Definition')
     [%| (perr-brk s 2)]
     ::
       %recursive

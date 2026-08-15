@@ -1865,3 +1865,29 @@ flow, .2 collections+EXCEPT, .3 temporal/fairness/LAMBDA, .4 module-level+proof,
 points+exhaustive+close-out/ledger flip). Reverted the 49 probe fixtures (suite back to 52
 goldens green). Also — RESUMED the tla-zod ship after a session-teardown kill (`tmux
 new-session -d -s tla-zod -x 220 -y 50` + vere resume, ~20s, no pill; clean stop, no lock).
+
+### R1.3.5.6.4.1 — expr/control-flow productions (SHIP-VERIFIED, 2026-08-14)
+
+Added 8 boundary fixtures (`boundary/c-{exists,choose,letin,if,if-nothen,if-noelse,
+case,case-arm}-inc.tla`; the last four dropping the `-inc`): `\E`/CHOOSE/LET/IF/CASE
+incomplete forms. Regen 52→60 goldens. Ship differential vs ParseErrDump: **6 already
+byte-exact** (choose/if-inc/if-nothen/if-noelse/case-inc/case-arm), **2 diverged** — exactly
+the plan's predicted `\E` + `LET`.
+
+**exists-inc (`x == \E`).** Port pushed a spurious `Quant Bound` at 3.1 and (frame-cap then
+dropping the outermost) was MISSING `Module definition` at the bottom. SANY enters the
+QuantBound production only once a bound variable actually starts — a bare `\A`/`\E` at end
+pushes nothing. FIX in `+unbound-quant`: replaced the unconditional `bpa 'Quant Bound'` with a
+`=?` guarded on the next token being `%identifier`. Removing the spurious frame drops stack
+depth from 6→5, so the residual-stack cap now reveals `Module definition` — both the extra and
+the missing line fixed by one change. (`\A i` / setofall still push Quant Bound at the ident
+position — unchanged.)
+
+**letin-inc (`x == LET`).** Port's LET definition-list frame was `Definition`; SANY names it
+`Let Definitions`. FIX: `+op-or-fun-def` now takes an `lbl=@t` frame label; the LET caller
+passes `'Let Definitions'`, the three module-level callers `'Definition'`.
+
+Both byte-exact; parse-err 60/60 `ok=%.y`; `tests/lib/syntax` CST green (shared productions
+`op-or-fun-def`/`unbound-quant` touched, error-path-only — no valid-parse regression). No
+existing golden changed bytes. Renamed fixtures to the `.6.x` `c-*` convention, which revived
+the stale orphan goldens `b-c-{choose,letin,if-noelse}-inc.gold`.

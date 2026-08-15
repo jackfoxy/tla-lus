@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "====" at line 3, column 1 and token "IF" 
+
+Residual stack trace follows:
+ExtendableExpr starting at line 3, column 1.
+Expression starting at line 3, column 1.
+IF THEN ELSE starting at line 2, column 6.
+Expression starting at line 2, column 6.
+Definition starting at line 2, column 1.
+
+%%
