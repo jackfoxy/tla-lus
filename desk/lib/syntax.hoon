@@ -2317,7 +2317,8 @@
   ^-  (pres node)
   =/  pk  (peek s)
   ?>  ?=(^ pk)
-  =/  kw  (leaf:ast u.pk)
+  =/  wtok  u.pk
+  =/  kw  (leaf:ast wtok)
   =.  s  (advance s)
   =/  stk0  stk.s
   =/  subj
@@ -2333,7 +2334,20 @@
   ?:  ?=(%| -.subj)  [%| p.subj]
   =.  s  s.p.subj(stk stk0, exp '')
   =/  lr  (eat s %lbr)
-  ?:  ?=(%| -.lr)  [%| p.lr]
+  ::  subject parsed but no `(action)` follows: SANY aborts the whole
+  ::  WF_/SF_ with a single custom message at the keyword, dropping the
+  ::  caller's `Fairness Expression` frame (R1.3.5.6.4.3).  A bad SUBJECT
+  ::  (e.g. WF_3) still propagates the normal Encountered error with the
+  ::  frame -- see boundary/fairness.tla.
+  ?:  ?=(%| -.lr)
+    :-  %|
+    %+  perr  s(stk ?~(stk.s ~ t.stk.s), exp '')
+    ;:  welp
+      "Ill-structured fairness expression at line "
+      (dec-tape:ast line.from.span.wtok)
+      ", column "
+      (dec-tape:ast col.from.span.wtok)
+    ==
   =/  er  (expression s.p.lr)
   ?:  ?=(%| -.er)  [%| p.er]
   =/  rr  (eat s.p.er %rbr)
@@ -2413,16 +2427,22 @@
   [%| (perr-enc s 1)]
 ::
 ++  subscript-expr
-  ::  the _v subscript: identifier, tuple, or parenthesized expr
+  ::  the _v subscript: identifier, tuple, or parenthesized expr.  SANY
+  ::  wraps it in the `restricted form of expression` production
+  ::  (residual stack); popped on success (R1.3.5.6.4.3)
   |=  s=pst
   ^-  (pres node)
+  =/  stk0  stk.s
+  =.  s  (bpa s 'restricted form of expression')
   =/  pk  (peek s)
-  ?~  pk  [%| (perr-enc s 1)]
-  ?:  =(%lab kind.u.pk)  (tuple-expr s)
-  ?:  =(%lbr kind.u.pk)  (paren-expr s)
-  ?:  =(%identifier kind.u.pk)
-    (general-id-full s)
-  [%| (perr-enc s 1)]
+  =/  r=(pres node)
+    ?~  pk  [%| (perr-enc s 1)]
+    ?:  =(%lab kind.u.pk)  (tuple-expr s)
+    ?:  =(%lbr kind.u.pk)  (paren-expr s)
+    ?:  =(%identifier kind.u.pk)  (general-id-full s)
+    [%| (perr-enc s 1)]
+  ?:  ?=(%| -.r)  [%| p.r]
+  [%& v.p.r s.p.r(stk stk0, exp '')]
 ::
 ++  record-fields
   ::  [ name sep expr/set, .. ] for RcdConstructor and SetOfRcds
@@ -3318,8 +3338,10 @@
     %-  welp
     :_  ~[(mk-node:ast %n-identlhs lhs2) (leaf:ast v.p.dr) v.p.nr]
     ?~(lcl ~ ~[u.lcl])
-  ::  the Definition choice fails here without entering Expression
-  ?:  ?|(?=(~ pk) !(expr-start kind.u.pk))
+  ::  the Definition choice fails here without entering Expression; LAMBDA
+  ::  can start an operand but is NOT a valid definition body (only an
+  ::  operator argument), so SANY rejects it here too (R1.3.5.6.4.3)
+  ?:  ?|(?=(~ pk) !(expr-start kind.u.pk) =(%lambda kind.u.pk))
     [%| (perr-enc s 1)]
   =/  er  (expression s)
   ?:  ?=(%| -.er)  [%| p.er]

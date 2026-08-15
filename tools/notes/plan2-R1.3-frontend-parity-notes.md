@@ -1916,3 +1916,31 @@ Both byte-exact; parse-err 68/68 `ok=%.y`; `tests/lib/syntax` CST green (except-
 error-path-only for valid EXCEPTs); no existing golden changed bytes. `c-*` naming revived the
 orphan goldens `b-c-{except-inc,fcnconstr-inc}.gold`. NEXT: R1.3.5.6.4.3 (temporal/fairness +
 LAMBDA + special ops).
+
+### R1.3.5.6.4.3 — temporal/fairness + LAMBDA + special ops (SHIP-VERIFIED, 2026-08-14)
+
+11 boundary fixtures: WF_v/SF_v, [][a]_/<><<a>>_, LAMBDA/LAMBDA a, ENABLED/UNCHANGED/DOMAIN/
+SUBSET/`a \union`. 68→79 goldens. Differential: **5 already byte-exact** (all the prefix/infix
+special ops -- their expression-entry was already correct), **6 diverged** = the plan's WF/SF +
+box/diamond subscripts + LAMBDA×2. Three fixes:
+
+- **box/diamond subscript** (`[][a]_` / `<><<a>>_`). Port was missing a `restricted form of
+  expression` frame at the subscript position. `+subscript-expr` (both call sites: `]_`@arsb and
+  `>>_`@arab) now pushes that frame at entry and restores stk0 on success (same save/restore as
+  the fairness subject). One added frame; the `scag 5` cap then drops `Module body` -> byte-exact.
+- **LAMBDA as def body** (`x == LAMBDA`). SANY rejects LAMBDA at the Definition RHS (`Was
+  expecting "Expression or Instance"`, Encountered LAMBDA@2.6 token `==`, NO Expression frame) --
+  LAMBDA is only an operator ARGUMENT, never a standalone expression. `+expr-start` keeps
+  `%lambda` (args still parse), but `+finish-def`'s existing `.6.4a` guard gained an explicit
+  `=(%lambda kind.u.pk)` disjunct so the def-body choice fails before entering Expression. Both
+  lambda fixtures share one golden.
+- **WF_/SF_ missing `(action)`** (`WF_v`). SANY aborts with a custom `Ill-structured fairness
+  expression at line L, column C` (L,C = keyword pos), NO Encountered line, and the residual
+  stack DROPS the caller's `Fairness Expression` frame. Surgical: only the `eat %lbr` failure
+  (subject parsed OK, no `(`) emits this -- built via `perr` with `stk = t.stk.s` (drop the
+  frame) + exp cleared + the custom tape from `wtok`'s span. A bad SUBJECT (`WF_3`, existing
+  boundary/fairness.tla) still propagates the normal Encountered error WITH the frame -- verified
+  unchanged.
+
+Both/all byte-exact; parse-err 79/79 `ok=%.y`; `tests/lib/syntax` CST green; no existing golden
+changed bytes (fairness.tla `WF_3` preserved). NEXT: R1.3.5.6.4.4 (module-level + proof/theorem).
