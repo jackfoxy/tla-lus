@@ -2426,3 +2426,37 @@ CONSTANT (`+solve-init`/`+solve-next` take a module, not a config; that path run
 `gen-mp-tests.py` was never registered (my omission in R1.3.5.7.2, so its 112 cases were missing
 from the evidence counts), and `gen-safety-tests.py`'s note still read "no FP64/safety comparator
 yet — unit 7.1+" though those comparators have existed since unit 7.1. Both corrected.
+
+### R1.5.11 — coverage: approved-difference settled + scope corrected (SHIP-VERIFIED, 2026-08-16)
+
+The plan said "record the `getEvalCount` counts as an approved-difference AND fix the coverage
+line's `printLocation()` name-span rendering". Investigation corrected the second half: **the port
+emits no coverage surface at all** — `grep -ri coverage` over `desk/{lib,sur,app}` finds only a
+stdops string-list entry and two unrelated comments; the typed wire/job contract has no coverage
+member and nothing consumes one. So there is no renderer whose span could diverge, and building
+one now would be dead code written to satisfy my own earlier plan text. Recorded the format
+instead, fully characterized from the pin, for the day a surface is added.
+
+**The counts (re-measured, not restated).** `ActionWrapper.java:147/155`: INIT reports
+`[printLocation(), getEvalCount(), getEvalCount()+secondary]`, NEXT reports `[printLocation(),
+secondary, getEvalCount()]`. The numbers are the **cost model's evaluation tallies**, incremented
+as tlc2 walks its own `CostModelNode` tree — a property of that engine's evaluation strategy, not
+of the spec. A structurally different evaluator cannot reproduce them byte-for-byte; same class as
+the `UniqueString` order. → `approved-difference`.
+
+**The label format** (`printLocation`, ActionWrapper.java:61): `<Name declaration>` when
+`opDef.getBody().getLocation()` equals `pred.getLocation()` (1:1), else
+`<Name declaration (bl bc el ec)>` with the actual disjunct's coordinates (1:N). `declaration` is
+the action NAME's span — NOT the body span the trace labels use. That distinction was the row's
+stated residual; it is now documented rather than left implicit.
+
+**The reproducible half is now TESTED, not asserted.** New `tests/lib/trace`
+`test-coverage-action-set`: `+get-actions` on the `coverage` corpus spec decomposes
+`Next == Inc \/ Dec` into `['Inc' 'Dec']` in source order, matching the golden's action set
+(`Init`/`Inc`/`Dec`). Together with the per-action trace labels (R1.5.4) and the R1.5.10 ordered
+streams (successors concatenated in `getActions` order), everything reproducible about coverage is
+reproduced and proven.
+
+`tlc-coverage` `partial → approved-difference` (ledger: parity 65, approved-difference 5→6,
+partial 22→21, terminal 98). compatibility.md's coverage bullet rewritten with the measurement,
+the test, and the scope note. trace suite green.

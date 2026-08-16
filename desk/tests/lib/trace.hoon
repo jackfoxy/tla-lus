@@ -7,6 +7,8 @@
 ::  the disjunction cases below (R1.5.4).
 /+  *test
 /=  check  /lib/check
+/=  sem-lib  /lib/semantic
+/=  ne  /lib/node-eval
 |%
 ++  diamond
   ^-  @t
@@ -95,4 +97,35 @@
         'State 3: <Inc line 5, col 8 to line 5, col 26 of module A>'
     ==
   !>  (state-labels (check:check named cfg))
+::
+::  +|  Coverage action SET (R1.5.11)
+::
+::  The `coverage` safety corpus case. `tlc2.TLC -coverage 1` reports one line
+::  per action — `<Init …> 1`, `<Inc …> 3`, `<Dec …> 3` — whose COUNTS are
+::  `getEvalCount()`, an engine-internal cost-model tally that a structurally
+::  different evaluator cannot reproduce (a documented approved difference, like
+::  UniqueString order). The action SET and its order ARE reproducible, and this
+::  asserts exactly that half: getActions decomposes `Next == Inc \/ Dec` into
+::  the two named leaf actions, in source order.
+++  cov-spec
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"  "EXTENDS Naturals\0a"  "VARIABLE x\0a"
+    "Init == x = 0\0a"  "Inc == x < 3 /\\ x' = x + 1\0a"
+    "Dec == x > 0 /\\ x' = x - 1\0a"  "Next == Inc \\/ Dec\0a"
+    "Inv == TRUE\0a"  "====\0a"
+  ==
+::
+++  test-coverage-action-set
+  %+  expect-eq
+    !>  ^-  (list @t)
+    ~['Inc' 'Dec']
+  !>
+  =/  mo  (generate:sem-lib 'A' (malt ~[['A' cov-spec]]))
+  ?~  mo  ~['NO-MODULE']
+  =/  defs  (defmap-of:ne u.mo)
+  =/  nsb  (sem-body:check defs 'Next')
+  ?~  nsb  ~['NO-NEXT']
+  (turn (get-actions:check u.nsb 'Next' defs) |=([n=@t *] n))
 --

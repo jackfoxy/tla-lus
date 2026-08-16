@@ -463,13 +463,30 @@ limitations below are now at parity, tested):
   SafetyDump's LABEL. `\E`-action splitting (per-element binding) still uses the
   whole-`\E` span, and the job-kernel wire trace keeps the single label — both
   residual.
-- **`TLC_COVERAGE_INIT/NEXT` counts are an approved difference.** The action
-  *decomposition* keying them (`get-actions`) is reproducible, but the counts
-  are TLC's `getEvalCount()` — an engine-internal cost-model evaluation count
-  (measured: a 4-state disjunctive search reports Init 3 / disj1 6 / disj2 1),
-  which a structurally-different evaluator cannot reproduce byte-for-byte, like
-  the UniqueString order (family 5). The `coverage` corpus case's 1/3/3 equals
-  successor counts only coincidentally.
+- **`TLC_COVERAGE_INIT/NEXT` counts are an approved difference** (settled
+  R1.5.11; the ledger row is `approved-difference`). Re-read from the pin:
+  `ActionWrapper` reports INIT as `[printLocation(), getEvalCount(),
+  getEvalCount()+secondary]` and NEXT as `[printLocation(), secondary,
+  getEvalCount()]` (`ActionWrapper.java:147/155`) — the numbers are the **cost
+  model's evaluation tallies**, incremented as tlc2 walks its own
+  `CostModelNode` tree. They describe that engine's evaluation strategy, not the
+  specification, so a structurally different evaluator cannot reproduce them
+  byte-for-byte — the same class of deviation as the UniqueString order
+  (family 5). Measured: a 4-state disjunctive search reports Init 3 / disj1 6 /
+  disj2 1; the `coverage` corpus case's 1/3/3 equals successor counts only
+  coincidentally.
+  What IS reproducible is reproduced and tested: the **action set and its
+  order** (`+get-actions` splits `Next == Inc \/ Dec` into the named leaf
+  actions in source order — `tests/lib/trace` `test-coverage-action-set`,
+  matching the corpus golden's `Init`/`Inc`/`Dec`), the per-action trace labels
+  (above), and the successor ordering (the R1.5.10 stream differential
+  concatenates successors in `getActions` order).
+  Scope: the port emits **no coverage surface** — the typed wire/job contract
+  has no coverage member and nothing consumes one — so no renderer exists whose
+  span could diverge. For the day one is added, the format is
+  `<Name declaration>` when the action's pred is the whole definition body, else
+  `<Name declaration (bl bc el ec)>` carrying the disjunct's coordinates, where
+  `declaration` is the **name's** span — not the body span the trace labels use.
 - **Multi-variable `/\` state rendering** in declaration order pairs with the
   above (needed together for a branching multi-var trace).
 - **Out-degree min/mean/95th-percentile** distribution (needs the bucket
