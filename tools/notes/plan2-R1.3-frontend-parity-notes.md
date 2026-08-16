@@ -2303,3 +2303,50 @@ still carried `test52`). `tier2.py --check` byte-reproducible. `check-parity.py 
 well-formed, parity 60. Subdir SANY census **295/295 agree (empty)**; the only remaining tier-2
 divergence anywhere is `Github725d` (a TLC/R1.5 `ENABLED`-scoped primed-variable item, not
 front-end). **R1.3.7 COMPLETE → R1.3.6 COMPLETE → R1.3 front-end parity-complete.**
+
+### R1.5.8 — audit + reassignment (SHIP-VERIFIED, 2026-08-16)
+
+The R1.5 completion plan's `.8`: re-measure every open R1.5-owned row instead of trusting its
+prose. Result — **three rows were already terminal** (their residues named work that later
+increments closed but nobody restated) and **five belong to other units**:
+
+**Flipped `partial → parity` (3):**
+- `tlc-safety-constraint`. Its text said "TLC still checks invariants on constraint-pruned
+  boundary states; we skip them (no corpus case combines the two)". Both halves were stale:
+  `+check-pruned` (check.hoon:489) already checks them in declaration order without deduping /
+  counting / enqueueing (landed R1.5.1), and the row's own sibling `tlc-safety-stategen` recorded
+  it. Built the missing case (the plan's stated acceptance test): `CONSTRAINT x =< 4` +
+  `INVARIANT x # 5`. Oracle first — `tlc2.TLC` reports `Invariant NotFive is violated` with the
+  0..5 trace and **6 generated / 5 distinct**; the port byte-matches. New
+  `tests/lib/inv-constraints` `test-constraint-pruned-invariant`.
+- `tlc-eval-action`. Residue listed cfg CONSTANT override (closed R1.5.3 — `cfg-constants` is
+  parity) and lazy SUBSET enumeration (closed R1.5.2 — recorded on `tlc-enum`); both commits
+  verified in the log. The only survivor is CONSTRAINT handling in **simulation**, which is
+  `op-check-simulate`/R1.7's row, not this one's.
+- `tlc-resumable`. No residue named anywhere in its text; every claim has a test
+  (`tests/lib/job` pause/resume at every boundary incl. constraint + symmetry, typed `%limited`
+  resources, `%cancelled`, incompatible-version restart notice; `tests/app`
+  `test-inflight-resume-across-reload` across a Gall restart). The only unmatched artifact is
+  TLC's on-disk checkpoint format, already classified `replaced` (Gall noun-state persistence),
+  i.e. not owed.
+
+**Reassigned owner (5, status unchanged — they are real work, just not R1.5's):**
+`tlc-eval-node`, `tlc-enum`, `tlc-eval-cst`, `tlc-eval-error` → **R1.4** (all pend the
+`gen-core-eval-tests` `EvalDump` comparator / unit-6.5 evaluation work); `tlc-driver` → **R1.8**
+(per the release breakdown's own grounding list).
+
+Ledger: parity **60 → 63**, partial **27 → 24**, well-formed. Suites green
+(inv-constraints + safety-gen + job, 0 FAILED). HOON/PROCESS NOTE: I first edited the manifest with
+the wrong awk column (status is field **5**, invariants 6, rationale 7 — `| name | java | hoon |
+evidence | status | invariants | why |`), which wrote `| partial | parity |` into two columns;
+caught it by re-running `check-parity` and diffing, reverted with `git checkout --`, and redid it
+with an assertion on the status field. Two rows legitimately have NF≠9 (escaped pipes in prose:
+`tlc-safety-symmetry`, `op-check-simulate`) — pre-existing, verified against HEAD.
+
+**Frozen remaining R1.5 set** (the genuine work, now 4 rows + 1 shared): `tlc-eval-state`
+(Github725d — the last tier-2 divergence anywhere), `tlc-safety-stategen` (full ordered-stream
+differential vs SafetyDump), `tlc-coverage` (approved-difference for the `getEvalCount` counts +
+the `printLocation` name-span residual), `tlc-safety-trace` + `tlc-safety-stats` (trace `\E`-split
+/ wire label / `Back to state N`; out-degree histogram + wire exposure), `tlc-safety-assume` +
+`tlc-safety-invariant` (axiom/implied-init-action with the WU8 boundary; EC 2146). NEXT: R1.5.9
+(Github725d).

@@ -40,6 +40,28 @@
     !>  [%.y `@ud`5]
   !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
 ::
+::  +|  CONSTRAINT-pruned boundary: invariants are still checked (R1.5.1)
+::
+::  TLC prunes x = 5 from the search (Bound), but STILL checks the invariants on
+::  it, so NotFive is violated on the pruned boundary state and the trace runs
+::  0..5 (measured: `Invariant NotFive is violated`, 6 generated / 5 distinct).
+::  This is the case the tlc-safety-constraint row said no corpus spec combined
+::  (R1.5.8 audit).
+++  test-constraint-pruned-invariant
+  =/  m
+    %-  mod
+    "Init == x = 0\0aNext == x' = x + 1\0aBound == x =< 4\0aNotFive == x # 5\0a"
+  =/  c
+    ^-  @t
+    %-  crip
+    "INIT Init\0aNEXT Next\0aCONSTRAINT Bound\0aINVARIANT NotFive\0a"
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'NotFive' `@ud`6 `@ud`5]
+  !>
+  ?.  ?=([%violated [%invariant *] *] r)  [%.n '' 0 0]
+  [%.y name.violation.r generated.stats.r distinct.stats.r]
+::
 ::  +|  Action constraint (ACTION_CONSTRAINT): prune the transition
 ::
 ++  test-action-constraint
