@@ -1,0 +1,7 @@
+STREAM
+INIT 1
+S 0 x = 0
+ENDINIT
+NEXT 0 1
+S 0 x = 1
+ENDNEXT

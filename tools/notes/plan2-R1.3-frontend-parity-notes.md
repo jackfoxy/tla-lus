@@ -2389,3 +2389,40 @@ arms OK — 0 FAILED in both. `tier2.py --check` byte-reproducible. Also correct
 hardcoded summary line, which still printed "13/14 agree" / "290/295 agree" (the same class of
 stale prose the R1.5.8 audit was about) — it now reports 142/142, 14/14, 295/295 and states the
 census is empty. **The tier-2 differential layer is fully clean in both shards.**
+
+### R1.5.10 — ordered init/next stream differential (SHIP-VERIFIED, 2026-08-16)
+
+`tlc-safety-stategen`'s residue was "full ordered-stream differential vs SafetyDump remains" —
+the streams kept branch/binding order but were only SPOT-tested. `SafetyDump` could not close it:
+it drives `tlc2.TLC` end-to-end through an `IMessagePrinterRecorder` and projects
+verdict/stats/trace, never the generated streams themselves.
+
+**New oracle `tools/oracle/StreamDump.java`** (builds a `FastTool` like `EvalDump`): emits exactly
+what `Tool.getInitStates` / `getNextStates` return, in order —
+```
+STREAM / INIT <n> / S <i> <var = v; var = v> / ENDINIT
+        NEXT <si> <n> / S <i> ... / ENDNEXT
+```
+Successors are concatenated over `getActions()` in action order, which is the sequence
+`ModelChecker.doNext` walks AND the sequence the Hoon `+solve-next` produces for the whole `Next`
+(a `\/` branches in source order) — so the two are directly comparable. Action decomposition
+itself is deliberately NOT baked into the golden (that is `tlc-safety-trace`'s projection). State
+rendering is normalized to one line with TLC's conjunct prefixes stripped.
+
+**New `tools/gen-stream-tests.py`** emits `desk/tests/lib/stream.hoon`, comparing `+solve-init`
+and `+solve-next` (per initial state) against the golden byte-for-byte, reusing `+render-state`
+(already TLC-identical for traces). **28 cases green, 0 FAILED** — branch order, `\E` element
+order, and partial-next threading are now differentially proven.
+
+Two case shapes are skipped, deliberately and with the reason in the generator docstring:
+SPECIFICATION-form configs (no INIT/NEXT pair to drive — R1.5.13/WU8) and configs declaring
+CONSTANT (`+solve-init`/`+solve-next` take a module, not a config; that path runs through
+`run-check`, whose verdict/counts the SafetyDump differential covers, and the single such case
+`symmetry` has its own parity row). Measured: only 1 of 15 INIT/NEXT cases is constant-dependent.
+
+`tlc-safety-stategen` `partial → parity` (ledger parity 64→65, partial 23→22).
+
+**Also fixed two registration gaps in `tools/validate.py`** found while wiring this up:
+`gen-mp-tests.py` was never registered (my omission in R1.3.5.7.2, so its 112 cases were missing
+from the evidence counts), and `gen-safety-tests.py`'s note still read "no FP64/safety comparator
+yet — unit 7.1+" though those comparators have existed since unit 7.1. Both corrected.
