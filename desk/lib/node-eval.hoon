@@ -1015,6 +1015,30 @@
   =/  s  (~(get by psub) name.op.n)
   ?~(s n $(n u.s))
 ::
+++  deref-letin
+  ::  unwrap a LET whose body just names one of its own 0-ary definitions:
+  ::  `LET y == a' IN y` denotes the same occurrence as `a'`. tlc2's Tool
+  ::  pushes a LetInNode's definitions into the context and recurses on the
+  ::  body in action position, so a primed variable reached through a LET
+  ::  binding is still the action's assignment target (R1.5.9)
+  |=  n=sem:sm
+  ^-  sem:sm
+  =/  cur  n
+  |-  ^-  sem:sm
+  ?.  ?=(%letin -.cur)  cur
+  ?~  body.cur  cur
+  =/  b  u.body.cur
+  ?.  ?=(%apply -.b)  cur
+  ?.  ?=(~ args.b)  cur
+  =/  hit
+    =/  ls  lets.cur
+    |-  ^-  (unit sem:sm)
+    ?~  ls  ~
+    ?:  &(=(name.i.ls name.op.b) =(0 arity.i.ls))  body.i.ls
+    $(ls t.ls)
+  ?~  hit  cur
+  $(cur u.hit)
+::
 ++  assignable-sem
   ::  the variable name assigned by `lhs`, if it is an unbound assignable
   |=  $:  lhs=sem:sm  mode=?(%init %next)  vars=(set @t)
@@ -1022,6 +1046,8 @@
       ==
   ^-  (unit @t)
   =.  lhs  (deref-sem lhs psub)
+  ::  a LET-wrapped target resolves to the same assignable (R1.5.9)
+  =.  lhs  (deref-sem (deref-letin lhs) psub)
   ?.  ?=(%apply -.lhs)  ~
   =/  nm=(unit @t)
     ?:  =(%next mode)

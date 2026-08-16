@@ -302,17 +302,15 @@ TLC_BATCH = [
 # R1.5.1 closed the 7 `x \in S` / `x' \in S` / parameterized-action-operator
 # assignment specs; R1.5.2 closed SubsetEq (lazy `SUBSET A \subseteq SUBSET B`
 # reduction); R1.5.3 closed ConstantOperatorConfiguration (cfg constant-operator
-# `F(a) = v` enumeration bound as a function value). The one remaining residue is
-# a LET-wrapped primed ENABLED LHS (R1.5.x).
-_P = "Error: primed variable is unassigned in the successor state"
-TLC_BATCH_DIVERGENCES = [
-    f"Github725d -> {_P}: a",
-]
+# `F(a) = v` enumeration bound as a function value); R1.5.9 closed Github725d --
+# `+deref-letin` unwraps a LET whose body names one of its own 0-ary definitions
+# before the `=`-LHS assignability test, so `(LET y == a' IN y) = 0` inside
+# ENABLED assigns `a'` exactly as tlc2's Tool does (it pushes a LetInNode's
+# definitions into the context and recurses on the body in action position).
+# The TLC batch now agrees on every spec.
+TLC_BATCH_DIVERGENCES = []
 # grouped cause, keyed by module
-TLC_BATCH_REASONS = {
-    "Github725d": "a LET-wrapped primed variable as the `=` LHS inside ENABLED "
-                  "is not recognized as assignable (R1.5.x)",
-}
+TLC_BATCH_REASONS = {}
 
 # NB (R1.5.7): a tier-2 TLC LIVENESS batch (clean single-file test-model specs
 # with a temporal PROPERTY) was wired and ship-run, and surfaced a SECOND, deeper

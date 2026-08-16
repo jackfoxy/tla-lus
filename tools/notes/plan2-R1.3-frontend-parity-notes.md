@@ -2350,3 +2350,42 @@ the `printLocation` name-span residual), `tlc-safety-trace` + `tlc-safety-stats`
 / wire label / `Back to state N`; out-degree histogram + wire exposure), `tlc-safety-assume` +
 `tlc-safety-invariant` (axiom/implied-init-action with the WU8 boundary; EC 2146). NEXT: R1.5.9
 (Github725d).
+
+### R1.5.9 — LET-wrapped primed LHS inside ENABLED (SHIP-VERIFIED, 2026-08-16)
+
+`Github725d`: `Inv == ENABLED ((LET y == a' IN y) = 0)`. Oracle first — `tlc2.TLC` reports
+**`Model checking completed. No error has been found.`**, 2 generated / 1 distinct: `ENABLED`
+finds the assignment `a' = 0`, so the invariant holds. The port failed the whole run with
+`[%failed reason='primed variable is unassigned in the successor state: a']`.
+
+**Root cause.** `+solve`'s `=` case asks `+assignable-sem` whether the LHS is an assignable
+target; that arm opens with `?. ?=(%apply -.lhs) ~`. The LHS here is a **`%letin`**, so it bailed
+immediately, the equality degraded to a FILTER, and evaluating the filter read `a'` out of an
+empty successor state → the typed failure. (`+solve` already descends into `%letin` NODES via
+`+solve-letin`; the gap was only a LET *as the `=` LHS*.) Confirmed from the semantic dump:
+`apply =` → `letin lets=1` (`def y arity=0` → `apply '` → `apply a`) with `in → apply y`.
+
+**Fix.** New `+deref-letin`: unwrap a LET whose body just names one of its own 0-ary definitions,
+recursively (`LET y == a' IN y` → `a'`), and call it in `+assignable-sem` between the existing
+`+deref-sem` passes (so a LET-wrapped call-by-name param also resolves). This mirrors tlc2's
+`Tool`, which pushes a `LetInNode`'s definitions into the context and recurses on the body in
+action position. Blast radius is one arm — no other `+deref-sem` caller changes.
+
+Result: `[%ok generated=2 distinct=1]`, byte-matching TLC. Control case `ENABLED (a' = 0)` still
+passes. Regression: neval-state + neval-action + neval-mc + safety-gen + inv-constraints — 61
+tests, **0 FAILED**. `tlc-eval-state` `partial → parity` (ledger parity 63→64, partial 24→23).
+De-censused `Github725d` — **`TLC_BATCH_DIVERGENCES` is now empty**, so with the SANY census
+already empty (R1.3.7) the **entire tier-2 census is clean**.
+
+PROCESS: I misread a stale tmux capture as "fix didn't work" (twice this project now). The tell is
+results appearing ABOVE the `+ /~zod/.../<rev>/...` build line. Always `clear-history`, re-run, and
+read the rev and the results from the SAME capture.
+
+**R1.5.9 final verification (2026-08-16).** Regenerated: `divergences.txt` now has **zero**
+non-comment lines — flat SANY batch **142/142**, TLC safety batch **14/14** (was 13/14), subdir
+SANY batch **295/295**. Ship: `tests/lib/tier2` `ok=%.y` with `test-tlc-batch` **OK** (the arm that
+carried `Github725d`, now an empty expected set), and `tests/lib/tier2-sub` `ok=%.y` with all six
+arms OK — 0 FAILED in both. `tier2.py --check` byte-reproducible. Also corrected `tools/tier2.py`'s
+hardcoded summary line, which still printed "13/14 agree" / "290/295 agree" (the same class of
+stale prose the R1.5.8 audit was about) — it now reports 142/142, 14/14, 295/295 and states the
+census is empty. **The tier-2 differential layer is fully clean in both shards.**

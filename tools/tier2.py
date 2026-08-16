@@ -72,13 +72,15 @@ def main() -> int:
           "comparator shard reproduce byte-identically from the pins.")
     print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
           "(R1.1.1), TLC verdict/distinct-count (R1.1.2), a 142-spec "
-          "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2, all 142 agree), a 14-spec "
-          "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3, 13/14 agree — the "
-          "1 left pins R1.5.x), and a "
-          "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3/R1.3.5, tier2-sub.hoon, 290/295 agree). "
+          "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2, 142/142 agree), a 14-spec "
+          "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3/R1.5.9, 14/14 agree), and a "
+          "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3/R1.3.5/R1.3.7, "
+          "tier2-sub.hoon, 295/295 agree). "
+          "The census is EMPTY: every in-scope spec agrees with the pinned oracle in both "
+          "shards (SANY closed by R1.3.7, the last TLC one by R1.5.9). "
           "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
-          "Known divergences: desk/test-data/tier2/divergences.txt.")
+          "Known divergences (now none): desk/test-data/tier2/divergences.txt.")
     return 0
 
 

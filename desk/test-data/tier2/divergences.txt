@@ -8,8 +8,7 @@
 # in one mule-isolated arm; 0 disagree with Java (142/142 agree):
 
 # tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
-# 1 disagree with TLC (13/14 agree):
-tlc-batch	Github725d -> Error: primed variable is unassigned in the successor state: a	a LET-wrapped primed variable as the `=` LHS inside ENABLED is not recognized as assignable (R1.5.x)
+# 0 disagree with TLC (14/14 agree):
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
 # 0 disagree with Java (295/295 agree):
