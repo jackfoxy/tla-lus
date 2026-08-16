@@ -2264,3 +2264,42 @@ HOON: `?=(~ params.th)` in a guard NARROWS the list so the following `|-`/`?~` l
 — widen with `=/  pl=(list spar)  params.th` (or don't guard, as `+l-def` doesn't).
 
 NEXT: R1.3.7.2 (etest5 EC 4200 + census/ledger close-out; census now 2 → 1).
+
+### R1.3.7.2 — nonexistent-module member (EC 4200) + close-out (SHIP-VERIFIED, 2026-08-15)
+
+**etest5** (`IF M!Init THEN ...` for a module M that does not exist). Minimal repro (no EXTENDS
+needed): SANY makes the reference `nullODN` and reports `D 4200 ERROR 5.17-5.20 Unknown operator:
+`Init'.` — note it names the **final identifier** (`Init`), unqualified, at that identifier's span.
+
+**Root cause.** The port already produced the matching `nullODN` but WITHOUT any diagnostic, so it
+accepted. `+g-genid` failed the qualified lookup (`M!Init`), fell through to `+g-sel`, which built
+a `$Sel` placeholder; the post-generation resolver `+resolve-one` then failed and returned
+`[%nullodn ~]` **silently** — that path carries no diagnostic plumbing at all (`+rsel-sem` /
+`+resolve-sels` return a bare sem).
+
+**Fix** (catch it before the selector path, not by plumbing diags through the resolver): `M!x`
+whose prefix base names nothing resolvable is not a subexpression selector. New
+`+genid-prefix-base` (first prefix element's identifier) + `+inst-prefix-known` (base is in scope
+as a symbol — a def/theorem carrying labels — OR some ctx key starts with `base!`, i.e. it is an
+instance whose members are imported). When neither holds, `+g-genid` emits `nullODN` + EC 4200
+naming the FINAL identifier at its span. The `base!`-prefix test is what keeps the legitimate
+cases working: `Inst!Bar`/`I!Thm2!lab3` still route to `+g-sel` because `Inst!…`/`I!…` members are
+in ctx, and label chains (`Op!lab`) pass because their base is a def in scope.
+
+Byte-exact vs SANY (code, span, unqualified name); verdict now `%reject`. sem 135/135 `ok=%.y`.
+
+**Close-out.** De-censused `etest5` (the last subdir-batch divergence); `semantic-graph`
+`partial → PARITY` (evidence gen-sem-tests 107) with its rationale rewritten to describe the three
+R1.3.7 fixes; `check-parity.py --check` well-formed (parity 59→60); compatibility.md's R1.3.5/.6
+residual section replaced by the R1.3.7 closure. Census across this session: **4 → 2 → 1 → 0**.
+
+DEBUG NOTE: a stale tmux capture cost a false negative here — the `+ /~zod/.../687/...` build line
+appearing AFTER the test output was the tell. Always `clear-history`, re-run, and confirm the rev
+in the same capture.
+
+**R1.3.7.2 final verification (2026-08-15).** Full `-test /=tla-lus=/tests` → **`ok=%.y`, ZERO
+FAILED** across the entire run (the first fully-green full suite — every previous run this session
+still carried `test52`). `tier2.py --check` byte-reproducible. `check-parity.py --check`
+well-formed, parity 60. Subdir SANY census **295/295 agree (empty)**; the only remaining tier-2
+divergence anywhere is `Github725d` (a TLC/R1.5 `ENABLED`-scoped primed-variable item, not
+front-end). **R1.3.7 COMPLETE → R1.3.6 COMPLETE → R1.3 front-end parity-complete.**

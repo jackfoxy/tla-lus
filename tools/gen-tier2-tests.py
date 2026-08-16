@@ -359,13 +359,12 @@ SUB_BATCH_DIVERGENCES = [
     # reconciliation, `prefixop`): the port's SANY verdict now AGREES with Java
     # (accept). De-censused in R1.3.6 (2026-08-15) after the tier2-sub arm
     # measured hoon==java (sub-5 actual empty). [was: "suite/test52 -> hoon=reject"]
-    # etest5 `IF M!Init ...` references a member of a NONEXISTENT module M;
-    # SANY rejects (EC 4200 `Unknown operator: Init` at the selector), the port
-    # under-rejects (`M!Init` resolves to the local `Init` def, ignoring the
-    # unknown instance prefix) and accepts. PRE-EXISTING (accepts on 624cae35,
-    # before R1.3.5.4) — a nonexistent-module member-ref gap surfaced by the
-    # R1.3.5.4 tier2-sub run, NOT introduced by it; not `!`-nav/proof. → R1.3.6.
-    "suite/etest5 -> hoon=accept",
+    # etest5 CLOSED by R1.3.7.2: `IF M!Init ...` for a NONEXISTENT module M —
+    # +g-genid now rejects a `M!x` whose prefix base names neither a symbol in
+    # scope nor an instance (no `M!<member>` in ctx) instead of falling through
+    # to the $Sel resolver (which silently resolved to the local `Init`), so the
+    # reference is nullODN with SANY's EC 4200 `Unknown operator: `Init'.` at the
+    # FINAL identifier's span.
     # suite/test203 closed by R1.3.3.1: `foo(n) == INSTANCE M WITH A <- g,
     # b <- n` is a parametrized instance (Gap A) — an R1.3.3.4 target closed
     # early by the parametrized-parameter fix.
@@ -412,7 +411,6 @@ SUB_BATCH_REASONS = {
     # CHOOSE), test23 (LOCAL defs), etest16 (dup record fields, EC 4262).
     # test214 closed by R1.3.5.4.3 (USE/HIDE EC 4357). test52 closed by
     # R1.3.5.1 (prefixop), de-censused R1.3.6.
-    "suite/etest5": "`M!Init` member of a nonexistent module M — port resolves to the local `Init` def and under-rejects (SANY: EC 4200 Unknown operator); pre-existing (before R1.3.5.4), not `!`-nav/proof → R1.3.6",
     # test206/test219a are NOT the "\E/SUBSET under substitution" gap the plan
     # expected — that already works; both fail on labels / `!`-subexpression
     # selectors (test206 at PARSE, test219a on `Op!lab`), the R1.3.5 residue.

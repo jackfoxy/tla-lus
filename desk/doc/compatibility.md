@@ -401,18 +401,28 @@ the stale census entry was the sole remaining `-test` failure (`tier2-sub/test-s
 measured hoon==java). R1.3.6 removed it from `SUB_BATCH_DIVERGENCES`, so the full suite is
 now green.
 
-One residual keeps `semantic-graph` at `partial`, census-tracked and owned outside R1.3.5:
+**R1.3.7 closed the instance-member residuals**, so `semantic-graph` is at `parity` and
+the front-end SANY census is empty:
 
-- `suite/test206`/`test217`/`test219` — parametrized/nested-instance member-application
-  arity (`Inst2(COp!@!++)!Foo(..)`, `I(x')!Foo`, EC 4204): the instance-element/param
-  argument is uncounted, so arity/level under-checks. This is the **R1.3.3
-  instance-member follow-up**; not `!`-nav (that mechanism is complete — `test219a`
-  accepts). `suite/etest5` (an `M!Init` member of a nonexistent module — the port
-  resolves to the local `Init` and under-rejects) is a separate module-resolution gap,
-  also census-tracked.
+- **Member-application arity (EC 4204).** A parametrized instance imports its members with
+  the instance parameters prepended (`Inst2(A5(_,_,_,_,_)) == INSTANCE M` gives `Inst2!Foo`
+  arity 6), and an application supplies the instance argument in that leading position. The
+  arguments carried by the general identifier's `M(args)!` prefix are now welded onto the
+  application's own before the arity check (`+genid-prefix-args`), retiring a spurious 4204
+  on `Inst2(COp!@!++)!Foo(1..5)`, `I(x)!OOp2`, and the nested `L!Inst2!Foo`.
+- **Member-application level (EC 4205).** A member reference with no trailing argument list
+  (`I(x')!Foo`) applies the instance arguments too, and a theorem imported through a
+  parametrized instance carries the instance formals (`sem-thm` gains `params`) whose
+  maxLevels come from the body's level constraints (`+thm-pkeys`/`+thm-maxl`, with `+l-thm`
+  scoping the formals as `+l-def` does). A variable-substituting formal is constrained to
+  level 1, so the action-level argument `x'` raises SANY's two level errors.
+- **Nonexistent-module member (EC 4200).** `M!x` whose prefix base names neither a symbol in
+  scope nor an instance (nothing in scope under `M!…`) is not a subexpression selector: it
+  becomes `nullODN` with `Unknown operator: \`x'.` at the final identifier's span, instead of
+  falling through to a same-named local definition (`+inst-prefix-known`).
 
-These remain in `tier2/divergences.txt` (census-tracked, so no silent regression); the
-`tier2.py --check` census reproduces byte-identically.
+`tier2/divergences.txt` now records no subdir-batch divergence, and the `tier2.py --check`
+census reproduces byte-identically.
 
 ## Unit 7 (B6) — Safety model checking parity
 

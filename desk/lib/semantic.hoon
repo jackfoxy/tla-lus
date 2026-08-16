@@ -1835,6 +1835,34 @@
   ?~  parts  ~
   `(rap 3 `(list @t)`parts)
 ::
+++  genid-prefix-base
+  ::  the FIRST prefix element's identifier of a general identifier
+  ::  (`M` in `M!x!y`); ~ when there is no named prefix element
+  |=  n=node
+  ^-  (unit @t)
+  =/  kids  (kids-of n)
+  =/  pfxs  (skim kids |=(k=node (is-kind k %n-idprefix)))
+  ?~  pfxs  ~
+  =/  elems  (kids-of i.pfxs)
+  ?~  elems  ~
+  ?.  (is-kind i.elems %n-idprefixelement)  ~
+  =/  ek  (kids-of i.elems)
+  ?~  ek  ~
+  ?.  &(?=(%leaf -.i.ek) =(%identifier (leaf-kind i.ek)))  ~
+  `(leaf-text i.ek)
+::
+++  inst-prefix-known
+  ::  whether `base` names something a `base!…` selector could resolve
+  ::  through: a symbol in scope (a definition or theorem carrying labels)
+  ::  or an instance, whose members are in scope under `base!<member>`
+  |=  [c=ctx base=@t]
+  ^-  ?
+  ?:  (~(has by c) base)  &
+  =/  pre  (rap 3 ~[base '!'])
+  =/  pl  (lent (trip pre))
+  %+  lien  ~(tap in ~(key by c))
+  |=(k=@t =(pre (crip (scag pl (trip k)))))
+::
 ++  genid-prefix-args
   ::  the argument expressions carried by a general identifier's `M(args)!`
   ::  prefix elements, in prefix order.  A parametrized instance imports its
@@ -1903,6 +1931,18 @@
     :*  %apply  [nm kind.u.s]  (expr-level n c)  (span-of:ast n)
         ~  ~  out.ga
     ==
+  ::  `M!x` whose prefix base names NOTHING resolvable — neither a symbol
+  ::  in scope (a def/theorem carrying labels) nor an instance (whose
+  ::  members are in scope as `M!<member>`) — is not a subexpression
+  ::  selector: SANY makes the reference nullODN and reports the FINAL
+  ::  identifier unknown, rather than falling through to a same-named local
+  ::  definition (`IF M!Init` for a nonexistent M — R1.3.7.2)
+  =/  pbase  (genid-prefix-base n)
+  ?:  ?&(?=(^ pbase) !(inst-prefix-known c u.pbase))
+    :-  `[%nullodn ~]
+    :_  ~
+    %^  derr  4.200  (span-of:ast idn)
+    "Unknown operator: `{(trip (leaf-text idn))}'."
   ::  an unresolved subexpression selector (a non-empty `!`-prefix that is
   ::  not an in-scope instance member) -> a $Sel placeholder for the
   ::  post-generation resolver (+g-sel builds it for a pure %name/label
