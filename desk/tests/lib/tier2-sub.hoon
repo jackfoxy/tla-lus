@@ -220,8 +220,7 @@
 ++  test-sany-sub-4
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test217 -> hoon=accept'
-    ==
+    ~
   !>
   %-  sub-batch-run
   ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])

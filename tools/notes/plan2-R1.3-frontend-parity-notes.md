@@ -2230,3 +2230,37 @@ regenerated (census 4 → **2** subdir divergences: etest5, test217), redeployed
 Remaining for R1.3.7: `.1b` test217 (EC 4205 level — the instance arg's LEVEL, a different path:
 `I(x')!Foo` must level-check `x'` against `I!Foo`'s formal), `.2` etest5 (EC 4200) + census/ledger
 close-out. NEXT: R1.3.7.1b.
+
+### R1.3.7.1b — instance-member application LEVEL, EC 4205 (SHIP-VERIFIED, 2026-08-15)
+
+`suite/test217` (`I(z) == INSTANCE test217a WITH y <- z`; `FooBar == I(x')!Foo`;
+`THEOREM I({x'})!Foo`) — the port ACCEPTED where SANY rejects with two EC 4205. THREE layered
+causes, each found by measurement (a scratch `tests/lib/t217.hoon` probe cut the iteration from
+~25 min of tier2-sub to ~250 ms; removed after):
+
+1. **The argument was never applied.** `I(x')!Foo` has NO trailing `(args)`, so it takes the
+   0-ary `+g-genid` path — `.1a`'s fix was in `+g-opapply` and did not cover it. `+g-genid` now
+   generates the general-id's prefix arguments (`+genid-prefix-args` from `.1a`) via the existing
+   HO-aware `+gen-sel-args`, and emits them as the application's args. The tree then matched
+   SANY's EXACTLY (`apply I!Foo` L2 with the `apply '`/`apply x` child).
+2. **A theorem definition had no parameters.** `sem-thm` lacked a `params` field, so an imported
+   theorem could not carry the instance formals; both thmdef oplev registrations hardcoded
+   `ary=0, maxl=~`, and `+mxl-of` fell back to 3 — no 4205 possible. Added `params=(list spar)`
+   to `sem-thm` (3 construction sites: 2 in `+g-thm` → `~`, 1 in `+g-instance`'s `ithms` → the
+   instance's `isps`); the two registrations now build `ary`/`pars`/`maxl` via new `+thm-pkeys`
+   / `+thm-maxl` (maxLevels = the body's level constraint per formal, exactly as `+l-def`).
+3. **The constraint keyed on the wrong owner.** `+l-thm` checked the body WITHOUT binding the
+   formals, so `lc` keyed `z` to the enclosing scope, not the thmdef — `+thm-maxl`'s lookup
+   missed and returned 3. `+l-thm` now binds its params into `scope` with owner = the thmdef
+   name (mirroring `+l-def`) when the theorem is named.
+
+Result: `lc={z<=1}` (a VARIABLE substitution) → `maxLevels=[1]`, and the action-level argument
+`x'` (L2) draws both diagnostics — byte-matching SANY: `D 4205 ERROR 5.11-5.19` +
+`D 4205 ERROR 6.9-6.19` `Level error in applying operator I!Foo:`. Verdict now `%reject`.
+
+**Verification.** sem suite 135/135 `ok=%.y` — all 18 frozen instance/level goldens byte-identical
+across the mold change AND the new level scoping. De-censused test217; regenerating.
+HOON: `?=(~ params.th)` in a guard NARROWS the list so the following `|-`/`?~` loop is `mint-vain`
+— widen with `=/  pl=(list spar)  params.th` (or don't guard, as `+l-def` doesn't).
+
+NEXT: R1.3.7.2 (etest5 EC 4200 + census/ledger close-out; census now 2 → 1).

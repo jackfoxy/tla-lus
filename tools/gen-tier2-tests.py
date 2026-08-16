@@ -375,13 +375,13 @@ SUB_BATCH_DIVERGENCES = [
     # resolve as ThmOrAssumpDefKind, .4.1); test214 now rejects with exactly
     # EC 4357 on `HIDE bar, TRUE` (.4.3). Proofs walk clean without projection
     # (.4.2, SemDump renders getTheorem() only).
-    # test217 is the OTHER direction (hoon=accept / java=reject): a
-    # parametrized-instance MEMBER APPLICATION `I(x')!Foo` — the instance-element
-    # arg `x'` (action level) must be APPLIED to the member `I!Foo` (SANY: a
-    # level error, EC 2xxx); the port drops the arg (`apply I!Foo`, no args,
-    # L0) so it under-checks and accepts. Same instance-member gap as test206/
-    # test219 (this is its level-error variant), R1.3.3 follow-up — NOT `!`-nav.
-    "suite/test217 -> hoon=accept",
+    # test217 CLOSED by R1.3.7.1b: a parametrized-instance member reference
+    # `I(x')!Foo` with no trailing arg list APPLIES the instance arguments to
+    # the member (+g-genid now generates them via +genid-prefix-args), and an
+    # imported THEOREM carries the instance formals (sem-thm `params`), so its
+    # oplev gets arity + maxLevels from the body's constraints (`z<=1`, a
+    # VARIABLE substitution) — the action-level argument `x'` now draws SANY's
+    # two EC 4205 level errors.
     # test219a CLOSED by R1.3.5.3 (`!`-subexpression navigation): label refs,
     # structural/@/op-symbol selectors, and the unbounded-CHOOSE fix (.3.7).
     # test51 + test42 closed by R1.3.3.3 (operator-symbol parameter in a def).

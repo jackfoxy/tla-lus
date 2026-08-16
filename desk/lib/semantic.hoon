@@ -1172,6 +1172,12 @@
       lvl=@ud
       at=sspan
       body=(unit sem)
+      ::  SANY's ThmOrAssumpDefNode carries formal parameters: a theorem
+      ::  imported through a PARAMETRIZED instance takes the instance's
+      ::  formals (`I(z) == INSTANCE M` makes `I!Thm` arity 1), so an
+      ::  application `I(x')!Thm` level-checks its argument against them
+      ::  (EC 4205).  Empty for an ordinary named theorem (R1.3.7.1b)
+      params=(list spar)
   ==
 ::  one INSTANCE substitution as level checking sees it: the instanced
 ::  module's parameter (with its declaration kind) and the substituting
@@ -1882,7 +1888,21 @@
     ?~(pfx nm (rap 3 ~[u.pfx nm]))
   =/  s  (~(get by c) nm)
   ?^  s
-    [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
+    ::  a parametrized-instance member reference with no trailing argument
+    ::  list — `I(x')!Foo` — still APPLIES the instance arguments to the
+    ::  member (+g-instance prepends the instance params to its arity), so
+    ::  they become the application's arguments and are level-checked
+    ::  against the member's maxLevels (SANY: EC 4205 when a variable-
+    ::  substituting argument exceeds them).  R1.3.7.1b
+    =/  pargs  (genid-prefix-args n)
+    ?~  pargs
+      [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
+    =/  ga  (gen-sel-args pargs parg.u.s c)
+    :_  ds.ga
+    :-  ~
+    :*  %apply  [nm kind.u.s]  (expr-level n c)  (span-of:ast n)
+        ~  ~  out.ga
+    ==
   ::  an unresolved subexpression selector (a non-empty `!`-prefix that is
   ::  not an in-scope instance member) -> a $Sel placeholder for the
   ::  post-generation resolver (+g-sel builds it for a pure %name/label
@@ -2530,10 +2550,10 @@
     ?~(bs ~ `i.bs)
   ?:  &(?=(^ body) (is-kind u.body %n-assumeprove))
     =/  gap  (g-assumeprove u.body c)
-    [[nm | lvl.gap (span-of:ast u) r.gap] ds.gap]
+    [[nm | lvl.gap (span-of:ast u) r.gap ~] ds.gap]
   =/  gb=gout  ?~(body [~ ~] (g-x u.body c))
   =/  lvl  ?~(body 0 (expr-level u.body c))
-  [[nm | lvl (span-of:ast u) r.gb] ds.gb]
+  [[nm | lvl (span-of:ast u) r.gb ~] ds.gb]
 ::
 ++  hide-facts
   ::  the fact nodes of a USE/HIDE unit: the %node kids ahead of the
@@ -2767,6 +2787,7 @@
           ilvl
           (span-of:ast u)
           `wbody
+          isps
       ==
     $(bus t.bus, out [wthm out], ds (weld ds ds.gt))
   :*  -.idefs
@@ -4480,6 +4501,24 @@
   =/  base  (oplev-fresh own df)
   base(maxl (reap arity.df 2), wgts (reap arity.df 1))
 ::
+++  thm-pkeys
+  ::  a theorem definition's formal-parameter keys, in declaration order
+  ::  (empty for an ordinary named theorem) — R1.3.7.1b
+  |=  th=sem-thm
+  ^-  (list lkey)
+  ?~  name.th  ~
+  (turn params.th |=(p=spar `lkey`[u.name.th name.p %formal-param]))
+::
+++  thm-maxl
+  ::  maxLevels for a theorem definition's formals: the body's level
+  ::  constraint on each formal, exactly as +l-def derives a definition's
+  ::  (a parameter substituted for a VARIABLE is constrained to 1, so an
+  ::  action-level argument at the application draws EC 4205) — R1.3.7.1b
+  |=  [th=sem-thm ks=(list lkey) lc=(map lkey @ud)]
+  ^-  (list @ud)
+  %+  turn  ks
+  |=(k=lkey (~(gut by lc) k 3))
+::
 ++  l-def
   ::  OpDefNode.levelCheck: check the body with the formal parameters
   ::  in scope, then derive the operator's level data. Monotonic across
@@ -4607,7 +4646,21 @@
   |=  [th=sem-thm e=lenv]
   ^-  [th=sem-thm r=lres ds=(list sdiag)]
   ?~  body.th  [th lres-nil ~]
-  =/  gb  (l-x u.body.th e)
+  ::  a theorem imported through a parametrized instance carries the
+  ::  instance's formals: bind them in scope (owner = the thmdef name) so
+  ::  the body's level constraints key on THIS definition's parameters,
+  ::  which is what +thm-maxl reads for the 4205 check (R1.3.7.1b)
+  =/  e2
+    ?~  name.th  e
+    %_  e
+        scope
+      =/  acc  scope.e
+      =/  pl=(list spar)  params.th
+      |-  ^-  (map @t lkey)
+      ?~  pl  acc
+      $(pl t.pl, acc (~(put by acc) name.i.pl [u.name.th name.i.pl %formal-param]))
+    ==
+  =/  gb  (l-x u.body.th e2)
   [th(lvl lvl.r.gb, body `s.gb) r.gb ds.gb]
 ::
 ++  l-inst
@@ -5109,7 +5162,9 @@
                ops
              %+  ~(put by ops.eo)  u.name.th.gt
              ^-  oplev
-             :*  lvl.r.gt  ok.r.gt  0  |  ~  ~  ~  ~  ~
+             =/  tk  (thm-pkeys th.gt)
+             :*  lvl.r.gt  ok.r.gt  (lent params.th.gt)  |
+                 (thm-maxl th.gt tk lc.r.gt)  ~  ~  ~  tk
                  lp.r.gt  lc.r.gt  ac.r.gt  ap.r.gt  all.r.gt  nlp.r.gt  ~
              ==
            ==
@@ -5249,7 +5304,9 @@
           ops
         %+  ~(put by ops.eo)  u.name.th.gt
         ^-  oplev
-        :*  lvl.r.gt  ok.r.gt  0  |  ~  ~  ~  ~  ~
+        =/  tk  (thm-pkeys th.gt)
+        :*  lvl.r.gt  ok.r.gt  (lent params.th.gt)  |
+            (thm-maxl th.gt tk lc.r.gt)  ~  ~  ~  tk
             lp.r.gt  lc.r.gt  ac.r.gt  ap.r.gt  all.r.gt  nlp.r.gt  ~
         ==
       ==
