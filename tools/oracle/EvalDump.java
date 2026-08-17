@@ -1,3 +1,4 @@
+import tlc2.tool.EvalException;
 import tlc2.tool.impl.FastTool;
 import tlc2.value.impl.Value;
 import tla2sany.semantic.ModuleNode;
@@ -22,7 +23,7 @@ import java.util.Comparator;
  *   EVAL
  *   <name> <kind> <canonical-value>          (kind = value class, UID-free)
  * or
- *   <name> ! <ExceptionClass>: <message>     (a typed evaluation failure)
+ *   <name> ! EC<code> <ExceptionClass>: <message>   (a typed evaluation failure)
  *
  * Java object identities, coverage counters, and timing are excluded; values
  * render via Value.toString (TLC's canonical rendering, as the REPL uses).
@@ -57,11 +58,20 @@ public final class EvalDump {
         Value v = (Value) tool.eval(d.getBody());
         out.append(name).append(" ").append(kind(v)).append(" ").append(v.toString()).append("\n");
       } catch (Throwable t) {
-        out.append(name).append(" ! ").append(t.getClass().getSimpleName())
+        out.append(name).append(" ! ").append(ec(t))
+           .append(t.getClass().getSimpleName())
            .append(": ").append(msg(t)).append("\n");
       }
     }
     System.out.print(out);
+  }
+
+  /** `EC<code> ` for a typed TLC failure, empty otherwise (as ModuleOpDump). */
+  private static String ec(Throwable t) {
+    if (t instanceof EvalException) {
+      return "EC" + ((EvalException) t).getErrorCode() + " ";
+    }
+    return "";
   }
 
   private static String kind(Value v) {

@@ -9,18 +9,20 @@ them yet; those cases prove nothing about parity until a comparator lands.
 |---|---|---|---|---|
 | `gen-lexer-tests.py` | 270 | pass | Lexer (boundary + syntax corpus) | `desk/tests/lib/lexer/*.hoon` |
 | `gen-parser-tests.py` | 249 | pass | Parser (syntax corpus accept/reject) | `desk/tests/lib/corpus-*.hoon` |
-| `gen-parse-err-tests.py` | 34 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/parse-err.hoon` |
+| `gen-parse-err-tests.py` | 99 | pass | Parse-error diagnostics (PErrors text) | `desk/tests/lib/parse-err.hoon` |
 | `gen-bnf-manifest.py` | 35 | pass | BNF grammar productions | `desk/tests/lib/bnf.hoon` |
 | `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/modres.hoon` |
-| `gen-sem-tests.py` | 91 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
+| `gen-sem-tests.py` | 107 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/eval.hoon` |
 | `gen-mc-tests.py` | 7 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(PlusCal excluded from PLAN-2 scope — R1.0; goldens kept, translator not ported)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/cfg.hoon` |
 | `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/cfg-val.hoon` |
-| `gen-core-eval-tests.py` | 9 | oracle-only | Core value/evaluation (Tool.eval) | `(evaluator is lib/node-eval — R1.0; this corpus's Hoon comparator is owed, R1.4)` |
-| `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(no FP64/safety comparator yet — unit 7.1+)` |
+| `gen-core-eval-tests.py` | 9 | pass | Core value/evaluation (Tool.eval) | `desk/tests/lib/core-eval.hoon` |
+| `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(verdict/stats/trace projection; the Hoon comparators live in tests/lib/{mc,inv-constraints,safety-gen,trace,stats,symmetry} and, for the ordered state streams, gen-stream-tests below)` |
+| `gen-stream-tests.py` | 35 | pass | Ordered init/next state streams (Tool.getInitStates/getNextStates) | `desk/tests/lib/stream.hoon (R1.5.10): lib/node-eval +solve-init/+solve-next reproduce the ordered streams byte-for-byte over the safety corpus (28 cases; SPECIFICATION-form and cfg-CONSTANT cases are covered by run-check/tlc-safety-symmetry instead)` |
+| `gen-mp-tests.py` | None | pass | TLC output messages (tlc2.output.MP.getMessage) | `desk/tests/lib/mp.hoon (R1.3.5.7.2/.3): lib/diagnostics +mp-message/+diag-render byte-match MP.getMessage over the reachable EC set in both -tool and plain modes (112 cases)` |
 | `gen-stdops-tests.py` | 11 | pass | StandardModule overrides (tlc2.module registry) | `desk/tests/lib/stdops-diff.hoon` |
 | `gen-liveness-tests.py` | 16 | pass | Single-worker liveness (tlc2.TLC/LiveCheck) | `Hoon comparators over the pin's goldens: tests/lib/temporal{,-struct} (8.1 normal form), tests/lib/tableau (8.2), tests/lib/liveness-product (8.3), tests/lib/liveness-accept/-verdict (8.4/8.5), tests/lib/liveness-lasso (8.6, whole out.txt, 10 cases), tests/lib/liveness-message (8.7). Production runs the 8.2-8.6 engine through the job kernel (8.8); pure []P box-state routes to the invariant engine (8.9). leadsto-pass matches in the differential (VERDICT ok) but is production-deferred on SPECIFICATION-form config (unit-5 residue). Excluded: symmetry-live (8.7 approved-difference)` |
 | `gen-rng-tests.py` | 8 | pass | java.util.Random PRNG (tlc2.util.RandomGenerator) | `desk/tests/lib/rng.hoon (unit 9.1): lib/rng nextInt/nextLong/nextDouble/nextPrime + setSeed(seed,cnt) vs the JVM over 8 seeds` |
@@ -28,6 +30,6 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-sim-live-tests.py` | 10 | pass | Temporal property in simulation (LiveCheck.checkTrace) | `desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`` |
 | `gen-sim-stats-tests.py` | 7 | pass | Simulation statistics (SimulationWorkerStatistics) | `desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`` |
 
-Compared cases: **870**.  Oracle-only cases: **27**.
+Compared cases: **995**.  Oracle-only cases: **18**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

@@ -39,10 +39,10 @@ failures in the existing ones.
 Observable in `toString`, so it is a real parity item — small, and R1.4.1's differential
 will hold it.
 
-### Value-class column: approved difference
+### Value-class column
 
-The oracle's first column is the Java class name; the port's `+vkind` is its own ADT tag.
-The mapping measured over the corpus is **not injective** —
+The oracle's first column is the Java class name; `+vkind:value` is the port's own ADT tag.
+The raw mapping measured over the corpus is **not injective** —
 
 ```
 BoolValue -> bool    FcnRcdValue -> fcn    IntValue -> int
@@ -51,21 +51,21 @@ RecordValue -> rec   SetEnumValue -> set   SubsetValue -> set
 StringValue -> str   TupleValue -> seq
 ```
 
-`SetEnumValue` and `SubsetValue` both land on `set` because the port has no lazy-subset
-representation, and their `toString` agrees anyway. **R1.4.1 compares the rendered value
-text only**; the class-name column is a Java representation detail and is recorded as an
-approved difference. Nothing observable is lost — the `Dom` case proves a class difference
-that *does* matter still shows up in the text.
+**Superseded by R1.4.1**: `+kind-name:check` already maps the port's tags back to the
+oracle's class names, so the column *is* compared. The non-injectivity shows up as exactly
+one skipped definition (`ev-sets/Sub`, `SubsetValue` vs `SetEnumValue`) — see below.
 
 ### Harness gap found (drives R1.4.1's shape)
 
 `+eval-module-def:node-eval` takes `(modname, sources, defname)` and **no config**, so the
 two cases whose definitions read `.cfg` CONSTANTs (`ev-config`: `N = 5`, `K = 3`;
-`ev-model`: `MV = m0`, `MS = {a, b, c}`) cannot be driven through it at all. This is the
-same shape as the `StreamDump` CONSTANT skip (R1.5.10) — but here it must be *closed*, not
-skipped, because 6 of the 61 goldens are behind it. R1.4.1's comparator must build the
-constant environment from `A.txt` (the `+make-env:node-eval` `consts` slot already exists;
-`run-check` already populates it at `check.hoon:1284`) rather than adding a skip rule.
+`ev-model`: `MV = m0`, `MS = {a, b, c}`) cannot be driven through it at all. 6 of the 61
+goldens are behind it, so it must be *closed*, not skipped.
+
+**Closed in R1.4.1 without new code**: `+project-defs:check` — written for the C1.8 stdops
+differential — already builds `(make-env:ne defs (const-map cfg) (vars-of:ne mo))` and
+already renders the oracle's projection via `+kind-name`. Both `ev-config` and `ev-model`
+compare green through it.
 
 ### `ev-errors`: text, not capability
 
@@ -119,6 +119,50 @@ But excluded surfaces are excluded *as typed rejections*, and `node-eval:126` re
 `[%| 0 'decimal (Real) literals are unsupported.']` — **EC 0**, i.e. unclassified, unlike its
 neighbour at `:122` which carries EC 2265. That inconsistency is R1.4.5's (classification and
 wiring), not a new evaluator capability.
+
+## R1.4.1 — the `EvalDump` comparator (done)
+
+`tools/gen-core-eval-tests.py` gained the differential half: it emits
+`desk/tests/lib/core-eval.hoon`, one arm per case, running every arity-0 definition through
+`+project-defs:check` and comparing against the oracle's own projection line for line.
+**58 compared definitions across the 9 cases, all green** (rev 722, `ok=%.y`).
+`validate.py` flips the generator `oracle-only` → `pass`.
+
+No new comparator machinery was needed — `+project-defs:check` already did the work
+(constant environment from the `.cfg`, `+kind-name` for the oracle's class column,
+`! EC<code> <message>` for typed failures, an explicit per-arm skip list). This is the same
+shape `gen-stdops-tests.py` emits, so the two differentials read alike.
+
+**One oracle change was required.** `EvalDump` printed `! <ExceptionClass>: <message>` with
+no error code, while `+project-defs` emits `! EC<code> <message>` — every error line would
+have mismatched. `EvalDump` now carries the `EC<code> ` prefix for an `EvalException`,
+copied from `ModuleOpDump.ec` (which had it since C1.2); the generator then strips the Java
+class name from both sides, since the class is a Java identity and the code is the
+behaviour. `ev-errors/DivZero` is byte-exact at **EC 2179**. Only `golden-eval.txt` for
+`ev-errors` changed under regeneration — the eight other goldens are byte-identical, so the
+new projection is additive.
+
+### The three skips, each with a named owner
+
+| case/def | why | owner |
+|---|---|---|
+| `ev-lookup/Dom` | `DOMAIN` of a tuple stays a lazy `IntervalValue 1..3` in TLC; the port enumerates it | R1.4.5b |
+| `ev-errors/BadDom` | the out-of-domain message does not render the function value | R1.4.5 |
+| `ev-sets/Sub` | a forced top-level `SUBSET {1, 2}` prints as `SetEnumValue`: the port has no lazy-subset *representation class*. The enumeration itself is lazy (`ecur`, `sexp-subseteq`), and the rendering agrees | approved difference |
+
+Anything not on that list must match, so a new divergence cannot appear silently.
+
+### Ledger
+
+- `tlc-enum` — `oracle-only` → **`approved-difference`** (the comparator it was waiting on
+  now exists; the residual is the `SubsetValue` projection artifact, not lazy enumeration).
+- `tlc-eval-error` — `oracle-only` → **`partial`**, residue narrowed to two named items for
+  R1.4.5.
+- `tlc-eval-node` — stays `partial`; the "differential is still oracle-only" half of its
+  residue is gone, leaving exactly recursive functions, multi-binder constructors, and the
+  `Dom` interval.
+
+Owed rows: 24 → **23**.
 
 ## Consequences for the plan
 
