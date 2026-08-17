@@ -19,7 +19,7 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(PlusCal excluded from PLAN-2 scope — R1.0; goldens kept, translator not ported)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/cfg.hoon` |
 | `gen-cfg-val-tests.py` | 13 | pass | Config-vs-graph validation (SpecProcessor) | `desk/tests/lib/cfg-val.hoon` |
-| `gen-core-eval-tests.py` | 9 | pass | Core value/evaluation (Tool.eval) | `desk/tests/lib/core-eval.hoon` |
+| `gen-core-eval-tests.py` | 13 | pass | Core value/evaluation (Tool.eval) | `desk/tests/lib/core-eval.hoon` |
 | `gen-safety-tests.py` | 16 | oracle-only | Single-worker safety (tlc2.TLC/ModelChecker) | `(verdict/stats/trace projection; the Hoon comparators live in tests/lib/{mc,inv-constraints,safety-gen,trace,stats,symmetry} and, for the ordered state streams, gen-stream-tests below)` |
 | `gen-stream-tests.py` | 35 | pass | Ordered init/next state streams (Tool.getInitStates/getNextStates) | `desk/tests/lib/stream.hoon (R1.5.10): lib/node-eval +solve-init/+solve-next reproduce the ordered streams byte-for-byte over the safety corpus (28 cases; SPECIFICATION-form and cfg-CONSTANT cases are covered by run-check/tlc-safety-symmetry instead)` |
 | `gen-mp-tests.py` | None | pass | TLC output messages (tlc2.output.MP.getMessage) | `desk/tests/lib/mp.hoon (R1.3.5.7.2/.3): lib/diagnostics +mp-message/+diag-render byte-match MP.getMessage over the reachable EC set in both -tool and plain modes (112 cases)` |
@@ -30,6 +30,6 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-sim-live-tests.py` | 10 | pass | Temporal property in simulation (LiveCheck.checkTrace) | `desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`` |
 | `gen-sim-stats-tests.py` | 7 | pass | Simulation statistics (SimulationWorkerStatistics) | `desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`` |
 
-Compared cases: **995**.  Oracle-only cases: **18**.
+Compared cases: **999**.  Oracle-only cases: **18**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

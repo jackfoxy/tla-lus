@@ -1,0 +1,8 @@
+EVAL
+C3 IntValue 3
+Card FcnLambdaValue ({} :> 0 @@ {1} :> 1 @@ {2} :> 1 @@ {3} :> 1 @@ {1, 2} :> 2 @@ {1, 3} :> 2 @@ {2, 3} :> 2 @@ {1, 2, 3} :> 3)
+E3 BoolValue FALSE
+Even FcnLambdaValue (0 :> TRUE @@ 1 :> FALSE @@ 2 :> TRUE @@ 3 :> FALSE @@ 4 :> TRUE)
+F5 IntValue 120
+FDom IntervalValue 0..5
+Fact FcnLambdaValue (0 :> 1 @@ 1 :> 1 @@ 2 :> 2 @@ 3 :> 6 @@ 4 :> 24 @@ 5 :> 120)

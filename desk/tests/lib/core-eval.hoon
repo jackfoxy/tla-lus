@@ -109,6 +109,35 @@
   %^  project-defs:check  '---- MODULE A ----\0aCONSTANT MV, MS\0aSameM == MV = MV\0aMem == MV \\in MS\0aMSet == MS\0a====\0a'  'CONSTANT MV = m0\0aMS = {a, b, c}\0a'
   ~
 ::
+++  test-multibind
+  ::  ExTup: tuple-pattern bounded quantifier at constant level; the port reports 'unbounded quantifier is not enumerable', which misdescribes a bound quantifier --- a site R1.4.0 did not name; R1.4.3
+  ::  G: function constructor over multiple binders --- R1.4.3
+  ::  GAt: function constructor over multiple binders --- R1.4.3
+  ::  GDom: function constructor over multiple binders --- R1.4.3
+  ::  H: function constructor over multiple binders --- R1.4.3
+  ::  SetMulti: set-of-all over multiple binders ('a set-of-all expects one bounded variable') --- a site R1.4.0 did not name, surfaced here; R1.4.3
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "AllMulti BoolValue TRUE"
+        "ExMulti BoolValue TRUE"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aG == [i \\in 1..2, j \\in 1..2 |-> i * 10 + j]\0aGAt == G[1, 2]\0aGDom == DOMAIN G\0aH == [i, j \\in 1..2 |-> i + j]\0aExMulti == \\E i \\in 1..3, j \\in 1..3 : i + j = 5\0aAllMulti == \\A i \\in 1..2, j \\in 1..2 : i + j > 1\0aExTup == \\E <<i, j>> \\in (1..2) \\X (1..2) : i = j\0aSetMulti == {i * j : i \\in 1..2, j \\in 1..3}\0a====\0a'  ''
+  ~['ExTup' 'G' 'GAt' 'GDom' 'H' 'SetMulti']
+::
+++  test-oparg
+  ::  A3: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
+  ::  A4: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
+  ::  Sel: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "A1 IntValue 6"
+        "A2 IntValue 7"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, Sequences\0aInc(n) == n + 1\0aApply(Op(_), x) == Op(x)\0aTwice(Op(_), x) == Op(Op(x))\0aFold(Op(_,_), a, b) == Op(a, b)\0aA1 == Apply(Inc, 5)\0aA2 == Twice(Inc, 5)\0aA3 == Apply(LAMBDA n : n * 2, 7)\0aA4 == Fold(LAMBDA a, b : a + b, 3, 4)\0aSel == SelectSeq(<<1, 2, 3, 4>>, LAMBDA n : n % 2 = 0)\0a====\0a'  ''
+  ~['A3' 'A4' 'Sel']
+::
 ++  test-primitives
   %+  expect-eq
     !>  ^-  (list tape)
@@ -127,6 +156,21 @@
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aPosInt == 42\0aNegInt == -7\0aZero == 0\0aYes == TRUE\0aNo == FALSE\0aEmpty == ""\0aStr == "hello"\0aEsc == "a\\"b"\0aIv == 3..7\0aEmptyIv == 5..2\0a====\0a'  '\0a'
   ~
 ::
+++  test-recfcn
+  ::  C3: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  Card: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  E3: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  Even: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  F5: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  FDom: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  Fact: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  %+  expect-eq
+    !>  ^-  (list tape)
+    ~
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, FiniteSets\0aFact[n \\in 0..5] == IF n = 0 THEN 1 ELSE n * Fact[n - 1]\0aF5 == Fact[5]\0aFDom == DOMAIN Fact\0aCard[s \\in SUBSET (1..3)] == IF s = {} THEN 0 ELSE 1 + Card[s \\ {CHOOSE y \\in s : TRUE}]\0aC3 == Card[{1, 2, 3}]\0aEven[n \\in 0..4] == IF n = 0 THEN TRUE ELSE ~Even[n - 1]\0aE3 == Even[3]\0a====\0a'  ''
+  ~['C3' 'Card' 'E3' 'Even' 'F5' 'FDom' 'Fact']
+::
 ++  test-sets
   ::  Sub: SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset representation, so the kind reads SetEnumValue (the rendering agrees)
   %+  expect-eq
@@ -143,5 +187,17 @@
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, FiniteSets\0aU == {1, 2} \\cup {2, 3}\0aI == {1, 2, 3} \\cap {2, 3, 4}\0aD == {1, 2, 3} \\ {2}\0aSub == SUBSET {1, 2}\0aBig == UNION {{1}, {2, 3}}\0aCard == Cardinality({5, 5, 6, 7})\0aIn == 2 \\in {1, 2, 3}\0aSq == {x * x : x \\in 1..3}\0aFilt == {x \\in 1..6 : x % 2 = 0}\0a====\0a'  '\0a'
   ~['Sub']
+::
+++  test-subbag
+  ::  Empty: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
+  ::  NSubs: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
+  ::  Subs: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "B FcnRcdValue <<1, 1>>"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Bags, Integers, FiniteSets\0aB == SetToBag({1, 2})\0aSubs == SubBag(B)\0aNSubs == Cardinality(SubBag(B))\0aEmpty == SubBag(EmptyBag)\0a====\0a'  ''
+  ~['Empty' 'NSubs' 'Subs']
 ::
 --

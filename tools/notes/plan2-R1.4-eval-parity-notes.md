@@ -164,6 +164,70 @@ Anything not on that list must match, so a new divergence cannot appear silently
 
 Owed rows: 24 → **23**.
 
+## R1.4.1b — corpus extension (done)
+
+R1.4.0 measured that the nine original cases reach **none** of the sites `lib/node-eval` names
+as unsupported, so R1.4.2/.3 had nothing to verify against. Four cases now exist to reach
+them, goldens captured at the pin:
+
+| case | targets | oracle loads |
+|---|---|---|
+| `ev-recfcn` | `$RecursiveFcnSpec` — `Fact[n \in 0..5]`, a `SUBSET`-domain recursion, a boolean one | 7 defs |
+| `ev-multibind` | multi-binder function constructor, multi-binder `\E`/`\A`, tuple-pattern `\E`, multi-binder set-of-all | 8 defs |
+| `ev-oparg` | operator-valued arguments: an operator NAME, and LAMBDAs at arity 1 and 2 | 5 defs |
+| `ev-subbag` | `Bags!SubBag` — the witness `tlc-module-body`'s residue names | 4 defs |
+
+Corpus 9 → **13 cases**, 61 → **82 golden definitions**.
+
+### What already works (measured, not assumed)
+
+Three of the twenty-one new definitions were expected to fail and do not:
+
+- `ev-multibind/ExMulti`, `ev-multibind/AllMulti` — **multi-binder `\E`/`\A` at constant level
+  already evaluate.** The plan lists `:1250`/`:1275` as unsupported, but those are the *action*
+  paths; the constant quantifier handles multiple bounds today.
+- `ev-oparg/A1`, `A2` — **an operator NAME passed as an argument already evaluates**
+  (`Apply(Inc, 5)` = 6, `Twice(Inc, 5)` = 7). The `:946`/`:1119` "unsupported operator-valued
+  argument" site is reached only by a **LAMBDA**.
+- `ev-subbag/B` — `SetToBag` evaluates; only `SubBag`'s own body is blocked.
+
+### Two sites R1.4.0 did not name, surfaced here
+
+1. **Set-of-all over multiple binders** — `{i * j : i \in 1..2, j \in 1..3}` gives
+   `a set-of-all expects one bounded variable`. Not in the plan's five-site table.
+2. **Tuple-pattern bounded quantifier at constant level** — `\E <<i, j>> \in (1..2) \X (1..2)`
+   gives `unbounded quantifier is not enumerable`, which **misdescribes the input**: the
+   quantifier is bounded. Both belong to R1.4.3.
+
+### The LAMBDA finding changes R1.4.3's scope
+
+`ev-oparg/A3`, `A4` and `Sel` fail because **LAMBDA is not in the WU3 semantic graph** — the
+identical residue `stdops-diff` already carries as a skip on `Sel`/`SelNone`
+(`tests/lib/stdops-diff.hoon:137`). This is unit-3 / front-end work, not evaluator work.
+**R1.4.3 cannot close the operator-valued-argument site for LAMBDA arguments**; it can only
+close the multi-binder ones. That is a dependency the plan did not record.
+
+### Oracle facts worth keeping
+
+- A recursive function evaluates to a **`FcnLambdaValue`**, a class no earlier case produced,
+  rendered `(0 :> 1 @@ 1 :> 1 @@ 2 :> 2 @@ …)` — *not* as a tuple, because `Fact`'s domain is
+  `0..5` and so does not start at 1. `+kind-name:check` has no `FcnLambdaValue` case yet.
+- `Card`'s domain is `SUBSET (1..3)` and the oracle emits its points in **`SubsetValue`
+  order** — `{}, {1}, {2}, {3}, {1,2}, {1,3}, {2,3}, {1,2,3}` — which R1.4.2 must reproduce.
+- The multi-binder constructor's point order is **first index fastest**:
+  `<<1,1>> :> 11 @@ <<2,1>> :> 21 @@ <<1,2>> :> 12 @@ <<2,2>> :> 22`. That is the iteration
+  order R1.4.3 owes, and it is *not* the order `DOMAIN G` prints (`GDom` is a normalized
+  `SetEnumValue`, sorted).
+- `SubBag(B)` renders a mixed set — `{<<>>, <<1>>, (2 :> 1), <<1, 1>>}` — because a bag whose
+  domain is `{2}` is not a tuple. `SubBag(EmptyBag)` is `{<<>>}`.
+
+### Suite discipline
+
+The twenty-one new definitions split 3 green / 18 skipped, each skip naming the increment that
+removes it (R1.4.2: 10, R1.4.3: 6, unit-3 LAMBDA: 3 — the last with no R1.4 owner). Compared
+definitions 58 → **63**. The shard stays green, and the skip list *is* the work list for
+R1.4.2/.3.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two
