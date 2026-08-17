@@ -2460,3 +2460,99 @@ reproduced and proven.
 `tlc-coverage` `partial → approved-difference` (ledger: parity 65, approved-difference 5→6,
 partial 22→21, terminal 98). compatibility.md's coverage bullet rewritten with the measurement,
 the test, and the scope note. trace suite green.
+
+### R1.5.12 — trace residues: `\E`-span closed, back-edge verified (PARTIAL, SHIP-VERIFIED, 2026-08-16)
+
+**`\E`-action span — CLOSED.** Measured from the pin first: `Tool.getActionsAppl` OPCODE_be
+ENUMERATES the bound set and recurses into `args[0]` once per element, carrying the binding in the
+element's `Context`. So every `\E`-derived action carries the **body's** span. Oracle on
+`Next == \E i \in 1..2 : x' = x + i`: `<Next line 5, col 25 to line 5, col 34 of module A>`; the
+port emitted the whole-quantifier span (col 9). Fixed in `+get-actions`.
+
+The first attempt — recursing into the body as the action, mirroring Java — produced
+`<unknown action>`: the label matcher re-solves each action, and the bare body `x' = x + i` has an
+unbound `i` (Java escapes this because each Action carries its element's Context). Final shape:
+keep ONE action whose BODY is still the whole quantifier (so it stays solvable) but whose **span**
+is the body's, which is what the label renders. One-vs-N is unobservable in the port: all N
+per-element actions share this label, the successor stream is already enumerated in element order
+by `+solve-exists` (proven by R1.5.10's stream differential), and coverage counts are an
+`approved-difference`. Verified byte-exact vs TLC; trace + mc + stream + sim-diff + sim-live all
+green (0 FAILED). HOON: `?&(=(op …) ?=(^ args.n))` does NOT carry the narrowing into the branch
+(`mull-grow`) — use a nested `?~` so `i.args.n` is proven.
+
+**`Back to state N:` — already closed, verified not assumed.** Implemented at check.hoon:1608 with
+per-action labels and byte-compared over the whole `out.txt` projection by
+`tests/lib/liveness-lasso` (8 back-to-state cases). The row's residue list was stale on this point.
+
+**NOT closed, so `.12` stays PARTIAL:**
+- `tlc-safety-trace`: the **job-kernel wire trace** still fills a single action for every state
+  (`job.hoon +trace-states`), though `trace-state` already carries a per-state `action` field.
+  Closing it needs a structured variant of `+edge-action-label` (it currently returns rendered
+  text) — contained, and NOT a wire-contract change.
+- `tlc-safety-stats`: the out-degree **distribution**. TLC reports
+  `min, round(mean), round(p95), max` from a `BucketStatistics` histogram
+  (`ModelChecker.java:890`); the port keeps only the max (`outdeg` in the cursor). The percentile
+  algorithm is readable and portable (`AbstractBucketStatistics.getPercentile`: bucket map,
+  `pos = (int)(obs * q)`, walk accumulating), but the histogram lives in the **jammed** BFS cursor
+  (a mold change with continuation-version implications) and exposing it needs a decision on the
+  **frozen** wire `run-stats` (4 fields today). That decision is the user's, not mine to take
+  unilaterally — hence split out rather than half-done.
+
+### R1.5.12b — out-degree distribution, wire per-state labels, migration collapse (2026-08-16)
+
+Three pieces, all enabled by the user's ruling that **nothing has been released**, so the wire
+contract is malleable and no deployed state needs migrating.
+
+**1. Out-degree distribution (`tlc-safety-stats` → parity).** The BFS cursor now keeps the
+**bucket histogram** tlc2's `BucketStatistics` keeps (`outdeg=(map @ud @ud)`, sample → count)
+instead of only the running max. `+od-stats` ports `AbstractBucketStatistics`: `min`,
+`Math.round(mean)` (integer form `(2*sum + obs) / (2*obs)`), `Math.round(getPercentile(.95))`
+(`pos = (int)(obs*q)`, then the first ascending bucket whose running count EXCEEDS `pos`), and
+`max` — exactly the four `ModelChecker.java:890` reports.
+
+Found a real bug doing it: a dequeued state with **no successors** never recorded its sample,
+but `Worker.outDegree.addSample(unseenSuccessorStates)` fires for every dequeued state, so a sink
+contributes a **0** and pulls `min` to 0. The oracle caught it — `deadlock-off` expected
+`[0 1 1 1]`, port gave `[1 1 1 1]`. Fixed on the `?~ nexts` path.
+
+Differential: `gen-stream-tests.py` now also compares the distribution against `SafetyDump`'s
+`STAT outdegree` — **7 cases, all green**, so the numbers are oracle-verified rather than
+self-asserted. Only after that did I update the ~19 in-repo test literals to the port's values.
+
+**2. Wire per-state trace labels (`tlc-safety-trace`).** New `+edge-action` (the structured
+sibling of `+edge-action-label`, which returns rendered text) yields `[name span]`, and
+`job.hoon`'s `+trace-states` now attributes each non-initial state to the getActions leaf that
+generated it, falling back to the whole-Next label. `finish-bfs` threads `bfs-opts` to build the
+action list + eval env. Lasso/simulate traces keep the single label (their action context is not
+threaded there).
+
+**3. Migration chain collapsed.** Verified first that every symbol in `lib/migrate.hoon` was
+migration-only — the two apparent external users were substring false positives (`op-0` matching
+`test-c-infix-op-005`, `root-name` matching `test-bundle-empty-root-name`). Deleted
+`lib/migrate.hoon` (204 lines) and `tests/lib/migrate.hoon` (13 arms), dropped the v0/v2
+migration tests and their fixtures from `tests/app`, and reduced `versioned-state` to the single
+current `$%(state-3)`. **Kept the architecture**: a version-tagged union + `;;`-coercing `on-load`
+with a `?-` dispatch, documented as the place a future `state-N` plugs in. Kept
+`test-on-load-coerces-a-stale-type` — rebased on a type-erased CURRENT state — because coercion
+still matters during development whenever a request mold is reshaped.
+
+**Documentation corrected** (the premise changed, so claims resting on it had to): `api.md` no
+longer says the wire is frozen — it says shapes may still change and freeze at first release;
+`tlc-safety-invariant`'s approved-difference no longer argues "the frozen contract carries no EC"
+(which was *we can't*) but states the design reason (*we chose*: consumers act on WHICH invariant
+failed, and initial-vs-behavior is already carried by trace length and the report).
+
+HOON: `?~`-narrowed lists break wet gates — `(snag 0 ks)`/`(rear ks)` on a narrowed list
+nest-fails with `-have.%~`; walk the list manually or widen with `=/ l=(list @ud)`.
+
+**R1.5.12b final verification (2026-08-17).** Full `-test /=tla-lus=/tests` → **`ok=%.y`, ZERO
+FAILED** across the whole suite (tier2 + tier2-sub + app + mar + every lib shard), on rev 713 with
+the migration chain removed and `run-stats` reshaped. `tlc-safety-trace` and `tlc-safety-stats`
+both `partial → parity`; ledger now **67 parity / 6 approved-difference / 19 partial, 100
+terminal**. Net deletions: `lib/migrate.hoon` (204 lines), `tests/lib/migrate.hoon` (13 arms), the
+v0/v2 fixtures in `tests/app`, and three dead state molds.
+
+CLAY GOTCHA worth remembering: deleting a file from the pier and running `|commit` did NOT remove
+it from Clay — `/tests/lib/migrate/hoon` kept failing to build until an explicit
+`|rm /=tla-lus=/lib/migrate/hoon` (and the tests path). Check for `- /~zod/desk/N/path` in the
+commit output; if it is absent, the file is still in the desk.

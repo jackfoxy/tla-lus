@@ -39,10 +39,10 @@
 ::
 ++  test-outdeg-diamond
   =/  s  (full toggles cfg)
-  (expect-eq !>([`@ud`4 `@ud`2]) !>([distinct.s outdeg.s]))
+  (expect-eq !>([`@ud`4 `@ud`2]) !>([distinct.s max.outdeg.s]))
 ++  test-outdeg-chain
   =/  s  (full chain cfg)
-  (expect-eq !>([`@ud`4 `@ud`1]) !>([distinct.s outdeg.s]))
+  (expect-eq !>([`@ud`4 `@ud`1]) !>([distinct.s max.outdeg.s]))
 ::
 ::  +|  slice-boundary resume equality: every counter is independent of budget
 ::

@@ -454,11 +454,11 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 256)
   ;:  weld
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>(%terminal) !>(stage.j))
     (expect-eq !>([3 3]) !>(progress.j))
     (expect-eq !>([%stage %parse]) !>((snag 0 evs)))
-    (expect-eq !>([%result %ok 5 4 0 4]) !>((rear evs)))
+    (expect-eq !>([%result %ok 5 4 0 4 [0 1 1 1]]) !>((rear evs)))
     (expect !>((~(has by artifacts.j) %report)))
     (expect !>(!(~(has by artifacts.j) %trace)))
     (expect-eq !>(~) !>(cont.j))
@@ -479,7 +479,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 256)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
     (expect !>((~(has by artifacts.j) %report)))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
@@ -502,13 +502,13 @@
 ++  test-check-deadlock
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req dead-spec mc-cfg) t0) 256)
-  (expect-eq !>(`[%violated [%deadlock ~] [3 3 0 3]]) !>(result.j))
+  (expect-eq !>(`[%violated [%deadlock ~] [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
     [[%check [| ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim |]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
-  (expect-eq !>(`[%ok [3 3 0 3]]) !>(result.j))
+  (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
 ++  test-pause-resume-every-boundary-safety
   (every-boundary (check-req cyc-spec mc-cfg) 1)
@@ -528,7 +528,7 @@
         lim  |
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
-  (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
 ::
 ::  a search whose persisted cursor is under the noun-size bound completes
 ::  normally (the limit is a defense-in-depth ceiling above max-states)
@@ -588,7 +588,7 @@
   =.  max-artifact.limits.req  4
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   ;:  weld
-    (expect-eq !>(`[%limited %artifact [5 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%limited %artifact [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>(~) !>(artifacts.j))
   ==
 ::  the state cap applies to a temporal (~>) run's graph build too, so the
@@ -620,7 +620,7 @@
   =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aINVARIANT Inv\0a'
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
-  (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
 ::
 ::  no INIT and no SPECIFICATION with state variables -> TLC_CONFIG 2231
 ++  test-config-missing-init
@@ -664,7 +664,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req live-spec live-good-cfg) t0) 256)
   ;:  weld
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>([3 3]) !>(progress.j))
   ==
 ::
@@ -674,7 +674,7 @@
   =/  art  (~(got by artifacts.j) %trace)
   ?>  ?=(%trace -.art)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'PBad'] [3 3 0 3]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'PBad'] [3 3 0 3 [1 1 1 1]]]) !>(result.j))
     (expect-eq !>(%safety) !>(kind.trace.art))
   ==
 ::
@@ -686,7 +686,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req live-spec lead-cfg) t0) 256)
   %+  expect-eq
-    !>(`[%violated [%property 'Lead'] [5 4 0 4]])
+    !>(`[%violated [%property 'Lead'] [5 4 0 4 [0 1 1 1]]])
   !>(result.j)
 ::
 ++  test-pause-resume-every-boundary-liveness

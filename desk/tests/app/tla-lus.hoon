@@ -2,7 +2,6 @@
 /+  *test
 /=  agent    /app/tla-lus
 /=  job-lib  /lib/job
-/=  mig      /lib/migrate
 |%
   ::  Agent-Level Tests For %tla-lus
   ::
@@ -174,26 +173,6 @@
       (expect-eq !>(progress.base) !>(progress:(need (reload-at i.reqs 2))))
     ==
   $(reqs t.reqs)
-::
-++  test-on-load-migrates-v0
-  =/  old
-    ^-  state-0:mig
-    :-  %0
-    %-  malt
-    ^-  (list [@ta job-0:mig])
-    :~  [~.old-done [%done [%check 60] 60 `%ok]]
-        [~.old-run [%running [%analyze 40] 25 ~]]
-    ==
-  =/  ag  `agent:gall`+:(~(on-load agent bol) !>(old))
-  =/  done  (need (scry-job ag ~.old-done))
-  =/  run   (need (scry-job ag ~.old-run))
-  ;:  weld
-    (expect-eq !>(`[%ok *run-stats]) !>(result.done))
-    (expect-eq !>([60 60]) !>(progress.done))
-    (expect-eq !>(`[%cancelled ~]) !>(result.run))
-    (expect-eq !>(%terminal) !>(stage.run))
-  ==
-::
 ::  +|  Authorization And Marks
 ::
 ::
@@ -289,9 +268,9 @@
     ::  final wake: stage, progress, result facts and no timer
     (expect-eq !>(3) !>((lent caz)))
     %+  expect-eq
-      !>([%job ~.j1 [%result [%ok [5 4 0 4]]]])
+      !>([%job ~.j1 [%result [%ok [5 4 0 4 [0 1 1 1]]]]])
     !>((fact-update (snag 2 caz)))
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>([total total]) !>(progress.j))
     (expect-eq !>(~) !>(diags.j))
   ==
@@ -586,69 +565,24 @@
     !>((fact-update (snag 1 caz)))
   ==
 ::
-::  +|  API Version And State Migration (unit 10.6)
-::
-::
-++  req-2
-  ::  a pre-unit-10 request, over the frozen mold
-  ^-  request-2:mig
-  :*  [%check [| ~ [%exhaustive &]]]
-      [%inline 'Demo' (malt ~[['Demo' cyc-spec]]) `'INIT Init\0aNEXT Next\0a']
-      default-limits:job-lib
-      |
-  ==
-::
-++  state-2-fixture
-  ^-  state-2:mig
-  :-  %2
-  %-  malt
-  ^-  (list [req-id job-2:mig])
-  :~  :-  ~.done
-      :*  req-2  %terminal  ~  [3 3]  [5 4 0 4]  ~
-          (malt ~[[`artifact-name`%report `artifact`[%text 'kept']]])
-          `[%ok [5 4 0 4]]
-          ~2026.7.20
-          ~
-      ==
-    ::
-      :-  ~.live
-      [req-2 %explore ~[%liveness] [2 4] [9 8 1 2] ~ ~ ~ ~2026.7.21 `[%1 42]]
-  ==
-::
+::  +|  API Version And State Loading
 ++  test-scry-version
   ::  a caller can ask what it is talking to
   =/  res  (~(on-peek agent bol) /x/version)
   %+  expect-eq
     !>([api-version 3])
   !>(!<([api=@ud state=@ud] q:(need (need res))))
-::
-++  test-on-load-migrates-v2
-  ::  %2 -> %3: a completed run survives whole; an in-flight one is
-  ::  sealed with a restart instruction rather than resumed across the
-  ::  new source-load stage
-  =/  ag  `agent:gall`+:(~(on-load agent bol) !>(state-2-fixture))
-  =/  done  (need (scry-job ag ~.done))
-  =/  live  (need (scry-job ag ~.live))
-  ;:  weld
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.done))
-    (expect-eq !>([3 3]) !>(progress.done))
-    (expect-eq !>(`[%text 'kept']) !>((~(get by artifacts.done) %report)))
-    %+  expect-eq
-      !>(`[%failed 'restarted: the source-load stage is new; resubmit'])
-    !>(result.live)
-    (expect-eq !>(%terminal) !>(stage.live))
-    (expect-eq !>([9 8 1 2]) !>(stats.live))
-  ==
-::
 ++  test-on-load-coerces-a-stale-type
-  ::  the stored *type* names molds that have since changed, so on-load
-  ::  coerces the noun instead of requiring it to nest as stored — a
-  ::  shape change anywhere in the request must not throw away results
-  =/  ag  `agent:gall`+:(~(on-load agent bol) !>(`*`state-2-fixture))
-  ;:  weld
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result:(need (scry-job ag ~.done))))
-    (expect-eq !>(2) !>((lent !<((list [req-id stage]) q:(need (need (~(on-peek ag bol) /x/jobs)))))))
-  ==
+  ::  the stored *type* may name molds this version has since changed (during
+  ::  development that happens whenever a request mold is reshaped), so on-load
+  ::  COERCES the noun rather than requiring it to nest as stored — a shape
+  ::  change must never throw away completed results
+  =/  ag   `agent:gall`agent
+  =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  ag2  `agent:gall`+:(~(on-load agent bol) !>(`*`q:~(on-save ag bol)))
+  %+  expect-eq
+    !>  1
+  !>  (lent !<((list [req-id stage]) q:(need (need (~(on-peek ag2 bol) /x/jobs)))))
 ::
 ++  test-on-load-keeps-v3
   ::  a current state loads unchanged

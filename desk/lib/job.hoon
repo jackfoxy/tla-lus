@@ -2,6 +2,7 @@
 /=  ast       /lib/ast
 /=  syntax    /lib/syntax
 /=  check     /lib/check
+/=  fp        /lib/fingerprint
 /=  tp        /lib/temporal
 /=  lv        /lib/liveness
 /=  semantic  /lib/semantic
@@ -1242,30 +1243,36 @@
     ?:  ?=(%more -.r)
       ::  live statistics at the slice boundary (deterministic, resumable): the
       ::  public view reflects search progress, not just the final report
-      =.  stats.j  [gen.cur.r distinct.cur.r (lent queue.cur.r) depth.cur.r]
+      =.  stats.j
+        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+            (od-stats:check outdeg.cur.r)
+        ==
       =.  cont.j  (save-kont kk(cur cur.r))
       ::  bound the persisted noun: a search whose cursor outgrows the limit is
       ::  stopped %limited with the limiting resource, never carried unbounded
       ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
-    (finish-bfs j out.r nl.kk act.kk pre)
+    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk pre)
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
     ?:  ?=(%more -.r)
       ::  partial statistics at the slice boundary (as in do-explore), so a
       ::  max-time interruption of the graph build reports progress (9.5)
-      =.  stats.j  [gen.cur.r distinct.cur.r (lent queue.cur.r) depth.cur.r]
+      =.  stats.j
+        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+            (od-stats:check outdeg.cur.r)
+        ==
       =.  cont.j  (save-kont kk(cur cur.r))
       (more j pre)
     ?:  ?=(%limited -.out.r)
-      =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r]
+      =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
       =.  stats.j  st
       (finish j [%limited what.out.r st] pre)
     ?.  ?=(%ok -.out.r)
       (finish j [%failed 'internal: unexpected graph outcome'] pre)
-    =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r]
+    =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
     =.  stats.j  st
     ::  the graph is built; hand off to the 8.2–8.6 %check phase (unit 8.8)
     =.  cont.j  (save-kont kk(phase %check, cur cur.r, otodo oss.kk, pcur ~))
@@ -1274,15 +1281,15 @@
 ::
 ++  finish-bfs
   ::  seal a safety search: wire result, stats, report + trace artifacts
-  |=  [j=job-3 out=outcome:check nl=@t act=next-act pre=(list event)]
+  |=  [j=job-3 out=outcome:check od=out-degree o=bfs-opts:check nl=@t act=next-act pre=(list event)]
   ^-  step-result-3
   ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
   =/  st=run-stats
     ?-  -.out
-      %ok        [gen.out distinct.out queued.out depth.out]
-      %limited   [gen.out distinct.out queued.out depth.out]
-      %inv       [gen.out distinct.out queued.out depth.out]
-      %deadlock  [gen.out distinct.out queued.out depth.out]
+      %ok        [gen.out distinct.out queued.out depth.out od]
+      %limited   [gen.out distinct.out queued.out depth.out od]
+      %inv       [gen.out distinct.out queued.out depth.out od]
+      %deadlock  [gen.out distinct.out queued.out depth.out od]
     ==
   =.  stats.j  st
   =/  res=result
@@ -1292,14 +1299,17 @@
       %inv       [%violated [%invariant name.out] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
-  ::  the job console keeps the single whole-Next label (per-action labels via
-  ::  getActions are the run-check console path, R1.5.4; job-kernel per-action
-  ::  trace labels are a follow-on)
+  ::  per-action attribution for the wire trace: the getActions leaves plus the
+  ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
+  ::  keeps the whole-Next label it has always rendered.
+  =/  acts  (get-actions:check next.o 'Next' defs.o)
+  =/  env   (make-env:ne defs.o consts.o vars.o)
+  =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
   =/  report  (wain-text (render-outcome:check out nl ~ *eenv:ne ~ ''))
   =/  tr=(unit trace)
     ?+  -.out  ~
-      %inv       `[%safety (trace-states trace.out act) ~]
-      %deadlock  `[%safety (trace-states trace.out act) ~]
+      %inv       `[%safety (trace-states trace.out act acts env order.o modn) ~]
+      %deadlock  `[%safety (trace-states trace.out act acts env order.o modn) ~]
     ==
   (finish-arts j res report tr pre)
 ::
@@ -1358,7 +1368,7 @@
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
-  =/  typed=trace  [%lasso (trace-states tr-states act.kk) `loop.u.l]
+  =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '') `loop.u.l]
   (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
 ::
 ::  +|  Stage: %simulate
@@ -1374,12 +1384,13 @@
   ?:  ?=(%more -.r)
     ::  commit partial statistics at the slice boundary so an interruption
     ::  (max-time / noun bound) reports the run so far, not empty stats (9.5)
-    =.  stats.j  [gen.cur.r 0 0 maxn.cur.r]
+    =.  stats.j  [gen.cur.r 0 0 maxn.cur.r [0 0 0 0]]
     =.  cont.j  (save-kont kk(cur cur.r))
     (more j pre)
   ::  states-generated / behaviors / trace-length in TLC's simulation stat slots
   ::  (generated = states generated; depth = deepest transition reached)
-  =/  st=run-stats  [gen.res.r 0 0 maxn.cur.r]
+  ::  simulation samples no state-graph out-degree (no BFS frontier)
+  =/  st=run-stats  [gen.res.r 0 0 maxn.cur.r [0 0 0 0]]
   =.  stats.j  st
   =/  head
     %-  crip
@@ -1416,7 +1427,7 @@
       (render-trace:check vpath nl.kk ~ *eenv:ne ~ '')
       ~[head]
     ==
-  =/  typed=trace  [%simulate (trace-states vpath act.kk) ~]
+  =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '') ~]
   =/  vn  ?-(vk %invariant [%invariant vname], %property [%property vname])
   (finish-arts j [%violated vn st] report `typed pre)
 ::
@@ -1461,14 +1472,31 @@
   (finish j res pre)
 ::
 ++  trace-states
-  ::  wire-typed trace states: 1-indexed, initial state has no action
-  |=  [sts=(list state:check) act=next-act]
+  ::  wire-typed trace states: 1-indexed, initial state has no action. Each
+  ::  later state names the getActions leaf that GENERATED it (R1.5.12b) --
+  ::  the same per-action attribution the console trace renders; `act` (the
+  ::  whole-Next label) is the fallback when no leaf matches or no action
+  ::  context is available.
+  |=  $:  sts=(list state:check)  act=next-act
+          acts=(list [name=@t body=sem:semantic])
+          e=eenv:ne  order=(list @t)  modn=@t
+      ==
   ^-  (list trace-state)
   =/  i  1
+  =/  prev=(unit state:check)  ~
   |-  ^-  (list trace-state)
   ?~  sts  ~
-  :_  $(sts t.sts, i +(i))
-  [i ?:(=(1 i) ~ act) (state-pairs:check i.sts)]
+  =/  a=next-act
+    ?:  =(1 i)  ~
+    ?~  prev  act
+    ?:  ?=(~ acts)  act
+    =/  hit
+      %:  edge-action:check
+        u.prev  (@t (state-fp:fp order i.sts))  acts  e  order  modn
+      ==
+    ?~(hit act hit)
+  :_  $(sts t.sts, i +(i), prev `i.sts)
+  [i a (state-pairs:check i.sts)]
 ::
 ++  wain-text
   |=  w=wain

@@ -1,9 +1,11 @@
 # `%tla-lus` API
 
 `%tla-lus` is a headless Gall agent. You drive it entirely with pokes, watches,
-and scries — there is no web UI. All wire nouns are frozen in `sur/tla-lus.hoon`
-(the contract is "extend, don't reshape"). Every operation below works from the
-Dojo of the ship that hosts the agent.
+and scries — there is no web UI. All wire nouns live in `sur/tla-lus.hoon`.
+Nothing has been released yet, so those shapes may still change; they freeze at
+the first release, after which the contract is "extend, don't reshape" and every
+change carries a state migration. Every operation below works from the Dojo of
+the ship that hosts the agent.
 
 Only the host ship may drive the agent: `on-poke`, `on-watch`, and `on-arvo`
 all assert `=(src.bowl our.bowl)`.
@@ -84,7 +86,10 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
       [%cancelled ~]
       [%limited kind=limit-kind stats=run-stats]
   ==
-+$  run-stats  [generated=@ud distinct=@ud queued=@ud depth=@ud]
++$  run-stats  [generated=@ud distinct=@ud queued=@ud depth=@ud outdeg=out-degree]
+::  state-graph out-degree: one sample per dequeued state (its newly-distinct
+::  successor count), summarized as TLC reports it
++$  out-degree  [min=@ud mean=@ud p95=@ud max=@ud]
 +$  violation  $%([%invariant name=@t] [%deadlock ~] [%property name=@t] [%liveness name=@t] [%assumption name=@t])
 ```
 
@@ -155,7 +160,10 @@ Inv  == x < 4
 
 ## Current surface
 
-The wire contract is complete and frozen. The pipeline behind it is being
+The wire contract is complete, and stable in practice — it changes only when a
+parity gap needs a field the contract cannot express (most recently the
+state-graph out-degree distribution in `run-stats`). It freezes at release. The
+pipeline behind it is being
 filled in unit by unit (see `port-map.md`): `%check` runs the real safety and
 liveness model checker for inline sources that carry a config; the PlusCal
 translation, semantic/level diagnostics, and Clay-source paths are documented

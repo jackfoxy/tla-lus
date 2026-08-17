@@ -290,7 +290,7 @@
   ::  the root EXTENDS a user module: two files, loaded asynchronously,
   ::  closing to the frozen inline golden of test-multi-module-check
   %+  expect-eq
-    !>(`[%ok [5 4 0 4]])
+    !>(`[%ok [5 4 0 4 [0 1 1 1]]])
   !>((clay-result multi-fs (clay-req 'spec' `/src/cfg/txt ~[/src])))
 ::
 ++  test-clay-equals-inline
@@ -306,7 +306,7 @@
   =/  cr  (clay-result single-fs (clay-req 'spec' `/src/cfg/txt ~[/src]))
   =/  ir  (run-inline (inline-req 'spec' ~[['spec' single-mod]] mc-cfg) 256)
   ;:  weld
-    (expect-eq !>(`[%ok [4 3 0 3]]) !>(cr))
+    (expect-eq !>(`[%ok [4 3 0 3 [0 1 1 1]]]) !>(cr))
     (expect-eq !>(cr) !>(result.ir))
   ==
 ::
@@ -318,7 +318,7 @@
   =/  f  (mk-fs ~[[/src/spec/tla live-mod] [/src/cfg/txt live-cfg]])
   =/  j  +:(run-clay f (clay-req 'spec' `/src/cfg/txt ~[/src]) 256)
   ;:  weld
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>([5 5]) !>(progress.j))
   ==
 ::
@@ -355,7 +355,7 @@
   ;:  weld
     (expect-eq !>(2) !>((lent `(list read-request)`reads.r1)))
     (expect-eq !>(8) !>((lent `(list read-request)`reads.r2)))
-    (expect-eq !>(`[%ok [5 4 0 4]]) !>((clay-result wide-fs req)))
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>((clay-result wide-fs req)))
   ==
 ::
 ++  test-clay-stale-response-ignored
@@ -405,7 +405,7 @@
         [/src/cfg/txt mc-cfg]
     ==
   %+  expect-eq
-    !>(`[%ok [5 4 0 4]])
+    !>(`[%ok [5 4 0 4 [0 1 1 1]]])
   !>((clay-result f (clay-req 'spec' `/src/cfg/txt ~[/src /alt])))
 ::
 ++  test-clay-standard-module-needs-no-file
@@ -416,7 +416,7 @@
   ;:  weld
     (expect !>((lien paths |=(p=path =(p /src/naturals/tla)))))
     %+  expect-eq
-      !>(`[%ok [5 4 0 4]])
+      !>(`[%ok [5 4 0 4 [0 1 1 1]]])
     !>((clay-result multi-fs req))
   ==
 ::
@@ -710,7 +710,7 @@
   =/  tr  (~(got by artifacts.j) %trace)
   ?>  ?=(%trace -.tr)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
     (expect-eq !>(%safety) !>(kind.trace.tr))
     ::  x = 0, 1, 2, 3 — the shortest path to the violation
     (expect-eq !>(4) !>((lent states.trace.tr)))

@@ -195,7 +195,12 @@
       distinct=@ud
       queued=@ud
       depth=@ud
+      ::  state-graph out-degree distribution, as TLC reports it: one sample
+      ::  per dequeued state (its newly-distinct successor count), summarized
+      ::  min / round(mean) / round(95th percentile) / max (R1.5.12b)
+      outdeg=out-degree
   ==
++$  out-degree  [min=@ud mean=@ud p95=@ud max=@ud]
 ::  terminal results; a counterexample is never collapsed into %failed
 +$  result
   $%  [%ok stats=run-stats]

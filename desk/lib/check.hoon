@@ -418,7 +418,12 @@
       gen=@ud
       distinct=@ud
       depth=@ud
-      outdeg=@ud   ::  max newly-distinct successors of any state (TLC max out-degree)
+      ::  out-degree samples as TLC collects them: one per DEQUEUED state, the
+      ::  count of its newly-distinct successors (Worker.outDegree.addSample of
+      ::  unseenSuccessorStates). A bucket histogram (sample -> count), which is
+      ::  what tlc2's BucketStatistics keeps, so min/mean/95th/max all derive
+      ::  from it rather than only the max (R1.5.12b)
+      outdeg=(map @ud @ud)
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -431,7 +436,7 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 0]
+  [is ~ ~ ~ (lent is) 0 0 ~]
 ::
 ++  con-hold
   ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
@@ -453,6 +458,42 @@
   ?:  ?=(%| -.r)  [%| msg.p.r]
   ?.  p.r  [%& |]
   $(cs t.cs)
+::
+++  od-stats
+  ::  tlc2.util.statistics.BucketStatistics over the out-degree histogram,
+  ::  reported by ModelChecker as `min, round(mean), round(p95), max`
+  ::  (ModelChecker.java:890). Empty (no state dequeued) renders all zeros --
+  ::  TLC only prints the line when getObservations() > 0. R1.5.12b
+  |=  h=(map @ud @ud)
+  ^-  [min=@ud mean=@ud p95=@ud max=@ud]
+  =/  ks  (sort ~(tap in ~(key by h)) lth)
+  ?~  ks  [0 0 0 0]
+  =/  obs  (roll ~(val by h) add)
+  ?:  =(0 obs)  [0 0 0 0]
+  ::  largest observed sample (the list is ascending; walked rather than
+  ::  +rear'd, which nest-fails on a ?~-narrowed list)
+  =/  mx
+    =/  l=(list @ud)  t.ks
+    =/  m=@ud  i.ks
+    |-  ^-  @ud
+    ?~  l  m
+    $(l t.l, m i.l)
+  ::  getMean: sum(sample * count) / observations, then Math.round (half up)
+  =/  sum
+    %+  roll  ~(tap by h)
+    |=([[k=@ud v=@ud] a=@ud] (add a (mul k v)))
+  =/  mean  (div (add (mul 2 sum) obs) (mul 2 obs))
+  ::  getPercentile(.95): pos = (int)(obs * .95), then the first bucket (in
+  ::  ascending sample order) at which the running count EXCEEDS pos
+  =/  pos  (div (mul obs 95) 100)
+  =/  p95
+    =/  l=(list @ud)  ks
+    =/  cnt=@ud  0
+    |-  ^-  @ud
+    ?~  l  mx
+    =.  cnt  (add cnt (~(gut by h) i.l 0))
+    ?:((gth cnt pos) i.l $(l t.l))
+  [i.ks mean p95 mx]
 ::
 ++  first-violated
   ::  the first invariant (declaration order) violated by `st`; ~ = all hold,
@@ -571,6 +612,10 @@
   ?:  ?=(%| -.nr)  [%done [%error msg.p.nr] cur]
   =/  nexts  p.nr
   ?~  nexts
+    ::  a dequeued state with NO successors still contributes a 0 out-degree
+    ::  sample: TLC calls outDegree.addSample(unseenSuccessorStates) for every
+    ::  state it dequeues, so a sink pulls the distribution's min to 0 (R1.5.12b)
+    =.  outdeg.cur  (~(put by outdeg.cur) 0 +((~(gut by outdeg.cur) 0 0)))
     ?.  deadlock.o  $(cur cur(queue t.q), spent +(spent))
     :+  %done
       [%deadlock gen.cur distinct.cur (lent t.q) depth.cur (trace-to seen.cur fp)]
@@ -582,7 +627,9 @@
   ?^  out.rr  [%done u.out.rr cur.rr]
   ::  TLC out-degree sample: the number of newly-distinct successors this state
   ::  produced (Worker.outDegree.addSample of unseenSuccessorStates)
-  =.  outdeg.cur.rr  (max outdeg.cur.rr (sub distinct.cur.rr before))
+  =/  sample  (sub distinct.cur.rr before)
+  =.  outdeg.cur.rr
+    (~(put by outdeg.cur.rr) sample +((~(gut by outdeg.cur.rr) sample 0)))
   $(cur cur.rr, spent (add spent cost))
 ::
 ++  explore
@@ -592,11 +639,11 @@
   ::  yields %limited with the statistics so far, so a caller can bound a
   ::  single event's work.
   |=  [is=(list state) o=bfs-opts]
-  ^-  outcome
+  ^-  [out=outcome od=out-degree]
   =/  cur  (bfs-init is)
-  |-  ^-  outcome
+  |-  ^-  [out=outcome od=out-degree]
   =/  r  (bfs-step o cur 1.024)
-  ?:  ?=(%done -.r)  out.r
+  ?:  ?=(%done -.r)  [out.r (od-stats outdeg.cur.r)]
   $(cur cur.r)
 ::
 ++  explore-cursor
@@ -1659,6 +1706,20 @@
     $(n u.body.u.d, nm op)
   ?:  |(=(op '$DisjList') =(op '\\lor'))
     (get-actions-list args.n nm defs)
+  ::  `\E i \in S : body` — tlc2's getActions ENUMERATES S and recurses into
+  ::  args[0] once per element, carrying the binding in the element's Context
+  ::  (Tool.getActionsAppl OPCODE_be), so every resulting action carries the
+  ::  BODY's span, not the whole quantifier's. We keep ONE action whose BODY is
+  ::  still the whole quantifier (so it stays solvable -- the bound variable has
+  ::  no binding outside it) but whose SPAN is the body's, which is what the
+  ::  label renders. One-vs-N is unobservable here: every per-element action
+  ::  carries this same label, the successor stream is already enumerated in
+  ::  element order by +solve-exists, and the coverage counts are a documented
+  ::  approved difference. R1.5.12
+  ?:  =(op '$BoundedExists')
+    ?~  args.n  ~[[nm n]]
+    ?.  ?=(%apply -.i.args.n)  ~[[nm n]]
+    ~[[nm n(at at.i.args.n)]]
   ~[[nm n]]
 ::
 ++  get-actions-list
@@ -1693,6 +1754,24 @@
   ?:  ?=(%| -.r)  $(actions t.actions)
   ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
     (action-label name.i.actions (sem-span:config body.i.actions) modn)
+  $(actions t.actions)
+::
+++  edge-action
+  ::  the STRUCTURED form of +edge-action-label: the action that generates
+  ::  `s1fp` from `s0` as [name span], for the wire trace's per-state `action`
+  ::  field (the rendered text form is what the report artifact prints).
+  ::  ~ when no action matches. R1.5.12b
+  |=  $:  s0=state  s1fp=@t
+          actions=(list [name=@t body=sem:sem-lib])
+          e=eenv:ne  order=(list @t)  modn=@t
+      ==
+  ^-  (unit [name=@t at=(unit loc)])
+  ?~  actions  ~
+  =/  r  (next-states:ne s0 body.i.actions e)
+  ?:  ?=(%| -.r)  $(actions t.actions)
+  ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
+    =/  sp  (sem-span:config body.i.actions)
+    `[name.i.actions ?~(sp ~ `[modn u.sp])]
   $(actions t.actions)
 ::
 ++  fp-hex
@@ -1770,7 +1849,7 @@
       =/  actions  (get-actions nsb.c 'Next' defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
-      (render-outcome (explore is.c o) nl.c actions env order.c modn)
+      (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
     =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
     ?:  ?=(%| -.osr)  ~[(cat 3 'Error: ' msg.p.osr)]
     ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
@@ -1794,7 +1873,7 @@
   =/  actions  (get-actions nsb.c 'Next' defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
-  (render-outcome (explore is.c o) nl.c actions env order.c modn)
+  (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
 ::
 ++  render-outcome
   ::  TLC's terminal lines for a safety outcome. `actions`/`e`/`order`/`modn`
@@ -1871,7 +1950,8 @@
       ::  yields %limited rather than a lasso verdict on a partial graph
       =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | cap 0]
       =/  bg  (build-graph-cap is.c o)
-      =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg]
+      ::  the liveness graph build samples no out-degree (no BFS frontier)
+      =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
       ?:  capped.bg  [[%limited %states st] st]
       =/  l
         %-  find-lasso:lv
@@ -1882,21 +1962,23 @@
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
       [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
-    (explore-outcome (explore is.c o))
+    =/  er  (explore is.c o)
+    (explore-outcome out.er od.er)
   ::  safety (invariant)
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
-  (explore-outcome (explore is.c o))
+  =/  er  (explore is.c o)
+  (explore-outcome out.er od.er)
 ::
 ++  explore-outcome
   ::  a safety outcome as the wire result + run-stats (shared by run-check's
   ::  invariant and box-state paths)
-  |=  res=outcome
+  |=  [res=outcome od=out-degree]
   ^-  [result run-stats]
   ?-    -.res
-      %ok        =/  st  [gen.res distinct.res queued.res depth.res]  [[%ok st] st]
-      %limited   =/  st  [gen.res distinct.res queued.res depth.res]  [[%limited what.res st] st]
-      %inv       =/  st  [gen.res distinct.res queued.res depth.res]  [[%violated [%invariant name.res] st] st]
-      %deadlock  =/  st  [gen.res distinct.res queued.res depth.res]  [[%violated [%deadlock ~] st] st]
+      %ok        =/  st  [gen.res distinct.res queued.res depth.res od]  [[%ok st] st]
+      %limited   =/  st  [gen.res distinct.res queued.res depth.res od]  [[%limited what.res st] st]
+      %inv       =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%invariant name.res] st] st]
+      %deadlock  =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%deadlock ~] st] st]
       %error     [[%failed msg.res] *run-stats]
   ==
 ::
@@ -1905,13 +1987,13 @@
   ::  the wire run-stats does not carry, run in `budget`-sized slices (for
   ::  statistics and pause/resume-equality differential tests)
   |=  [spec=@t cfg=@t cap=@ud budget=@ud]
-  ^-  [gen=@ud distinct=@ud queued=@ud depth=@ud outdeg=@ud]
+  ^-  [gen=@ud distinct=@ud queued=@ud depth=@ud outdeg=[min=@ud mean=@ud p95=@ud max=@ud]]
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  [0 0 0 0 0]
+  ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
     [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
   =/  cur  (explore-cursor is.c o budget)
-  [gen.cur distinct.cur (lent queue.cur) depth.cur outdeg.cur]
+  [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --
 

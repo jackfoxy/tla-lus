@@ -1,7 +1,6 @@
 /-  *tla-lus
 /+  default-agent, dbug
 /=  job-lib  /lib/job
-/=  mig      /lib/migrate
 |%
   ::  %tla-lus: Headless TLA+ Toolchain Agent
   ::
@@ -13,7 +12,12 @@
   ::
 ::  +|  Types
 ::
-+$  versioned-state  $%(state-0:mig state-1:mig state-2:mig state-3)
+::  The agent's saved state is a VERSION-TAGGED union, which is the whole
+::  migration mechanism: to change the state's shape, add the new `state-N`
+::  here, keep the previous mold alongside it, and convert in `on-load`'s `?-`.
+::  Nothing has been released, so the pre-`%3` chain that used to live in
+::  /lib/migrate was collapsed rather than carried (R1.5.12b).
++$  versioned-state  $%(state-3)
 +$  state-3  [%3 jobs=(map req-id job-3:job-lib)]
 +$  card     card:agent:gall
 ::
@@ -165,16 +169,12 @@
   ^-  (quip card _this)
   =/  res=(each state-3 tang)
     %-  mule  |.
-    ::  the stored *type* names molds this version has changed (unit 10
-    ::  reshaped the %clay bundle), so the noun is coerced through the
-    ::  frozen historical molds rather than required to nest as stored —
-    ::  otherwise a shape change anywhere in the request would throw away
-    ::  every completed job's result
+    ::  the stored noun is COERCED (`;;`) rather than required to nest as
+    ::  stored, so a mold change anywhere inside a request cannot throw away
+    ::  completed results. A future version adds its `state-N` to
+    ::  `versioned-state` and its conversion arm to this `?-`.
     =/  old  ;;(versioned-state q.old-vase)
     ?-  -.old
-      %0  [%3 (jobs-2-to-3:mig (jobs-1-to-2:mig (jobs-0-to-1:mig jobs.old)))]
-      %1  [%3 (jobs-2-to-3:mig (jobs-1-to-2:mig jobs.old))]
-      %2  [%3 (jobs-2-to-3:mig jobs.old)]
       %3  old
     ==
   ?:  ?=(%.y -.res)  `this(state p.res)
