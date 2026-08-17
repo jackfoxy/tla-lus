@@ -2556,3 +2556,64 @@ CLAY GOTCHA worth remembering: deleting a file from the pier and running `|commi
 it from Clay — `/tests/lib/migrate/hoon` kept failing to build until an explicit
 `|rm /=tla-lus=/lib/migrate/hoon` (and the tests path). Check for `- /~zod/desk/N/path` in the
 commit output; if it is absent, the file is still in the desk.
+
+### R1.5.13 — assume + invariant residues (PARTIAL, SHIP-VERIFIED, 2026-08-17)
+
+**Axiom-marked assumptions — CLOSED.** Measured from the pin: `Tool.checkAssumptions` skips
+axioms (`if ((!isAxiom[i]) && !isValidAssumption(assumps[i]))`, Tool.java:3651), and SANY sets
+`isAxiom` **only when the source keyword image is literally `AXIOM`** (AssumeNode.java:65).
+Oracle: `AXIOM 1 = 2` → `Model checking completed. No error has been found.`; `ASSUME 1 = 2` →
+`Assumption ... is false.`; `ASSUMPTION 1 = 2` → also false (only `AXIOM` is an axiom). The port
+evaluated every assumption — its own comment called this "a documented residue". The lexer maps
+`AXIOM` and `ASSUMPTION` to ONE token kind (`%assumption`), so `+g-thm` now reads the keyword TEXT
+and carries an `axiom=?` flag on `sem-thm`; `+check-assumes` skips it. Permanent tests in
+`tests/lib/safety-gen` (`test-axiom-false-skipped`, `test-assumption-false-fails`) — all green.
+
+**EC 2146 — REASSIGNED, not implemented.** It was double-listed: `cfg-validate` already claims
+`TLC_INVARIANT_VIOLATED_LEVEL` as its 5.3c residue, and that is its real owner — `SpecProcessor`
+raises it while PROCESSING THE CONFIG (`def.getLevel() >= 2`, SpecProcessor.java:1021), which is
+where the port's `+validate-config` lives. `tlc-safety-invariant` is the RUNTIME check (2107/2110,
+first-violated, shortest trace). Measured the implementation detail for whoever takes it: the
+message has two variants and the selector is **`levelParams` emptiness, NOT the level** —
+`x' = x` / `x' > x` take the "Note that a bug can cause TLC…" suffix, while `UNCHANGED x`
+(**also level 2**), `[]TRUE`, `[][x' = x]_x` and `<>(x = 1)` take the plain sentence, because
+temporal/UNCHANGED operators carry weight 0 and zero the params. Blocker recorded: `sem-def` has
+`lvl` but not `lp`; the `lp` set lives in `oplev` (built by `+l-module-core`) and never reaches
+`+validate-config`.
+
+With 2146 reassigned, `tlc-safety-invariant`'s only residual is the wire's 2107/2110 collapse,
+which R1.5.12b restated as a deliberate choice — so the row is now a tested
+**`approved-difference`** rather than `partial`. (Carrying the EC on the wire is available, since
+the contract is pre-release and was extended in .12b; not done unilaterally.)
+
+**Still open: implied-init/action properties** (`getImpliedInits`/`getImpliedActions`, the
+SPECIFICATION decomposition) — the temporal-spec split this row shares with WU8/liveness. Left on
+`tlc-safety-assume` (still `partial`) and scoped to the `tlc-live-*` work rather than done here.
+
+Ledger: **67 parity / 7 approved-difference / 18 partial — 101 terminal**.
+
+### R1.5.14 — R1.5 close-out (SCOPED, SHIP-VERIFIED, 2026-08-17)
+
+**15 of the 16 rows R1.5 owns are terminal.** `tlc-safety-stategen`, `-constraint`, `-deadlock`,
+`-bfs`, `-trace`, `-symmetry`, `-stats`, `tlc-resumable`, `tlc-eval-state`, `tlc-eval-action`,
+`tlc-fp`, `cfg-constants`, `op-check-exhaustive` at `parity`; `tlc-coverage` and
+`tlc-safety-invariant` as tested `approved-difference`s.
+
+**Verification:** full `-test /=tla-lus=/tests` → **`ok=%.y`, ZERO FAILED**; `tier2.py --check`
+byte-reproducible; ledger well-formed at **67 parity / 7 approved-difference / 18 partial —
+101 terminal**. The tier-2 census remains empty in both shards.
+
+**The one open row is handed off, not hidden.** `tlc-safety-assume`'s residual is implied-init /
+implied-action, i.e. the `processConfigSpec`/`processConfigProps` **SPECIFICATION-form
+decomposition** — config-side work, not a safety-engine gap. Three other rows (`cfg-validate`,
+`cfg-runspec`, `check-opt-cfg`) name the same mechanism as their residue, so building it inside
+R1.5 would half-solve a thing four rows wait on. Scheduled as **R1.8.1**
+(`R1.8.1-spec-decomposition-plan.md`, .0–.4) with the measurement already done: `[][A]_v` →
+implied action (EC 2112/2113, name + two-state trace, `ModelChecker.java:533`), level-1 predicate
+→ implied init (`:1195`), `[]P` level<2 → the port's existing box-invariant path, and
+`SimulationWorker:601` consumes the same mechanism for R1.7. All four rows carry that pointer in
+the manifest. The kickoff must first reproduce the recorded uncatchable `check:check` crash on
+SPECIFICATION-form/multi-PROPERTY specs (`gen-tier2-tests.py:296`), which also blocks re-enabling
+the tier-2 liveness batch.
+
+R1.5's engine work is complete; what remains of it is one shared, named, scheduled mechanism.

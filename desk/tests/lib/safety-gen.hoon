@@ -45,6 +45,16 @@
 ::  a conjunction of assumptions: all must hold
 ++  test-assume-false-still-fails
   (expect-eq !>(%failed) !>((verdict "ASSUME 2 = 3")))
+::  an AXIOM is SKIPPED by Tool.checkAssumptions (`(!isAxiom[i]) && ...`), so a
+::  false one does NOT fail the run -- measured against tlc2.TLC, which reports
+::  `Model checking completed. No error has been found.` for `AXIOM 1 = 2`
+::  where `ASSUME 1 = 2` gives `Assumption ... is false.` (R1.5.13)
+++  test-axiom-false-skipped
+  (expect-eq !>(%ok) !>((verdict "AXIOM 1 = 2")))
+::  ...but only the literal `AXIOM` keyword marks an axiom (AssumeNode.java:65),
+::  so ASSUMPTION is still a checked assumption
+++  test-assumption-false-fails
+  (expect-eq !>(%failed) !>((verdict "ASSUMPTION 1 = 2")))
 ::
 ::  +|  Ordered state generation (branch / binding order at the TLC point)
 ::

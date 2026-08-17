@@ -1178,6 +1178,12 @@
       ::  application `I(x')!Thm` level-checks its argument against them
       ::  (EC 4205).  Empty for an ordinary named theorem (R1.3.7.1b)
       params=(list spar)
+      ::  AssumeNode.isAxiom: set ONLY when the source keyword image is
+      ::  literally `AXIOM` (AssumeNode.java:65) -- `ASSUME`/`ASSUMPTION` are
+      ::  ordinary assumptions. TLC's checkAssumptions SKIPS axioms
+      ::  (`(!isAxiom[i]) && !isValidAssumption(...)`), so a false AXIOM does
+      ::  not fail a run. Always | for a theorem. R1.5.13
+      axiom=?
   ==
 ::  one INSTANCE substitution as level checking sees it: the instanced
 ::  module's parameter (with its declaration kind) and the substituting
@@ -2588,12 +2594,18 @@
   =/  body=(unit node)
     =/  bs  (skim kids |=(k=node ?=(%node -.k)))
     ?~(bs ~ `i.bs)
+  ::  AssumeNode.isAxiom keys off the literal keyword image, and the lexer
+  ::  maps AXIOM and ASSUMPTION to one token kind, so read the text (R1.5.13)
+  =/  ax=?
+    =/  ls  (skim kids |=(k=node ?=(%leaf -.k)))
+    ?~  ls  |
+    =('AXIOM' (leaf-text i.ls))
   ?:  &(?=(^ body) (is-kind u.body %n-assumeprove))
     =/  gap  (g-assumeprove u.body c)
-    [[nm | lvl.gap (span-of:ast u) r.gap ~] ds.gap]
+    [[nm | lvl.gap (span-of:ast u) r.gap ~ ax] ds.gap]
   =/  gb=gout  ?~(body [~ ~] (g-x u.body c))
   =/  lvl  ?~(body 0 (expr-level u.body c))
-  [[nm | lvl (span-of:ast u) r.gb ~] ds.gb]
+  [[nm | lvl (span-of:ast u) r.gb ~ ax] ds.gb]
 ::
 ++  hide-facts
   ::  the fact nodes of a USE/HIDE unit: the %node kids ahead of the
@@ -2828,6 +2840,7 @@
           (span-of:ast u)
           `wbody
           isps
+          |
       ==
     $(bus t.bus, out [wthm out], ds (weld ds ds.gt))
   :*  -.idefs

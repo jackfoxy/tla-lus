@@ -1423,11 +1423,16 @@
   ::  TLC Tool.checkAssumptions, run before the search: every module ASSUME
   ::  must evaluate to TRUE under the constant environment. A FALSE assumption
   ::  is EC 2104 (assumption-false); a non-boolean value or evaluation error is
-  ::  EC 2105 (assumption-error). ~ when all assumptions hold. (TLC skips
-  ::  axioms; we check every assumption — axiom marking is a documented residue.)
+  ::  EC 2105 (assumption-error). ~ when all assumptions hold.
+  ::  An AXIOM-marked assumption is SKIPPED, exactly as tlc2 does
+  ::  (`(!isAxiom[i]) && !isValidAssumption(...)`, Tool.java:3651): SANY sets
+  ::  isAxiom only when the source keyword image is literally `AXIOM`
+  ::  (AssumeNode.java:65), so `ASSUME`/`ASSUMPTION` are still checked and a
+  ::  false AXIOM does not fail the run. R1.5.13
   |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne]
   ^-  (unit [ec=@ud msg=@t])
   ?~  asmz  ~
+  ?:  axiom.i.asmz  $(asmz t.asmz)
   ?~  body.i.asmz  $(asmz t.asmz)
   =/  r  (pred-bool:ne u.body.i.asmz ~ ~ e)
   ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]

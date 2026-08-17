@@ -426,6 +426,23 @@ census reproduces byte-identically.
 
 ## Unit 7 (B6) — Safety model checking parity
 
+**R1.5 close-out (R1.5.14).** Fifteen of the sixteen rows this unit owns are terminal: the
+state-generation streams are differentially proven in order (R1.5.10), the out-degree
+distribution reproduces tlc2's `BucketStatistics` summary (R1.5.12b), traces carry per-action
+attribution on the console *and* the typed wire (R1.5.4/.12b), `ENABLED` accepts a LET-wrapped
+primed target (R1.5.9), constraint-pruned states have their invariants checked (R1.5.1, proven
+R1.5.8), and `AXIOM`-marked assumptions are skipped exactly as `Tool.checkAssumptions` does
+(R1.5.13). Two rows are tested approved-differences: coverage counts (an engine-internal cost
+model) and the wire's 2107/2110 collapse.
+
+The single remaining row, `tlc-safety-assume`, is blocked on something that is **not** a safety
+gap: the `processConfigSpec`/`processConfigProps` **SPECIFICATION-form decomposition**, which
+routes `[][A]_v` to an implied action and a level-1 predicate to an implied init. Three config
+rows (`cfg-validate`, `cfg-runspec`, `check-opt-cfg`) name the same mechanism as their residue, so
+it is scheduled once as **R1.8.1** rather than half-built here.
+
+
+
 Work Unit 7 rebuilt the single-worker safety checker to `tlc2.TLC` parity over
 the Work Unit 3 semantic graph and the Work Unit 6 evaluator. Oracle:
 `tools/oracle/SafetyDump.java` (`tools/gen-safety-tests`, 16 cases) plus the
