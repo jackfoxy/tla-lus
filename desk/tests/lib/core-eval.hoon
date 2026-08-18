@@ -157,19 +157,19 @@
   ~
 ::
 ++  test-recfcn
-  ::  C3: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  Card: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  E3: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  Even: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  F5: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  FDom: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
-  ::  Fact: recursive function definition ($RecursiveFcnSpec) --- R1.4.2
+  ::  FDom: DOMAIN of a recursive function: TLC keeps the lazy IntervalValue 0..5, the port enumerates it --- the same divergence as ev-lookup/Dom (R1.4.5b)
   %+  expect-eq
     !>  ^-  (list tape)
-    ~
+    :~  "C3 IntValue 3"
+        "Card FcnLambdaValue (\{} :> 0 @@ \{1} :> 1 @@ \{2} :> 1 @@ \{3} :> 1 @@ \{1, 2} :> 2 @@ \{1, 3} :> 2 @@ \{2, 3} :> 2 @@ \{1, 2, 3} :> 3)"
+        "E3 BoolValue FALSE"
+        "Even FcnLambdaValue (0 :> TRUE @@ 1 :> FALSE @@ 2 :> TRUE @@ 3 :> FALSE @@ 4 :> TRUE)"
+        "F5 IntValue 120"
+        "Fact FcnLambdaValue (0 :> 1 @@ 1 :> 1 @@ 2 :> 2 @@ 3 :> 6 @@ 4 :> 24 @@ 5 :> 120)"
+    ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, FiniteSets\0aFact[n \\in 0..5] == IF n = 0 THEN 1 ELSE n * Fact[n - 1]\0aF5 == Fact[5]\0aFDom == DOMAIN Fact\0aCard[s \\in SUBSET (1..3)] == IF s = {} THEN 0 ELSE 1 + Card[s \\ {CHOOSE y \\in s : TRUE}]\0aC3 == Card[{1, 2, 3}]\0aEven[n \\in 0..4] == IF n = 0 THEN TRUE ELSE ~Even[n - 1]\0aE3 == Even[3]\0a====\0a'  ''
-  ~['C3' 'Card' 'E3' 'Even' 'F5' 'FDom' 'Fact']
+  ~['FDom']
 ::
 ++  test-sets
   ::  Sub: SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset representation, so the kind reads SetEnumValue (the rendering agrees)
@@ -189,15 +189,15 @@
   ~['Sub']
 ::
 ++  test-subbag
-  ::  Empty: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
-  ::  NSubs: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
-  ::  Subs: recursive function definition ($RecursiveFcnSpec) --- R1.4.2 (SubBag's own body)
+  ::  NSubs: SubBag's own body needs a multi-binder set-of-all: its LET Combine builds {[...] : f \in BagSet, i \in 1..B[x]}, two bound variables --- R1.4.2 made the RSB recursion itself work (the base case, SubBag(EmptyBag), now agrees), so this is R1.4.3's half of tlc-module-body's residue. The fixpoint stalls and reports the last point's failure, so the surfaced message is the out-of-domain one, not the set-of-all one
+  ::  Subs: SubBag's own body needs a multi-binder set-of-all: its LET Combine builds {[...] : f \in BagSet, i \in 1..B[x]}, two bound variables --- R1.4.2 made the RSB recursion itself work (the base case, SubBag(EmptyBag), now agrees), so this is R1.4.3's half of tlc-module-body's residue. The fixpoint stalls and reports the last point's failure, so the surfaced message is the out-of-domain one, not the set-of-all one
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "B FcnRcdValue <<1, 1>>"
+        "Empty SetEnumValue \{<<>>}"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Bags, Integers, FiniteSets\0aB == SetToBag({1, 2})\0aSubs == SubBag(B)\0aNSubs == Cardinality(SubBag(B))\0aEmpty == SubBag(EmptyBag)\0a====\0a'  ''
-  ~['Empty' 'NSubs' 'Subs']
+  ~['NSubs' 'Subs']
 ::
 --

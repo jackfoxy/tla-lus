@@ -1218,6 +1218,33 @@ divergence is wider than string sets alone: it also fixes record field order,
 `ModelValue.fingerPrint` — state fingerprint bytes whenever a model value is
 in a state. Subunit C1.7 decides reproduce-vs-approve on measured evidence.
 
+## Release R1.4 — recursive function definitions
+
+tlc2 evaluates `f[x \in S] == e(f, x)` to a **lazy `FcnLambdaValue`** and forces a
+point only when it is applied. Three consequences were measured at the pin and are
+reproduced or recorded here:
+
+**Recursion direction does not matter (reproduced).** Because points are forced on
+demand, a body may refer to any other point, not merely an earlier one:
+`Fwd[n \in 1..3] == IF n = 3 THEN 0 ELSE Fwd[n + 1] + 1` is `<<2, 1, 0>>` at the pin.
+The port has eager values, so `+eval-recfcn` sweeps the domain to a fixpoint — each
+unsolved point retried with the self-binder bound to the points solved so far, stopping
+when a pass solves nothing new. Every well-founded definition converges regardless of
+which direction it recurses.
+
+**The value class is a property of the expression (reproduced).** `R1[n \in 1..3] == …`
+is a `FcnLambdaValue` and `NR1 == [n \in 1..3 |-> n]` a `FcnRcdValue`, though both render
+as tuples; `R0[n \in 0..2] == n` shows the pairs-vs-tuple rendering is decided by the
+*domain*, not the class. The class therefore cannot be read off a value, and
+`+kind-of:check` reads it off the semantic node instead.
+
+**A circular definition — approved difference.** `Circ[n \in 1..2] == Circ[n] + 1` does
+not fail in tlc2: it returns the unforced lambda, printed as
+`[n \in 1..2 |-> <expression line 7, col 21 to line 7, col 31 of module A>]`. That form
+has no analogue here — the port has no unforced-value representation, and reproducing it
+would mean carrying source spans inside values. A definition that cannot progress reports
+the failure its last sweep produced. No corpus case depends on this.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

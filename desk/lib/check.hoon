@@ -1377,6 +1377,24 @@
     %fcn    "FcnRcdValue"
   ==
 ::
+++  kind-of
+  ::  the tlc2 value class a definition's result corresponds to. Almost always
+  ::  a property of the VALUE, but a recursive function definition is the one
+  ::  case where it is a property of the EXPRESSION: tlc2 keeps a
+  ::  $RecursiveFcnSpec as a lazy FcnLambdaValue, while the identical function
+  ::  written as a plain constructor normalizes to a FcnRcdValue. Measured at
+  ::  the pin: `R1[n \in 1..3] == ...` is FcnLambdaValue and renders <<1, 2, 6>>,
+  ::  `NR1 == [n \in 1..3 |-> n]` is FcnRcdValue and renders <<1, 2, 3>> — same
+  ::  rendering, different class — so the class cannot be read off the value
+  |=  [b=sem:sem-lib x=value]
+  ^-  tape
+  ?:  ?&  ?=(%apply -.b)
+          =('$RecursiveFcnSpec' name.op.b)
+          ?=(?(%fcn %seq) -.x)
+      ==
+    "FcnLambdaValue"
+  (kind-name x)
+::
 ++  project-defs
   ::  every arity-0 definition of a module, sorted by name and evaluated once
   ::  under the config's constant assignments, in the oracle's projection
@@ -1408,7 +1426,7 @@
   ?~  body.u.d  :(weld (trip nm) " ! no body")
   =/  r  (eval:ne u.body.u.d e)
   ?:  ?=(%& -.r)
-    :(weld (trip nm) " " (kind-name p.r) " " (render:vl p.r))
+    :(weld (trip nm) " " (kind-of u.body.u.d p.r) " " (render:vl p.r))
   ;:  weld
     (trip nm)  " ! EC"  (a-co:co code.p.r)  " "  (flat-msg msg.p.r)
   ==

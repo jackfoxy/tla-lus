@@ -228,6 +228,69 @@ removes it (R1.4.2: 10, R1.4.3: 6, unit-3 LAMBDA: 3 — the last with no R1.4 ow
 definitions 58 → **63**. The shard stays green, and the skip list *is* the work list for
 R1.4.2/.3.
 
+## R1.4.2 — recursive functions (done)
+
+`$RecursiveFcnSpec` now evaluates. Compared definitions 63 → **70**; shard green at rev 727.
+
+### The plan's approach was wrong, and the pin says why
+
+The plan said "bind the function's own name in the environment and evaluate under the existing
+fuel bound", which implies solving points in domain order. Measured at the pin first:
+
+| probe | oracle |
+|---|---|
+| `R1[n \in 1..3] == IF n = 1 THEN 1 ELSE n * R1[n-1]` | `FcnLambdaValue <<1, 2, 6>>` |
+| `NR1 == [n \in 1..3 \|-> n]` | `FcnRcdValue <<1, 2, 3>>` |
+| `R0[n \in 0..2] == n` | `FcnRcdValue (0 :> 0 @@ 1 :> 1 @@ 2 :> 2)` |
+| `Fwd[n \in 1..3] == IF n = 3 THEN 0 ELSE Fwd[n+1] + 1` | `FcnLambdaValue <<2, 1, 0>>` |
+| `Circ[n \in 1..2] == Circ[n] + 1` | `FcnLambdaValue [n \in 1..2 \|-> <expression line 7, col 21 to line 7, col 31 of module A>]` |
+
+Three things follow:
+
+1. **`Fwd` works.** TLC's `FcnLambdaValue` is lazy and forces a point only when applied, so a
+   body may refer to *any* point, not only an earlier one. Domain-order iteration would be
+   wrong. `+eval-recfcn` therefore **sweeps the domain to a fixpoint**: each unsolved point is
+   retried with the self-binder bound to the points solved so far, and sweeping stops when a
+   whole pass solves nothing new. That terminates on every well-founded definition regardless
+   of recursion direction, and is bounded by |domain| sweeps.
+2. **The value class is a property of the EXPRESSION, not the value.** `R1` and `NR1` have
+   identical renderings (`<<1, 2, 6>>` vs `<<1, 2, 3>>`, both tuples) but different classes;
+   `R0` shows the pairs-vs-tuple choice is about the *domain*, not the class. So the class
+   cannot be read off a value, and adding a marker to `vfcn` would be a shape change to the
+   mold `lib/config`'s `cfg-value` and the jammed state share. New `+kind-of:check` instead
+   reads it off the semantic node: a `$RecursiveFcnSpec` body prints `FcnLambdaValue`.
+3. **`Circ` does not error** — TLC returns the unforced lambda, printing the body's source
+   span. The port has no unforced-value form; a stalled fixpoint reports its last failure.
+   Recorded as a difference, not in the corpus.
+
+### A latent crash this reached
+
+`+need-sexp` asserted `?>(?=(%& -.s) p.s)` on the set-constructor path (`node-eval:343`), so a
+set constructor whose operand failed to evaluate **crashed the evaluator** instead of returning
+a typed failure. Unreachable before, because nothing evaluated an expression expected to fail
+and then continued — a fixpoint sweep does exactly that (`s \ {CHOOSE y \in s : TRUE}` on an
+unsolved point). The call site now propagates; `+need-sexp` is deleted (it had one caller).
+
+### Results
+
+`ev-recfcn` 6/7 byte-exact — `Fact`, `Even`, `F5`, `C3`, `E3`, and `Card`, whose domain is
+`SUBSET (1..3)` and whose points come out in the oracle's `SubsetValue` order
+(`{}, {1}, {2}, {3}, {1,2}, {1,3}, {2,3}, {1,2,3}`). `ev-subbag` 2/4 — `B` and, newly,
+`Empty` (`SubBag(EmptyBag)`), which exercises the RSB recursion's base case over a domain of
+*functions*.
+
+Two skips remain, both already-owned rather than new:
+
+| def | why | owner |
+|---|---|---|
+| `ev-recfcn/FDom` | `DOMAIN` of a recursive function is a lazy `IntervalValue 0..5` in TLC, enumerated here — **the same divergence as `ev-lookup/Dom`** | R1.4.5b |
+| `ev-subbag/Subs`, `NSubs` | `SubBag`'s `LET Combine` builds `{[...] : f \in BagSet, i \in 1..B[x]}` — a **multi-binder set-of-all** | R1.4.3 |
+
+That second one confirms `tlc-module-body`'s residue verbatim ("recursive functions **and
+multi-binder set constructors**"): R1.4.2 supplied the first half, R1.4.3 owes the second.
+Because the fixpoint reports the last failing point rather than the first, the surfaced message
+is the out-of-domain one, not the set-of-all one — worth knowing when reading that skip.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two

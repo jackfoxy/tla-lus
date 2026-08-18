@@ -55,17 +55,17 @@ SKIPS = {
 #  as unsupported --- the nine original cases reached none of them. Every
 #  definition below is red on purpose and names the increment that turns it
 #  green; the goldens are frozen now so those increments have a target.
-_RECFCN = "recursive function definition ($RecursiveFcnSpec) --- R1.4.2"
 _MULTI = "function constructor over multiple binders --- R1.4.3"
+_SUBBAG = ("SubBag's own body needs a multi-binder set-of-all: its LET "
+           "Combine builds {[...] : f \\in BagSet, i \\in 1..B[x]}, two bound "
+           "variables --- R1.4.2 made the RSB recursion itself work (the base "
+           "case, SubBag(EmptyBag), now agrees), so this is R1.4.3's half of "
+           "tlc-module-body's residue. The fixpoint stalls and reports the "
+           "last point's failure, so the surfaced message is the out-of-domain "
+           "one, not the set-of-all one")
 _LAMBDA = ("LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same "
            "skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's "
            "evaluator work: an operator NAME argument already evaluates (A1/A2)")
-SKIPS.update({
-    ("ev-recfcn", d): _RECFCN
-    for d in ("Fact", "F5", "FDom", "Card", "C3", "Even", "E3")
-})
-SKIPS.update({("ev-subbag", d): _RECFCN + " (SubBag's own body)"
-              for d in ("Subs", "NSubs", "Empty")})
 SKIPS.update({("ev-multibind", d): _MULTI for d in ("G", "GAt", "GDom", "H")})
 SKIPS.update({
     ("ev-multibind", "SetMulti"):
@@ -75,6 +75,12 @@ SKIPS.update({
         "tuple-pattern bounded quantifier at constant level; the port reports "
         "'unbounded quantifier is not enumerable', which misdescribes a bound "
         "quantifier --- a site R1.4.0 did not name; R1.4.3",
+    ("ev-recfcn", "FDom"):
+        "DOMAIN of a recursive function: TLC keeps the lazy IntervalValue "
+        "0..5, the port enumerates it --- the same divergence as "
+        "ev-lookup/Dom (R1.4.5b)",
+    ("ev-subbag", "Subs"): _SUBBAG,
+    ("ev-subbag", "NSubs"): _SUBBAG,
     ("ev-oparg", "A3"): _LAMBDA,
     ("ev-oparg", "A4"): _LAMBDA,
     ("ev-oparg", "Sel"): _LAMBDA,

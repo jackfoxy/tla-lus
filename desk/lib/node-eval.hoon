@@ -340,7 +340,14 @@
   ?:  =(nm 'ENABLED')     (eval-enabled (snag 0 as) e)
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
-    (force:v (need-sexp (eval-domain n e)))
+    ::  a set constructor whose operand fails to evaluate is a typed failure,
+    ::  not an assertion: `s \ {CHOOSE y \in s : TRUE}` with an empty `s` used
+    ::  to crash the evaluator through +need-sexp's ?>, which a recursive
+    ::  function definition reaches whenever a sweep tries a point it cannot
+    ::  yet solve (R1.4.2)
+    =/  sx  (eval-domain n e)
+    ?:  ?=(%| -.sx)  sx
+    (force:v p.sx)
   ?:  =(nm 'DOMAIN')
     =/  a  (eval (snag 0 as) e)
     ?:(?=(%| -.a) a (domain:v p.a))
@@ -362,6 +369,7 @@
   ?:  =(nm '$SetOfAll')   (eval-setofall n e)
   ?:  |(=(nm '$FcnConstructor') =(nm '$NonRecursiveFcnSpec'))
     (eval-fcncon n e)
+  ?:  =(nm '$RecursiveFcnSpec')  (eval-recfcn n e)
   [%| 0 (rap 3 ~['unsupported builtin operator: ' nm])]
 ::
 ++  set-ctor-names
@@ -371,11 +379,6 @@
   :~  'SUBSET'  'UNION'  '\\union'  '\\intersect'  '\\'  '\\times'
       '$CartesianProd'  '$SetOfFcns'  '$SetOfRcds'
   ==
-::
-++  need-sexp
-  |=  s=(each sexp:v eval-err:v)
-  ^-  sexp:v
-  ?>(?=(%& -.s) p.s)
 ::
 ++  bi-eq
   |=  [as=(list sem:sm) e=eenv neg=?]
@@ -672,6 +675,75 @@
   =/  body  (snag 0 args.n)
   %+  fcn-over:v  p.sd
   |=(w=value:v (eval body e(vals (~(put by vals.e) nm.i.bs w))))
+::
+++  recfcn-partial
+  ::  the points solved so far, in domain order, as a function value — what
+  ::  the self-binder is bound to while the remaining points are solved
+  |=  [pts=(list value:v) sol=(map @ud value:v)]
+  ^-  value:v
+  =|  acc=(list vpair:v)
+  =/  i=@ud  0
+  |-  ^-  value:v
+  ?~  pts  (normalize:v [%fcn (flop acc)])
+  =/  r  (~(get by sol) i)
+  $(pts t.pts, i +(i), acc ?~(r acc [[i.pts u.r] acc]))
+::
+++  eval-recfcn
+  ::  a recursive function definition, `f[x \in S] == e(f, x)`. tlc2 builds a
+  ::  LAZY FcnLambdaValue and forces a point only when it is applied, so the
+  ::  body may refer to ANY other point, not merely an earlier one — measured
+  ::  at the pin, `Fwd[n \in 1..3] == IF n = 3 THEN 0 ELSE Fwd[n + 1] + 1`
+  ::  evaluates to <<2, 1, 0>>. A single pass in domain order would therefore
+  ::  be wrong, so this sweeps the domain to a fixpoint: each point is tried
+  ::  with the self-binder bound to the points solved so far, and sweeping
+  ::  stops when a whole pass solves nothing new. That terminates on every
+  ::  well-founded definition regardless of which direction it recurses, and
+  ::  a definition that cannot progress reports the failure its last attempt
+  ::  produced (tlc2 instead returns the unforced lambda, printing the body's
+  ::  source span — the port has no unforced-value form; compatibility.md)
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?~  ubound.n  [%| 0 'recursive function definition without a self-binder.']
+  =/  fnm  name.i.ubound.n
+  =/  bs  (flatten-bound bound.n)
+  ?.  ?=([* ~] bs)
+    [%| 0 'function constructor over multiple binders is unsupported.']
+  =/  sd  (eval-domain rng.i.bs e)
+  ?:  ?=(%| -.sd)  sd
+  =/  fr  (force:v p.sd)
+  ?:  ?=(%| -.fr)  fr
+  =/  el  (elemsof-e:v p.fr)
+  ?:  ?=(%| -.el)  el
+  =/  pts  p.el
+  =/  vnm  nm.i.bs
+  =/  body  (snag 0 args.n)
+  =/  tot  (lent pts)
+  =|  sol=(map @ud value:v)
+  =/  last=eval-err:v  [0 'recursive function definition does not converge.']
+  |-  ^-  eres
+  ?:  =(tot ~(wyt by sol))  [%& (recfcn-partial pts sol)]
+  ::  one sweep: the partial function is rebuilt per point, so a point solved
+  ::  earlier in this sweep is already visible to the next one
+  =/  sw
+    =/  ps  pts
+    =/  i=@ud  0
+    =/  s2  sol
+    =/  e2  last
+    |-  ^-  [(map @ud value:v) eval-err:v]
+    ?~  ps  [s2 e2]
+    ?^  (~(get by s2) i)  $(ps t.ps, i +(i))
+    =/  ev2=eenv
+      %=  e
+        vals
+      %+  ~(put by (~(put by vals.e) fnm (recfcn-partial pts s2)))
+        vnm
+      i.ps
+      ==
+    =/  r  (eval body ev2)
+    ?:  ?=(%| -.r)  $(ps t.ps, i +(i), e2 p.r)
+    $(ps t.ps, i +(i), s2 (~(put by s2) i p.r))
+  ?:  =(~(wyt by -.sw) ~(wyt by sol))  [%| +.sw]
+  $(sol -.sw, last +.sw)
 ::
 ::  +|  User-Defined Operators And LET
 ::
