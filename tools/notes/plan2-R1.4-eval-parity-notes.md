@@ -340,6 +340,35 @@ support — the `tupbind`/`tupsub` family from R1.3.3.2/R1.3.4, which handled tu
 *definitions*, `$SubsetOf` and `$SetOfAll` but not in quantifiers. That is front-end work; it is
 recorded against `semantic-graph` rather than absorbed here.
 
+## R1.4.4 — the CST state generator deleted (done)
+
+R1.4.0 measured it, R1.4.4 executes it. `check.hoon` lost **183 lines**: the whole
+*Environment Assembly* + *State Generation* section — `+combine`, `+ev-bool`, `+ev-val`,
+`+assignable`, `+gen`, `+gen-conj`, `+gen-exists`, `+qb-parts`, `+gen-unchanged`, `+filter` —
+plus the now-orphaned `++ op-key op-key:ev` re-export. 1.839 lines remain.
+
+Re-verified against the current file before cutting, not on the R1.4.0 reading: every call to
+those arms originates inside the block itself, nothing outside `check.hoon` names any of them
+(`<arm>:check` → 0 hits across `desk/` and `tools/`), and the one out-of-block `gen` match
+(`check.hoon:883`) is a loop face in `$(gen t.gen, …)`, not the arm.
+
+**`lib/eval.hoon` stays.** It owns the canonical `value` mold plus `vfield`/`vpair`, which
+`lib/value` (hence `lib/node-eval`) and `lib/config` (`+$ cfg-value value:eval`) depend on.
+What the deletion removes is its last *production* caller: `check.hoon` no longer uses
+`eval:ev`, `env:ev` or `as-set:ev`, and the CST evaluator is now reachable only from its own
+`tlc2.REPL` differential (`gen-eval-tests.py` → `tests/lib/eval`, 37 cases). The seven things
+`check.hoon` still takes from that library are the CST/AST helpers and the value mold —
+`value:ev`, `render:ev`, `elems:ev`, `kids-of:ev`, `is-kind:ev`, `op-name:ev`, `genid-name:ev`.
+
+**One binding chain.** `tlc-util-context`'s residue was "evaluation binding chain partial with
+the CST evaluator". There were two chains — `+combine`'s `state`-to-`env:ev` map and
+`+make-env:node-eval`'s `eenv`. After the deletion there is one, `+make-env`, so the residue is
+gone rather than merely smaller.
+
+`tlc-eval-cst` is therefore **`approved-difference`, not `replaced`**: the CST evaluator is not
+superseded code left lying around, it is a narrower constant-expression evaluator with its own
+oracle and its own passing differential, which happens to no longer back state generation.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two
