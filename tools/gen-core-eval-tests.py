@@ -40,9 +40,6 @@ TEST = REPO / "desk/tests/lib/core-eval.hoon"
 #  Each entry is a ledger residue with a named owner; nothing lands here
 #  without one.
 SKIPS = {
-    ("ev-lookup", "Dom"):
-        "DOMAIN of a tuple: TLC keeps the lazy IntervalValue 1..3, "
-        "the port enumerates it (R1.4.5b)",
     ("ev-sets", "Sub"):
         "SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset "
         "representation, so the kind reads SetEnumValue (the rendering agrees)",
@@ -67,10 +64,6 @@ SKIPS.update({
         "tuple-pattern bounded quantifier at constant level; the port reports "
         "'unbounded quantifier is not enumerable', which misdescribes a bound "
         "quantifier --- a site R1.4.0 did not name; R1.4.3",
-    ("ev-recfcn", "FDom"):
-        "DOMAIN of a recursive function: TLC keeps the lazy IntervalValue "
-        "0..5, the port enumerates it --- the same divergence as "
-        "ev-lookup/Dom (R1.4.5b)",
     ("ev-oparg", "A3"): _LAMBDA,
     ("ev-oparg", "A4"): _LAMBDA,
     ("ev-oparg", "Sel"): _LAMBDA,

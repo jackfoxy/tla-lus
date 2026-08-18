@@ -355,7 +355,16 @@
     (force:v p.sx)
   ?:  =(nm 'DOMAIN')
     =/  a  (eval (snag 0 as) e)
-    ?:(?=(%| -.a) a (domain:v p.a))
+    ?:  ?=(%| -.a)  a
+    ::  tlc2 returns the domain VALUE the function was built from, unchanged,
+    ::  so `DOMAIN [i \in 1..3 |-> i]` is an IntervalValue while
+    ::  `DOMAIN [i \in {1, 2, 3} |-> i]` is a SetEnumValue for the same set --
+    ::  provenance, not shape. The port's `%fcn` does not carry its domain, so
+    ::  recover it from the EXPRESSION where the expression reaches a
+    ::  constructor; otherwise fall back to enumerating the pairs (R1.4.5b)
+    ?.  ?=(%fcn -.p.a)  (domain:v p.a)
+    =/  de  (domain-expr (snag 0 as) e 8)
+    ?~(de (domain:v p.a) [%& u.de])
   ::  functions, tuples, records
   ?:  =(nm '$FcnApply')   (eval-fcnapply as e)
   ?:  =(nm '$Except')     (eval-except n e)
@@ -485,6 +494,41 @@
   ^-  eres
   =/  r  (disj-list:v (turn as |=(a=sem:sm |=(~ (eval-bool a e)))))
   ?:(?=(%| -.r) r [%& [%bool p.r]])
+::
+++  domain-expr
+  ::  the domain VALUE a function expression was built from, when the
+  ::  expression reaches a constructor. tlc2's DOMAIN hands back the value the
+  ::  function was constructed over rather than re-deriving a set from the
+  ::  points, which is why `1..3` survives as an IntervalValue and `{1, 2, 3}`
+  ::  does not; the port's `%fcn` keeps only its pairs, so the provenance is
+  ::  recovered here instead. Definition references are followed (a definition
+  ::  is where a constructor usually lives) under a small fuel bound; anything
+  ::  else -- a function that arrived as a parameter, an EXCEPT, a conditional
+  ::  -- yields ~ and the caller enumerates, which is the pre-R1.4.5b answer
+  |=  [n=sem:sm e=eenv fuel=@ud]
+  ^-  (unit value:v)
+  ?:  =(0 fuel)  ~
+  ?.  ?=(%apply -.n)  ~
+  =/  nm  name.op.n
+  ?:  ?|  =(nm '$FcnConstructor')
+          =(nm '$NonRecursiveFcnSpec')
+          =(nm '$RecursiveFcnSpec')
+      ==
+    =/  bs  (flatten-bound bound.n)
+    ::  a multi-binder constructor's domain is the tuple set, which tlc2
+    ::  builds rather than carries, so only the single-binder case applies
+    ?.  ?=([* ~] bs)  ~
+    ::  evaluate the range as an ordinary VALUE, not through +eval-domain and
+    ::  +force: forcing is exactly what destroys the interval, turning `1..3`
+    ::  into an eager `%set` and losing the distinction this arm exists for
+    =/  r  (eval rng.i.bs e)
+    ?:(?=(%| -.r) ~ `p.r)
+  ::  a reference to an arity-0 definition: look through to its body
+  ?.  =(~ args.n)  ~
+  =/  d  (~(get by ops.e) nm)
+  ?~  d  ~
+  ?~  body.u.d  ~
+  $(n u.body.u.d, fuel (dec fuel))
 ::
 ++  lambda-form
   ::  is this expression a function-lambda form? tlc2 keeps `[x \in S |-> e]`

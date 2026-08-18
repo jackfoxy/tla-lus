@@ -54,6 +54,25 @@
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aCONSTANT N, K\0aSum == N + K\0aProd == N * K\0aRange == 1..N\0a====\0a'  'CONSTANT N = 5\0aK = 3\0a'
   ~
 ::
+++  test-domain
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "EmptyD SetEnumValue \{}"
+        "FromIv IntervalValue 1..3"
+        "FromRcd SetEnumValue \{\"a\", \"b\"}"
+        "FromSet SetEnumValue \{1, 2, 3}"
+        "FromSetGap SetEnumValue \{1, 3}"
+        "FromTup IntervalValue 1..3"
+        "FromZero IntervalValue 0..2"
+        "Named FcnRcdValue <<1, 4, 9, 16>>"
+        "NamedDom IntervalValue 1..4"
+        "Neg IntervalValue -2..1"
+        "Single IntervalValue 2..2"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, Sequences\0aFromIv == DOMAIN [i \\in 1..3 |-> i]\0aFromSet == DOMAIN [i \\in {1, 2, 3} |-> i]\0aFromSetGap == DOMAIN [i \\in {1, 3} |-> i]\0aFromZero == DOMAIN [i \\in 0..2 |-> i]\0aFromTup == DOMAIN <<7, 8, 9>>\0aFromRcd == DOMAIN [a |-> 1, b |-> 2]\0aNeg == DOMAIN [i \\in (-2)..1 |-> i]\0aSingle == DOMAIN [i \\in 2..2 |-> i]\0aEmptyD == DOMAIN [i \\in {} |-> i]\0aNamed == [i \\in 1..4 |-> i * i]\0aNamedDom == DOMAIN Named\0a====\0a'  ''
+  ~
+::
 ++  test-domerr
   %+  expect-eq
     !>  ^-  (list tape)
@@ -97,10 +116,10 @@
   ~
 ::
 ++  test-lookup
-  ::  Dom: DOMAIN of a tuple: TLC keeps the lazy IntervalValue 1..3, the port enumerates it (R1.4.5b)
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "App IntValue 12"
+        "Dom IntervalValue 1..3"
         "F FcnRcdValue <<11, 12, 13>>"
         "Field IntValue 2"
         "R RecordValue [a |-> 1, b |-> 2]"
@@ -111,7 +130,7 @@
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, Sequences\0aF == [i \\in 1..3 |-> i + 10]\0aApp == F[2]\0aDom == DOMAIN F\0aR == [a |-> 1, b |-> 2]\0aField == R.b\0aRDom == DOMAIN R\0aT == <<9, 8, 7>>\0aTApp == T[1]\0aTLen == Len(T)\0a====\0a'  '\0a'
-  ~['Dom']
+  ~
 ::
 ++  test-model
   %+  expect-eq
@@ -172,7 +191,6 @@
   ~
 ::
 ++  test-recfcn
-  ::  FDom: DOMAIN of a recursive function: TLC keeps the lazy IntervalValue 0..5, the port enumerates it --- the same divergence as ev-lookup/Dom (R1.4.5b)
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "C3 IntValue 3"
@@ -180,11 +198,12 @@
         "E3 BoolValue FALSE"
         "Even FcnLambdaValue (0 :> TRUE @@ 1 :> FALSE @@ 2 :> TRUE @@ 3 :> FALSE @@ 4 :> TRUE)"
         "F5 IntValue 120"
+        "FDom IntervalValue 0..5"
         "Fact FcnLambdaValue (0 :> 1 @@ 1 :> 1 @@ 2 :> 2 @@ 3 :> 6 @@ 4 :> 24 @@ 5 :> 120)"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, FiniteSets\0aFact[n \\in 0..5] == IF n = 0 THEN 1 ELSE n * Fact[n - 1]\0aF5 == Fact[5]\0aFDom == DOMAIN Fact\0aCard[s \\in SUBSET (1..3)] == IF s = {} THEN 0 ELSE 1 + Card[s \\ {CHOOSE y \\in s : TRUE}]\0aC3 == Card[{1, 2, 3}]\0aEven[n \\in 0..4] == IF n = 0 THEN TRUE ELSE ~Even[n - 1]\0aE3 == Even[3]\0a====\0a'  ''
-  ~['FDom']
+  ~
 ::
 ++  test-sets
   ::  Sub: SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset representation, so the kind reads SetEnumValue (the rendering agrees)

@@ -420,6 +420,54 @@ col 21 of module A`. `+apply:value` receives values, not nodes, so the span is n
 plumbing spans into the value layer is a wider change than this increment. Left out of
 `ev-domerr` deliberately rather than skipped inside it.
 
+## R1.4.5b — `DOMAIN` keeps the interval (done)
+
+Both witnesses close. Corpus 15 cases, **96 compared definitions**; `core-eval` 15/15.
+
+### It is provenance, not shape
+
+The obvious reading — "a contiguous integer domain renders as an interval" — is wrong, and one
+probe settles it:
+
+| expression | oracle |
+|---|---|
+| `DOMAIN [i \in 1..3 \|-> i]` | `IntervalValue 1..3` |
+| `DOMAIN [i \in {1, 2, 3} \|-> i]` | `SetEnumValue {1, 2, 3}` |
+
+Same set, same function, different answer. tlc2's `DOMAIN` hands back **the value the function
+was constructed over, unchanged**; it never re-derives a set from the points. `DOMAIN <<7,8,9>>`
+is `IntervalValue 1..3` because `TupleValue.getDomain` synthesizes one, and
+`DOMAIN [i \in {} |-> i]` is `SetEnumValue {}` because that is what it was built from.
+
+### Reproduced from the expression, not by changing the mold
+
+The port's `%fcn` stores only its pairs, so the provenance is not in the value. Carrying it
+would mean adding a field to `vfcn` — the mold `lib/config`'s `cfg-value` and the jammed state
+share — *and* making `+normalize`/`+equal`/`vlth`/fingerprinting ignore that field, since two
+equal functions with different provenance must stay equal. That is a change to the fingerprint
+path safety checking depends on, for a rendering distinction.
+
+Instead, new `+domain-expr` recovers it the way `+kind-of` and `+lambda-form` already do: it
+walks the *expression*, following arity-0 definition references under a small fuel bound, and
+when it reaches a single-binder constructor it evaluates that binder's range **as an ordinary
+value**. This is not a heuristic — it recomputes exactly the value tlc2 stored.
+
+The one subtlety that cost a build: the first attempt evaluated the range through
+`+eval-domain` and `+force:value`, which is precisely what destroys the distinction — forcing
+turns `1..3` into an eager `%set`. Evaluating the range with plain `+eval` keeps `%intv`.
+
+`%seq` and `%rec` needed nothing: `+domain:value` already returned `[%intv --1 n]` for a tuple,
+which is what `FromTup` wants.
+
+### Where it falls back
+
+`+domain-expr` yields `~` — and the caller enumerates, the pre-R1.4.5b answer — when the
+expression does not reach a constructor: a function that arrived as an operator parameter, the
+result of an `EXCEPT`, a conditional, or a multi-binder constructor (whose domain tlc2 *builds*
+rather than carries, so there is no stored value to match). New corpus case **`ev-domain`** pins
+the rule from both sides, including `FromSet`/`FromSetGap` staying `SetEnumValue` and a
+`NamedDom` that has to be followed through a definition.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two
