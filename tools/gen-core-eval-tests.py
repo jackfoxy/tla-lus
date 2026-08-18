@@ -39,10 +39,29 @@ TEST = REPO / "desk/tests/lib/core-eval.hoon"
 #  (case, defname) -> why this port deliberately answers differently.
 #  Each entry is a ledger residue with a named owner; nothing lands here
 #  without one.
+_LAZYSET = ("tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, "
+            "SetOfTuplesValue for `A \\X B`, SetPredValue for a filter whose base "
+            "set is itself lazy -- and the port normalizes all of them to one "
+            "eager `%set`, so only the class column differs; the elements and "
+            "their rendering agree exactly. The class is NOT a property of the "
+            "operator either: `{x \\in 1..6 : P}` is a SetEnumValue at the pin "
+            "while `{x \\in (A \\X B) : P}` is a SetPredValue, so reproducing it "
+            "would mean modelling tlc2's lazy-value class hierarchy, which this "
+            "port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) "
+            "-- it is the representation class that is absent. Laziness also "
+            "PROPAGATES from the base set, which is why `[<<i, j>> \\in (A \\X B) "
+            "|-> e]` is a FcnLambdaValue at the pin while `[i \\in 1..3 |-> e]` is "
+            "a FcnRcdValue: same constructor, but the first is built over a lazy "
+            "domain. R1.3.8")
+
 SKIPS = {
-    ("ev-sets", "Sub"):
-        "SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset "
-        "representation, so the kind reads SetEnumValue (the rendering agrees)",
+    ("ev-sets", "Sub"): _LAZYSET,
+    ("ev-prod", "P"): _LAZYSET,
+    ("ev-prod", "R"): _LAZYSET,
+    ("ev-prodfilt", "Card"): _LAZYSET,
+    ("ev-tupbind", "S"): _LAZYSET,
+    ("ev-tupbind", "FiltT"): _LAZYSET,
+    ("ev-tupbind", "FcnT"): _LAZYSET,
 }
 
 #  R1.4.1b added four cases that exist to REACH the sites lib/node-eval names

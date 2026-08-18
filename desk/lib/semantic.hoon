@@ -698,6 +698,10 @@
     ?.  =(3 (lent kids))  (max-levels c (skim kids |=(k=node ?=(%node -.k))))
     (op-level (op-of-genop (snag 1 kids)) c ~[(snag 0 kids) (snag 2 kids)])
   ::
+      ::  `\X` is a flattened N_Times, not an infix pair (R1.3.8)
+      %n-times
+    (op-level '\\times' c (times-operands n))
+  ::
       %n-prefixexpr
     =/  kids  (kids-of n)
     ?.  =(2 (lent kids))  (max-levels c ~)
@@ -902,6 +906,16 @@
   ?:  (is-kind k %n-identifiertuple)
     (weld (tuple-idents k) $(ks t.ks))
   $(ks t.ks)
+::
+++  qbound-is-tuple
+  ::  is this N_QuantBound a DESTRUCTURING binder, `<<i, j>> \in S`? SANY
+  ::  records it as OpApplNode.isBdedQuantATuple, and it changes the meaning:
+  ::  the tuple form takes one element of S apart, while `i, j \in S` ranges
+  ::  each variable over the whole of S (R1.3.8)
+  |=  qb=node
+  ^-  ?
+  %+  lien  (kids-of qb)
+  |=(k=node (is-kind k %n-identifiertuple))
 ::
 ++  qbound-range
   ::  the range expression (after \in) of an N_QuantBound
@@ -1147,7 +1161,12 @@
       bound=(list sem-bound)
       args=(list sem)
   ==
-+$  sem-bound   $+(sem-bound $:(vars=(list sbind) range=(unit sem)))
+::  `tuple` marks a DESTRUCTURING binder `<<i, j>> \in S`, as opposed to a
+::  plain group `i, j \in S`: the first takes one element of S apart, the
+::  second ranges each variable over the whole of S. SANY carries this as
+::  OpApplNode.isBdedQuantATuple; without it the two shapes are identical
+::  here and no consumer can tell them apart (R1.3.8)
++$  sem-bound   $+(sem-bound $:(vars=(list sbind) range=(unit sem) tuple=?))
 +$  sem-letin
   $+  sem-letin
   $:  %letin
@@ -1410,7 +1429,8 @@
   :-  ~
   :*  %apply  ['$OpArg' %user-op]  (expr-level body c2)  sp
       [['LAMBDA' | sp] ~]
-      [[pbinds ~] ~]
+      ::  a LAMBDA's parameters are never a destructuring binder (R1.3.8)
+      [[pbinds ~ |] ~]
       :~  [%lit %num (crip (a-co (lent params))) sp]
           ?~(r.gb [%nullodn ~] u.r.gb)
       ==
@@ -1605,6 +1625,9 @@
   ::
       %n-disjlist
     (g-junction '$DisjList' n c)
+  ::
+      %n-times
+    (g-times n c)
   ::
       %n-setenumerate
     (g-elems '$SetEnumerate' n c)
@@ -2126,6 +2149,36 @@
   =/  g  (g-list items c)
   [`(builtin-apply opn n c [~ ~ rs.g]) ds.g]
 ::
+++  times-operands
+  ::  the operand kids of an N_Times. The parser flattens `A \X B \X C` into
+  ::  one node whose kids alternate operand, operator, operand, … (see
+  ::  syntax.hoon's `%n-times` reduce), so the operands are the even
+  ::  positions. Skimming for `%node` would be wrong: an operator token can
+  ::  itself be a node (a wrapped N_InfixOp), not a bare leaf
+  |=  n=node
+  ^-  (list node)
+  =/  ks  (kids-of n)
+  =/  i=@ud  0
+  |-  ^-  (list node)
+  ?~  ks  ~
+  ?:  =(0 (mod i 2))
+    [i.ks $(ks t.ks, i +(i))]
+  $(ks t.ks, i +(i))
+::
+++  g-times
+  ::  `A \X B` / `A \times B`, and flattened chains, become SANY's VARIADIC
+  ::  `$CartesianProd` — one apply over all operands, not nested binaries.
+  ::  Before R1.3.8 `%n-times` had no case here at all, so `g-x` fell through
+  ::  and returned `[~ ~]`: the node was dropped from the graph SILENTLY, with
+  ::  no diagnostic. That is why a definition whose body was a top-level `\X`
+  ::  had no body, why `{x \in (A \X B) : P}` lost its range and then
+  ::  miscounted its binder, and why `e \in (A \X B)` crashed the evaluator
+  ::  (`+bi-in` reached for an argument that had been dropped)
+  |=  [n=node c=ctx]
+  ^-  gout
+  =/  g  (g-list (times-operands n) c)
+  [`(builtin-apply '$CartesianProd' n c [~ ~ rs.g]) ds.g]
+::
 ++  g-elems
   |=  [opn=@t n=node c=ctx]
   ^-  gout
@@ -2148,7 +2201,7 @@
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   %=  $
     qbounds  t.qbounds
-    bs       [[vars r.gr] bs]
+    bs       [[vars r.gr (qbound-is-tuple i.qbounds)] bs]
     ds       (weld ds ds.gr)
   ==
 ::
@@ -2214,7 +2267,9 @@
       %^  builtin-apply  opn  n
         :-  c2
       ?:  bounded
-        [~ [[sbinds r.gr] ~] (drop-nulls ~[r.gx])]
+        ::  `CHOOSE <<i, j>> \in S : P` destructures, like the quantifiers
+        ::  (R1.3.8)
+        [~ [[sbinds r.gr (lien kids |=(k=node (is-kind k %n-identifiertuple)))] ~] (drop-nulls ~[r.gx])]
       [sbinds ~ (drop-nulls ~[r.gx])]
   (weld ds.gr ds.gx)
 ::
@@ -2264,7 +2319,9 @@
     |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
   =/  gx=gout  ?~(body [~ ~] (g-x u.body c2))
-  :-  `(builtin-apply '$SubsetOf' n c [~ [[sbinds r.gr] ~] (drop-nulls ~[r.gx])])
+  ::  `{<<i, j>> \in S : P}` destructures, like the quantifiers (R1.3.8)
+  =/  tup  (lien kids |=(k=node (is-kind k %n-identifiertuple)))
+  :-  `(builtin-apply '$SubsetOf' n c [~ [[sbinds r.gr tup] ~] (drop-nulls ~[r.gx])])
   (weld ds.gr ds.gx)
 ::
 ++  g-fcnconst
@@ -5974,7 +6031,10 @@
         ^-  wain
         %+  turn  vars.g
         |=  b=sbind
-        (line +(d) "bound {(trip name.b)} {(rlvl |(mask !used.b) 0)} {(sspan-tape at.b)}")
+        %+  line  +(d)
+        %+  weld
+          "bound {(trip name.b)} {(rlvl |(mask !used.b) 0)} {(sspan-tape at.b)}"
+        ?:(tuple.g " tup" "")
       ?~(range.g ~ (render-sem u.range.g (add d 2) mask))
     ::
       ^-  wain

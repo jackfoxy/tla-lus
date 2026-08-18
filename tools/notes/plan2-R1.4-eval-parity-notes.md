@@ -513,6 +513,59 @@ Option (2) stays available and is now costed.
 `ev-tlc` skips `Pr`/`PrT`/`PrNest` with that reason, so the decision is machine-checked rather
 than only written down.
 
+## R1.4.7 — close-out
+
+**Six of the seven rows are terminal.** `tlc-module-body` and `tlc-util-context` reach
+`parity`; `tlc-enum`, `tlc-eval-cst`, `tlc-eval-error` and `tlc-module-tlc` are
+`approved-difference`, each with its difference documented in `compatibility.md`. Owed rows
+across the whole ledger: **23 → 18** over this unit.
+
+### The seventh row stays `partial`, and the measurement says why
+
+`tlc-eval-node`'s only remaining residue is `\E <<i, j>> \in S : P`. R1.4.3 recorded that the
+port cannot tell a tuple-pattern binder from `\E i, j \in S : P`, and flagged — without
+measuring — that `semantic-graph` (at `parity`) might be overstated by it. R1.4.7 measured it:
+
+```
+def Tup  \E <<i, j>> \in S : i = j      def Two  \E i, j \in 1..2 : i = j
+  apply $BoundedExists                    apply $BoundedExists
+    bound i                                 bound i
+    bound j                                 bound j
+      apply S                                 apply ..
+```
+
+**`SemDump` does not distinguish them either.** Both project identically. The distinction is
+SANY's `OpApplNode.isBdedQuantATuple()`, a boolean the oracle projection never prints and
+`+$ sem-bound` never stores. So `semantic-graph` is **not** overstated — the port agrees with
+the differential it is measured against — and the earlier flag is resolved without demoting a
+terminal row.
+
+Closing `ExTup` therefore needs three things in order: **extend the `SemDump` projection** to
+print the tuple flag, **add the flag to `sem-bound`** and the generator, then evaluator support.
+That is front-end work with an oracle change in front of it, handed on rather than absorbed:
+R1.4 owns the evaluator, and no evaluator change can reach this.
+
+Recording `tlc-eval-node` as `partial` with that one narrow residue is the honest close. The
+alternative — reassigning the residue to `semantic-graph` and flipping this row — would move a
+gap onto a row the evidence says is fine.
+
+### What this unit did
+
+| increment | outcome |
+|---|---|
+| `.0` | corpus partition; three scope decisions; two plan-table entries found wrong |
+| `.1` | the `EvalDump` comparator, reusing `+project-defs`; generator `oracle-only` → `pass` |
+| `.1b` | four cases added to *reach* the unsupported sites; two unnamed sites surfaced |
+| `.2` | recursive functions via a domain fixpoint; a latent `+need-sexp` crash fixed |
+| `.3` | multi-binder constructors; `SubBag` fully evaluates |
+| `.4` | 183 dead lines deleted; one binding chain |
+| `.5` | four out-of-domain wordings; the decimal item corrected |
+| `.5b` | `DOMAIN` provenance |
+| `.6` | `TLCEval` residue was stale; `Print` decided |
+
+Corpus **9 → 16 cases**, compared definitions **58 → 100**. `check.hoon` lost 183 lines;
+`lib/eval`'s CST driver became test-only.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two

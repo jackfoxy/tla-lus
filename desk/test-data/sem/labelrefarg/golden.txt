@@ -8,8 +8,8 @@ MODULE A 1.1-6.4
         apply $SetEnumerate opkind=BuiltInKind L0 3.27-3.32
           num 1 L0 3.28-3.28
           num 2 L0 3.31-3.31
-      bound y L0 3.37-3.37
-      bound z L0 3.40-3.40
+      bound y L0 3.37-3.37 tup
+      bound z L0 3.40-3.40 tup
         apply $SetEnumerate opkind=BuiltInKind L0 3.48-3.57
           apply $Tuple opkind=BuiltInKind L0 3.49-3.56
             num 3 L0 3.51-3.51

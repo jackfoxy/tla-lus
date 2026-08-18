@@ -2,8 +2,8 @@ ACCEPT
 MODULE A 1.1-4.4
   def Sub arity=0 local=n L0 2.1-2.39
     apply $SubsetOf opkind=BuiltInKind L0 2.8-2.39
-      bound y L0 2.11-2.11
-      bound z L0 2.14-2.14
+      bound y L0 2.11-2.11 tup
+      bound z L0 2.14-2.14 tup
         apply $SetEnumerate opkind=BuiltInKind L0 2.22-2.30
           apply $Tuple opkind=BuiltInKind L0 2.23-2.29
             num 1 L0 2.25-2.25
@@ -13,8 +13,8 @@ MODULE A 1.1-4.4
         apply z opkind=FormalParamKind L0 2.38-2.38
   def Ch arity=0 local=n L0 3.1-3.43
     apply $BoundedChoose opkind=BuiltInKind L0 3.7-3.43
-      bound i L0 3.16-3.16
-      bound j L0 3.19-3.19
+      bound i L0 3.16-3.16 tup
+      bound j L0 3.19-3.19 tup
         apply $SetEnumerate opkind=BuiltInKind L0 3.27-3.35
           apply $Tuple opkind=BuiltInKind L0 3.28-3.34
             num 3 L0 3.30-3.30

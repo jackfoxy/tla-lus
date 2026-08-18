@@ -643,18 +643,31 @@
 ::
 ::  +|  Binders
 ::
++$  bgroup
+  ::  one binder to iterate: the names it binds, its range, and whether it
+  ::  DESTRUCTURES. `i, j \in S` is two bgroups (each name ranges over the
+  ::  whole of S); `<<i, j>> \in S` is ONE bgroup carrying both names, since
+  ::  a single element of S is taken apart across them (R1.3.8)
+  $:  nms=(list @t)
+      rng=sem:sm
+      tup=?
+  ==
+::
 ++  flatten-bound
-  ::  expand each `x, y \in S` group into one (name, range) per variable
+  ::  expand a bound list into the binders to iterate. A plain group becomes
+  ::  one bgroup per variable; a tuple group stays one bgroup
   |=  bs=(list sem-bound:sm)
-  ^-  (list [nm=@t rng=sem:sm])
+  ^-  (list bgroup)
   ?~  bs  ~
-  =/  here=(list [nm=@t rng=sem:sm])
+  =/  here=(list bgroup)
     ?~  range.i.bs  ~
-    (turn vars.i.bs |=(b=sbind:sm [name.b u.range.i.bs]))
+    ?:  tuple.i.bs
+      ~[[(turn vars.i.bs |=(b=sbind:sm name.b)) u.range.i.bs &]]
+    (turn vars.i.bs |=(b=sbind:sm [~[name.b] u.range.i.bs |]))
   (weld here $(bs t.bs))
 ::
-++  bind-vals
-  ::  bind var names to a positional binding tuple (zips to the shorter)
+++  bind-names
+  ::  bind names to a positional value list (zips to the shorter)
   |=  [e=eenv names=(list @t) vs=(list value:v)]
   ^-  eenv
   ?~  names  e
@@ -665,24 +678,46 @@
     e      e(vals (~(put by vals.e) i.names i.vs))
   ==
 ::
+++  bind-group
+  ::  bind ONE binder group to ONE domain element. A plain group binds its
+  ::  single name to the element; a tuple group destructures the element
+  ::  across its names. A tuple binder over a non-tuple element binds
+  ::  nothing, so the body fails on the unbound name rather than silently
+  ::  seeing the whole element (R1.3.8)
+  |=  [e=eenv g=bgroup w=value:v]
+  ^-  eenv
+  ?.  tup.g
+    ?~(nms.g e e(vals (~(put by vals.e) i.nms.g w)))
+  ?.  ?=(%seq -.w)  e
+  (bind-names e nms.g p.w)
+::
+++  bind-vals
+  ::  bind a whole binding context: one value per bgroup, each destructured
+  ::  or not according to its group
+  |=  [e=eenv gs=(list bgroup) vs=(list value:v)]
+  ^-  eenv
+  ?~  gs  e
+  ?~  vs  e
+  $(gs t.gs, vs t.vs, e (bind-group e i.gs i.vs))
+::
 ++  ctx-doms
-  ::  a cdom per flattened binder: evaluate its range with the prefix bound
-  |=  [bs=(list [nm=@t rng=sem:sm]) names=(list @t) e=eenv]
+  ::  a cdom per binder group: evaluate its range with the prefix bound
+  |=  [bs=(list bgroup) e=eenv]
   ^-  (list cdom:v)
   %+  turn  bs
-  |=  bd=[nm=@t rng=sem:sm]
-  |=(pre=(list value:v) (eval-domain rng.bd (bind-vals e names pre)))
+  |=  bd=bgroup
+  |=(pre=(list value:v) (eval-domain rng.bd (bind-vals e bs pre)))
 ::
 ++  eval-forall
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
   =/  bs  (flatten-bound bound.n)
   ?~  bs  [%| 0 'unbounded quantifier is not enumerable.']
-  =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+
   =/  body  (snag 0 args.n)
   =/  r
-    %+  all-ctx:v  (ctx-doms bs names e)
-    |=(pre=(list value:v) (eval-bool body (bind-vals e names pre)))
+    %+  all-ctx:v  (ctx-doms bs e)
+    |=(pre=(list value:v) (eval-bool body (bind-vals e bs pre)))
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
 ++  eval-exists
@@ -690,11 +725,11 @@
   ^-  eres
   =/  bs  (flatten-bound bound.n)
   ?~  bs  [%| 0 'unbounded quantifier is not enumerable.']
-  =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+
   =/  body  (snag 0 args.n)
   =/  r
-    %+  ex-ctx:v  (ctx-doms bs names e)
-    |=(pre=(list value:v) (eval-bool body (bind-vals e names pre)))
+    %+  ex-ctx:v  (ctx-doms bs e)
+    |=(pre=(list value:v) (eval-bool body (bind-vals e bs pre)))
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
 ++  eval-choose
@@ -706,7 +741,7 @@
   ?:  ?=(%| -.sd)  sd
   =/  body  (snag 0 args.n)
   %+  choose-over:v  p.sd
-  |=(w=value:v (eval-bool body e(vals (~(put by vals.e) nm.i.bs w))))
+  |=(w=value:v (eval-bool body (bind-group e i.bs w)))
 ::
 ++  eval-subsetof
   |=  [n=sem-apply:sm e=eenv]
@@ -717,7 +752,7 @@
   ?:  ?=(%| -.sd)  sd
   =/  body  (snag 0 args.n)
   %+  filter-over:v  p.sd
-  |=(w=value:v (eval-bool body e(vals (~(put by vals.e) nm.i.bs w))))
+  |=(w=value:v (eval-bool body (bind-group e i.bs w)))
 ::
 ++  eval-setofall
   ::  {e : x \in S} and, over several binders, {e : x \in S, y \in T(x)} —
@@ -729,16 +764,16 @@
   ?~  bs  [%| 0 'a set-of-all expects a bounded variable.']
   =/  body  (snag 0 args.n)
   ?.  ?=([* ~] bs)
-    =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+  
     =/  r
-      %^  ctx-map:v  (ctx-doms bs names e)  ~
-      |=(pre=(list value:v) (eval body (bind-vals e names pre)))
+      %^  ctx-map:v  (ctx-doms bs e)  ~
+      |=(pre=(list value:v) (eval body (bind-vals e bs pre)))
     ?:  ?=(%| -.r)  r
     [%& (normalize:v [%set p.r])]
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
   %+  map-over:v  p.sd
-  |=(w=value:v (eval body e(vals (~(put by vals.e) nm.i.bs w))))
+  |=(w=value:v (eval body (bind-group e i.bs w)))
 ::
 ++  eval-fcncon
   ::  [x \in S |-> e] and, over several binders, [x \in S, y \in T |-> e],
@@ -751,16 +786,16 @@
   ?~  bs  [%| 0 'a function constructor expects a bounded variable.']
   =/  body  (snag 0 args.n)
   ?.  ?=([* ~] bs)
-    =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+  
     =/  r
-      %^  ctx-fcn:v  (ctx-doms bs names e)  ~
-      |=(pre=(list value:v) (eval body (bind-vals e names pre)))
+      %^  ctx-fcn:v  (ctx-doms bs e)  ~
+      |=(pre=(list value:v) (eval body (bind-vals e bs pre)))
     ?:  ?=(%| -.r)  r
     [%& (normalize:v [%fcn p.r])]
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
   %+  fcn-over:v  p.sd
-  |=(w=value:v (eval body e(vals (~(put by vals.e) nm.i.bs w))))
+  |=(w=value:v (eval body (bind-group e i.bs w)))
 ::
 ++  recfcn-partial
   ::  the points solved so far, in domain order, as a function value — what
@@ -801,7 +836,6 @@
   =/  el  (elemsof-e:v p.fr)
   ?:  ?=(%| -.el)  el
   =/  pts  p.el
-  =/  vnm  nm.i.bs
   =/  body  (snag 0 args.n)
   =/  tot  (lent pts)
   =|  sol=(map @ud value:v)
@@ -818,13 +852,12 @@
     |-  ^-  [(map @ud value:v) eval-err:v]
     ?~  ps  [s2 e2]
     ?^  (~(get by s2) i)  $(ps t.ps, i +(i))
+    ::  the self-binder plus this point, destructured if the binder is a
+    ::  tuple pattern (R1.3.8)
     =/  ev2=eenv
-      %=  e
-        vals
-      %+  ~(put by (~(put by vals.e) fnm (recfcn-partial pts s2)))
-        vnm
-      i.ps
-      ==
+      %+  bind-group
+        e(vals (~(put by vals.e) fnm (recfcn-partial pts s2)))
+      [i.bs i.ps]
     =/  r  (eval body ev2)
     ?:  ?=(%| -.r)  $(ps t.ps, i +(i), e2 p.r)
     $(ps t.ps, i +(i), s2 (~(put by s2) i p.r))
@@ -1075,7 +1108,7 @@
   ?.  =((lent params.d) (lent vs))
     [%| 0 (rap 3 ~['wrong number of arguments to ' name.d])]
   =/  names  (turn params.d |=(p=spar:sm name.p))
-  (eval u.body.d (bind-vals e(fuel (dec fuel.e)) names vs))
+  (eval u.body.d (bind-names e(fuel (dec fuel.e)) names vs))
 ::
 ++  binding-of
   ::  what an operator resolves to, mirroring the oracle's BINDINGS
@@ -1415,7 +1448,7 @@
   =/  xs  p.els
   |-  ^-  sres
   ?~  xs  [%& out]
-  =/  e2  e(vals (~(put by vals.e) nm.i.bs i.xs))
+  =/  e2  (bind-group e i.bs i.xs)
   =/  r  (solve body mode cur part e2)
   ?:  ?=(%| -.r)  r
   $(xs t.xs, out (weld out p.r))
@@ -1440,7 +1473,7 @@
   =/  xs  p.els
   |-  ^-  sres
   ?~  xs  [%& acc]
-  =/  e2  e(vals (~(put by vals.e) nm.i.bs i.xs))
+  =/  e2  (bind-group e i.bs i.xs)
   =/  step  (solve-each body mode cur acc e2)
   ?:  ?=(%| -.step)  step
   $(xs t.xs, acc p.step)

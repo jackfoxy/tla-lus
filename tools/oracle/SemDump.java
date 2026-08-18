@@ -314,10 +314,19 @@ public final class SemDump {
       FormalParamNode[][] bq = a.getBdedQuantSymbolLists();
       if (bq != null) {
         ExprNode[] bounds = a.getBdedQuantBounds();
+        // R1.3.8(b): whether each group is a TUPLE pattern (`<<i, j>> \in S`)
+        // rather than a plain list (`i, j \in S`). The two mean different
+        // things -- destructure one element vs range each variable over the
+        // whole set -- and without this the projection cannot tell them apart,
+        // so a port could not be measured against the distinction at all.
+        boolean[] tup = a.isBdedQuantATuple();
         for (int i = 0; i < bq.length; i++) {
+          boolean isTup = tup != null && i < tup.length && tup[i];
           for (FormalParamNode p : bq[i]) {
             indent(d + 1, o);
-            o.append("bound ").append(p.getName()).append(' ').append(sll(p)).append('\n');
+            o.append("bound ").append(p.getName()).append(' ').append(sll(p));
+            if (isTup) o.append(" tup");
+            o.append('\n');
           }
           if (bounds != null && i < bounds.length) node(bounds[i], d + 2, o);
         }

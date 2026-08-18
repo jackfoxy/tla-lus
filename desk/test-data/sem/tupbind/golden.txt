@@ -2,8 +2,8 @@ ACCEPT
 MODULE A 1.1-4.4
   def Foo arity=0 local=n L0 2.1-2.40
     apply $BoundedExists opkind=BuiltInKind L0 2.8-2.40
-      bound y L0 2.13-2.13
-      bound z L0 2.16-2.16
+      bound y L0 2.13-2.13 tup
+      bound z L0 2.16-2.16 tup
         apply $SetEnumerate opkind=BuiltInKind L0 2.24-2.32
           apply $Tuple opkind=BuiltInKind L0 2.25-2.31
             num 1 L0 2.27-2.27
@@ -16,8 +16,8 @@ MODULE A 1.1-4.4
       bound x L0 3.11-3.11
         apply $SetEnumerate opkind=BuiltInKind L0 3.17-3.19
           num 1 L0 3.18-3.18
-      bound y L0 3.24-3.24
-      bound z L0 3.27-3.27
+      bound y L0 3.24-3.24 tup
+      bound z L0 3.27-3.27 tup
         apply $SetEnumerate opkind=BuiltInKind L0 3.35-3.43
           apply $Tuple opkind=BuiltInKind L0 3.36-3.42
             num 3 L0 3.38-3.38

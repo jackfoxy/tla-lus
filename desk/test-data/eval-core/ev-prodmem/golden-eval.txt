@@ -1,0 +1,4 @@
+EVAL
+Mem BoolValue TRUE
+NotMem BoolValue FALSE
+Tri BoolValue TRUE

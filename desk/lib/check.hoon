@@ -1109,7 +1109,22 @@
   ::  than the CST — the verdict still comes from the first-increment recognizer
   ::  (unit 8.5 retires that). Empty for a pure-safety run; a non-boolean
   ::  constant leaf is a typed rejection (unit 8.1.5).
-  =/  or  ?~(pp `(each (list oos:tp) aerr:tp)`[%& ~] (build-live-oss ca defs consts vars fair))
+  ::  R1.8.1.1: only a genuinely TEMPORAL property goes to the liveness
+  ::  normalizer. A box-invariant, an implied init (level 1) or an implied
+  ::  action (`[][A]_v`) is checked elsewhere, and feeding one of the latter two
+  ::  to `normalize:tp` bails — which is why a `[][A]_v` PROPERTY crashed here
+  ::  before the routing existed
+  =/  ppb=(unit sem:sem-lib)
+    ?~  properties.ca  ~
+    (sem-body defs i.properties.ca)
+  =/  non-temporal=?
+    ?~  ppb  |
+    ?|  (lte (sem-lvl:sem-lib u.ppb) 1)
+        ?=(^ (implied-action-inner u.ppb))
+    ==
+  =/  or=(each (list oos:tp) aerr:tp)
+    ?:  |(?=(~ pp) non-temporal)  [%& ~]
+    (build-live-oss ca defs consts vars fair)
   ?:  ?=(%| -.or)  [%| msg.p.or]
   :-  %&
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
@@ -1687,7 +1702,17 @@
   ?^  pp.c
     =/  psb  (sem-body defs.c u.pp.c)
     ?~  psb  ~['No property def']
+    ::  R1.8.1.1: route the PROPERTY the way SpecProcessor.processConfigProps
+    ::  does. `[]P` with a state-level P is a box invariant (8.9, below); a
+    ::  LEVEL-1 predicate is an IMPLIED INIT, checked while computing initial
+    ::  states; `[][A]_v` is an IMPLIED ACTION, checked on every transition;
+    ::  anything else is a temporal property for the liveness engine
     =/  binner  (box-state-inner:tp u.psb)
+    ?:  &(?=(~ binner) (lte (sem-lvl:sem-lib u.psb) 1))
+      (implied-init-run c u.pp.c u.psb)
+    =/  iact  (implied-action-inner u.psb)
+    ?:  &(?=(~ binner) ?=(^ iact))
+      (implied-action-run c u.pp.c u.iact)
     ?^  binner
       =/  o=bfs-opts
         [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
@@ -1695,8 +1720,13 @@
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
       (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
-    =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
-    ?:  ?=(%| -.osr)  ~[(cat 3 'Error: ' msg.p.osr)]
+    ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
+    ::  includes the fairness conjuncts `decompose-spec` extracted from the
+    ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
+    ::  silently discarded every WF_/SF_ the SPEC declared, so a fair spec had a
+    ::  stuttering counterexample and EVERY liveness property reported violated.
+    ::  `live-verdict-lines` used `oss.c` and got these same specs right, which
+    ::  is why the differential passed while production did not.
     ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
     ::  on a large/looping state space; a capped build renders %limited
     =/  o=bfs-opts
@@ -1708,12 +1738,104 @@
       (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
     =/  r
       %-  live-report
-      :*  p.osr  (states-of seen.g.bg)  inits.g.bg  nsb.c
+      :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
           gen.g.bg  distinct.g.bg  depth.g.bg
       ==
     report.r
   ::  safety: an INVARIANT
+  (safety-run c)
+::
+++  implied-action-inner
+  ::  the A of a `[][A]_v` implied-action property — a box over a square-action
+  ::  (SpecProcessor routes these to the implied-action list, checked on every
+  ::  transition rather than by the liveness engine). ~ if not that shape
+  |=  s=sem:sem-lib
+  ^-  (unit sem:sem-lib)
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('[]' name.op.s)  ~
+  ?~  args.s  ~
+  =/  a  i.args.s
+  ?.  ?=(%apply -.a)  ~
+  ?.  =('$SquareAct' name.op.a)  ~
+  ?~(args.a ~ `i.args.a)
+::
+++  implied-init-run
+  ::  an IMPLIED INIT: tlc2 checks a level-1 PROPERTY against each initial state
+  ::  while computing them, so a violation aborts there — the diagnostic names
+  ::  the offending state and NO state-graph counts follow (measured at the pin).
+  ::  If it holds, the ordinary safety search proceeds (R1.8.1.1/.2)
+  |=  [c=sctx pname=@t body=sem:sem-lib]
+  ^-  wain
+  =/  env  (make-env:ne defs.c consts.c vars.c)
+  =/  bad
+    =/  sts  is.c
+    |-  ^-  (unit state)
+    ?~  sts  ~
+    =/  r  (pred-bool:ne body i.sts ~ env)
+    ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
+    `i.sts
+  ?~  bad  (safety-run c)
+  :-  (crip "Error: Property {(trip pname)} is violated by the initial state:")
+  (render-state u.bad)
+::
+++  implied-action-run
+  ::  an IMPLIED ACTION: tlc2 checks `[][A]_v`'s A on every transition, so a
+  ::  violation reports `Action property <name> is violated.` followed by the
+  ::  behavior up to and including the offending step, then the usual counts
+  ::  (measured at the pin — the console shows the whole prefix, not a two-state
+  ::  trace). Implemented by giving the BFS the action as a checked predicate
+  ::  rather than a filter (R1.8.1.1/.2)
+  |=  [c=sctx pname=@t body=sem:sem-lib]
+  ^-  wain
+  =/  o=bfs-opts
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
+  =/  env      (make-env:ne defs.c consts.c vars.c)
+  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  modn     (module-name-of tree.c)
+  ::  build the whole reachability graph, then scan every transition for the
+  ::  first state whose successor breaks A. The trace is the behavior reaching
+  ::  that state plus the offending successor
+  =/  g  (build-graph is.c o)
+  =/  viol  (first-bad-step g nsb.c env body)
+  ?~  viol
+    (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
+  ;:  weld
+    ~[(crip "Error: Action property {(trip pname)} is violated.")]
+    ~['Error: The behavior up to this point is:']
+    (render-trace u.viol nl.c actions env order.c modn)
+    (counts-lines gen.g distinct.g 0 depth.g)
+  ==
+::
+++  first-bad-step
+  ::  the first behavior (in BFS order) whose LAST step violates `body` as an
+  ::  action predicate — the implied-action counterexample (R1.8.1.1/.2)
+  |=  [g=graph nsb=sem:sem-lib env=eenv:ne body=sem:sem-lib]
+  ^-  (unit (list state))
+  =/  fps  ~(tap in ~(key by seen.g))
+  |-  ^-  (unit (list state))
+  ?~  fps  ~
+  =/  vis  (~(get by seen.g) i.fps)
+  ?~  vis  $(fps t.fps)
+  =/  nr  (next-states:ne st.u.vis nsb env)
+  ?:  ?=(%| -.nr)  $(fps t.fps)
+  =/  succ  p.nr
+  =/  hit
+    |-  ^-  (unit state)
+    ?~  succ  ~
+    =/  r  (pred-bool:ne body st.u.vis i.succ env)
+    ?:  ?&(?=(%& -.r) p.r)  $(succ t.succ)
+    `i.succ
+  ?~  hit  $(fps t.fps)
+  `(snoc (trace-to seen.g i.fps) u.hit)
+::
+++  safety-run
+  ::  the plain safety search and its terminal lines. Factored out (R1.8.1.1)
+  ::  so an IMPLIED-INIT property that HOLDS can fall through to it: tlc2 checks
+  ::  such a property while computing initial states and, if it passes, carries
+  ::  on with the ordinary model check
+  |=  c=sctx
+  ^-  wain
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
   =/  actions  (get-actions nsb.c 'Next' defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)

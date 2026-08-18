@@ -190,6 +190,36 @@
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aPosInt == 42\0aNegInt == -7\0aZero == 0\0aYes == TRUE\0aNo == FALSE\0aEmpty == ""\0aStr == "hello"\0aEsc == "a\\"b"\0aIv == 3..7\0aEmptyIv == 5..2\0a====\0a'  '\0a'
   ~
 ::
+++  test-prod
+  ::  P: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  ::  R: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  %+  expect-eq
+    !>  ^-  (list tape)
+    ~
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aP == (1..2) \\X (1..2)\0aR == {1, 2} \\X {3}\0a====\0a'  ''
+  ~['P' 'R']
+::
+++  test-prodfilt
+  ::  Card: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  %+  expect-eq
+    !>  ^-  (list tape)
+    ~
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aCard == {x \\in ((1..2) \\X (1..2)) : TRUE}\0a====\0a'  ''
+  ~['Card']
+::
+++  test-prodmem
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "Mem BoolValue TRUE"
+        "NotMem BoolValue FALSE"
+        "Tri BoolValue TRUE"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aMem == <<1, 1>> \\in ((1..2) \\X (1..2))\0aNotMem == <<9, 9>> \\in ((1..2) \\X (1..2))\0aTri == <<1, 2, 3>> \\in ({1} \\X {2} \\X {3})\0a====\0a'  ''
+  ~
+::
 ++  test-recfcn
   %+  expect-eq
     !>  ^-  (list tape)
@@ -206,7 +236,7 @@
   ~
 ::
 ++  test-sets
-  ::  Sub: SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset representation, so the kind reads SetEnumValue (the rendering agrees)
+  ::  Sub: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "Big SetEnumValue \{1, 2, 3}"
@@ -248,5 +278,20 @@
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS TLC, Integers, Sequences\0aEv == TLCEval(2 + 3)\0aEvSet == TLCEval({1, 2} \\cup {2, 3})\0aEvNest == TLCEval(TLCEval(7))\0aEvFcn == TLCEval([i \\in 1..3 |-> i * i])\0aPr == Print("side", 42)\0aPrT == PrintT("alone")\0aPrNest == Print("a", Print("b", 1))\0a====\0a'  ''
   ~['Pr' 'PrNest' 'PrT']
+::
+++  test-tupbind
+  ::  FcnT: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  ::  FiltT: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  ::  S: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "AllT BoolValue FALSE"
+        "ChT TupleValue <<1, 1>>"
+        "ExT BoolValue TRUE"
+        "MapT SetEnumValue \{2, 3, 4}"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aS == (1..2) \\X (1..2)\0aExT == \\E <<i, j>> \\in S : i = j\0aAllT == \\A <<i, j>> \\in S : i <= j\0aFiltT == {<<i, j>> \\in S : i = j}\0aMapT == {i + j : <<i, j>> \\in S}\0aChT == CHOOSE <<i, j>> \\in S : i = j\0aFcnT == [<<i, j>> \\in S |-> i * 10 + j]\0a====\0a'  ''
+  ~['FcnT' 'FiltT' 'S']
 ::
 --
