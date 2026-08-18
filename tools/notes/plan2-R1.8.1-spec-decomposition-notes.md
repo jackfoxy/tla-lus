@@ -152,3 +152,52 @@ All three shapes are byte-exact against the pin, including the `State 1..5` numb
 Because the checks landed with the routing, `.2`'s scope is now largely *verification* — the
 EC 2112/2113 diagnostics it describes are implemented; what it still owes is the corpus fixtures
 and the `SafetyDump` differential that pin them.
+
+## R1.8.1.2 — checking implied inits + actions
+
+`.1` landed the checks together with the routing, so this increment's job was to **pin them**
+and to close the gap the fixtures exposed.
+
+### The fixtures found a diagnostic the port did not emit
+
+Four cases added to the `mc` corpus — `implied-init-viol`, `implied-init-pass`,
+`implied-act-viol`, `implied-act-pass` — which compares `check:check`'s console output against
+tlc2's byte for byte. Capturing the goldens surfaced something my hand-run measurements had
+filtered away: tlc2 emits a **warning before the verdict** whenever a PROPERTY is state-level:
+
+```
+Warning: The formula ImpInit is a state-level formula, but it was used as a PROPERTY (or
+PROPERTIES), where a temporal formula is typically expected. …
+See https://explain.tlapl.us/invariants-and-properties for additional details.
+```
+
+That is **EC 2255** `TLC_LIVE_FORMULA_STATE_LEVEL` (`MP.java:1035`), and it appears whether the
+property holds or is violated. The port had no coverage of it — my earlier probes had grepped
+it out of the oracle output, which is exactly the sort of thing a committed golden catches and
+an ad-hoc measurement does not. Now emitted inline, following the same pattern as the existing
+2279 symmetry warning.
+
+### Result
+
+**11/11 `mc` cases green**, including all four new ones, byte-exact:
+
+| case | shape |
+|---|---|
+| `implied-init-viol` | 2255 warning, then `Property X is violated by the initial state:` + state, **no counts** |
+| `implied-init-pass` | 2255 warning, then the ordinary safety completion + counts |
+| `implied-act-viol` | `Action property X is violated.` + full numbered behavior + counts |
+| `implied-act-pass` | ordinary safety completion + counts |
+
+### On EC 2112/2113
+
+The plan names these as the implied-action codes to carry. Measured, tlc2's **console** output
+carries no `EC` prefix on these lines — the codes are internal, the same way EC 2110 is for an
+invariant violation, which the port already renders as bare text. The mc differential pins the
+rendered text, which is what a user sees; wiring the numeric codes matters only where the port
+exposes them (the MP layer), and `gen-mp-tests` does not currently reach 2112/2113/2255.
+Extending the MP corpus to cover them belongs with `.3b`'s diagnostic sweep, not here.
+
+### Note for the close-out
+
+`gen-mc-tests.py` went 7 → **11** cases, so `evidence-counts.md` needs regenerating at `.4`
+(`validate.py` will flag the drift).

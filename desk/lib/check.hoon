@@ -1768,6 +1768,23 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  env  (make-env:ne defs.c consts.c vars.c)
+  ::  tlc2 always warns that a state-level PROPERTY is only checked in the
+  ::  initial state (EC 2255 TLC_LIVE_FORMULA_STATE_LEVEL) — before the verdict,
+  ::  and whether or not the property holds
+  =/  warn=@t
+    %-  crip
+    ;:  weld
+      "Warning: The formula {(trip pname)} is a state-level formula, but it "
+      "was used as a PROPERTY (or PROPERTIES), where a temporal formula is "
+      "typically expected. State-level formulas used as PROPERTY or PROPERTIES "
+      "are only checked in the initial state. To verify that the formula "
+      "{(trip pname)} holds in all states of every behavior, use INVARIANT "
+      "{(trip pname)} instead. Alternatively, applying the \"always\" temporal "
+      "operator ([]) to the state-level formula {(trip pname)} changes it into "
+      "a temporal formula, asserting that {(trip pname)} holds in all states "
+      "of every behavior. See https://explain.tlapl.us/invariants-and-properties "
+      "for additional details."
+    ==
   =/  bad
     =/  sts  is.c
     |-  ^-  (unit state)
@@ -1775,8 +1792,9 @@
     =/  r  (pred-bool:ne body i.sts ~ env)
     ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
     `i.sts
-  ?~  bad  (safety-run c)
-  :-  (crip "Error: Property {(trip pname)} is violated by the initial state:")
+  ?~  bad  [warn (safety-run c)]
+  :+  warn
+    (crip "Error: Property {(trip pname)} is violated by the initial state:")
   (render-state u.bad)
 ::
 ++  implied-action-run

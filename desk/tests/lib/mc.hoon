@@ -45,6 +45,74 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ x\' = x + 1\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
 ::
+++  test-mc-implied-act-pass
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aImpAct == [][x\' # x]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY ImpAct\0a'
+::
+++  test-mc-implied-act-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Action property ImpAct is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 2'
+        'State 4: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 3'
+        'State 5: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 0'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aImpAct == [][x\' = x + 1]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY ImpAct\0a'
+::
+++  test-mc-implied-init-pass
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula ImpInit is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula ImpInit holds in all states of every behavior, use INVARIANT ImpInit instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula ImpInit changes it into a temporal formula, asserting that ImpInit holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Model checking completed. No error has been found.'
+        '4 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {0, 1}\0aNext == x\' = x\0aSpec == Init /\\ [][Next]_x\0aImpInit == x < 2\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
+::
+++  test-mc-implied-init-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula ImpInit is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula ImpInit holds in all states of every behavior, use INVARIANT ImpInit instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula ImpInit changes it into a temporal formula, asserting that ImpInit holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Property ImpInit is violated by the initial state:'
+        'x = 3'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {0, 3}\0aNext == x\' = x\0aSpec == Init /\\ [][Next]_x\0aImpInit == x = 0\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
+::
 ++  test-mc-inv-initial
   %+  expect-eq
     !>  ^-  wain
