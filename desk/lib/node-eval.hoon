@@ -655,24 +655,45 @@
   |=(w=value:v (eval-bool body e(vals (~(put by vals.e) nm.i.bs w))))
 ::
 ++  eval-setofall
+  ::  {e : x \in S} and, over several binders, {e : x \in S, y \in T(x)} —
+  ::  the one-binder case keeps the streaming +map-over so a large domain is
+  ::  never materialized; several binders walk the binding context (R1.4.3)
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
   =/  bs  (flatten-bound bound.n)
-  ?.  ?=([* ~] bs)  [%| 0 'a set-of-all expects one bounded variable.']
+  ?~  bs  [%| 0 'a set-of-all expects a bounded variable.']
+  =/  body  (snag 0 args.n)
+  ?.  ?=([* ~] bs)
+    =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+    =/  r
+      %^  ctx-map:v  (ctx-doms bs names e)  ~
+      |=(pre=(list value:v) (eval body (bind-vals e names pre)))
+    ?:  ?=(%| -.r)  r
+    [%& (normalize:v [%set p.r])]
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
-  =/  body  (snag 0 args.n)
   %+  map-over:v  p.sd
   |=(w=value:v (eval body e(vals (~(put by vals.e) nm.i.bs w))))
 ::
 ++  eval-fcncon
+  ::  [x \in S |-> e] and, over several binders, [x \in S, y \in T |-> e],
+  ::  whose domain point is the binding TUPLE (R1.4.3). tlc2 prints such a
+  ::  function in construction order; the port normalizes function pairs into
+  ::  its storage order, which is the same function — compatibility.md
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
   =/  bs  (flatten-bound bound.n)
-  ?.  ?=([* ~] bs)  [%| 0 'function constructor over multiple binders is unsupported.']
+  ?~  bs  [%| 0 'a function constructor expects a bounded variable.']
+  =/  body  (snag 0 args.n)
+  ?.  ?=([* ~] bs)
+    =/  names  (turn bs |=(b=[nm=@t rng=sem:sm] nm.b))
+    =/  r
+      %^  ctx-fcn:v  (ctx-doms bs names e)  ~
+      |=(pre=(list value:v) (eval body (bind-vals e names pre)))
+    ?:  ?=(%| -.r)  r
+    [%& (normalize:v [%fcn p.r])]
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
-  =/  body  (snag 0 args.n)
   %+  fcn-over:v  p.sd
   |=(w=value:v (eval body e(vals (~(put by vals.e) nm.i.bs w))))
 ::

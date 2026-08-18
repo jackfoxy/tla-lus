@@ -1245,6 +1245,34 @@ has no analogue here — the port has no unforced-value representation, and repr
 would mean carrying source spans inside values. A definition that cannot progress reports
 the failure its last sweep produced. No corpus case depends on this.
 
+## Release R1.4 — multi-binder constructors
+
+**Print order of a multi-binder function — approved difference.** tlc2 leaves a
+multi-binder `FcnRcdValue` un-normalized when printing, so
+`G == [i \in 1..2, j \in 1..2 |-> i * 10 + j]` comes out in *construction* order,
+first index fastest:
+
+```
+G     FcnRcdValue  (<<1, 1>> :> 11 @@ <<2, 1>> :> 21 @@ <<1, 2>> :> 12 @@ <<2, 2>> :> 22)
+GDom  SetEnumValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+```
+
+`DOMAIN G` is sorted while `G` is not, which is how one can tell. The port normalizes
+function pairs into its storage order (sorted by domain point), and that ordering is
+load-bearing — value equality and state fingerprints depend on it. Matching tlc2's print
+order would mean either abandoning the normal form or carrying insertion order inside
+`vfcn`, a mold `lib/config`'s `cfg-value` and the jammed state share. The pairs are
+identical and the function is the same function: `G[1, 2]` is `12` and `DOMAIN G` agrees
+byte-for-byte. This belongs to the same family as the other value-order differences.
+
+**Tuple-pattern quantifier binders — not supported.** `\E <<i, j>> \in S : P` is
+rejected. The semantic graph binds a tuple binder's identifiers individually
+(`+qbound-vars`) and `+$ sem-bound` carries no destructuring flag, so this shape is
+indistinguishable from `\E i, j \in S : P`, which means something different — the first
+destructures one element of `S`, the second ranges each variable over all of `S`. Tuple
+binders *are* supported in definitions, `$SubsetOf` and `$SetOfAll` (R1.3.3.2/R1.3.4);
+quantifiers need the flag added to `sem-bound` first.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

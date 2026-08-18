@@ -111,19 +111,19 @@
 ::
 ++  test-multibind
   ::  ExTup: tuple-pattern bounded quantifier at constant level; the port reports 'unbounded quantifier is not enumerable', which misdescribes a bound quantifier --- a site R1.4.0 did not name; R1.4.3
-  ::  G: function constructor over multiple binders --- R1.4.3
-  ::  GAt: function constructor over multiple binders --- R1.4.3
-  ::  GDom: function constructor over multiple binders --- R1.4.3
-  ::  H: function constructor over multiple binders --- R1.4.3
-  ::  SetMulti: set-of-all over multiple binders ('a set-of-all expects one bounded variable') --- a site R1.4.0 did not name, surfaced here; R1.4.3
+  ::  G: tlc2 prints a multi-binder function in CONSTRUCTION order (first index fastest: <<1,1>>, <<2,1>>, <<1,2>>, <<2,2>>); the port normalizes function pairs into its storage order, sorted by domain point --- the same function, the same pairs, a different print order. DOMAIN of it agrees (GDom), and applying it agrees (GAt). Approved difference, the tlc-value-order family
+  ::  H: tlc2 prints a multi-binder function in CONSTRUCTION order (first index fastest: <<1,1>>, <<2,1>>, <<1,2>>, <<2,2>>); the port normalizes function pairs into its storage order, sorted by domain point --- the same function, the same pairs, a different print order. DOMAIN of it agrees (GDom), and applying it agrees (GAt). Approved difference, the tlc-value-order family
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "AllMulti BoolValue TRUE"
         "ExMulti BoolValue TRUE"
+        "GAt IntValue 12"
+        "GDom SetEnumValue \{<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}"
+        "SetMulti SetEnumValue \{1, 2, 3, 4, 6}"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aG == [i \\in 1..2, j \\in 1..2 |-> i * 10 + j]\0aGAt == G[1, 2]\0aGDom == DOMAIN G\0aH == [i, j \\in 1..2 |-> i + j]\0aExMulti == \\E i \\in 1..3, j \\in 1..3 : i + j = 5\0aAllMulti == \\A i \\in 1..2, j \\in 1..2 : i + j > 1\0aExTup == \\E <<i, j>> \\in (1..2) \\X (1..2) : i = j\0aSetMulti == {i * j : i \\in 1..2, j \\in 1..3}\0a====\0a'  ''
-  ~['ExTup' 'G' 'GAt' 'GDom' 'H' 'SetMulti']
+  ~['ExTup' 'G' 'H']
 ::
 ++  test-oparg
   ::  A3: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
@@ -189,15 +189,15 @@
   ~['Sub']
 ::
 ++  test-subbag
-  ::  NSubs: SubBag's own body needs a multi-binder set-of-all: its LET Combine builds {[...] : f \in BagSet, i \in 1..B[x]}, two bound variables --- R1.4.2 made the RSB recursion itself work (the base case, SubBag(EmptyBag), now agrees), so this is R1.4.3's half of tlc-module-body's residue. The fixpoint stalls and reports the last point's failure, so the surfaced message is the out-of-domain one, not the set-of-all one
-  ::  Subs: SubBag's own body needs a multi-binder set-of-all: its LET Combine builds {[...] : f \in BagSet, i \in 1..B[x]}, two bound variables --- R1.4.2 made the RSB recursion itself work (the base case, SubBag(EmptyBag), now agrees), so this is R1.4.3's half of tlc-module-body's residue. The fixpoint stalls and reports the last point's failure, so the surfaced message is the out-of-domain one, not the set-of-all one
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "B FcnRcdValue <<1, 1>>"
         "Empty SetEnumValue \{<<>>}"
+        "NSubs IntValue 4"
+        "Subs SetEnumValue \{<<>>, <<1>>, (2 :> 1), <<1, 1>>}"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Bags, Integers, FiniteSets\0aB == SetToBag({1, 2})\0aSubs == SubBag(B)\0aNSubs == Cardinality(SubBag(B))\0aEmpty == SubBag(EmptyBag)\0a====\0a'  ''
-  ~['NSubs' 'Subs']
+  ~
 ::
 --

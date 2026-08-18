@@ -291,6 +291,55 @@ multi-binder set constructors**"): R1.4.2 supplied the first half, R1.4.3 owes t
 Because the fixpoint reports the last failing point rather than the first, the surfaced message
 is the out-of-domain one, not the set-of-all one — worth knowing when reading that skip.
 
+## R1.4.3 — multi-binder constructors (done)
+
+Compared definitions 70 → **75**; `core-eval` green (13/13).
+
+New `+ctx-map` and `+ctx-fcn` in `lib/value` walk a binding context over several
+prefix-dependent domains and collect *every* binding (the existing `+ctx-go` short-circuits on
+the first match, which suits `\E`/`\A` but not a constructor). `+eval-setofall` and
+`+eval-fcncon` take that path when there is more than one binder and keep the streaming
+one-binder path otherwise, so a large single-binder domain is still never materialized.
+
+**`SubBag` now evaluates fully.** `ev-subbag` is 4/4: R1.4.2 supplied the recursion, this
+supplies the multi-binder set-of-all in its `LET Combine`. `tlc-module-body`'s residue —
+"recursive functions and multi-binder set constructors" — is closed on both halves.
+
+### Multi-binder function print order: approved difference
+
+`G == [i \in 1..2, j \in 1..2 |-> i * 10 + j]` at the pin prints
+`(<<1, 1>> :> 11 @@ <<2, 1>> :> 21 @@ <<1, 2>> :> 12 @@ <<2, 2>> :> 22)` — **construction
+order, first index fastest**, which is *not* sorted: `DOMAIN G` prints
+`{<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}`. So tlc2 leaves a multi-binder `FcnRcdValue`
+un-normalized when printing.
+
+The port's `+normalize` sorts function pairs by domain point, and that ordering is load-bearing
+— value equality and state fingerprints depend on it. Reproducing tlc2's print order would mean
+either abandoning the normal form or carrying insertion order inside `vfcn`, a mold change to a
+type `lib/config`'s `cfg-value` and the jammed state share. The pairs are identical and the
+function is the same function: `GAt == G[1, 2]` is `12` and `GDom` agrees byte-for-byte, both
+green. `G` and `H` are therefore skipped as an **approved difference** in the existing
+`tlc-value-order` family, not as owed work.
+
+### `ExTup` is a front-end gap, not evaluator work — and needs a mold change
+
+`\E <<i, j>> \in (1..2) \X (1..2) : i = j` still fails, and R1.4.3 cannot fix it. Two findings:
+
+1. `+qbound-vars` (`semantic.hoon:890`) flattens a tuple binder by descending
+   `%n-identifiertuple` and binding each identifier individually, so **`<<i, j>> \in S` and
+   `i, j \in S` produce the same `sem-bound`** — `vars=[i j]`, one `range`. Those mean different
+   things: the first destructures one element of `S`, the second ranges each variable over the
+   whole of `S`. `+$ sem-bound` is `[vars=(list sbind) range=(unit sem)]` and has **no way to
+   record the difference**, so no evaluator change can distinguish them.
+2. The observed message (`unbounded quantifier is not enumerable`) means the graph handed the
+   evaluator an empty bound list, so the CST for this shape is not producing an
+   `%n-quantbound` for `g-bound-quant` to pick up either.
+
+Closing it needs a destructuring flag on `sem-bound`, generator support, and then evaluator
+support — the `tupbind`/`tupsub` family from R1.3.3.2/R1.3.4, which handled tuple binders in
+*definitions*, `$SubsetOf` and `$SetOfAll` but not in quantifiers. That is front-end work; it is
+recorded against `semantic-graph` rather than absorbed here.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two

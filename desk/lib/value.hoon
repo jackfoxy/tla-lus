@@ -1198,6 +1198,7 @@
 +$  bthunk  $-(~ (each ? eval-err))             ::  a deferred boolean (guard)
 +$  cpred   $-((list value) (each ? eval-err))  ::  multi-binder predicate
 +$  cdom    $-((list value) (each sexp eval-err))  ::  prefix-dependent domain
++$  cmap    $-((list value) (each value eval-err)) ::  multi-binder image
 ::
 ::  +|  Streaming Primitives Over A Cursor
 ::
@@ -1347,6 +1348,61 @@
     ?:  ?=(%| -.sub)  sub
     ?^  p.sub  sub
     $(cur +.st)
+  ==
+::
+++  ctx-map
+  ::  {e(x1, …, xk) : x1 \in S1, x2 \in S2(x1), …} — the multi-binder analogue
+  ::  of +map-over: every binding is visited (no short-circuit) and mapped,
+  ::  results collected in visit order. The caller normalizes, so visit order
+  ::  is not observable in the result set
+  |=  [ds=(list cdom) pre=(list value) f=cmap]
+  ^-  (each (list value) eval-err)
+  ?~  ds
+    =/  r  (f pre)
+    ?:  ?=(%| -.r)  r
+    [%& ~[p.r]]
+  =/  rs  (i.ds pre)
+  ?:  ?=(%| -.rs)  rs
+  =/  rc  (enum p.rs)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list (list value))
+  =/  cur  p.rc
+  |-  ^-  (each (list value) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (zing (flop acc))]
+      %item
+    =/  sub  (ctx-map t.ds (snoc pre v.es) f)
+    ?:  ?=(%| -.sub)  sub
+    $(acc [p.sub acc], cur +.st)
+  ==
+::
+++  ctx-fcn
+  ::  [x1 \in S1, x2 \in S2, … |-> e] — one pair per binding, the binding
+  ::  TUPLE being the domain point, exactly as tlc2 keys a multi-binder
+  ::  function. The caller normalizes the pairs into storage order
+  |=  [ds=(list cdom) pre=(list value) f=cmap]
+  ^-  (each (list vpair) eval-err)
+  ?~  ds
+    =/  r  (f pre)
+    ?:  ?=(%| -.r)  r
+    [%& ~[[[%seq pre] p.r]]]
+  =/  rs  (i.ds pre)
+  ?:  ?=(%| -.rs)  rs
+  =/  rc  (enum p.rs)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list (list vpair))
+  =/  cur  p.rc
+  |-  ^-  (each (list vpair) eval-err)
+  =/  st  (enum-next cur)
+  =/  es  -.st
+  ?-  -.es
+    %done  [%& (zing (flop acc))]
+      %item
+    =/  sub  (ctx-fcn t.ds (snoc pre v.es) f)
+    ?:  ?=(%| -.sub)  sub
+    $(acc [p.sub acc], cur +.st)
   ==
 ::
 ++  ex-ctx
