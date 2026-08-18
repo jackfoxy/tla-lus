@@ -1244,6 +1244,11 @@
   =/  r  (eval:ne u.body.u.d e)
   ?:  ?=(%& -.r)
     :(weld (trip nm) " " (kind-of u.body.u.d p.r) " " (render:vl p.r))
+  ::  code 0 means "no TLC error code", which is what a TLCRuntimeException
+  ::  carries; the oracle projection prints no `EC…` for those, so neither do
+  ::  we (R1.4.5)
+  ?:  =(0 code.p.r)
+    :(weld (trip nm) " ! " (flat-msg msg.p.r))
   ;:  weld
     (trip nm)  " ! EC"  (a-co:co code.p.r)  " "  (flat-msg msg.p.r)
   ==

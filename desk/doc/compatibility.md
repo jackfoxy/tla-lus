@@ -1273,6 +1273,27 @@ destructures one element of `S`, the second ranges each variable over all of `S`
 binders *are* supported in definitions, `$SubsetOf` and `$SetOfAll` (R1.3.3.2/R1.3.4);
 quantifiers need the flag added to `sem-bound` first.
 
+## Release R1.4 — evaluator diagnostics
+
+**Decimal (Real) literals — same rejection, different moment.** tlc2 rejects a decimal
+literal while *processing the spec*, before any evaluation, and the failure takes the
+whole module down: `TLCRuntimeException: TLC can't handle real numbers. 1.5`. Because
+it is a `TLCRuntimeException` and not an `EvalException` it carries **no error code**.
+The port rejects at evaluation instead, with the pin's wording and likewise no code, so
+a spec using Reals is refused either way — the difference is *when*, not *whether*.
+`Reals` remains an excluded surface.
+
+**Record field selection — message text not reproduced.** `[a |-> 1].b` raises a
+`TLCDetailedRuntimeException` whose message embeds a source span: `Attempted to select
+nonexistent field "b" from the record [a |-> 1] line 7, col 11 to line 7, col 21 of
+module A`. The port's `+apply` operates on values, not semantic nodes, so the span is
+not available where the message is built; the failure is still typed and still refuses
+the expression. The four *function*-application wordings are reproduced exactly,
+including tlc2's split between an inline `[i \in 1..3 |-> i][9]` (`In applying the
+function …`) and a definition's `F[9]` (`Attempted to apply function: …`), which differ
+because tlc2 keeps the former a lazy `FcnLambdaValue` and normalizes the latter to a
+`FcnRcdValue`.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

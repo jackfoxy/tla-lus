@@ -468,19 +468,77 @@
   ?:  (equal d.i.ps x)  `r.i.ps
   $(ps t.ps)
 ::
+++  int-dom-msg
+  ::  tlc2's wording when a function whose domain is all integers is applied to
+  ::  a non-integer (FcnRcdValue.apply, measured at the pin)
+  |=  x=value
+  ^-  @t
+  %^  cat  3
+    'Attempted to apply function with integer domain to the non-integer argument '
+  (crip (render x))
+::
+++  apply-oob
+  ::  the out-of-domain failure text. tlc2 has THREE wordings here, measured at
+  ::  the pin, and which one appears depends on the function's value class and
+  ::  on the argument:
+  ::
+  ::    [i \in 1..3 |-> i][9]   FcnLambdaValue  In applying the function …
+  ::    F == […]  F[9]          FcnRcdValue     Attempted to apply function: …
+  ::    F["x"]                  FcnRcdValue     …with integer domain to the non-integer…
+  ::
+  ::  The class split is the same one +kind-of:check reads off the expression:
+  ::  a lambda form stays lazy in tlc2, a definition's value is normalized
+  |=  [f=value x=value lam=?]
+  ^-  @t
+  ?:  &(!lam ?=(%fcn -.f) (int-domain f) !?=(%int -.x))
+    (int-dom-msg x)
+  ?:  lam
+    %^  cat  3  'In applying the function '
+    %^  cat  3  (crip (render f))
+    %^  cat  3  ', the first argument is: '
+    %^  cat  3  (crip (render x))
+    ' which is not in its domain.'
+  %^  cat  3  'Attempted to apply function: '
+  %^  cat  3  (crip (render f))
+  %^  cat  3  ' to argument '
+  %^  cat  3  (crip (render x))
+  ', which is not in the domain of the function.'
+::
+++  int-domain
+  ::  every domain point of a function is an integer
+  |=  f=value
+  ^-  ?
+  ?.  ?=(%fcn -.f)  |
+  (levy p.f |=(pr=vpair ?=(%int -.d.pr)))
+::
 ++  apply
-  ::  f[x]: function, tuple (integer index), or record (string field)
-  |=  [f=value x=value]
+  ::  f[x]: function, tuple (integer index), or record (string field).
+  ::  `lam` says the function EXPRESSION was a lambda form (a function
+  ::  constructor or recursive spec) rather than something already reduced to a
+  ::  value: tlc2 keeps the former as a FcnLambdaValue and the latter as a
+  ::  FcnRcdValue, and the two classes word an out-of-domain failure
+  ::  differently (R1.4.5, measured at the pin -- see +apply-oob)
+  |=  [f=value x=value lam=?]
   ^-  vres
   ?-  -.f
       %fcn
     =/  hit  (find-image p.f x)
-    ?~  hit  [%| 0 (rap 3 ~['applying a function outside its domain: ' (crip (render x))])]
+    ?~  hit  [%| 0 (apply-oob f x lam)]
     [%& u.hit]
       %seq
     =/  i  (idx-of x)
     ?:  |(=(0 i) (gth i (lent p.f)))
-      [%| 0 (rap 3 ~['applying a tuple outside its domain: ' (crip (render x))])]
+      ::  a tuple IS a function with an integer domain, so a non-integer
+      ::  selector takes the integer-domain wording, not the index one
+      ?:  =(0 (idx-of x))
+        [%| 0 (int-dom-msg x)]
+      :-  %|
+      :-  0
+      %^  cat  3  'Attempted to access index '
+      %^  cat  3  (crip (render x))
+      %^  cat  3  ' of tuple '
+      %^  cat  3  (crip (render f))
+      ' which is out of bounds.'
     [%& (snag (dec i) p.f)]
       %rec
     ?.  ?=(%str -.x)  [%| 0 'applying a record to a non-string selector']

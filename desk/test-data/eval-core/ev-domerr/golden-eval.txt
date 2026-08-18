@@ -1,0 +1,8 @@
+EVAL
+F FcnRcdValue <<1, 2, 3>>
+G FcnRcdValue [a |-> 1, b |-> 1]
+GMiss ! TLCRuntimeException: Attempted to apply function: [a |-> 1, b |-> 1] to argument "z", which is not in the domain of the function.
+Lam ! TLCRuntimeException: In applying the function <<1, 2, 3>>, the first argument is: 9 which is not in its domain.
+NonInt ! TLCRuntimeException: Attempted to apply function with integer domain to the non-integer argument "x"
+Rcd ! TLCRuntimeException: Attempted to apply function: <<1, 2, 3>> to argument 9, which is not in the domain of the function.
+Tup ! TLCRuntimeException: Attempted to access index 5 of tuple <<1, 2>> which is out of bounds.

@@ -43,9 +43,6 @@ SKIPS = {
     ("ev-lookup", "Dom"):
         "DOMAIN of a tuple: TLC keeps the lazy IntervalValue 1..3, "
         "the port enumerates it (R1.4.5b)",
-    ("ev-errors", "BadDom"):
-        "the out-of-domain message does not yet render the function "
-        "value (R1.4.5)",
     ("ev-sets", "Sub"):
         "SUBSET stays a lazy SubsetValue in TLC; the port has no lazy-subset "
         "representation, so the kind reads SetEnumValue (the rendering agrees)",

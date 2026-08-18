@@ -369,6 +369,57 @@ gone rather than merely smaller.
 superseded code left lying around, it is a narrower constant-expression evaluator with its own
 oracle and its own passing differential, which happens to no longer back state generation.
 
+## R1.4.5 — evaluator diagnostics (done)
+
+Measured before implementing, and the measurement corrected the plan on both items.
+
+### tlc2 has FOUR wordings for "applied outside the domain", not one
+
+| expression | oracle |
+|---|---|
+| `[i \in 1..3 \|-> i][9]` | `In applying the function <<1, 2, 3>>, the first argument is: 9 which is not in its domain.` |
+| `F == [i \in 1..3 \|-> i]` then `F[9]` | `Attempted to apply function: <<1, 2, 3>> to argument 9, which is not in the domain of the function.` |
+| `F["x"]` | `Attempted to apply function with integer domain to the non-integer argument "x"` |
+| `<<1, 2>>[5]` | `Attempted to access index 5 of tuple <<1, 2>> which is out of bounds.` |
+
+The first two are the *same logical error* on the *same function*, and differ only by whether
+the function expression was written inline or reached through a definition. That is the
+`FcnLambdaValue` / `FcnRcdValue` split R1.4.2 already found: tlc2 keeps a lambda form lazy and
+normalizes a definition's value, and the two classes word the failure differently.
+
+So the port reproduces it the same way `+kind-of:check` does — off the expression, not the
+value. New `+lambda-form` in `node-eval` asks whether the applied expression is a
+`$FcnConstructor` / `$NonRecursiveFcnSpec` / `$RecursiveFcnSpec`, and `+apply:value` takes that
+as a third argument, choosing between `+apply-oob`'s three texts (the integer-domain wording
+wins over the record wording when a non-integer is applied to an all-integer domain).
+
+New corpus case **`ev-domerr`** pins all four wordings plus a string-domain function; corpus
+14 cases, **83 compared definitions**. `ev-errors/BadDom` is now compared rather than skipped.
+
+### Decimal literals: R1.4.0's item was wrong
+
+R1.4.0 recorded that `node-eval:126` "returns EC 0 where its neighbour carries 2265" and owed a
+typed EC. Measured at the pin, that is backwards: **TLC rejects a decimal literal at spec-load
+time, not at evaluation**, with `TLCRuntimeException: TLC can't handle real numbers. 1.5` —
+a `TLCRuntimeException`, which carries **no error code at all**, and which takes the whole
+module down (`EvalDump` prints a single `LOAD !` line). EC 0 was therefore right; the message
+was wrong. The port now emits the pin's wording. The remaining difference is *timing* — load
+vs evaluation — with the same outcome, a typed rejection; recorded in `compatibility.md`.
+
+### `EC0` in the projection
+
+`+project-defs` printed `! EC0 <message>` for a code-less failure, but the oracle prints no
+`EC…` for a `TLCRuntimeException`. It now omits the code when it is 0. No existing shard
+expected an `EC0` line (`stdops-diff` and `core-eval` both had zero), so this is additive.
+
+### Not covered, with the reason
+
+`[a |-> 1].b` is a **`TLCDetailedRuntimeException`** whose message embeds a source span —
+`Attempted to select nonexistent field "b" from the record [a |-> 1] line 7, col 11 to line 7,
+col 21 of module A`. `+apply:value` receives values, not nodes, so the span is not in scope;
+plumbing spans into the value layer is a wider change than this increment. Left out of
+`ev-domerr` deliberately rather than skipped inside it.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two

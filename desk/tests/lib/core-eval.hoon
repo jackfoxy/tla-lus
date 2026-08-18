@@ -54,15 +54,30 @@
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aCONSTANT N, K\0aSum == N + K\0aProd == N * K\0aRange == 1..N\0a====\0a'  'CONSTANT N = 5\0aK = 3\0a'
   ~
 ::
-++  test-errors
-  ::  BadDom: the out-of-domain message does not yet render the function value (R1.4.5)
+++  test-domerr
   %+  expect-eq
     !>  ^-  (list tape)
-    :~  "DivZero ! EC2179 The second argument of \\div is 0."
+    :~  "F FcnRcdValue <<1, 2, 3>>"
+        "G FcnRcdValue [a |-> 1, b |-> 1]"
+        "GMiss ! Attempted to apply function: [a |-> 1, b |-> 1] to argument \"z\", which is not in the domain of the function."
+        "Lam ! In applying the function <<1, 2, 3>>, the first argument is: 9 which is not in its domain."
+        "NonInt ! Attempted to apply function with integer domain to the non-integer argument \"x\""
+        "Rcd ! Attempted to apply function: <<1, 2, 3>> to argument 9, which is not in the domain of the function."
+        "Tup ! Attempted to access index 5 of tuple <<1, 2>> which is out of bounds."
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, Sequences\0aF == [i \\in 1..3 |-> i]\0aLam == [i \\in 1..3 |-> i][9]\0aRcd == F[9]\0aNonInt == F["x"]\0aTup == <<1, 2>>[5]\0aG == [x \\in {"a", "b"} |-> 1]\0aGMiss == G["z"]\0a====\0a'  ''
+  ~
+::
+++  test-errors
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "BadDom ! In applying the function <<1, 2, 3>>, the first argument is: 9 which is not in its domain."
+        "DivZero ! EC2179 The second argument of \\div is 0."
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aDivZero == 5 \\div 0\0aBadDom == [i \\in 1..3 |-> i][9]\0a====\0a'  '\0a'
-  ~['BadDom']
+  ~
 ::
 ++  test-except
   %+  expect-eq

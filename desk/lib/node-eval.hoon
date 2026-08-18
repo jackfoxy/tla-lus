@@ -123,7 +123,12 @@
       [%| 2.265 (rap 3 ~['TLC can\'t handle a number this big.\0a' val.n])]
     [%& [%int x]]
     %str  [%& [%str val.n]]
-    %dec  [%| 0 'decimal (Real) literals are unsupported.']
+    ::  tlc2 rejects a decimal literal while PROCESSING the spec, not while
+    ::  evaluating, so its failure has no error code (a TLCRuntimeException,
+    ::  not an EvalException) and takes the whole module down. The port rejects
+    ::  at evaluation with the pin's wording; the outcome is the same typed
+    ::  rejection, the timing differs (R1.4.5, compatibility.md)
+    %dec  [%| 0 (cat 3 'TLC can\'t handle real numbers. ' val.n)]
   ==
 ::
 ++  eval-apply
@@ -168,7 +173,7 @@
   =/  as  (eval-args args.n e)
   ?:  ?=(%| -.as)  as
   =/  dp=value:v  ?:(=(1 (lent p.as)) (snag 0 p.as) [%seq p.as])
-  (apply:v u.fv dp)
+  (apply:v u.fv dp |)
 ::
 ++  lookup-var
   ::  a variable resolves from the successor state under a prime, else the
@@ -481,6 +486,20 @@
   =/  r  (disj-list:v (turn as |=(a=sem:sm |=(~ (eval-bool a e)))))
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
+++  lambda-form
+  ::  is this expression a function-lambda form? tlc2 keeps `[x \in S |-> e]`
+  ::  and a recursive spec as a lazy FcnLambdaValue, while a definition's value
+  ::  is a normalized FcnRcdValue, and the two classes word an out-of-domain
+  ::  failure differently
+  |=  n=sem:sm
+  ^-  ?
+  ?.  ?=(%apply -.n)  |
+  =/  nm  name.op.n
+  ?|  =(nm '$FcnConstructor')
+      =(nm '$NonRecursiveFcnSpec')
+      =(nm '$RecursiveFcnSpec')
+  ==
+::
 ++  eval-fcnapply
   |=  [as=(list sem:sm) e=eenv]
   ^-  eres
@@ -488,7 +507,9 @@
   ?:  ?=(%| -.f)  f
   =/  x  (eval (snag 1 as) e)
   ?:  ?=(%| -.x)  x
-  (apply:v p.f p.x)
+  ::  tlc2 words an out-of-domain failure by the function's value class, and a
+  ::  lambda FORM is what stays a FcnLambdaValue there (R1.4.5)
+  (apply:v p.f p.x (lambda-form (snag 0 as)))
 ::
 ++  eval-setenum
   |=  [as=(list sem:sm) e=eenv]
@@ -522,7 +543,7 @@
   ^-  eres
   =/  r  (eval (snag 0 as) e)
   ?:  ?=(%| -.r)  r
-  (apply:v p.r [%str (lit-str (snag 1 as))])
+  (apply:v p.r [%str (lit-str (snag 1 as))] |)
 ::
 ++  eval-ite
   |=  [as=(list sem:sm) e=eenv]
