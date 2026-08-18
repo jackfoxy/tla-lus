@@ -45,6 +45,56 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ x\' = x + 1\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
 ::
+++  test-mc-gate-no-fair
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        'Warning: The stuttering counterexample above may be caused by the absence of a fairness constraint in the behavior specification Spec defined at line 6, col 1 to line 6, col 26 of module spec. To rule out such counterexamples, conjoin a suitable fairness constraint to Spec (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
+        '5 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 \\/ x\' = 0\0aSpec == Init /\\ [][Next]_x\0aLive == []<>(x = 1)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+::
+++  test-mc-gate-no-spec
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        'Warning: The stuttering counterexample above may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided, so TLC permits infinite stuttering. To rule out such counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable fairness constraint (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
+        '5 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 \\/ x\' = 0\0aSpec == Init /\\ [][Next]_x\0aLive == []<>(x = 1)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+::
+++  test-mc-gate-trivial
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: The spec is trivially false because Falsy is false.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aFalsy == FALSE\0aSpec == Falsy /\\ Init /\\ [][Next]_x\0a====\0a'
+  'SPECIFICATION Spec\0a'
+::
 ++  test-mc-implied-act-pass
   %+  expect-eq
     !>  ^-  wain
@@ -158,6 +208,7 @@
         'State 1: <Initial predicate>'
         'x = 0'
         'State 2: Stuttering'
+        'Warning: The stuttering counterexample above may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided, so TLC permits infinite stuttering. To rule out such counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable fairness constraint (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
         '3 states generated, 2 distinct states found, 0 states left on queue.'
         'The depth of the complete state graph search is 2.'
     ==

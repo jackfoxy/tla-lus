@@ -99,6 +99,30 @@
 ::
 ::  +|  Node level and action-containment (LiveExprNode getLevel/containAction)
 ::
+++  has-box
+  ::  does this expression contain an `[]` (LNAll)? tlc2's
+  ::  OrderOfSolution.containsBoxInPromise asks this of each promise's body: a
+  ::  promise carrying a box is not "box-free", which keeps the stuttering hint
+  ::  in play even when every PEM is empty (R1.8.1.3)
+  |=  x=live-expr
+  ^-  ?
+  =/  work=(list live-expr)  ~[x]
+  |-  ^-  ?
+  ?~  work  |
+  =/  h  i.work
+  ?-  -.h
+    %all      &
+    %conj     $(work (weld cs.h t.work))
+    %disj     $(work (weld ds.h t.work))
+    %neg      $(work [b.h t.work])
+    %next     $(work [b.h t.work])
+    %even     $(work [b.h t.work])
+    %act      $(work t.work)
+    %state    $(work t.work)
+    %enabled  $(work t.work)
+    %bool     $(work t.work)
+  ==
+::
 ++  le-level
   |=  x=live-expr
   ^-  @ud

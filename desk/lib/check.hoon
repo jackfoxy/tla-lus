@@ -897,6 +897,9 @@
                                              ::  decomposition (SpecProcessor
                                              ::  getTemporals); empty in
                                              ::  INIT/NEXT mode (unit 5.3c/8.1)
+      sname=(unit @t)                        ::  the SPECIFICATION's name and
+      sloc=sspan:sem-lib                     ::  definition span, for the EC 2259
+                                             ::  stuttering hint (R1.8.1.3)
       tree=node
       nl=@t                                  ::  Next span label
       oss=(list oos:tp)                      ::  the normalized temporal
@@ -965,6 +968,13 @@
   ?~  t.l  `i.l
   `[%apply ['$ConjList' %builtin] (max-lvl l) sp ~ ~ l]
 ::
+++  is-false-body
+  ::  is this definition body the constant FALSE?
+  |=  b=sem:sem-lib
+  ^-  ?
+  ?.  ?=(%apply -.b)  |
+  &(?=(%builtin kind.op.b) =('FALSE' name.op.b))
+::
 ++  decompose-spec
   ::  port of SpecProcessor.processConfigSpec: structurally decompose a
   ::  SPECIFICATION body into its init conjuncts, its next-state action, and
@@ -996,11 +1006,19 @@
     ?:  =(3 l)     $(work rest, fair [p fair])
     [inits next fair `'cannot handle this conjunct in the SPECIFICATION']
   =/  op  name.op.p
+  ::  EC 2237: a conjunct that is constantly FALSE makes the whole spec
+  ::  trivially false, and tlc2 names the conjunct AS WRITTEN — the operator
+  ::  name for `Falsy == FALSE`, the literal for an inline `FALSE` (R1.8.1.3)
+  ?:  &(?=(%builtin kind.op.p) =('FALSE' op))
+    [inits next fair `'The spec is trivially false because FALSE is false.']
   ?:  &(?=(%user-op kind.op.p) =(~ args.p))
     ::  arity-0 user operator: expand its body (init if state-level, else recurse)
     =/  d  (~(get by defs) op)
     ?~  d  $(work rest)
     ?~  body.u.d  $(work rest)
+    ?:  (is-false-body u.body.u.d)
+      :^  inits  next  fair
+      `(crip "The spec is trivially false because {(trip op)} is false.")
     ?:  =(1 (sem-lvl u.body.u.d))
       $(work rest, inits [u.body.u.d inits])
     $(work [u.body.u.d rest])
@@ -1126,9 +1144,13 @@
     ?:  |(?=(~ pp) non-temporal)  [%& ~]
     (build-live-oss ca defs consts vars fair)
   ?:  ?=(%| -.or)  [%| msg.p.or]
+  =/  sloc=sspan:sem-lib
+    ?~  spec.ca  ~
+    =/  d  (~(get by defs) u.spec.ca)
+    ?~(d ~ at.u.d)
   :-  %&
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
-      invs  cons  acons  ddl  pp  fair  tree
+      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree
       ?~(nb '' (next-span-label u.nb modn))
       p.or
   ==
@@ -1468,12 +1490,25 @@
           nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
           gen=@ud  distinct=@ud  depth=@ud
+          ::  context for the EC 2257/2259 stuttering hint (R1.8.1.3)
+          sname=(unit @t)  sloc=sspan:sem-lib  fair=(list sem:sem-lib)
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
-  =/  l  (find-lasso:lv oss states inits nsb env order)
-  :-  l
+  ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
+  ::  hint against `this.oos` — the one being reported — not against every
+  ::  solution, so a spec whose FIRST violated property has empty PEMs prints no
+  ::  hint even when a later property would have one (multi-property)
+  =/  hit
+    =/  os  oss
+    |-  ^-  [l=(unit lasso:lv) o=(list oos:tp)]
+    ?~  os  [~ ~]
+    =/  r  (oos-lasso:lv i.os states inits nsb env order)
+    ?^(r [r ~[i.os]] $(os t.os))
+  :-  l.hit
   %-  live-render
-  :*  l  states  nsb  env  order  modn  defs  pname  gen  distinct  depth  ==
+  :*  l.hit  states  nsb  env  order  modn  defs  pname  gen  distinct  depth
+      (stutter-gate o.hit sname sloc fair modn)
+  ==
 ::
 ++  live-render
   ::  render the console diagnostic from a resolved lasso (unit 8.8.2a): shared
@@ -1485,6 +1520,7 @@
           nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
           gen=@ud  distinct=@ud  depth=@ud
+          gate=wain                     ::  EC 2257/2259 hint (R1.8.1.3)
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
@@ -1526,7 +1562,70 @@
     ~['Error: The following behavior constitutes a counter-example:']
     body
     closer
+    ::  the 2257/2259 hint sits between the stuttering marker and the counts,
+    ::  and only after a STUTTERING closer (R1.8.1.3)
+    ?:(stut gate ~)
     footer
+  ==
+::
+++  stutter-gate
+  ::  the hint tlc2 appends AFTER a STUTTERING counterexample (EC 2257 / 2259,
+  ::  `Liveness.printStutteringCounterExampleWarning`). It fires only when the
+  ::  OrderOfSolution has a non-empty PEM — a `<>P` whose tableau has no pending
+  ::  obligation prints no hint, which is why a naive `<>(x = 1)` probe does not
+  ::  show it. 2259 when a SPECIFICATION is configured but carries no fairness
+  ::  (naming the spec and its source location); 2257 when only INIT/NEXT were
+  ::  given, so TLC permits infinite stuttering
+  |=  [oss=(list oos:tp) sname=(unit @t) sloc=(unit span) fair=(list sem:sem-lib) modn=@t]
+  ^-  wain
+  ::  tlc2 suppresses the hint when EVERY OrderOfSolution has box-free promises
+  ::  AND every one of its PEMs is itself EMPTY — `isEmpty` meaning no `<>[]A`,
+  ::  no `[]<>S` and no `[]<>A` condition (`PossibleErrorModel.isEmpty`), not an
+  ::  empty PEM LIST. Testing the list was wrong: a spec with one condition-free
+  ::  PEM would then have printed a hint tlc2 omits (live-diamond)
+  =/  quiet
+    %+  levy  oss
+    |=  o=oos:tp
+    ?:  (lien promises.o has-box:tp)  |
+    %+  levy  pems.o
+    |=  m=pem:tp
+    &(=(~ ea-action.m) =(~ ae-state.m) =(~ ae-action.m))
+  ?:  quiet  ~
+  ?^  sname
+    ?^  fair  ~
+    :_  ~
+    %-  crip
+    ;:  weld
+      "Warning: The stuttering counterexample above may be caused by the "
+      "absence of a fairness constraint in the behavior specification "
+      "{(trip u.sname)} defined at {(trip (locn-tape sloc modn))}. To rule out "
+      "such counterexamples, conjoin a suitable fairness constraint to "
+      "{(trip u.sname)} (compare Chapter 8, page 87ff of Specifying Systems at "
+      "https://lamport.azurewebsites.net/tla/book.html)."
+    ==
+  :_  ~
+  %-  crip
+  ;:  weld
+    "Warning: The stuttering counterexample above may be caused by the absence "
+    "of a behavior specification (SPECIFICATION). Only INIT and NEXT have been "
+    "provided, so TLC permits infinite stuttering. To rule out such "
+    "counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable "
+    "fairness constraint (compare Chapter 8, page 87ff of Specifying Systems "
+    "at https://lamport.azurewebsites.net/tla/book.html)."
+  ==
+::
+++  locn-tape
+  ::  `line BL, col BC to line EL, col EC of module M` — the bare location tlc2
+  ::  prints for a definition (the same shape +action-label wraps in angles)
+  |=  [sp=(unit span) modn=@t]
+  ^-  @t
+  ?~  sp  (crip "module {(trip modn)}")
+  =*  s  u.sp
+  %-  crip
+  ;:  weld
+    "line "  (a-tape line.from.s)  ", col "  (a-tape col.from.s)
+    " to line "  (a-tape line.to.s)  ", col "  (a-tape col.to.s)
+    " of module "  (trip modn)
   ==
 ::
 ++  live-message-lines
@@ -1547,7 +1646,7 @@
   =/  r
     %-  live-report
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
-        gen.g  distinct.g  depth.g
+        gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c
     ==
   report.r
 ::
@@ -1740,7 +1839,7 @@
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
-          gen.g.bg  distinct.g.bg  depth.g.bg
+          gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c
       ==
     report.r
   ::  safety: an INVARIANT

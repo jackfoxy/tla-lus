@@ -201,3 +201,48 @@ Extending the MP corpus to cover them belongs with `.3b`'s diagnostic sweep, not
 
 `gen-mc-tests.py` went 7 → **11** cases, so `evidence-counts.md` needs regenerating at `.4`
 (`validate.py` will flag the drift).
+
+## R1.8.1.3 — fairness + property gates
+
+### The differential had been hiding two of them
+
+`gen-mc-tests.py`'s DROP filter contained `^Warning: The stuttering`, so the mc goldens had
+never carried EC 2257/2259 at all. Removing that filter did two things: it let the new fixtures
+pin the gates, and it revealed that **`live-box` — an existing case — had been silently missing
+the 2257 warning all along**. A filter added to make a differential pass is a differential that
+stops measuring; this one hid a real divergence in a case that read as green.
+
+### The gates, measured
+
+| EC | fires when | text |
+|---|---|---|
+| **2257** | stuttering counterexample, config is INIT/NEXT (no SPECIFICATION) | `…may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided…` |
+| **2259** | stuttering counterexample, SPECIFICATION present but carries no fairness | `…absence of a fairness constraint in the behavior specification Spec defined at line 6, col 1 to line 6, col 26 of module spec…` |
+| **2237** | a SPECIFICATION conjunct is constantly FALSE | `The spec is trivially false because Falsy is false.` |
+
+Two details a naive reading would miss:
+
+**The stuttering hint is conditional on the PEM, not just on stuttering.** tlc2 guards it with
+`!oos.hasEmptyPEMAndBoxFreePromises()` (`LiveWorker.java:997`). My first probe used
+`Live == <>(x = 1)`, whose PEMs are empty, and printed no hint — which is why the gates looked
+like they did not exist. `[]<>(x = 1)` shows them. My first implementation then tested whether
+the PEM *list* was empty rather than whether *each PEM* is empty
+(`PossibleErrorModel.isEmpty` = no `<>[]A`, no `[]<>S`, no `[]<>A`), which over-fired on
+`live-diamond`. New `+has-box:temporal` supplies the box-in-promise half of the predicate.
+
+**2259 names the SPEC's source location**, so `sctx` gained `sname`/`sloc` and a `+locn-tape`
+renderer for the bare `line L, col C to line L, col C of module M` form.
+
+2237 is detected during decomposition, naming the conjunct **as written** — the operator name
+for `Falsy == FALSE`, the literal for an inline `FALSE`.
+
+### Result
+
+**14/14 mc cases green**, including `gate-no-spec`, `gate-no-fair`, `gate-trivial` and the
+corrected `live-box`.
+
+### Known gap, stated rather than hidden
+
+The **job kernel's** liveness path (`job.hoon`, sliced continuation) passes `~` for the gate: it
+does not carry the SPEC name/fairness needed to compute it, so its report omits the 2257/2259
+hint that the console path emits. Recorded here and in the code rather than papered over.

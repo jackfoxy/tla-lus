@@ -27,7 +27,7 @@ DROP = re.compile(
     r"^Starting|Computing |throughput|nowarning|garbage|Running break|"
     r"worker on|Estimates|because two|calculated |average outdeg|"
     r"Finished in|Finished comp|^TLC2 Version|probability|Trace exploration|"
-    r"^Warning: The invariant|^Warning: The stuttering|Progress\(|"
+    r"^Warning: The invariant|Progress\(|"
     r"^Implied-temporal|^Checking temporal|Finished checking temporal")
 
 

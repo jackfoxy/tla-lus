@@ -1334,7 +1334,7 @@
       %-  wain-text
       %-  live-render:check
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-          generated.st  distinct.st  depth.st
+          generated.st  distinct.st  depth.st  ~
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1363,8 +1363,11 @@
   =/  report
     %-  wain-text
     %-  live-render:check
+    ::  the EC 2257/2259 stuttering hint needs the SPEC name/fairness, which the
+    ::  sliced continuation does not carry; the console path (`check:check`)
+    ::  emits it. Known gap, R1.8.1.3
     :*  l  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-        generated.st  distinct.st  depth.st
+        generated.st  distinct.st  depth.st  ~
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))

@@ -37,7 +37,7 @@
 ++  cfg-leadsto-viol  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-message-leadsto-viol
   %+  expect-eq
-    !>(`wain`~['Error: Temporal property Live was violated.' 'Error: The following behavior constitutes a counter-example:' 'State 1: <Initial predicate>' 'x = 0' 'State 2: Stuttering' '4 states generated, 2 distinct states found, 0 states left on queue.' 'The depth of the complete state graph search is 2.'])
+    !>(`wain`~['Error: Temporal property Live was violated.' 'Error: The following behavior constitutes a counter-example:' 'State 1: <Initial predicate>' 'x = 0' 'State 2: Stuttering' 'Warning: The stuttering counterexample above may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided, so TLC permits infinite stuttering. To rule out such counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable fairness constraint (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).' '4 states generated, 2 distinct states found, 0 states left on queue.' 'The depth of the complete state graph search is 2.'])
   !>((live-message-lines:check src-leadsto-viol cfg-leadsto-viol))
 ++  src-wf-absent-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 3 /\\ x\' = x + 1\0aNext == Inc \\/ (x = 3 /\\ x\' = 3)\0aLive == <>(x = 3)\0a====\0a'
 ++  cfg-wf-absent-viol  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
