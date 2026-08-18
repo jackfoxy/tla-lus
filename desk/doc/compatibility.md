@@ -1294,6 +1294,29 @@ function …`) and a definition's `F[9]` (`Attempted to apply function: …`), w
 because tlc2 keeps the former a lazy `FcnLambdaValue` and normalizes the latter to a
 `FcnRcdValue`.
 
+## Release R1.4 — `TLC!Print` and `TLC!PrintT`
+
+**Decided in R1.4.6: approved difference, a typed rejection.** In tlc2 `Print(out, val)`
+returns `val` and writes `out` to the console, and `PrintT(out)` returns `TRUE`. The
+values are trivial and deterministic — only the console write is missing here, because
+Gall owns effects and the evaluator is a pure function with no output channel.
+
+The port refuses the expression, naming what is absent:
+`unsupported StandardModule operator: TLC!Print; it writes to the TLC console and this
+engine has no output channel`.
+
+Two alternatives were weighed and rejected. **Returning the value and dropping the
+output** is closest to tlc2's value semantics and would let a spec that uses `Print` for
+debugging run rather than fail — but a silent no-op is exactly what plan-2 invariant 8
+forbids. **Routing the output to a job artifact** is the honest analogue, since the job
+kernel already produces artifacts, but `+eval` would have to carry an accumulator through
+every return — roughly a hundred evaluator arms, surviving the recursive-function fixpoint
+sweeps and the lazy set cursors — which is a change to the evaluator's calling convention
+rather than a feature. That option remains open and is now costed.
+
+The consequence to be aware of: **a spec using `Print` is refused here where tlc2 runs
+it.** Reversing the decision is a small change to `+print-op` and the affected goldens.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

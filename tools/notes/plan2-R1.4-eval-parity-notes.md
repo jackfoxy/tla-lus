@@ -468,6 +468,51 @@ rather than carries, so there is no stored value to match). New corpus case **`e
 the rule from both sides, including `FromSet`/`FromSetGap` staying `SetEnumValue` and a
 `NamedDom` that has to be followed through a definition.
 
+## R1.4.6 — `tlc-module-tlc` residues (done)
+
+The row listed three residues. Measured, they resolve differently from how they read.
+
+### `TLCEval` was already done — the residue was stale
+
+`+eval-tlc-eval` exists (`node-eval:998`), is registered as the `@Evaluation` override
+(`stdops:332`), and `binding-in` already asserted `%override` for it. Measured at the pin and
+byte-exact: `TLCEval(2 + 3)` = 5, `TLCEval(TLCEval(7))` = 7,
+`TLCEval({1, 2} \cup {2, 3})` = `{1, 2, 3}`, `TLCEval([i \in 1..3 |-> i * i])` =
+`<<1, 4, 9>>`. C1.6 implemented it and the row was never updated. New corpus case **`ev-tlc`**
+turns that from an assertion about binding into four compared values.
+
+### `RandomElement` is R1.7's, confirmed in `.0`
+
+Already recorded under *Excluded surfaces* (`compatibility.md`) with a test pinning the typed
+rejection. Removed from this row's residue rather than carried.
+
+### `Print` — decided: approved difference
+
+`Print(out, val)` returns `val` and writes `out` to tlc2's console; `PrintT(out)` returns
+`TRUE`. The *values* are trivial and deterministic (measured: `Print("side", 42)` = 42,
+`PrintT("alone")` = TRUE, `Print("a", Print("b", 1))` = 1). Only the console write is missing.
+
+Three options were on the table:
+
+1. **Return the value, drop the output.** Closest to tlc2's value semantics, and it would let a
+   spec that uses `Print` for debugging run instead of failing. Rejected: plan-2 invariant 8
+   forbids a silent no-op, and this is the exact case it was written for.
+2. **Route the output to a job artifact.** The honest analogue — the job kernel already produces
+   artifacts. But `+eval` is `|=([n=sem e=eenv] ^-eres)`, a pure function; carrying output means
+   either widening `eres` or returning `[eres out]` at **every** evaluator arm, ~100 sites, and
+   the accumulator would have to survive the fixpoint sweeps and the lazy set cursors. That is a
+   change to the evaluator's calling convention, not a feature of this unit.
+3. **Typed rejection naming the missing channel.** What the port already does.
+
+Decision: **(3), recorded as an approved difference.** It keeps invariant 8, and it is honest —
+the user is told the engine has no output channel rather than silently losing their debugging
+output. The cost is that a spec using `Print` is refused where tlc2 would run it; that is a
+product judgement, and reversing it later is a small change to `+print-op` plus the goldens.
+Option (2) stays available and is now costed.
+
+`ev-tlc` skips `Pr`/`PrT`/`PrNest` with that reason, so the decision is machine-checked rather
+than only written down.
+
 ## Consequences for the plan
 
 - **R1.4.1 grows a requirement**: the comparator must supply cfg CONSTANTs, not skip the two

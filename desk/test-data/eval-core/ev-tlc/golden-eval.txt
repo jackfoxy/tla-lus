@@ -1,0 +1,8 @@
+EVAL
+Ev IntValue 5
+EvFcn FcnRcdValue <<1, 4, 9>>
+EvNest IntValue 7
+EvSet SetEnumValue {1, 2, 3}
+Pr IntValue 42
+PrNest IntValue 1
+PrT BoolValue TRUE

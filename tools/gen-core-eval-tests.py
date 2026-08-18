@@ -49,6 +49,13 @@ SKIPS = {
 #  as unsupported --- the nine original cases reached none of them. Every
 #  definition below is red on purpose and names the increment that turns it
 #  green; the goldens are frozen now so those increments have a target.
+_PRINT = ("TLC!Print/PrintT write to tlc2's console. Gall owns effects here "
+          "and the evaluator is a pure function with no output channel, so "
+          "the port gives a typed rejection naming what is missing rather "
+          "than a silent no-op returning the value (plan-2 invariant 8). "
+          "Approved difference decided in R1.4.6 --- routing the output to a "
+          "job artifact would mean threading an accumulator through every "
+          "+eval return, which is not this unit's change")
 _LAMBDA = ("LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same "
            "skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's "
            "evaluator work: an operator NAME argument already evaluates (A1/A2)")
@@ -64,6 +71,9 @@ SKIPS.update({
         "tuple-pattern bounded quantifier at constant level; the port reports "
         "'unbounded quantifier is not enumerable', which misdescribes a bound "
         "quantifier --- a site R1.4.0 did not name; R1.4.3",
+    ("ev-tlc", "Pr"): _PRINT,
+    ("ev-tlc", "PrT"): _PRINT,
+    ("ev-tlc", "PrNest"): _PRINT,
     ("ev-oparg", "A3"): _LAMBDA,
     ("ev-oparg", "A4"): _LAMBDA,
     ("ev-oparg", "Sel"): _LAMBDA,
