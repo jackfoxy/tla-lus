@@ -1251,10 +1251,13 @@
 ::
 ++  render-struct
   ::  the full LivenessStruct projection (unit 8.2): LIVESTRUCT / OOS n / the
-  ::  per-OOS counts, the TABLEAU node count, and the TF…ENDTF rendering. The
-  ::  tableau sizes are supplied by the caller (tableau.hoon imports this lib,
-  ::  so temporal.hoon must not depend on it), one per OrderOfSolution in order.
-  |=  [oss=(list oos) modn=@t tabs=(list @ud)]
+  ::  per-OOS counts, the TABLEAU block, and the TF…ENDTF rendering. The tableau
+  ::  BLOCKS are supplied by the caller (tableau.hoon imports this lib, so
+  ::  temporal.hoon must not depend on it), one per OrderOfSolution in order —
+  ::  each already rendered by `+render-tableau:tableau` as `TABLEAU n` plus,
+  ::  when there is a tableau, `TBINIT`/`TBGRAPH`…`ENDTBGRAPH` (R1.6.2; it was
+  ::  a bare node count until then, so nothing compared the graph).
+  |=  [oss=(list oos) modn=@t tabs=(list wain)]
   ^-  wain
   =/  hd=@t  (crip "OOS {(scow %ud (lent oss))}")
   =/  body
@@ -1263,7 +1266,7 @@
     |-  ^-  (list @t)
     ?~  oss  (flop acc)
     =/  o  i.oss
-    =/  tab  ?:((gth (lent tabs) i) (snag i tabs) 0)
+    =/  tab=wain  ?:((gth (lent tabs) i) (snag i tabs) ~['TABLEAU 0'])
     =/  block=(list @t)
       ;:  weld
         :~  (crip "--- {(scow %ud i)} ---")
@@ -1271,9 +1274,9 @@
             (crip "CHECKSTATE {(scow %ud (lent check-state.o))}")
             (crip "CHECKACTION {(scow %ud (lent check-action.o))}")
             (crip "PEMS {(scow %ud (lent pems.o))}")
-            (crip "TABLEAU {(scow %ud tab)}")
-            'TF'
         ==
+        tab
+        `wain`~['TF']
         (to-lines (render-oos modn o))
         `wain`~['ENDTF']
       ==

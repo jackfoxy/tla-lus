@@ -74,6 +74,16 @@ public final class LivenessStruct {
       out.append("CHECKACTION ").append(o.getCheckAction() == null ? 0 : o.getCheckAction().length).append("\n");
       out.append("PEMS ").append(o.getPems() == null ? 0 : o.getPems().length).append("\n");
       out.append("TABLEAU ").append(o.hasTableau() ? o.getTableau().size() : 0).append("\n");
+      // R1.6.2: the tableau GRAPH, not just its size. TBGraph.toString is TLC's
+      // own rendering — per node, its index, its particle (TBPar.toString, the
+      // same padded LiveExprNode printer the TF block already pins) and its
+      // successor indices — so it is stable and free of object identities.
+      // `getInitCnt` is the count of leading nodes that are initial.
+      if (o.hasTableau()) {
+        out.append("TBINIT ").append(o.getTableau().getInitCnt()).append("\n");
+        out.append("TBGRAPH\n").append(o.getTableau().toString());
+        out.append("ENDTBGRAPH\n");
+      }
       out.append("TF\n").append(o.toString());
       if (!o.toString().endsWith("\n")) out.append("\n");
       out.append("ENDTF\n");

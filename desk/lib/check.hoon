@@ -1329,13 +1329,13 @@
   (render-counts:tp oss.p.sc)
 ::
 ++  live-tabs
-  ::  the tableau node count (unit 8.2) for each OrderOfSolution, in order —
-  ::  0 when the OOS has no tableau formula (hand-rolled; a wet turn over the
-  ::  oos list fuse-loops the recursive live-expr it carries)
-  |=  oss=(list oos:tp)
-  ^-  (list @ud)
+  ::  the TABLEAU block (R1.6.2: the graph, not just its node count) for each
+  ::  OrderOfSolution, in order (hand-rolled; a wet turn over the oos list
+  ::  fuse-loops the recursive live-expr it carries)
+  |=  [oss=(list oos:tp) modn=@t]
+  ^-  (list wain)
   ?~  oss  ~
-  [(tableau-size:tb tf.i.oss) $(oss t.oss)]
+  [(render-tableau:tb modn tf.i.oss) $(oss t.oss)]
 ::
 ++  live-struct-full
   ::  the full structural projection (unit 8.2): the LivenessStruct output
@@ -1347,7 +1347,8 @@
   ^-  wain
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  (render-struct:tp oss.p.sc (module-name-of tree.p.sc) (live-tabs oss.p.sc))
+  =/  modn  (module-name-of tree.p.sc)
+  (render-struct:tp oss.p.sc modn (live-tabs oss.p.sc modn))
 ::
 ++  states-of
   ::  the reachable graph's fingerprint -> state map (drops depth/predecessor)
@@ -1785,7 +1786,7 @@
   ^-  wain
   =/  or  (raw-live-oss spec cfg)
   ?:  ?=(%| -.or)  ~[(cat 3 'Error: ' p.or)]
-  (render-struct:tp oss.p.or modn.p.or (live-tabs oss.p.or))
+  (render-struct:tp oss.p.or modn.p.or (live-tabs oss.p.or modn.p.or))
 ::
 ++  check
   ::  model-check a spec + config, returning TLC's terminal output lines

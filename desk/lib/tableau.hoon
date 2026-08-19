@@ -345,4 +345,68 @@
   ^-  @ud
   ?~  tf  0
   (lent nodes:(build-tableau u.tf))
+::
+::  +|  The TABLEAU projection (R1.6.2)
+::
+::  LivenessStruct projected only the node COUNT, so nothing compared the graph
+::  itself — which is how the 8.2 alpha-closure fixpoint bug came to be found
+::  INDIRECTLY, through a product count. These arms reproduce TLC's own
+::  `TBGraph.toString` / `TBPar.toString`: per node its index, its particle, and
+::  its successor indices, all identity-free.
+::
+++  render-par
+  ::  TBPar.toString(sb, padding): `{e0,\n e1,\n e2}` with each element
+  ::  rendered at padding+" " (padding is "" at the top level)
+  |=  [modn=@t p=par]
+  ^-  tape
+  ?~  p  "\{}"
+  =/  hd  (weld "\{" (render-expr:tp modn i.p " "))
+  =/  rest
+    =/  l  t.p
+    |-  ^-  tape
+    ?~  l  ""
+    %+  weld
+      (weld ",\0a " (render-expr:tp modn i.l " "))
+    $(l t.l)
+  :(weld hd rest "}")
+::
+++  render-tb-node
+  ::  one TBGraph.toString node: `Node <i>.` then the particle, then
+  ::  ` --> ` and each successor index followed by a space
+  |=  [modn=@t n=tb-node]
+  ^-  tape
+  =/  succs
+    =/  l  nexts.n
+    |-  ^-  tape
+    ?~  l  ""
+    (weld (weld (scow %ud i.l) " ") $(l t.l))
+  ;:  weld
+    "Node "  (scow %ud index.n)  ".\0a"
+    (render-par modn par.n)
+    " --> "  succs  "\0a"
+  ==
+::
+++  render-tableau
+  ::  the per-OrderOfSolution TABLEAU block of the LivenessStruct projection:
+  ::  the node count, and — when there IS a tableau — its initial-node count
+  ::  and the graph. Built here rather than in temporal.hoon, which cannot
+  ::  import this library (tableau.hoon imports temporal.hoon).
+  |=  [modn=@t tf=(unit live-expr)]
+  ^-  wain
+  ?~  tf  ~['TABLEAU 0']
+  =/  g  (build-tableau u.tf)
+  =/  body
+    =/  l  nodes.g
+    |-  ^-  tape
+    ?~  l  ""
+    (weld (render-tb-node modn i.l) $(l t.l))
+  ;:  weld
+    ^-  wain
+    :~  (crip "TABLEAU {(scow %ud (lent nodes.g))}")
+        (crip "TBINIT {(scow %ud init-cnt.g)}")
+        'TBGRAPH'
+    ==
+    (to-lines:tp body)
+    `wain`~['ENDTBGRAPH']
+  ==
 --

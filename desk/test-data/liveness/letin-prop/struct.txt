@@ -6,6 +6,13 @@ CHECKSTATE 0
 CHECKACTION 0
 PEMS 1
 TABLEAU 1
+TBINIT 1
+TBGRAPH
+Node 0.
+{[]-line 7, col 26 to line 7, col 30 of module A,
+ -line 7, col 26 to line 7, col 30 of module A,
+ ()[]-line 7, col 26 to line 7, col 30 of module A} --> 0 
+ENDTBGRAPH
 TF
 []-line 7, col 26 to line 7, col 30 of module A
 ENDTF

@@ -229,3 +229,55 @@ Github1389ViolatedB`, location and module exact — but no corpus case reaches i
 works, so nothing pins it. `Github525` and `Github742` raise 2213 from a **different** site: the
 SPEC side of `processLiveness`, not `astToLive`. That is a separate residue, and it is why both
 stay excluded from the batch.
+
+## R1.6.2 — the TABLEAU projection
+
+### The projection
+
+`LivenessStruct` emitted `TABLEAU <node-count>` and nothing else, so the tableau graph itself was
+never compared. It now emits, per OrderOfSolution that has one:
+
+```
+TABLEAU <n>
+TBINIT <init-node-count>
+TBGRAPH
+<TBGraph.toString()>
+ENDTBGRAPH
+```
+
+`TBGraph.toString` is TLC's own rendering — per node, `Node i.`, its particle via
+`TBPar.toString`, then ` --> ` and the successor indices — so it carries no object identities and
+needs no normalization. It also reuses the padded `LiveExprNode` printer the `TF` block already
+pins, which means the particle's leaves are compared against a renderer the corpus had already
+proven. `getInitCnt()` is the count of leading nodes that are initial.
+
+The port side is `+render-par` / `+render-tb-node` / `+render-tableau` in `lib/tableau`, and
+`+render-struct` now takes the rendered BLOCK per OrderOfSolution instead of a bare count — the
+same device the count used, since `tableau.hoon` imports `temporal.hoon` and not the other way
+round. **11 of 16 goldens grew a graph**; all 16 compare green on the first ship run, including
+the three-node `~>` tableaux (`leadsto-pass` / `leadsto-viol`), whose particle contents are exactly
+what the 8.2 alpha-closure fixpoint bug got wrong and what no projection could see at the time.
+
+### The shard claimed to be generated and was not
+
+`tests/lib/temporal-struct.hoon` carried the header *"GENERATED from
+desk/test-data/liveness/<case>/{A.tla,A.txt,struct.txt} — do not edit"*, and no tool wrote it. It
+was hand-maintained with 16 inline goldens. Extending the projection meant either hand-editing all
+of them or making the claim true; `gen-liveness-tests.py` now emits the shard, which also puts it
+under `validate.py`'s drift guard for the first time.
+
+One case needs a different entry point and now says so in the generator rather than by hand:
+`symmetry-live` declares SYMMETRY with a liveness PROPERTY, which tlc2 warns about and continues
+while the port refuses (an 8.7 approved-difference). Only `+live-struct-full-raw` reaches the
+decomposition this shard compares, so `STRUCT_RAW` names it with the reason.
+
+### Hoon note
+
+`{` opens string interpolation inside a `"..."` tape, so `"{"` and `"{}"` are syntax errors, not
+literals — they must be written `"\{"` and `"\{}"`. Rendering a set-braced particle is the first
+place in this port that needed a literal brace.
+
+### Result
+
+`temporal-struct` 16/16 green; `tableau`, `temporal`, `liveness-{product,accept,verdict,lasso,message}`,
+`mc`, `sim-live` and `job` unchanged and green. No full suite (deferred to `.7`).
