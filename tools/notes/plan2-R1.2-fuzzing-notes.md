@@ -193,3 +193,63 @@ stage → capture its golden → only then fix), and an honest statement of what
 
 `=/  name  value` needs a **two-space gap** on both sides of the name; `=/ name  value` is a syntax
 error, and the message points at the value rather than at the missing space.
+
+## R1.2.2 — semantic graph + config
+
+### Mutation, not generation
+
+`.0` decided to mutate valid inputs rather than generate from a grammar, and `.2` implements the
+line-level operators: drop a line, duplicate a line, swap two lines, replace a line with random
+token soup — 1 to 3 edits per case, over a base picked at random. Line-level on purpose: a
+character-level edit almost always breaks the parse, and a module that does not parse tells the
+semantic stage nothing.
+
+The bases are three corpus modules and three corpus `.cfg`s, **inlined** in the shard. A test cannot
+scry Clay for `test-data` (the framework passes no `our`/`now`), so embedding is the only option; the
+same constraint every generated shard in this repo works around.
+
+Four adapters: `+fz-sem` (`generate:semantic`), `+fz-cfg` (`+parse-cfg`), and `+fz-runspec-cfg` /
+`+fz-runspec-spec` — the whole config path (`+run-spec-of`: parse, validate against the graph,
+assemble) with one side fixed and the other mutated. Two arms rather than one because the path takes
+*two* inputs, and mutating both at once would almost never produce a pair that validates.
+
+**None of these four can report `%budget`**, and the shard says so: they walk a finite parse tree,
+with no state space to bound and no cap to pass. The adapter's budget obligation binds the stages
+that *iterate*, which are `.3`'s and `.4`'s.
+
+### 700 cases, zero bails — and why that alone would have been a weak result
+
+No crash was found. That is worth having, but on its own it is nearly meaningless: **an arm that
+only asserts "no bails" passes trivially if every mutation is rejected at the parse step and never
+reaches the stage under test.** So the reach was measured rather than assumed, with a `+fz-reach`
+counter over the same seeds:
+
+| arm | reached the stage | rejected earlier |
+|---|---|---|
+| `fz-sem` | 99 / 200 | 101 |
+| `fz-cfg` | 91 / 200 | 91 |
+| `fz-runspec-cfg` | 29 / 150 | 121 |
+| `fz-runspec-spec` | 16 / 150 | 134 |
+
+Half of the mutations reach the semantic graph and the config parser; 11–19 % reach the full
+run-spec path, which is expected — that path needs a module that resolves *and* a config that
+validates against it, so most single edits break the pair.
+
+`test-fuzz-reach-floors` asserts floors of 60 / 60 / 15 / 8 against those exact counts (the seeds are
+fixed, so they are reproducible). The floors sit well below the measurements, so ordinary drift does
+not trip them — but a change that stops mutations reaching a stage, or makes a stage reject
+everything, fails *there* instead of quietly leaving the four arms above passing on nothing.
+
+This is the fuzz form of the hazard R1.8.1.4 recorded for differentials: a filter added to make a
+test pass is a test that has stopped measuring.
+
+### Result
+
+`fuzz` **9/9** green. The shard now takes roughly ten minutes (`test-fuzz-sem-no-crash` alone is
+~120 s), which is worth knowing before adding more runs.
+
+### Hoon note
+
+`(snag i bases)` on a list narrowed by `?~ bases` nest-fails the wet gate with `-have.%~` — the
+zuse-408 hazard this repo keeps hitting. Use `=(0 (lent bases))` for the guard and cast at the call
+site: `(snag bi `(list @t)`bases)`.

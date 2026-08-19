@@ -21,6 +21,8 @@
 ::  fixture in the corpus that owns the stage (see doc/testing.md).
 /+  *test
 /=  syntax  /lib/syntax
+/=  semantic  /lib/semantic
+/=  config  /lib/config
 |%
 +$  fz-outcome  ?(%ok %rejected %bailed %budget)
 ::  a failing case: which run, what it produced, and the input that did it
@@ -90,6 +92,138 @@
   ^-  [@t _og]
   [?:((gth (lent l) i) (snag i l) '') rng]
 ::
+::  +|  Mutation over valid corpus inputs (R1.2.2)
+::
+::  A random token stream reaches the lexer and the parser and essentially never
+::  PARSES, so it never reaches the semantic graph or the config validator. The
+::  R1.2.0 decision was to MUTATE valid inputs instead: a small edit to a module
+::  that already parses lands close enough to stay interesting, and the repo is
+::  full of such modules. The bases below are corpus cases, inlined because a
+::  test cannot scry Clay for `test-data`.
+::
+++  lines-of
+  ::  split on newline, keeping no trailing empty (hand-rolled)
+  |=  t=@t
+  ^-  (list tape)
+  =/  c  (trip t)
+  =|  cur=tape
+  =|  acc=(list tape)
+  |-  ^-  (list tape)
+  ?~  c
+    ?~(cur (flop acc) (flop [(flop cur) acc]))
+  ?:  =(10 i.c)  $(c t.c, cur ~, acc [(flop cur) acc])
+  $(c t.c, cur [i.c cur])
+::
+++  unlines
+  |=  l=(list tape)
+  ^-  @t
+  ?~  l  ''
+  %-  crip
+  |-  ^-  tape
+  ?~  t.l  i.l
+  :(weld i.l "\0a" $(l t.l))
+::
+++  drop-at
+  |=  [i=@ud l=(list tape)]
+  ^-  (list tape)
+  ?~  l  ~
+  ?:(=(0 i) t.l [i.l $(i (dec i), l t.l)])
+::
+++  dup-at
+  |=  [i=@ud l=(list tape)]
+  ^-  (list tape)
+  ?~  l  ~
+  ?:(=(0 i) [i.l i.l t.l] [i.l $(i (dec i), l t.l)])
+::
+++  put-at
+  |=  [i=@ud v=tape l=(list tape)]
+  ^-  (list tape)
+  ?~  l  ~
+  ?:(=(0 i) [v t.l] [i.l $(i (dec i), l t.l)])
+::
+++  mutate
+  ::  one edit, chosen by the rng: drop a line, duplicate a line, swap two, or
+  ::  replace a line with a random token soup. Line-level on purpose -- a
+  ::  character-level edit almost always breaks the parse, and a module that
+  ::  does not parse tells the SEMANTIC stage nothing
+  |=  [t=@t rng=_og]
+  ^-  [@t _og]
+  =/  ls  (lines-of t)
+  =/  n  (lent ls)
+  ?:  =(0 n)  [t rng]
+  =^  op   rng  (rads:rng 4)
+  =^  a    rng  (rads:rng n)
+  =^  b    rng  (rads:rng n)
+  ?+  op  [t rng]
+    %0  [(unlines (drop-at a ls)) rng]
+    %1  [(unlines (dup-at a ls)) rng]
+  ::
+      %2
+    =/  va  (snag a ls)
+    =/  vb  (snag b ls)
+    [(unlines (put-at a vb (put-at b va ls))) rng]
+  ::
+      %3
+    =^  body  rng  (rand-body rng 6)
+    [(unlines (put-at a (trip body) ls)) rng]
+  ==
+::
+++  gen-mutate
+  ::  pick a base at random, then apply 1-3 edits
+  |=  bases=(list @t)
+  ^-  $-([@ud _og] [@t _og])
+  |=  [i=@ud rng=_og]
+  ^-  [@t _og]
+  ::  `=(0 n)` rather than `?~ bases`: a ?~-narrowed list nest-fails the WET
+  ::  `snag` (`-have.%~`), the zuse-408 hazard this repo hits repeatedly
+  =/  n  (lent bases)
+  ?:  =(0 n)  ['' rng]
+  =^  bi  rng  (rads:rng n)
+  =^  k   rng  (rads:rng 3)
+  =/  t  (snag bi `(list @t)`bases)
+  =/  j  0
+  |-  ^-  [@t _og]
+  ?:  (gth j k)  [t rng]
+  =^  t2  rng  (mutate t rng)
+  $(j +(j), t t2, rng rng)
+::
+::  +|  Corpus bases (inlined; a test cannot scry Clay)
+::
+++  base-modules
+  ^-  (list @t)
+  :~  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aOp(a) == a + 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x = 0 /\\ x\' = 1\0aB == x = 1 /\\ x\' = 0\0aNext == A \\/ B\0aSpec == Init /\\ [][Next]_x /\\ WF_x(A)\0aLive == <>[](x = 1)\0a====\0a'
+      '---- MODULE A ----\0aEXTENDS Integers\0aCONSTANT C\0aVARIABLE x, y\0aInit == x = C /\\ y = 0\0aNext == x\' = x /\\ y\' = y + 1\0a====\0a'
+  ==
+::
+++  base-cfgs
+  ^-  (list @t)
+  :~  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+      'SPECIFICATION Spec\0aPROPERTY Live\0a'
+      'CONSTANT C = 1\0aINIT Init\0aNEXT Next\0aCONSTRAINT Inv\0a'
+  ==
+::
+::
+++  fz-reach
+  ::  the same run, counting how many cases the stage actually PRODUCED A
+  ::  RESULT for. A fuzz arm that only asserts "no bails" passes trivially if
+  ::  every mutation is rejected at the parse step and never reaches the stage
+  ::  under test, so the reach is asserted, not assumed (R1.2.2)
+  |=  $:  seed=@
+          runs=@ud
+          gen=$-([@ud _og] [@t _og])
+          stage=$-(@t fz-outcome)
+      ==
+  ^-  @ud
+  =/  rng  ~(. og seed)
+  =/  i  0
+  =/  ok  0
+  |-  ^-  @ud
+  ?:  =(i runs)  ok
+  =^  inp  rng  (gen i rng)
+  =/  out  (stage inp)
+  $(i +(i), rng rng, ok ?:(?=(%ok out) +(ok) ok))
+::
 ::  +|  Stage adapters
 ::
 ++  fz-parse
@@ -97,6 +231,52 @@
   |=  inp=@t
   ^-  fz-outcome
   =/  r  (mule |.((parse:syntax inp)))
+  ?:  ?=(%| -.r)  %bailed
+  ?:(?=(%| -.p.r) %rejected %ok)
+::
+::  NOTE on `%budget` for the three adapters below: `generate:semantic`,
+::  `+parse-cfg` and `+run-spec-of` walk a FINITE parse tree, so there is no
+::  state space to bound and no cap to pass -- they cannot report `%budget`.
+::  The adapter's budget obligation (see the header) binds the stages that
+::  ITERATE, which are `.3`'s and `.4`'s.
+::
+++  fz-sem
+  ::  the semantic graph: a module that does not resolve is `~`, a typed
+  ::  rejection; anything else must be a graph, never a bail
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((generate:semantic 'A' (malt ~[['A' inp]]))))
+  ?:  ?=(%| -.r)  %bailed
+  ?:(?=(~ p.r) %rejected %ok)
+::
+++  fz-cfg
+  ::  the .cfg parser: a malformed config is a CFG_* diagnostic, never a bail
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((parse-cfg:config inp)))
+  ?:  ?=(%| -.r)  %bailed
+  ?:(?=(%| -.p.r) %rejected %ok)
+::
+++  fz-runspec-cfg
+  ::  the whole config path -- parse, validate against the graph, assemble the
+  ::  run-spec -- with the MODULE fixed and the .cfg mutated. This is the
+  ::  surface a user actually supplies, and `+build-defns` was rewritten
+  ::  wholesale in R1.8.1.3b
+  |=  spec=@t
+  ^-  $-(@t fz-outcome)
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((run-spec-of:config 'A' (malt ~[['A' spec]]) inp)))
+  ?:  ?=(%| -.r)  %bailed
+  ?:(?=(%| -.p.r) %rejected %ok)
+::
+++  fz-runspec-spec
+  ::  the same path with the .cfg fixed and the MODULE mutated
+  |=  cfg=@t
+  ^-  $-(@t fz-outcome)
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((run-spec-of:config 'A' (malt ~[['A' inp]]) cfg)))
   ?:  ?=(%| -.r)  %bailed
   ?:(?=(%| -.p.r) %rejected %ok)
 ::
@@ -126,6 +306,66 @@
 ::  the runner itself: it must REPORT a bail and a budget rather than pass them,
 ::  and must carry the offending input back. Synthetic stages, so this stays
 ::  true whatever the port does
+::  +|  R1.2.2 arms: semantic graph + config
+::
+++  test-fuzz-sem-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0001 200 (gen-mutate base-modules) fz-sem))
+::
+++  test-fuzz-cfg-parse-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0002 200 (gen-mutate base-cfgs) fz-cfg))
+::
+++  test-fuzz-runspec-cfg-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>
+  %-  fz-run
+  :*  0xbeef.0003
+      150
+      (gen-mutate base-cfgs)
+      (fz-runspec-cfg (snag 0 `(list @t)`base-modules))
+  ==
+::
+++  test-fuzz-runspec-spec-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>
+  %-  fz-run
+  :*  0xbeef.0004
+      150
+      (gen-mutate base-modules)
+      (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
+  ==
+::
+::  Reach floors. The seeds are fixed, so these counts are exact and
+::  reproducible; measured on the R1.2.2 ship run they are 99 / 91 / 29 / 16.
+::  The floors sit well below, so ordinary drift does not trip them -- but a
+::  change that stops mutations reaching a stage, or makes a stage reject
+::  everything, fails here instead of leaving the arms above passing on nothing.
+++  test-fuzz-reach-floors
+  ;:  weld
+    %+  expect-eq  !>(%.y)
+    !>  (gte (fz-reach 0xbeef.0001 200 (gen-mutate base-modules) fz-sem) 60)
+  ::
+    %+  expect-eq  !>(%.y)
+    !>  (gte (fz-reach 0xbeef.0002 200 (gen-mutate base-cfgs) fz-cfg) 60)
+  ::
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          %-  fz-reach
+          :*  0xbeef.0003  150  (gen-mutate base-cfgs)
+              (fz-runspec-cfg (snag 0 `(list @t)`base-modules))
+          ==
+        15
+  ::
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          %-  fz-reach
+          :*  0xbeef.0004  150  (gen-mutate base-modules)
+              (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
+          ==
+        8
+  ==
+::
 ++  test-fuzz-runner-classifies
   =/  bail-stage  |=(inp=@t ^-(fz-outcome =/(r (mule |.(!!)) ?:(?=(%| -.r) %bailed %ok))))
   =/  budget-stage  |=(inp=@t `fz-outcome`%budget)
