@@ -56,15 +56,22 @@
   ::  exist for liveness either. The product build used to take the raw relation
   ::  and then `~(got by states)` the successor, which crashes on a constrained
   ::  spec (test-model's `LivenessConstraintWarning`). R1.8.1.4
+  ::  DEDUPLICATED by fingerprint, in first-occurrence order: tlc2 collects the
+  ::  successors into a `SetOfStates` keyed by fingerprint before handing them to
+  ::  `addNextState`, and `GraphNode.transExists` refuses a repeat, so a state
+  ::  reachable by two actions contributes ONE product edge. The port emitted one
+  ::  per occurrence -- again invisible to a node-count projection (R1.6.3).
   |=  [s0=state:ne nsb=sem:sm env=eenv:ne order=(list @t) states=(map @t state:ne)]
   ^-  (list [fp=@t st=state:ne])
   =/  r  (next-states:ne s0 nsb env)
   ?:  ?=(%| -.r)  ~
+  =|  seen=(set @t)
   |-  ^-  (list [fp=@t st=state:ne])
   ?~  p.r  ~
   =/  fp  `@t`(state-fp:fpl order i.p.r)
   ?.  (~(has by states) fp)  $(p.r t.p.r)
-  [[fp i.p.r] $(p.r t.p.r)]
+  ?:  (~(has in seen) fp)  $(p.r t.p.r)
+  [[fp i.p.r] $(p.r t.p.r, seen (~(put in seen) fp))]
 ::
 ++  build-product
   ::  the product node count and initial-node count for one OrderOfSolution.
@@ -316,7 +323,15 @@
 ::  +|  Labeled product graph, SCC search, and verdict (Work Unit 8.5)
 ::
 +$  pnode  [cs=(list ?) par=par:tb]           ::  a product node's labels
-+$  pedge  [from=pg-key to=pg-key ca=(list ?)]
+::  `stut` marks the self-edge the port adds so a behavior can stutter forever.
+::  tlc2's EXHAUSTIVE product has no such edge (`LiveChecker.addNextState`
+::  records the real successors only) -- it grants stuttering in the acceptance
+::  search instead. The port grants it in the GRAPH, which is verdict-equivalent
+::  (every liveness fixture agrees) but is a different representation, so the
+::  PRODUCT projection excludes exactly these edges rather than filtering
+::  self-loops by shape -- a genuine `x' = x` transition is still compared.
+::  R1.6.3; recorded as an approved difference in compatibility.md.
++$  pedge  [from=pg-key to=pg-key ca=(list ?) stut=?]
 ::  the bounded/resumable product-build cursor (unit 8.8.2a): the tableau, the
 ::  BFS worklist over product keys, the visited set, and the product built so
 ::  far. The static inputs (oos, states, nsb, env, order) are supplied fresh at
@@ -418,10 +433,13 @@
       %+  turn  ~(tap by states)
       |=  [fp0=@t s0=state:ne]
       ^-  (list pedge)
-      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (succ-fps s0 nsb env order states)]
+      ::  the tagged stutter self-edge, then the real successors (see +$ pedge)
+      :-  ^-  pedge
+          [[fp0 0] [fp0 0] (ca-bits check-action.o s0 s0 env) &]
+      %+  turn  (succ-fps s0 nsb env order states)
       |=  [fp1=@t s1=state:ne]
       ^-  pedge
-      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]
+      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env) |]
     [nm es ik]
   ::  drain the bounded product-build cursor in one unbounded pass (the job
   ::  kernel steps the same cursor a slice at a time — unit 8.8.2a)
@@ -429,21 +447,98 @@
   =/  r   (product-step o states nsb env order pc (bex 62))
   [nodes.cur.r edges.cur.r inits.cur.r]
 ::
+++  bit-tape
+  ::  a checkState/checkAction bit vector as `1`/`0`, or `-` when empty
+  ::  `=(~ bs)` rather than `?~`: the latter NARROWS bs, which makes the inner
+  ::  loop's own `?~` vacuous (mint-vain)
+  |=  bs=(list ?)
+  ^-  tape
+  ?:  =(~ bs)  "-"
+  |-  ^-  tape
+  ?~  bs  ""
+  [`@tD`?:(i.bs '1' '0') $(bs t.bs)]
+::
+++  render-product-graph
+  ::  the PNODE/PEDGE half of the PRODUCT projection (R1.6.3): each product
+  ::  node with its checkState bits, then its outgoing edges with their
+  ::  checkAction bits, in (fingerprint-rank, tableau-index) order so the
+  ::  projection is a SET rather than a traversal artifact. `ranks` maps a state
+  ::  fingerprint to its index in the ascending fingerprint ordering; the
+  ::  oracle ranks the same way, so the two agree without exposing raw FP64s.
+  ::
+  ::  Only KEYS and EDGES go through `sort` -- a `pnode` carries a particle,
+  ::  which is the recursive `live-expr` mold, and the wet list gates fuse-loop
+  ::  on it (the zuse-408 hazard this library is written around).
+  |=  $:  o=oos:tp
+          states=(map @t state:ne)
+          inits=(list @t)
+          nsb=sem:sm
+          env=eenv:ne
+          order=(list @t)
+          ranks=(map @t @ud)
+      ==
+  ^-  wain
+  =/  lp  (labeled-product o states inits nsb env order)
+  =/  rk  |=(fp=@t ^-(@ud (~(gut by ranks) fp 0)))
+  =/  ks=(list pg-key)
+    %+  sort  ~(tap in ~(key by nodes.lp))
+    |=  [a=pg-key b=pg-key]
+    ^-  ?
+    =/  ra  (rk fp.a)
+    =/  rb  (rk fp.b)
+    ?:(=(ra rb) (lte tidx.a tidx.b) (lth ra rb))
+  =/  es=(list pedge)
+    %+  sort  edges.lp
+    |=  [a=pedge b=pedge]
+    ^-  ?
+    =/  ra  (rk fp.to.a)
+    =/  rb  (rk fp.to.b)
+    ?:(=(ra rb) (lte tidx.to.a tidx.to.b) (lth ra rb))
+  =|  acc=(list @t)
+  |-  ^-  wain
+  ?~  ks  (flop acc)
+  =/  k  i.ks
+  =/  nd  (~(got by nodes.lp) k)
+  =/  hd=@t
+    %-  crip
+    "PNODE {(scow %ud (rk fp.k))} {(scow %ud tidx.k)} CS {(bit-tape cs.nd)}"
+  =/  rows=(list @t)
+    =/  l  (skim es |=(e=pedge &(=(from.e k) !stut.e)))
+    |-  ^-  (list @t)
+    ?~  l  ~
+    :_  $(l t.l)
+    %-  crip
+    ;:  weld
+      "PEDGE {(scow %ud (rk fp.k))} {(scow %ud tidx.k)} -> "
+      "{(scow %ud (rk fp.to.i.l))} {(scow %ud tidx.to.i.l)} "
+      "CA {(bit-tape ca.i.l)}"
+    ==
+  $(ks t.ks, acc (weld (flop rows) [hd acc]))
+::
 ++  node-edges
   ::  the outgoing product edges of (fp,tidx) with their checkAction labels,
   ::  and the successor product keys, over the state × tableau successor cross.
   ::  `succs` are the state's non-stutter successors (from the reachable graph in
   ::  the whole search, or a trace's own next states in +trace-product).
+  ::  stuttering is always a valid liveness behaviour: a state can step to
+  ::  itself (the tableau still advances), so prepend the self-successor. The
+  ::  edge is TAGGED `stut`, because tlc2's exhaustive product does not have it
+  ::  (see `+$ pedge`); on the TRACE product it is what tlc2 does too
+  ::  (`LiveCheck.checkTrace`: `successors.put(tlcState)`, "Add state itself to
+  ::  allow stuttering").
   |=  $:  k=pg-key  s0=state:ne  t0=tb-node:tb  tabg=tb-graph:tb
           ca=(list live-expr)  succs=(list [fp=@t st=state:ne])  env=eenv:ne
       ==
   ^-  [es=(list pedge) keys=(list pg-key)]
-  ::  stuttering is always a valid liveness behaviour: a state can step to
-  ::  itself (the tableau still advances), so prepend the self-successor
-  =/  stutter=[fp=@t st=state:ne]  [fp.k s0]
-  =/  ss  (weld ~[stutter] succs)
+  ::  the stutter edge is a pure SELF-loop on (fp,tidx): it must not cross with
+  ::  the tableau successors, or stuttering would DISCOVER product nodes tlc2
+  ::  never has -- measured on the `~>` fixtures, where crossing added a
+  ::  (state, tidx 2) node that neither tlc2 nor the port's own `+build-product`
+  ::  count path has (R1.6.3).
+  =/  stut-edge=pedge  [k k (ca-bits ca s0 s0 env) &]
+  =/  ss  succs
   |-  ^-  [es=(list pedge) keys=(list pg-key)]
-  ?~  ss  [~ ~]
+  ?~  ss  [~[stut-edge] ~]
   =/  rest  $(ss t.ss)
   =/  here
     =/  bits  (ca-bits ca s0 st.i.ss env)
@@ -454,7 +549,7 @@
     =/  more  $(ns t.ns)
     ?.  (consistent-at t1 st.i.ss env)  more
     =/  nk=pg-key  [fp.i.ss i.ns]
-    [[[k nk bits] es.more] [nk keys.more]]
+    [[[k nk bits |] es.more] [nk keys.more]]
   [(weld es.here es.rest) (weld keys.here keys.rest)]
 ::
 ::  +|  Liveness over a simulation trace (Work Unit 9.3a)
@@ -501,10 +596,12 @@
       %+  turn  ~(tap by states.g)
       |=  [fp0=@t s0=state:ne]
       ^-  (list pedge)
-      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (~(get ja succ.g) fp0)]
+      :-  ^-  pedge
+          [[fp0 0] [fp0 0] (ca-bits check-action.o s0 s0 env) &]
+      %+  turn  (~(get ja succ.g) fp0)
       |=  [fp1=@t s1=state:ne]
       ^-  pedge
-      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]
+      [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env) |]
     [nm es ik]
   =/  tabg  (build-tableau:tb u.tf.o)
   =/  ik    (init-keys states.g ~[init.g] tabg env)

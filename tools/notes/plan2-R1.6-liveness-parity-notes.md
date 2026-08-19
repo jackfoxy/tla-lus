@@ -281,3 +281,60 @@ place in this port that needed a literal brace.
 
 `temporal-struct` 16/16 green; `tableau`, `temporal`, `liveness-{product,accept,verdict,lasso,message}`,
 `mc`, `sim-live` and `job` unchanged and green. No full suite (deferred to `.7`).
+
+## R1.6.3 — the product edge/label projection
+
+### The projection
+
+`ProductDump` emitted `NODES`/`INITS` and nothing else. It now emits, per product node in
+fingerprint-rank order:
+
+```
+PNODE <fp-rank> <tidx> CS <checkState bits>
+PEDGE <fp-rank> <tidx> -> <fp-rank> <tidx> CA <checkAction bits>
+```
+
+State fingerprints project as a **rank** — the index in the ascending ordering of the reachable
+state fingerprints — not raw. Both sides compute the same FP64 (`tlc-fp` is parity), so the rank
+agrees, and no 64-bit blob lands in a golden. Successors sort numerically by (rank, tidx); a
+lexicographic sort of the rendered lines would put rank 10 before rank 2. tlc2 keys the single
+implicit node of a no-tableau product at `-1`; the projection normalizes it to `0`, which is how
+the port indexes it.
+
+`tests/lib/liveness-product.hoon` is generated now, for the same reason `temporal-struct` was in
+`.2`. Its coverage went **14 → 15**: the old hand-written shard excluded `leadsto-pass` as a
+"fairness residue", which R1.8.1.1 closed.
+
+### Three real divergences, none of which a count could see
+
+**1. Duplicate edges.** `Next == \/ x' = x \/ x' = 1` reaches the same successor by two disjuncts,
+and the port emitted one product edge per occurrence. tlc2 collects successors into a
+`SetOfStates` keyed by fingerprint before `addNextState`, and `GraphNode.transExists` refuses a
+repeat, so a state reachable two ways contributes ONE edge. `+succ-fps` now deduplicates by
+fingerprint in first-occurrence order.
+
+**2. A stutter self-loop on every node.** The port prepended a self-successor to every state so a
+behavior could stutter forever. tlc2's EXHAUSTIVE product has no such edge —
+`LiveChecker.addNextState` records the real successors only — and grants stuttering in the
+acceptance search instead. (Its TRACE path is different and *does* add it:
+`LiveCheck.checkTrace` does `successors.put(tlcState)`, "Add state itself to allow stuttering".)
+Removing it outright turned `wf-absent-viol` and `diamond-const-false` from
+`violated-property`/`CLASS stuttering` into `ok`, so it is load-bearing: the port grants stuttering
+in the GRAPH where tlc2 grants it in the SEARCH. That is verdict-equivalent across all 16 fixtures
+and is now an **approved difference**, with `pedge` carrying a `stut` tag so the projection excludes
+exactly those edges — a genuine `x' = x` transition is still compared, which a "skip self-loops"
+filter would have hidden.
+
+**3. The stutter successor was discovering product NODES.** This is the one that could not be
+waved through. `+node-edges` crossed the stutter successor with the tableau successors, so on the
+`~>` fixtures it reached a `(state, tidx 2)` product node that neither tlc2 **nor the port's own
+`+build-product` count path** has — which means the `NODES` count the differential had compared
+since 8.3 came from a graph the verdict was not computed on. The stutter edge is now a pure
+self-loop on `(fp, tidx)`, discovering nothing. Verdict and lasso stay green, so nothing depended
+on the crossing.
+
+### Result
+
+`liveness-product` **15/15**, `liveness-{verdict,lasso,message,accept}`, `temporal-struct`,
+`tableau`, `mc`, `sim-live`, `sim`, `sim-stats`, `job`, `stream`, `spec-decomp`, `trace` and
+`tier2` all green. No full suite (deferred to `.7`).

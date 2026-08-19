@@ -1373,9 +1373,13 @@
   $(oss t.oss)
 ::
 ++  render-product
-  ::  the PRODUCT projection (unit 8.3): the product node and initial-node
-  ::  counts per OrderOfSolution, matching tools/oracle/ProductDump
-  |=  counts=(list [nodes=@ud inits=@ud])
+  ::  the PRODUCT projection (unit 8.3, extended R1.6.3): per OrderOfSolution
+  ::  the product node and initial-node COUNTS, then the graph itself — each
+  ::  node's checkState bits and each outgoing edge's checkAction bits. State
+  ::  fingerprints project as a RANK (the index in the ascending ordering of the
+  ::  reachable state fingerprints) rather than raw: both sides compute the same
+  ::  FP64, so the rank agrees, and it keeps the golden readable.
+  |=  [counts=(list [nodes=@ud inits=@ud]) blocks=(list wain)]
   ^-  wain
   =/  hd=@t  (crip "OOS {(scow %ud (lent counts))}")
   =/  body
@@ -1383,13 +1387,45 @@
     =|  acc=(list @t)
     |-  ^-  (list @t)
     ?~  counts  (flop acc)
+    =/  blk=wain  ?:((gth (lent blocks) i) (snag i blocks) ~)
     =/  block=(list @t)
-      :~  (crip "--- {(scow %ud i)} ---")
-          (crip "NODES {(scow %ud nodes.i.counts)}")
-          (crip "INITS {(scow %ud inits.i.counts)}")
-      ==
+      %+  weld
+        ^-  wain
+        :~  (crip "--- {(scow %ud i)} ---")
+            (crip "NODES {(scow %ud nodes.i.counts)}")
+            (crip "INITS {(scow %ud inits.i.counts)}")
+        ==
+      blk
     $(counts t.counts, i +(i), acc (weld (flop block) acc))
   `wain`['PRODUCT' hd body]
+::
+++  product-blocks
+  ::  the per-OrderOfSolution PNODE/PEDGE lines: the labeled product from
+  ::  lib/liveness, rendered in fingerprint-rank order so the projection is a
+  ::  SET and not a traversal artifact
+  |=  c=sctx
+  ^-  (list wain)
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  g       (build-graph is.c o)
+  =/  states  (states-of seen.g)
+  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  ranks   (fp-ranks states)
+  =/  oss  oss.c
+  |-  ^-  (list wain)
+  ?~  oss  ~
+  :-  (render-product-graph:lv i.oss states inits.g nsb.c env order.c ranks)
+  $(oss t.oss)
+::
+++  fp-ranks
+  ::  state fingerprint -> its index in the ascending fingerprint ordering
+  |=  states=(map @t state:ne)
+  ^-  (map @t @ud)
+  =/  fps  (sort ~(tap in ~(key by states)) lth)
+  =|  acc=(map @t @ud)
+  =/  i  0
+  |-  ^-  (map @t @ud)
+  ?~  fps  acc
+  $(fps t.fps, i +(i), acc (~(put by acc) i.fps i))
 ::
 ++  live-product
   ::  the product projection for a spec+cfg via the production search context
@@ -1397,7 +1433,7 @@
   ^-  wain
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
-  (render-product (product-counts p.sc))
+  (render-product (product-counts p.sc) (product-blocks p.sc))
 ::
 ++  live-verdict-lines
   ::  the liveness VERDICT/EC projection (unit 8.5) for a spec+cfg — the

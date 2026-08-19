@@ -1379,6 +1379,26 @@ with temporal bodies, which `Liveness.astToLive` expands during tableau construc
 `tlc-live-normalize` moved from `approved-difference` to `partial` — a terminal row that bails on
 in-scope specs was overstated, and only running real specs could show it.
 
+## Release R1.6 — stuttering in the product graph
+
+**Approved difference, measured in R1.6.3.** TLA+ behaviors may always stutter, and the port and
+tlc2 grant that in different places. tlc2's exhaustive behavior-graph product contains only the
+real successors (`LiveCheck.LiveChecker.addNextState`) and allows stuttering inside the acceptance
+search; the port adds a **self-loop on every product node** and lets the ordinary SCC search find
+it. The two are verdict-equivalent across the whole liveness corpus — removing the port's edge
+turns `wf-absent-viol` and `diamond-const-false` from `violated-property` / `CLASS stuttering` into
+`ok`, so it is exactly what carries stuttering there.
+
+The `PRODUCT` differential therefore excludes these edges *structurally*, not by shape: `pedge`
+carries a `stut` tag and the projection drops tagged edges only, so a genuine `x' = x` transition
+is still compared. A "skip self-loops" filter would have hidden real ones.
+
+Note what this is **not**. The stutter successor used to be crossed with the tableau successors,
+which discovered product nodes that neither tlc2 nor the port's own `+build-product` count path
+had. That was a defect, not a difference, and R1.6.3 fixed it: the stutter edge is now a pure
+self-loop on `(fp, tidx)` and discovers nothing. Its own path (`LiveCheck.checkTrace`) does add a
+stutter successor for a simulated behavior, and the port matches that.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,
