@@ -1,0 +1,195 @@
+# R1.2 — Fuzzing + fixture expansion (unit 11) — measurement notes
+
+Parent plan: `~/FoxyLabs/tla-lus/R1.2-fuzzing-plan.md` (.0–.7).
+Oracle pin: `tlaplus@4ba7d8811`.
+
+## R1.2.0 — kickoff (docs only)
+
+### The headline: a reachable crash, found by inspection before any fuzzer was written
+
+```
+---- MODULE A ----
+EXTENDS Naturals
+VARIABLE x, y
+Init == x = 0 /\ y = 0
+Next == x' = 1 - x /\ y' = y
+Live == <>(x = 1 /\ y = 0)
+====
+INIT Init / NEXT Next / PROPERTY Live
+```
+
+`check:check` **bails `%tlc-live-statepred-junction`**. TLC runs it to a verdict:
+`Error: Temporal property Live was violated.` / `2 distinct states found`.
+
+There is nothing exotic here — an eventually-operator over a conjunction of two state predicates.
+It was found by reading `+st-pred-bool:liveness` against `+cs-eval:liveness`, not by fuzzing, which
+is the first thing `.0` has to say about how much surface is unexplored.
+
+**The cause is an asymmetry between two evaluators over the same mold.** Both walk a `live-expr` at
+a state:
+
+| arm | handles | bails on |
+|---|---|---|
+| `+cs-eval` (checkState) | `%bool %neg %conj %disj %state` | `%act %enabled %all %even %next` |
+| `+st-pred-bool` (tableau node consistency) | `%bool %neg %state` | `%next %all %even` **`%conj %disj`** `%act %enabled` |
+
+`+state-preds-of:tableau` keeps a particle's members with `le-level <= 1`, and `le-level` of a
+`%conj` is the max of its children — so a conjunction of two state predicates has level 1, survives
+the filter, reaches `+st-pred-bool`, and hits a bail that `+cs-eval` would have evaluated. The
+R1.6.2 `TBGRAPH` projection makes this visible: `leadsto-viol`'s golden shows a particle whose
+second member *is* a conjunction (there at level 3, so the filter drops it — which is why no
+existing fixture trips this).
+
+This is `.3`'s first fixture and probably its first fix. It also validates the plan's ordering:
+`.3` (temporal/liveness) was already flagged as the increment to do first among the middle four.
+
+### (a) The bail surface, classified
+
+29 `!!` sites in port libraries. The first cut is **not** reachable-vs-unreachable, it is
+**production-reachable at all**:
+
+**19 sites are in a test-only driver.** `lib/eval.hoon`'s CST evaluator (`+eval` over `node`) is
+reached only from `desk/tests/lib/eval.hoon`. Production imports `lib/eval` for its *types*
+(`value:ev`, `vfield`, `vpair`) and four CST helpers (`kids-of`, `is-kind`, `op-name`,
+`genid-name`) — R1.4.4 retired the CST driver to test-only and R1.4 deleted the dead state
+generator from `check.hoon`. No input a user submits reaches those 19, **including all six
+unlabelled `!!`** (lines 528, 530, 569, 570, 579, 582).
+
+That materially re-scopes the plan: DoD item 3 ("no unlabelled `!!` remains in port code") is about
+a test-only file, so `.0` recommends **either deleting the CST driver or exempting it explicitly**
+— a decision for `.4`, not a fuzzing target. The `!!` hits in `lexer.hoon:148` and
+`syntax.hoon:111/181` are the TLA+ operator `!!` in token/precedence tables, not crashes at all.
+
+**The production-reachable surface is 21 sites, all labelled:**
+
+| site | tag | first read |
+|---|---|---|
+| `liveness.hoon:30-36` (7) | `%tlc-live-statepred-{next,temporal,junction,action,enabled}` | **`%conj`/`%disj` PROVEN REACHABLE (above)**; the rest need the same test |
+| `liveness.hoon:253-257` (5) | `%tlc-live-checkstate-{action,enabled,temporal,next}` | checkState is built from level<=1 PEM entries; `%act`/`%enabled` should be impossible — argument owed |
+| `liveness.hoon:277-279` (3) | `%tlc-live-checkaction-{temporal,next}` | checkAction is level<=2; `%all`/`%even` should be impossible — argument owed |
+| `tableau.hoon:86-87` (2) | `%tlc-live-encountered-actions` | **has a real EC**: 2249 `TLC_LIVE_ENCOUNTERED_ACTIONS`, "TLC encountered actions when computing closure." Convert, don't bail |
+| `temporal.hoon:810` (1) | `%tlc-live-wrong-formula-format` | **has a real EC**: 2214. Already fired on five test-model specs (R1.6.0); now unreachable via `+ast`'s user-op branch, but that is a fix upstream, not a proof |
+| `config.hoon:400` (1) | `%cfg-value-unexpected` | `+render-value` over a `cfg-value` variant `parse-cfg` cannot produce — argument owed |
+| `job.hoon:515` (1) | `%tla-lus-unplanned-stage` | an internal invariant on the stage plan, not input-driven — argument owed |
+| `diagnostics.hoon:128` (1) | `[%unmapped-ec code]` | an EC with no message mapping; reachable iff any emitter can produce an unmapped code |
+
+Two of the 21 already map to real tlc2 error codes (2214, 2249), so for those the conversion target
+is not invention: emit the EC as a typed rejection. That is the pattern to prefer everywhere —
+**a bail with a tlc2 EC behind it is a diagnostic waiting to be wired**, not an assertion.
+
+### (b) Generator strategy — per stage, and why the current one does not generalize
+
+`tests/lib/fuzz` generates a random token soup inside a module frame. That reaches the lexer and
+parser and essentially never reaches `sem`, `config`, or liveness — a random token stream almost
+never parses. So:
+
+- **Front end** (lexer/parser): keep the existing token-soup generator. It is the right shape and
+  the invariant is already enforced.
+- **Everything past it**: **mutate the existing corpora** rather than generate from a grammar. The
+  repo already holds hundreds of *valid* inputs (`test-data/{parse,sem,cfg,liveness,mc,safety}`),
+  and small mutations of a valid module stay parseable far more often than anything generated from
+  scratch. Mutation operators to start with: delete/duplicate a line, swap two operators of the
+  same arity, change a level (prime/unprime a variable, wrap a subformula in `[]`/`<>`), and
+  perturb a `.cfg` key.
+- **Decoding** (`.5`): no generator needed — `jam`/`cue` round-trips with bit-flips and truncation.
+
+Grammar-directed generation is explicitly **not** chosen at `.0`: it is a large build whose payoff
+is unclear next to a corpus that already exists, and it can be revisited if mutation plateaus.
+
+### (c) The budget — `mule` is not enough
+
+`mule` catches a bail; it does not catch a loop. R1.8.1.4's liveness build ran 480 s without a
+verdict on a 5-state spec. So the runner must classify **four** outcomes, not two:
+
+```
+%ok  %rejected  %bailed  %budget
+```
+
+with `%budget` produced by a step bound the runner threads into the stage (the port already has the
+device: `build-graph-cap`/`live-graph-cap`, `+expand-cap`, `fuel` in `eenv`). A `%budget` result is
+a *recorded failure*, not a hang — an arm must never be able to wedge the ship, which the dev-log
+already records as a real cost (`[[tla-lus-dev-environment]]`, dojo wedge recovery).
+
+### (d) Shrinking — deliberately none at `.0`
+
+A delta-debug over the mutation list is cheap to add later, but the mutation strategy in (b)
+produces inputs that are already close to a valid corpus case, so the reduction distance is small.
+Decision: **no shrinker in `.1`**; revisit if a found crash is not obviously minimal. The
+already-found `%tlc-live-statepred-junction` case is six lines, which supports this.
+
+### (e) Where arms and fixtures live
+
+- **Arms**: extend `tests/lib/fuzz.hoon` rather than adding per-stage shards. One shard keeps the
+  runner in one place and keeps the seeds together; the arms name their stage
+  (`test-fuzz-liveness-*`, `test-fuzz-cfg-*`).
+- **Fixtures**: a reduced crash lands in the corpus that *owns the stage* — a liveness crash in
+  `test-data/liveness`, a config crash in `test-data/cfg-val` — so it is picked up by that stage's
+  existing generator and comparator, and becomes a permanent tier-1 case. It does **not** land in a
+  fuzz-specific corpus, which would leave it outside every differential.
+
+### Consequences for the plan
+
+- `.4`'s scope shrinks to a decision (delete the CST driver, or exempt it) plus `node-eval`, since
+  `lib/eval`'s 19 sites are test-only.
+- `.3` gains a proven fixture and a probable fix before it starts.
+- DoD item 3 needs the test-only carve-out written into it.
+
+## R1.2.1 — the harness
+
+### What landed
+
+`tests/lib/fuzz.hoon` now has one runner instead of three ad-hoc arms. `+fz-run` takes a seed, a
+run count, a **generator** (`[index rng] -> input`) and a **stage adapter** (`input -> fz-outcome`),
+and returns only the failures — each carrying the input that caused it, so the case is reducible.
+
+```
++$  fz-outcome  ?(%ok %rejected %bailed %budget)
++$  fz-fail     [i=@ud out=fz-outcome inp=@t]
+```
+
+`%ok` and `%rejected` both pass: a typed rejection is a correct answer, and the invariant is about
+crashing, not about accepting. `%bailed` and `%budget` are failures.
+
+### The budget is a contract on the adapter, not a feature of the runner
+
+This is the design point worth recording. `mule` catches a bail; it does not catch a loop, and
+R1.8.1.4 found a liveness build that ran 480 s on a five-state spec. Hoon offers the harness no
+timeout it can impose from outside — so `+fz-run` **cannot** bound a stage. What it can do is
+require that each adapter call its stage with the caps that stage already owns (`live-graph-cap`,
+`+expand-cap`, `fuel:eenv`) and report a cap-hit as `%budget`.
+
+That obligation is unenforceable in code, so it is written in three places: the shard header,
+`doc/testing.md`, and here. An adapter that forgets it does not fail loudly — it hangs the arm,
+which is exactly the failure mode `[[tla-lus-dev-environment]]` records as costly.
+
+### The runner is tested, not assumed
+
+`test-fuzz-runner-classifies` drives four **synthetic** stages — one that bails, one that reports a
+budget, one that succeeds, one that rejects — and asserts the runner reports exactly the first two,
+with the offending input attached. Synthetic on purpose: it stays true whatever the port does, so it
+tests the harness rather than the port.
+
+`.0`'s real crash (`<>(x = 1 /\ y = 0)` → `%tlc-live-statepred-junction`) is deliberately **not**
+used here. It belongs to `.3` as a corpus fixture, and an arm built on a bug is an arm that fails
+the moment the bug is fixed.
+
+### Retrofit
+
+The three existing parser arms now go through `+fz-run` with the `+fz-parse` adapter and the
+`+gen-module` / `+gen-fixed` generators, so there is one mechanism. Coverage is unchanged (200 + 120
+random modules, 10 hand-written garbage inputs); what changed is that a failure now names the run
+index and hands back the input instead of collapsing to `%.n`.
+
+`+gen-fixed` — a generator over a fixed list — is what lets a hand-written adversarial set share the
+runner with the random ones, and it is how `.2`–`.5` will feed reduced fixtures back through.
+
+### Result
+
+`fuzz` 4/4 green. `doc/testing.md`'s Fuzzing section rewritten: the four outcomes, the adapter's
+budget obligation, the reduce-and-freeze procedure (reduce → commit to the corpus that OWNS the
+stage → capture its golden → only then fix), and an honest statement of what is covered today.
+
+### Hoon note
+
+`=/  name  value` needs a **two-space gap** on both sides of the name; `=/ name  value` is a syntax
+error, and the message points at the value rather than at the missing space.

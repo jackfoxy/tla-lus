@@ -173,16 +173,61 @@ never bail. Any reduced mismatch discovered by fuzzing is saved as a
 regression fixture under the appropriate `test-data/` corpus so it becomes a
 permanent tier-1 case.
 
-**The invariant is enforced for the front end only** (3 arms, lexer + parser).
-Every stage past it — config validation, the semantic graph, the evaluator, the
-temporal normalizer, action generation, persisted-cursor decoding — is expected
-to hold the same contract and is not fuzzed. That gap is not hypothetical:
-R1.6.0 measured `+ast:temporal` **bailing** (`%tlc-live-wrong-formula-format`)
-on five ordinary `test-model` specs, because a user-defined operator falls
-through its name dispatch to a level-based leaf. A typed rejection would have
-been correct there; a bail is what the front-end fuzzer exists to forbid.
-Extending the fuzzer past the parser is R1.2, and the surfaces above are its
-targets in that order.
+### The runner and its four outcomes
+
+`+fz-run` (R1.2.1) drives a seeded generator into a **stage adapter** and
+classifies every case four ways:
+
+| outcome | meaning | verdict |
+|---|---|---|
+| `%ok` | the stage produced a result | pass |
+| `%rejected` | the stage produced a TYPED rejection | pass |
+| `%bailed` | the stage crashed (`mule` caught it) | **failure** |
+| `%budget` | the stage hit a work cap instead of finishing | **failure** on this corpus |
+
+`%budget` exists because **`mule` catches a bail but not a loop** — R1.8.1.4
+found a liveness build that ran 480 s on a five-state spec. Hoon has no timeout
+the harness can impose from outside, so each stage adapter must call its stage
+with the caps that stage already has (`live-graph-cap`, `+expand-cap`,
+`fuel:eenv`) and report a cap-hit as `%budget`. That is a contract on the
+adapter; it cannot be enforced in code, so it is written down here and in the
+shard header.
+
+The seed fixes the whole run, so a reported failure replays exactly, and a
+failure carries the input that caused it.
+
+### When fuzzing finds a crash
+
+Do **not** fix it in place. In order:
+
+1. Reduce the input by hand (the mutation generators start from valid corpus
+   cases, so the distance is usually small).
+2. Commit it as a fixture in the corpus that **owns the stage** — a liveness
+   crash in `test-data/liveness`, a config crash in `test-data/cfg-val` — so it
+   is picked up by that stage's existing generator and comparator and becomes a
+   permanent tier-1 case. It does not go in a fuzz-only corpus, which would
+   leave it outside every differential.
+3. Capture its oracle golden.
+4. Only then fix the port.
+
+### Coverage today
+
+The invariant is enforced for the **lexer and parser** (`+fz-parse`). The stages
+past them — config validation, the semantic graph, the evaluator, the temporal
+normalizer, action generation, persisted-cursor decoding — hold the same
+contract and are not yet fuzzed; that is R1.2's remaining scope.
+
+The gap is not hypothetical. R1.6.0 measured `+ast:temporal` **bailing**
+(`%tlc-live-wrong-formula-format`) on five ordinary `test-model` specs, and
+R1.2.0 found `<>(x = 1 /\ y = 0)` bailing `%tlc-live-statepred-junction` by
+inspection alone. A typed rejection would have been correct in both; a bail is
+what this suite exists to forbid.
+
+**When converting a bail, never make it silent**: either prove the site
+unreachable and record the argument, or emit a diagnostic that names the shape
+that reached it. Two of the port's bail tags already have real tlc2 error codes
+behind them (2214, 2249) — a bail with an EC behind it is a diagnostic waiting
+to be wired.
 
 ## Adding a case
 
