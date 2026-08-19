@@ -1142,7 +1142,7 @@
     ==
   =/  or=(each (list oos:tp) aerr:tp)
     ?:  |(?=(~ pp) non-temporal)  [%& ~]
-    (build-live-oss ca defs consts vars fair)
+    (build-live-oss ca defs consts vars fair modn)
   ?:  ?=(%| -.or)  [%| msg.p.or]
   =/  sloc=sspan:sem-lib
     ?~  spec.ca  ~
@@ -1165,6 +1165,7 @@
           consts=(map @t value)
           vars=(set @t)
           fair=(list sem:sem-lib)
+          modn=@t
       ==
   ^-  (each (list oos:tp) aerr:tp)
   =/  pbods=(list sem:sem-lib)
@@ -1174,15 +1175,15 @@
     =/  b  (sem-body defs i.ps)
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
-  (oss-of pbods fair (make-env:ne defs consts vars))
+  (oss-of pbods modn fair (make-env:ne defs consts vars))
 ::
 ++  oss-of
   ::  normalize temporal property bodies + fairness conjuncts into the
   ::  OrderOfSolution list (exposes temporal.normalize for the job kernel's
   ::  %liveness setup and the differential's build-live-oss)
-  |=  [pbods=(list sem:sem-lib) fair=(list sem:sem-lib) env=eenv:ne]
+  |=  [pbods=(list sem:sem-lib) modn=@t fair=(list sem:sem-lib) env=eenv:ne]
   ^-  (each (list oos:tp) aerr:tp)
-  (normalize:tp pbods fair env)
+  (normalize:tp pbods modn fair env)
 ::
 ++  consts-of
   ::  config constant assignments as an evaluation binding map (WU6.9 task 1).
@@ -1766,7 +1767,7 @@
     ?~  b  $(ps t.ps)
     [u.b $(ps t.ps)]
   =/  env  (make-env:ne defs (const-map cfg) (var-names tree))
-  =/  or  (normalize:tp pbods fair.p.rt env)
+  =/  or  (normalize:tp pbods modn fair.p.rt env)
   ?:  ?=(%| -.or)  [%| msg.p.or]
   [%& modn p.or]
 ::
@@ -2034,7 +2035,7 @@
     ?~  psb  [[%failed 'no property definition'] *run-stats]
     =/  binner  (box-state-inner:tp u.psb)
     ?~  binner
-      =/  osr  (oss-of ~[u.psb] ~ (make-env:ne defs.c consts.c vars.c))
+      =/  osr  (oss-of ~[u.psb] (module-name-of tree.c) ~ (make-env:ne defs.c consts.c vars.c))
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph

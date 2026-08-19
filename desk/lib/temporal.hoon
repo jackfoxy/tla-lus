@@ -16,6 +16,20 @@
 ::  a typed rejection surfaced during normalization (astToLive constant-leaf
 ::  evaluation): an EC code and message, matching the pin's Assert.fail
 +$  aerr  [ec=@ud msg=@t]
+::  the translation context `+ast` threads alongside the evaluation env
+::  (R1.6.1). `modn` renders the module in a Location leaf (EC 2213's message
+::  is the expression's `toString`, i.e. its location); `dep` counts nested
+::  user-operator expansions.
++$  actx  [modn=@t dep=@ud]
+::
+++  expand-cap
+  ::  the nested user-operator expansion bound. tlc2 has none — it expands
+  ::  until the JVM stack overflows and `TLC.process` turns that into
+  ::  EC.SYSTEM_STACK_OVERFLOW (`Github1389Loops`, `Github1389StateGuard`).
+  ::  A Hoon runaway is a hang, not a catchable failure, so the port bounds it
+  ::  and rejects with a typed diagnostic instead — the same trade `live-graph-cap`
+  ::  makes for the graph build. Terminating expansions are far below it.
+  ^~  1.000
 ::  +|  Live-expression tree (LN* analogue)
 ::
 +$  live-expr
@@ -263,7 +277,7 @@
   ::  Liveness.astToLive / astToLiveAppl: a temporal ExprNode to a live-expr.
   ::  `env` is the constant evaluation environment, used only to fold a
   ::  constant-level leaf to LNBool (a non-boolean is a typed rejection)
-  |=  [s=sem:sm env=eenv:ne]
+  |=  [s=sem:sm c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?.  ?=(%apply -.s)
     ::  LetIn/Label/SubstIn unwrap to their body (INSTANCE substitution stays a
@@ -274,33 +288,33 @@
       ::  under node-eval (eval-letin); the leaf renders at the body's span
       ::  (matching TLC, which keeps the body node with its bindings resolved).
       ::  Only a temporal-bodied LET unwraps to its body.
-      ?.  (lte (sem-lvl s) 2)  (ast u.body.s env)
+      ?.  (lte (sem-lvl s) 2)  (ast u.body.s c env)
       =/  bat  (sspan-of u.body.s)
-      ?~  bat  (ast u.body.s env)
+      ?~  bat  (ast u.body.s c env)
       ::  keep the LET's bindings but render at the body's span (matching TLC,
       ::  which keeps the body node with its bindings resolved)
-      (leaf s(at bat) env)
-    (leaf s env)
+      (leaf s(at bat) (sem-lvl s) env)
+    (leaf s (sem-lvl s) env)
   =/  op  name.op.s
   =/  as  args.s
   ?:  |(=(op '$ConjList') =(op '\\land'))
-    =/  r  (ast-list as env)
+    =/  r  (ast-list as c env)
     ?:(?=(%| -.r) r [%& [%conj p.r]])
   ?:  |(=(op '$DisjList') =(op '\\lor'))
-    =/  r  (ast-list as env)
+    =/  r  (ast-list as c env)
     ?:(?=(%| -.r) r [%& [%disj p.r]])
   ?:  =(op '[]')
-    =/  r  (ast (hd as) env)
+    =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%all p.r]])
   ?:  =(op '<>')
-    =/  r  (ast (hd as) env)
+    =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%even p.r]])
-  ?:  =(op '$Nop')  (ast (hd as) env)
+  ?:  =(op '$Nop')  (ast (hd as) c env)
   ?:  |(=(op '~>') =(op '-+->'))
     ::  P ~> Q  ==  [](-P \/ <>Q)
-    =/  rp  (ast (hd as) env)
+    =/  rp  (ast (hd as) c env)
     ?:  ?=(%| -.rp)  rp
-    =/  rq  (ast (hd (tl as)) env)
+    =/  rq  (ast (hd (tl as)) c env)
     ?:  ?=(%| -.rq)  rq
     [%& [%all [%disj ~[[%neg p.rp] [%even p.rq]]]]]
   ?:  =(op '$WF')
@@ -319,16 +333,145 @@
   ?:  =(op '$SquareAct')
     [%& [%act & `(hd (tl as)) (hd as)]]
   ?:  =(op '\'')      [%& [%act | ~ s]]
-  ?:  =(op '\\lnot')  (neg-of (ast (hd as) env) s env)
-  ?:  =(op '\\neg')   (neg-of (ast (hd as) env) s env)
-  ?:  =(op '=>')      (implies-of as s env)
-  (leaf s env)
+  ?:  =(op '\\lnot')  (neg-of (ast (hd as) c env) s c env)
+  ?:  =(op '\\neg')   (neg-of (ast (hd as) c env) s c env)
+  ?:  =(op '=>')      (implies-of as s c env)
+  ?:  =(op '$IfThenElse')  (ite-of as s c env)
+  (user-op as op s c env)
+::
+++  ite-of
+  ::  Liveness.astToLiveAppl OPCODE_ite. When the guard evaluates to a constant
+  ::  boolean, translate ONLY the chosen branch — that is what terminates the
+  ::  expansion of a RECURSIVE operator whose recursion ends on such a guard
+  ::  (`Reach(n) == IF n = 0 THEN <>(x = 99) ELSE Reach(n - 1)`). Translating
+  ::  both branches would re-enter the recursion forever. When the guard depends
+  ::  on state it does not evaluate here (the env carries no state), and the
+  ::  disjunctive expansion `(g /\ e1) \/ (-g /\ e2)` is used instead — kept
+  ::  only when it is above action level, exactly as the Java does.
+  |=  [as=(list sem:sm) s=sem:sm c=actx env=eenv:ne]
+  ^-  (each live-expr aerr)
+  =/  g   (hd as)
+  =/  e1  (hd (tl as))
+  =/  e2  (hd (tl (tl as)))
+  ::  the chosen branch is computed OUTSIDE the guard evaluation, so a failure
+  ::  translating it is not retried disjunctively (which would re-enter the
+  ::  recursion) — the Java comments this at the same site
+  =/  chosen=(unit sem:sm)
+    =/  gv  (eval:ne g env)
+    ?.  ?=(%& -.gv)  ~
+    ?.  ?=(%bool -.p.gv)  ~
+    `?:(p.p.gv e1 e2)
+  ?^  chosen  (ast u.chosen c env)
+  =/  rg  (ast g c env)
+  ?:  ?=(%| -.rg)  rg
+  =/  r1  (ast e1 c env)
+  ?:  ?=(%| -.r1)  r1
+  =/  r2  (ast e2 c env)
+  ?:  ?=(%| -.r2)  r2
+  =/  res=live-expr
+    [%disj ~[[%conj ~[p.rg p.r1]] [%conj ~[[%neg p.rg] p.r2]]]]
+  ?:  (gth (le-level res) 2)  [%& res]
+  (leaf s (le-level res) env)
+::
+++  user-op
+  ::  Liveness.astToLiveAppl with opcode == 0: a USER-DEFINED operator. tlc2
+  ::  resolves it and translates its BODY in place of the call, so the liveness
+  ::  translator sees the operator's structure. The port had no such branch at
+  ::  all — a user operator fell through the name dispatch to `+leaf`, which
+  ::  made an LNAction of anything above state level INCLUDING a temporal
+  ::  formula, and that opaque action leaf is what sent five test-model specs
+  ::  into the EC 2214 `%tlc-live-wrong-formula-format` fallback (R1.6.0).
+  ::
+  ::  EXPANSION IS GATED ON LEVEL, WITHOUT A `recursive` FLAG, and that is
+  ::  observationally identical to the Java rather than a simplification. tlc2
+  ::  always expands a non-recursive operator but then DISCARDS the result
+  ::  unless it is above action level (`if (level > ActionLevel) return res;`),
+  ::  falling back to the same level-based leaf either way; and it expands a
+  ::  RECURSIVE operator only when `getLevelBound > ActionLevel`, precisely to
+  ::  avoid non-termination. Gating every user operator on the call's own level
+  ::  produces the same result in both cases, and the level of an application is
+  ::  the level of its definition, so no expansion that would have mattered is
+  ::  skipped.
+  |=  [as=(list sem:sm) op=@t s=sem:sm c=actx env=eenv:ne]
+  ^-  (each live-expr aerr)
+  ::  a formal parameter bound call-by-name to an argument NODE is translated
+  ::  in place (tlc2's Context lookup finds the substituted value first)
+  =/  sb  (~(get by psub.env) op)
+  ?^  sb  (ast u.sb c env)
+  |^  go
+  ++  go
+    ^-  (each live-expr aerr)
+    =/  d  (~(get by ops.env) op)
+    ?~  d  fall
+    ?~  body.u.d  fall
+    ::  the expansion gate. tlc2 always expands a NON-recursive operator and
+    ::  then discards the result unless it is above action level, and expands a
+    ::  RECURSIVE one only when its level bound is above action level (to avoid
+    ::  non-termination). Gating every user operator on the call's own level is
+    ::  observationally the same in both cases -- the level of an application is
+    ::  the level of its definition -- and needs no `recursive` flag.
+    ?.  (gth (sem-lvl s) 2)  fall
+    ?:  (gte dep.c expand-cap)  fall
+    =/  r  (ast u.body.u.d c(dep +(dep.c)) (bind-formals params.u.d as env))
+    ::  a FAILURE inside the expansion falls through rather than propagating:
+    ::  tlc2 swallows it for a non-recursive operator and re-throws for a
+    ::  recursive one, and the re-throw exists ONLY to stop an enclosing
+    ::  OPCODE_ite from retrying disjunctively and re-entering the recursion --
+    ::  `+ite-of` computes its chosen branch outside any recovery, so there is
+    ::  no such retry here and nothing to distinguish
+    ?:  ?=(%| -.r)  fall
+    ?:  (gth (le-level p.r) 2)  r
+    ::  expanded, but at or below action level: a leaf of the ORIGINAL call at
+    ::  the EXPANSION's level, not the call's. `Github1389ViolatedB`'s `Reach(0)`
+    ::  expands to a level-1 state predicate although `Reach` is temporal
+    (leaf s (le-level p.r) env)
+  ::  no expansion was made (unresolved, level-gated, capped, or failed):
+  ::  Liveness.java:295-300. Above action level there is nothing to build, and
+  ::  tlc2 raises EC 2213 rather than making an LNAction of a temporal formula
+  ::  -- which is what the port used to do, and what sent five test-model specs
+  ::  into the EC 2214 fallback (R1.6.0)
+  ++  fall
+    ^-  (each live-expr aerr)
+    =/  l  (sem-lvl s)
+    ?.  (gth l 2)  (leaf s l env)
+    :-  %|
+    :-  2.213
+    %+  rap  3
+    ~['TLC cannot handle the temporal formula ' (crip (loc-leaf modn.c s))]
+  --
+::
+++  bind-formals
+  ::  bind an operator's formals to its arguments for the expansion, the way
+  ::  tlc2's `tool.getVal(args[i], con, false)` does: LAZILY, in the CALLER's
+  ::  context. An argument that evaluates there is bound as a VALUE — which is
+  ::  what captures the caller's context and makes `Reach(n - 1)` terminate
+  ::  (binding the unevaluated node would rebind `n` to an expression mentioning
+  ::  `n` and recurse forever). One that does not (it reads a state variable, as
+  ::  `getVal` also declines to force) is bound as the argument NODE through
+  ::  `psub`, the port's existing call-by-name device. Each binding clears the
+  ::  other map so lookup order cannot matter.
+  |=  [ps=(list spar:sm) as=(list sem:sm) env=eenv:ne]
+  ^-  eenv:ne
+  ?~  ps  env
+  ?~  as  env
+  =/  r  (eval:ne i.as env)
+  =/  e2=eenv:ne
+    ?:  ?=(%& -.r)
+      %=  env
+        vals  (~(put by vals.env) name.i.ps p.r)
+        psub  (~(del by psub.env) name.i.ps)
+      ==
+    %=  env
+      psub  (~(put by psub.env) name.i.ps i.as)
+      vals  (~(del by vals.env) name.i.ps)
+    ==
+  $(ps t.ps, as t.as, env e2)
 ::
 ++  ast-list
-  |=  [l=(list sem:sm) env=eenv:ne]
+  |=  [l=(list sem:sm) c=actx env=eenv:ne]
   ^-  (each (list live-expr) aerr)
   ?~  l  [%& ~]
-  =/  hr  (ast i.l env)
+  =/  hr  (ast i.l c env)
   ?:  ?=(%| -.hr)  hr
   =/  tr  $(l t.l)
   ?:  ?=(%| -.tr)  tr
@@ -338,9 +481,15 @@
   ::  a non-temporal leaf, by level: a constant (level 0) evaluates to a boolean
   ::  (LNBool) under the constant env — a non-boolean is EC 2215 (the pin's
   ::  TLC_EXPECTED_VALUE); a state (level 1) is LNState, an action LNAction
-  |=  [s=sem:sm env=eenv:ne]
+  ::  R1.6.1: the level is PASSED, not recomputed from the node. This is the
+  ::  four-argument `astToLive(tool, expr, con, level)`, and its callers pass a
+  ::  level they computed — the negation passes its operand's, the implication
+  ::  the max of both, and a user-operator expansion passes the EXPANSION's.
+  ::  Recomputing from the node broke `Github1389ViolatedB`, whose `Reach(0)`
+  ::  expands to a level-1 state predicate although the recursive definition it
+  ::  came from is temporal.
+  |=  [s=sem:sm l=@ud env=eenv:ne]
   ^-  (each live-expr aerr)
-  =/  l  (sem-lvl s)
   ?:  =(0 l)     (eval-const s env)
   ?:  (lte l 1)  [%& [%state s]]
   [%& [%act | ~ s]]
@@ -357,50 +506,50 @@
   [%& [%bool p.p.r]]
 ::
 ++  neg-of
-  |=  [lr=(each live-expr aerr) s=sem:sm env=eenv:ne]
+  |=  [lr=(each live-expr aerr) s=sem:sm c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  ?=(%| -.lr)  lr
   ?:  (gth (le-level p.lr) 2)  [%& [%neg p.lr]]
-  (leaf s env)
+  (leaf s (le-level p.lr) env)
 ::
 ++  implies-of
-  |=  [as=(list sem:sm) s=sem:sm env=eenv:ne]
+  |=  [as=(list sem:sm) s=sem:sm c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
-  =/  lr  (ast (hd as) env)
+  =/  lr  (ast (hd as) c env)
   ?:  ?=(%| -.lr)  lr
-  =/  rr  (ast (hd (tl as)) env)
+  =/  rr  (ast (hd (tl as)) c env)
   ?:  ?=(%| -.rr)  rr
-  ?:  (gth (max (le-level p.lr) (le-level p.rr)) 2)
-    [%& [%disj ~[[%neg p.lr] p.rr]]]
-  (leaf s env)
+  =/  l  (max (le-level p.lr) (le-level p.rr))
+  ?:  (gth l 2)  [%& [%disj ~[[%neg p.lr] p.rr]]]
+  (leaf s l env)
 ::
 ::  +|  parseLiveness: negate the properties, conjoin the fairness
 ::
 ++  parse-liveness
-  |=  [props=(list sem:sm) fair=(list sem:sm) env=eenv:ne]
+  |=  [props=(list sem:sm) fair=(list sem:sm) c=actx env=eenv:ne]
   ^-  (each (unit live-expr) aerr)
-  =/  fcr  (ast-list fair env)
+  =/  fcr  (ast-list fair c env)
   ?:  ?=(%| -.fcr)  fcr
   =/  fc  p.fcr
   ?~  props
     ?~  fc  [%& ~]
     [%& `[%conj fc]]
   ?~  t.props
-    =/  lr  (ast i.props env)
+    =/  lr  (ast i.props c env)
     ?:  ?=(%| -.lr)  lr
     ?~  fc  [%& `[%neg p.lr]]
     [%& `[%conj (weld-le fc ~[[%neg p.lr]])]]
-  =/  nlr  (neg-list props env)
+  =/  nlr  (neg-list props c env)
   ?:  ?=(%| -.nlr)  nlr
   =/  nd=live-expr  [%disj p.nlr]
   ?~  fc  [%& `nd]
   [%& `[%conj (weld-le fc ~[nd])]]
 ::
 ++  neg-list
-  |=  [l=(list sem:sm) env=eenv:ne]
+  |=  [l=(list sem:sm) c=actx env=eenv:ne]
   ^-  (each (list live-expr) aerr)
   ?~  l  [%& ~]
-  =/  hr  (ast i.l env)
+  =/  hr  (ast i.l c env)
   ?:  ?=(%| -.hr)  hr
   =/  tr  $(l t.l)
   ?:  ?=(%| -.tr)  tr
@@ -833,9 +982,10 @@
 ++  normalize
   ::  the OrderOfSolutions for a spec's PROPERTY list under its fairness, or a
   ::  typed rejection (a non-boolean constant leaf). `env` folds constant leaves
-  |=  [props=(list sem:sm) fair=(list sem:sm) env=eenv:ne]
+  |=  [props=(list sem:sm) modn=@t fair=(list sem:sm) env=eenv:ne]
   ^-  (each (list oos) aerr)
-  =/  lr  (parse-liveness (drop-box-state props) fair env)
+  =/  c=actx  [modn 0]
+  =/  lr  (parse-liveness (drop-box-state props) fair c env)
   ?:  ?=(%| -.lr)  lr
   ?~  p.lr  [%& ~]
   =/  nf  (to-dnf (simplify u.p.lr))

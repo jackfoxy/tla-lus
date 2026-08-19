@@ -349,7 +349,7 @@
 ++  test-tlc-liveness-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'Github1389 -> crash'  'Github1389Violated -> crash'  'Github1389ViolatedB -> crash'  'Github710d -> Error: Temporal property NeverThree was violated.'  'Github710e -> crash'  'Test2a -> crash'
+    :~  'Github710d -> Error: Temporal property NeverThree was violated.'  'Github710e -> Error: Temporal property VisitsTwoThenStaysSmall was violated.'
     ==
   !>
   %-  tlc-batch-run

@@ -173,6 +173,17 @@ never bail. Any reduced mismatch discovered by fuzzing is saved as a
 regression fixture under the appropriate `test-data/` corpus so it becomes a
 permanent tier-1 case.
 
+**The invariant is enforced for the front end only** (3 arms, lexer + parser).
+Every stage past it — config validation, the semantic graph, the evaluator, the
+temporal normalizer, action generation, persisted-cursor decoding — is expected
+to hold the same contract and is not fuzzed. That gap is not hypothetical:
+R1.6.0 measured `+ast:temporal` **bailing** (`%tlc-live-wrong-formula-format`)
+on five ordinary `test-model` specs, because a user-defined operator falls
+through its name dispatch to a level-based leaf. A typed rejection would have
+been correct there; a bail is what the front-end fuzzer exists to forbid.
+Extending the fuzzer past the parser is R1.2, and the surfaces above are its
+targets in that order.
+
 ## Adding a case
 
 1. Put the source fixture under the matching `test-data/<stage>/` corpus.

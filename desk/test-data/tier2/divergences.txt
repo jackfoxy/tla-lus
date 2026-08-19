@@ -11,13 +11,9 @@
 # 0 disagree with TLC (14/14 agree):
 
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
-# 6 disagree with TLC (3/9 agree):
-tlc-liveness-batch	Github1389 -> crash	PEM classification: %tlc-live-wrong-formula-format bail (EC 2214 fallback reached on a formula tlc2 handles)
-tlc-liveness-batch	Github1389Violated -> crash	PEM classification: %tlc-live-wrong-formula-format bail
-tlc-liveness-batch	Github1389ViolatedB -> crash	PEM classification: %tlc-live-wrong-formula-format bail
+# 2 disagree with TLC (7/9 agree):
 tlc-liveness-batch	Github710d -> Error: Temporal property NeverThree was violated.	deadlock-vs-liveness precedence: TLC reports `Deadlock reached`, the port reports the temporal violation (same 4 distinct states)
-tlc-liveness-batch	Github710e -> crash	PEM classification: %tlc-live-wrong-formula-format bail
-tlc-liveness-batch	Test2a -> crash	PEM classification: %tlc-live-wrong-formula-format bail
+tlc-liveness-batch	Github710e -> Error: Temporal property VisitsTwoThenStaysSmall was violated.	deadlock-vs-liveness precedence: TLC reports `Deadlock reached`, the port reports the temporal violation (same 3 distinct states)
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
 # 0 disagree with Java (295/295 agree):

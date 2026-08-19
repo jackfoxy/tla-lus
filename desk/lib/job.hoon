@@ -1173,7 +1173,7 @@
       ?~  pp  [%& ~]
       =/  psb  (sem-body:check defs u.pp)
       ?~  psb  [%| [0 (rap 3 ~['no definition for PROPERTY ' u.pp])]]
-      (oss-of:check ~[u.psb] ~ (make-env:ne defs consts vars))
+      (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=sim-opts:check
       [actions invs p.osr ?~(pp '' u.pp) defs consts vars order num.mode dep]
@@ -1211,7 +1211,7 @@
       ==
     ::  normalize the property into the 8.1 OrderOfSolution form (no fairness in
     ::  %init-next mode); a non-boolean/unsupported leaf is a typed rejection
-    =/  osr  (oss-of:check ~[u.psb] ~ (make-env:ne defs consts vars))
+    =/  osr  (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=bfs-opts:check
       [u.nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
