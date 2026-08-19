@@ -607,12 +607,27 @@
   ::  %limited rather than a verdict on a partial graph, and never hangs.
   |=  [is=(list state) o=bfs-opts]
   ^-  [g=graph capped=?]
+  =/  r  (build-graph-out is o)
+  [g.r capped.r]
+::
+++  build-graph-out
+  ::  +build-graph-cap that also returns the search OUTCOME. The liveness path
+  ::  needs it: tlc2 finds a DEADLOCK in the state search (ModelChecker.doNext)
+  ::  and aborts the run there, so the final liveness check never runs. The port
+  ::  built the temporal graph with deadlock checking OFF and went straight to
+  ::  the liveness report, which is why `Github710d`/`Github710e` reported a
+  ::  temporal violation where TLC reports `Deadlock reached` over the same
+  ::  state count (R1.6.6). `+bfs-step` stops at the first deadlock, so the
+  ::  graph is complete exactly when the outcome is not one.
+  |=  [is=(list state) o=bfs-opts]
+  ^-  [g=graph capped=? out=outcome]
   =/  cur  (bfs-init is)
-  |-  ^-  [g=graph capped=?]
+  |-  ^-  [g=graph capped=? out=outcome]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    :-  [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
-    ?=(%limited -.out.r)
+    :+  [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+      ?=(%limited -.out.r)
+    out.r
   $(cur cur.r)
 ::
 ::  +|  Seeded Simulation (bounded, reproducible, resumable)
@@ -1872,13 +1887,25 @@
     ::  whose state space is finite only under its constraint (test-model's
     ::  `LivenessConstraintWarning`: `history' = history \o <<pc>>` bounded by
     ::  `Len(history) < 3`) grew without bound here until R1.8.1.4 passed them.
+    ::  DEADLOCK CHECKING IS ON here (R1.6.6). tlc2 reaches a deadlock in the
+    ::  state search and aborts the run, so the final liveness check never runs:
+    ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
+    ::  violation the port used to report over the same state count.
     =/  o=bfs-opts
-      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | live-graph-cap 0]
-    =/  bg    (build-graph-cap is.c o)
+      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0]
+    =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
       :-  'Model checking stopped: state limit reached.'
       (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
+    ::  a deadlock (or a typed evaluation failure) is the state search's own
+    ::  verdict and pre-empts the liveness report, exactly as it pre-empts
+    ::  tlc2's final check
+    ?:  ?=(?(%deadlock %error) -.out.bg)
+      %-  render-outcome
+      :*  out.bg  nl.c  (get-actions nsb.c 'Next' defs.c)
+          (make-env:ne defs.c consts.c vars.c)  order.c  modn
+      ==
     =/  r
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c

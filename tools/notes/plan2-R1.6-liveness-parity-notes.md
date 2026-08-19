@@ -338,3 +338,96 @@ on the crossing.
 `liveness-product` **15/15**, `liveness-{verdict,lasso,message,accept}`, `temporal-struct`,
 `tableau`, `mc`, `sim-live`, `sim`, `sim-stats`, `job`, `stream`, `spec-decomp`, `trace` and
 `tier2` all green. No full suite (deferred to `.7`).
+
+## R1.6.5 — the fairness differential is not reachable, and here is what pins the row instead
+
+### What the increment was scoped as, and why it cannot be built
+
+`.0` scoped `.5` as "project the accepting decision per candidate component from
+`LiveWorker.checkComponent`, and compare `+pem-accepting` against it over the corpus instead of
+over 7 hand-built cases". Against the pinned jar that projection does not exist:
+
+- `LiveWorker.checkComponent` is **private**, and its only externally visible effect is a
+  counterexample — it reports nothing about components it checked and rejected.
+- The single public signal is `LiveWorker.STATS`, a `BucketStatistics` histogram fed by one
+  `addSample(com.size())` at `LiveWorker.java:587`. It carries component **sizes**, not decisions,
+  and only in aggregate across the whole run.
+
+A harness was built anyway to measure how much that histogram is worth. Over the 16-case corpus,
+**11 cases record exactly one checked component (size 1 or 2) and 5 record none**. Two things
+follow, and both argue against shipping it:
+
+1. `wf-absent-viol` is a stuttering **violation** that records **no checked component at all** —
+   independent confirmation, from a completely different signal, of the difference `.3` recorded:
+   tlc2 detects stuttering **outside** `checkComponent` (`LiveWorker.isStuttering`), where the port
+   grants stuttering in the graph and lets the ordinary SCC search find it.
+2. Because of that same approved difference, the port's `+scc-accepting` sees a self-loop on every
+   singleton and so calls `+pem-accepting` on components tlc2 never examines. The two histograms
+   differ by design, broadly, and a differential over them would have to be filtered on most of
+   the corpus — which is the thing this unit's plan warns against.
+
+The harness was therefore reverted rather than committed. What it measured is recorded here.
+
+### What actually pins `tlc-live-fairness`
+
+The acceptance decision is differentially pinned, just not per candidate component:
+
+- **Its inputs**, completely, as of `.2` and `.3`: the per-node `checkState` bits and per-edge
+  `checkAction` bits (`PNODE`/`PEDGE`), the tableau particles and promises (`TBGRAPH`), and the
+  PEM decomposition itself (`PEMS`/`CHECKSTATE`/`CHECKACTION` and the `OrderOfSolution.toString`
+  rendering). Every operand `+pem-accepting` reads is compared byte-for-byte against the pin.
+- **Its output**, on every corpus case: `liveness-verdict` (does any PEM accept) and
+  `liveness-lasso` (which component did, and its `CLASS`). A wrong accepting decision changes one
+  of those.
+
+So the row is at parity for everything the oracle exposes. The residue is precise and, against
+this pin, unobservable: **the decision on candidate components that were checked and rejected**.
+Closing it would need a patched tlc2, which is out of scope — the pin is the contract.
+
+`tests/lib/liveness-accept`'s 7 hand-built cases stay as the direct structural test of
+`+pem-accepting` (fair/unfair, EAAction-every-edge, AEState/AEAction-some, promise discharge,
+multi-conjunct), now sitting on top of oracle-pinned inputs rather than hand-built ones.
+
+## R1.6.6 — deadlock-vs-liveness precedence
+
+### The cause was one flag
+
+`check:check`'s liveness path built its state graph with the deadlock flag hard-wired to `|`:
+
+```
+[nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | live-graph-cap 0]
+                                                              ^ deadlock off
+```
+
+and then went straight to `+live-report`. tlc2 reaches a deadlock in the state search
+(`ModelChecker.doNext`) and **aborts the run there**, so its final liveness check never runs. On
+`Github710d` and `Github710e` — both `Step == x < 3 /\ x' = x + 1`, so `x = 3` has no successor —
+TLC reports `Error: Deadlock reached.` where the port reported a temporal violation over the
+identical state count.
+
+### The fix, and why it is one pass and not two
+
+The flag now comes from the config (`ddl.c`), and a new `+build-graph-out` returns the search
+**outcome** alongside the graph. A `%deadlock` (or a typed `%error`) is rendered through
+`+render-outcome`, the same terminal renderer `+safety-run` uses, and pre-empts the liveness report.
+
+`+bfs-step` stops at the first deadlock, so the graph is complete exactly when the outcome is *not*
+one — which means the deadlock check costs nothing extra: no second exploration pass is needed, and
+the liveness build is unchanged whenever there is no deadlock. `+build-graph-cap` is now a thin
+wrapper over `+build-graph-out`, so the other five liveness graph builds are untouched.
+
+### Result: the census is empty
+
+**The tier-2 liveness batch is 9/9** and `TLC_LIVENESS_DIVERGENCES` is `[]`, which the
+`test-tlc-liveness-batch` arm now asserts. That is R1.6's stated definition of done: a test flip,
+not a judgment call.
+
+Green: `liveness-{verdict,lasso,message,product}`, `mc`, `sim-live`, `job`, `spec-decomp`, `tier2`.
+No full suite (deferred to `.7` by instruction).
+
+### Note on the environment
+
+The `tla-zod` tmux session was gone at the start of this increment (a harness teardown kills it, as
+`[[tla-lus-dev-environment]]` records). Restarted with `tmux new-session -d -s tla-zod -x 220 -y 50`
+then `/mnt/mars/piers/tla-zod/.run /mnt/mars/piers/tla-zod`; no stale `.vere.lock`, ~60 s to a
+prompt including replay. The scratchpad helper scripts are session-scoped and had to be rewritten.

@@ -336,24 +336,14 @@ TLC_BATCH_REASONS = {}
 # and the arm ASSERTS this exact list, so a new divergence (or a fixed one)
 # fails the test rather than passing unnoticed.
 #
-# 7 of 9 agree. R1.6.1 built the user-defined-operator branch of
-# `astToLiveAppl`, which the port had been missing entirely, and the five
-# `%tlc-live-wrong-formula-format` bails went with it: four now agree, and
-# `Github710e` reaches a verdict and lands on the SAME deadlock-vs-liveness
-# precedence difference as `Github710d`. Both remaining entries are that one
-# cause (R1.6.6), on identical state counts.
-TLC_LIVENESS_DIVERGENCES = [
-    "Github710d -> Error: Temporal property NeverThree was violated.",
-    "Github710e -> Error: Temporal property VisitsTwoThenStaysSmall was violated.",
-]
+# 9 of 9 agree. R1.6 closed the batch: R1.6.1 built the user-defined-operator
+# branch of `astToLiveAppl` (five `%tlc-live-wrong-formula-format` bails), and
+# R1.6.6 turned deadlock checking ON for the liveness graph build, so a deadlock
+# reached in the state search pre-empts the final liveness check exactly as it
+# does in tlc2 (`Github710d`/`Github710e`).
+TLC_LIVENESS_DIVERGENCES = []
 # grouped cause, keyed by module
-TLC_LIVENESS_REASONS = {
-    # Precedence, not a wrong answer: both find the same distinct states, but
-    # tlc2 stops at the deadlock it reaches first and the port reports the
-    # temporal violation.
-    "Github710d": "deadlock-vs-liveness precedence: TLC reports `Deadlock reached`, the port reports the temporal violation (same 4 distinct states)",
-    "Github710e": "deadlock-vs-liveness precedence: TLC reports `Deadlock reached`, the port reports the temporal violation (same 3 distinct states)",
-}
+TLC_LIVENESS_REASONS = {}
 # `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE
 # (no verdict in 480 s where TLC answers in 1.8 s over 5 distinct states). Root
 # cause found and fixed in R1.8.1.4 rather than censused: every liveness graph

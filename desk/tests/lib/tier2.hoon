@@ -349,8 +349,7 @@
 ++  test-tlc-liveness-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'Github710d -> Error: Temporal property NeverThree was violated.'  'Github710e -> Error: Temporal property VisitsTwoThenStaysSmall was violated.'
-    ==
+    ~
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])
