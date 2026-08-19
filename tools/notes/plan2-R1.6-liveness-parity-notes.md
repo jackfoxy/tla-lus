@@ -431,3 +431,50 @@ The `tla-zod` tmux session was gone at the start of this increment (a harness te
 `[[tla-lus-dev-environment]]` records). Restarted with `tmux new-session -d -s tla-zod -x 220 -y 50`
 then `/mnt/mars/piers/tla-zod/.run /mnt/mars/piers/tla-zod`; no stale `.vere.lock`, ~60 s to a
 prompt including replay. The scratchpad helper scripts are session-scoped and had to be rewritten.
+
+## R1.6.7 — close-out
+
+### The ledger
+
+**All ten `tlc-live-*` rows are terminal; unit 8 has no `partial` left.**
+
+| row | before R1.6 | after |
+|---|---|---|
+| `tlc-live-normalize` | `partial` (demoted by R1.8.1.4's batch) | `approved-difference` |
+| `tlc-live-tableau` | `partial` — no projection past a node count | **`parity`** |
+| `tlc-live-product` | `partial` — no projection past node/init counts | `approved-difference` |
+| `tlc-live-fairness` | `partial` — no differential at all | **`parity`** |
+
+Ledger 72 parity / 13 approved-difference / 9 partial / 112 terminal. The two approved differences
+are written up in `compatibility.md`: stuttering granted in the graph rather than in the acceptance
+search (`.3`), and `+expand-cap` bounding recursive expansion where tlc2 relies on the JVM stack
+(`.1`).
+
+### The definition of done was a test flip, and it flipped
+
+`TLC_LIVENESS_DIVERGENCES` is `[]` and `test-tlc-liveness-batch` asserts that exactly, so the tier-2
+liveness batch is **9/9**. `tools/tier2.py`'s summary line was corrected at `.6` — it had still
+claimed "3/9 agree … 6 frozen divergences" from R1.8.1.4.
+
+### Gates
+
+Full ship suite `-test /=tla-lus=/tests ~` **`ok=%.y`, 1758 OK, 0 FAILED / 0 CRASHED, 0 build
+errors**; `tier2.py --check` byte-reproducible from the pins; `check-parity.py --check` well-formed.
+
+### What this unit is worth remembering for
+
+Two of the four increments that mattered were **oracle** work, not Hoon work, and both paid the way
+R1.4's `EvalDump` and R1.5.10's `StreamDump` did: replacing a count with a structure immediately
+exposed defects the count could not see — a stutter successor discovering product nodes the verdict
+was not computed on, duplicate edges, and the home of an alpha-closure bug that had previously been
+found only by inference from a product count.
+
+The third lesson is `.5`'s: an increment can be **completed by measuring that it cannot be built**.
+`checkComponent` is private and the only public signal carries no decision, so the honest close was
+to name what pins the row instead (its inputs, completely, and its outputs on every case) and to
+name the residue that is unobservable against this pin — rather than ship a differential filtered
+across most of the corpus.
+
+And `.0`'s: the plan's central assumption — five bails in two families — was wrong, and eight
+characters of instrumentation in a bail label turned five opaque failures into five spans pointing
+at one missing branch. A bail that names only its error class costs a debugging cycle to re-derive.
