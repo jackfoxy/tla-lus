@@ -285,16 +285,34 @@ TLC_BATCH = [
     "SubsetEq", "SubseteqNextState", "TraceWithLargeSetOfInitialStatesTest",
 ]
 
-# NB (R1.1.8 -> R1.5.5): a TLC LIVENESS batch was DEFERRED because the raw
-# `check:check` entry had no state cap, so a liveness spec with a large / looping
-# Hoon state graph hung the arm (mule catches a bail, not an infinite loop).
+# R1.8.1.4: the TLC LIVENESS batch, deferred since R1.1.8 and re-deferred by
+# R1.5.7, is now WIRED. Its two historical blockers are both discharged:
 # R1.5.5 threaded a distinct-state cap through the temporal `build-graph` path of
-# `run-check`/`check` (`build-graph-cap` + `live-graph-cap`): a capped build now
-# yields %limited instead of hanging, so the graph-SIZE hang is fixed. R1.5.7 then
-# wired and ship-ran a curated liveness batch and hit a SECOND, orthogonal blocker
-# (see the NB after TLC_BATCH_REASONS): a per-state value-core EVAL blowup hard-bails
-# `check:check` (uncatchable by `mule`) on some SPECIFICATION-form / multi-PROPERTY
-# specs, aborting the arm. The batch stays deferred on that value-core hardening.
+# `run-check`/`check` (`build-graph-cap` + `live-graph-cap`), so a looping graph
+# yields %limited instead of hanging; and the uncatchable value-core bail R1.5.7
+# recorded does NOT reproduce (measured in R1.8.1.0 — every SPECIFICATION-form
+# case returns a verdict; R1.3.8's `$CartesianProd` fix is the likely cause).
+# R1.8.1.1 then supplied what the batch was really waiting on: fairness extraction
+# from a SPECIFICATION, without which every liveness property has a stuttering
+# counterexample and the port reports `violated` for all of them.
+#
+# Membership is derived the same way TLC_BATCH's is, one axis over: a flat
+# single-file test-model spec, `check`-class (its EXTENDS closure stays inside
+# the ported StandardModules), with a `PROPERTY`/`PROPERTIES` in its .cfg, whose
+# oracle verdict is an ordinary run outcome with state counts. Specs whose oracle
+# is a TLC exception or a temporal-handling message stay out of a verdict+count
+# comparison, exactly as they do for the safety batch:
+#   EmptyOrderOfSolutions (tautology), Github1389Loops / Github1389StateGuard
+#   (Java StackOverflowError), Github525 / Github742 ("TLC cannot handle the
+#   temporal formula"), Github607 (nested-evaluation error), testinvalidinvariant
+#   (EC 2146 config rejection), Test2 (postcondition failure), TLCGetLevel /
+#   TLCGetNonDeterminism (TLCGet-driven), and UserModuleOverride[Annotation]
+#   (a user-supplied Java override class, which has no port analogue).
+TLC_LIVENESS_BATCH = [
+    "Github1037", "Github1389", "Github1389Violated", "Github1389ViolatedB",
+    "Github710d", "Github710e", "Github715", "LivenessConstraintWarning",
+    "Test2a",
+]
 
 # TLC safety batch modules whose Hoon check disagrees with TLC.
 # Frozen from the ship run, in TLC_BATCH order (the arm returns processing
@@ -312,16 +330,50 @@ TLC_BATCH_DIVERGENCES = []
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {}
 
-# NB (R1.5.7): a tier-2 TLC LIVENESS batch (clean single-file test-model specs
-# with a temporal PROPERTY) was wired and ship-run, and surfaced a SECOND, deeper
-# blocker beyond R1.1.8's unbounded graph (which R1.5.5 fixed with `live-graph-cap`):
-# some SPECIFICATION-form / multi-PROPERTY liveness specs (from the small clean set
-# Github1037/1389ViolatedB/710d/710e/715/725b/725f/LivenessConstraintWarning/Test2a)
-# HARD-bail inside the value core during `check:check` — a bail `mule` does not
-# catch, which aborts the whole test arm and floods the dojo. R1.5.5 bounds the
-# GRAPH SIZE (distinct-state count); this is a per-state EVALUATION blowup, an
-# orthogonal value-core hardening task. The batch is therefore not yet wired; the
-# unblock condition is that value-core hardening, not the graph bound.
+# Liveness batch modules whose Hoon check disagrees with TLC, frozen from the
+# ship run in TLC_LIVENESS_BATCH order (the arm returns processing order via
+# +flop). Same census discipline as the safety batch: listed, not silenced --
+# and the arm ASSERTS this exact list, so a new divergence (or a fixed one)
+# fails the test rather than passing unnoticed.
+#
+# 3 of 9 agree. This is what re-enabling the batch actually measured, and what
+# remains is liveness-engine behavior, not decomposition: R1.8.1 supplied the
+# SPECIFICATION fairness these specs need (without it every one would report a
+# stuttering violation) and R1.8.1.4 fixed the constraint hole below, and with
+# those three now match.
+TLC_LIVENESS_DIVERGENCES = [
+    "Github1389 -> crash",
+    "Github1389Violated -> crash",
+    "Github1389ViolatedB -> crash",
+    "Github710d -> Error: Temporal property NeverThree was violated.",
+    "Github710e -> crash",
+    "Test2a -> crash",
+]
+# grouped cause, keyed by module
+TLC_LIVENESS_REASONS = {
+    # `+class-default:temporal` bails `%tlc-live-wrong-formula-format` (tlc2's
+    # EC 2214) on a conjunct that contains an action and matches none of the
+    # recognized PEM shapes. tlc2 accepts these formulas and runs to a verdict,
+    # so the port is reaching its fallback where tlc2 has a case. A bail, not a
+    # typed rejection, so it is a crash rather than a diagnostic.
+    "Github1389": "PEM classification: %tlc-live-wrong-formula-format bail (EC 2214 fallback reached on a formula tlc2 handles)",
+    "Github1389Violated": "PEM classification: %tlc-live-wrong-formula-format bail",
+    "Github1389ViolatedB": "PEM classification: %tlc-live-wrong-formula-format bail",
+    "Github710e": "PEM classification: %tlc-live-wrong-formula-format bail",
+    "Test2a": "PEM classification: %tlc-live-wrong-formula-format bail",
+    # Precedence, not a wrong answer: both find the same 4 distinct states, but
+    # tlc2 stops at the deadlock it reaches first and the port reports the
+    # temporal violation.
+    "Github710d": "deadlock-vs-liveness precedence: TLC reports `Deadlock reached`, the port reports the temporal violation (same 4 distinct states)",
+}
+# `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE
+# (no verdict in 480 s where TLC answers in 1.8 s over 5 distinct states). Root
+# cause found and fixed in R1.8.1.4 rather than censused: every liveness graph
+# build in `lib/check` passed `~` for the model CONSTRAINT / ACTION_CONSTRAINT,
+# so a spec finite only under its constraint (`history' = history \o <<pc>>`
+# bounded by `Len(history) < 3`) grew without bound; and `+succ-fps:liveness`
+# took the raw next-state relation, so once the graph WAS pruned the product
+# build crashed `~(got by states)` on a constrained successor. It now agrees.
 
 
 # R1.1.6: subdir SANY specs. Tests cannot scry Clay (the framework passes no
@@ -537,10 +589,23 @@ def write_sany_shard():
         "  (crip (slag (add 2 i.ix) t))",
         "++  tlc-sum",
         "  ::  verdict line + the distinct/queue counts (trace labels/depth are a",
-        "  ::  safety `partial` residue, compared in a later increment)",
+        "  ::  safety `partial` residue, compared in a later increment). The",
+        "  ::  verdict is SELECTED, not taken as the first line: tlc2 prints",
+        "  ::  warnings (EC 2255 state-level PROPERTY, 2279 symmetry) BEFORE it,",
+        "  ::  and the Java side of this comparator already skips them",
+        "  ::  (`tlc_summary`). Taking `i.w` compared a warning against a verdict",
+        "  ::  and read as a port divergence -- surfaced by R1.8.1.4's liveness",
+        "  ::  batch, the first specs here that warn.",
         "  |=  w=wain",
         "  ^-  (list @t)",
-        "  :~  ?~(w '' i.w)",
+        "  :~  =/  v",
+        "        %+  skim  w",
+        "        |=  l=@t",
+        "        =/  t  (trip l)",
+        "        ?|  =(\"Model checking completed\" (scag 24 t))",
+        "            =(\"Error:\" (scag 6 t))",
+        "        ==",
+        "      ?~(v '' i.v)",
         "      =/  c  (skim w |=(l=@t ?=(^ (fand \"distinct states found\" (trip l)))))",
         "      ?~(c '' (drop-gen i.c))",
         "  ==",
@@ -665,6 +730,33 @@ def write_sany_shard():
         lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
                      f"'{hcord(cfg_text)}']")
     lines += ["  =="]
+    # the batch TLC LIVENESS runner (R1.8.1.4) — same comparator, one axis over
+    if TLC_LIVENESS_DIVERGENCES:
+        lexpect = ["    :~  " + "  ".join(f"'{d}'"
+                                          for d in TLC_LIVENESS_DIVERGENCES),
+                   "    =="]
+    else:
+        lexpect = ["    ~"]
+    lines += [
+        "::",
+        "++  test-tlc-liveness-batch",
+        "  %+  expect-eq",
+        "    !>  ^-  (list @t)",
+        *lexpect,
+        "  !>",
+        "  %-  tlc-batch-run",
+        "  ^-  (list [@t (list @t) @t @t])",
+        "  :~",
+    ]
+    for module in TLC_LIVENESS_BATCH:
+        verdict, counts = tlc_summary(module, TESTMODEL, f"{module}.cfg")
+        dist = counts.split(", ", 1)[1] if ", " in counts else counts
+        spec_text = read(TESTMODEL / f"{module}.tla")
+        cfg_text = read(TESTMODEL / f"{module}.cfg")
+        exp = f"~['{hcord(verdict)}' '{hcord(dist)}']"
+        lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
+                     f"'{hcord(cfg_text)}']")
+    lines += ["  =="]
     lines.append("--")
     (REPO / "desk/tests/lib/tier2.hoon").write_text("\n".join(lines) + "\n")
     print(f"  sany shard: {len(SANY_CURATED)} cases -> tests/lib/tier2.hoon")
@@ -705,6 +797,17 @@ def write_sany_shard():
     for d in TLC_BATCH_DIVERGENCES:
         mod = d.split(" -> ")[0]
         dl.append(f"tlc-batch\t{d}\t{TLC_BATCH_REASONS.get(mod, '')}")
+    nlive = len(TLC_LIVENESS_BATCH)
+    dl += [
+        "",
+        f"# tlc-liveness-batch (R1.8.1.4): {nlive} clean single-file test-model "
+        "specs with a temporal PROPERTY through check:check;",
+        f"# {len(TLC_LIVENESS_DIVERGENCES)} disagree with TLC "
+        f"({nlive - len(TLC_LIVENESS_DIVERGENCES)}/{nlive} agree):",
+    ]
+    for d in TLC_LIVENESS_DIVERGENCES:
+        mod = d.split(" -> ")[0]
+        dl.append(f"tlc-liveness-batch\t{d}\t{TLC_LIVENESS_REASONS.get(mod, '')}")
     nsub = len(sany_subdir_specs())
     dl += [
         "",

@@ -311,3 +311,81 @@ Per-module `mod!lhs <- rhs` substitution checks (they need each non-root module'
 where the graph exposes the root plus its `EXTENDS` imports); `OpRcdValue.toString()` in a 2230
 body; and 2281's addendum when the body is non-constant because it is **temporal** (EC 2261
 there, with tlc2's abbreviated expression rendering).
+
+## R1.8.1.4 — close-out: the tier-2 liveness batch
+
+### The deferral was hiding more than it said
+
+The batch had been deferred twice (R1.1.8 on an unbounded graph, R1.5.7 on an "uncatchable
+value-core bail"), and `.0` discharged the second by measuring that the bail no longer reproduces
+— on the **mc corpus**. Wiring the real thing showed that measurement did not generalize: of the
+nine test-model liveness specs, **five bail, one diverges, one did not terminate**, and only two
+agreed at first contact.
+
+Membership is derived, not listed: a flat single-file test-model spec, `check`-class, with a
+`PROPERTY`/`PROPERTIES` in its `.cfg`, whose oracle verdict is an ordinary run outcome with state
+counts. Eleven further candidates are excluded on the same rule the safety batch uses (a TLC
+exception or a temporal-handling message is not a verdict+count comparison) and each is named in
+the generator.
+
+### The comparator was measuring the wrong line
+
+Two of the "divergences" were not divergences. `+tlc-sum` took `i.w` — the wain's **first** line —
+as the verdict, while the Java side of the same comparator (`tlc_summary`) *selects* the line
+starting `Model checking completed` or `Error:`. No safety spec prints anything before its
+verdict, so the two had never disagreed; R1.8.1.2's new EC 2255 warning ("a state-level PROPERTY
+is only checked in the initial state") is the first thing that does, and it made `Github715` read
+as a port divergence when the port's own verdict was right underneath. `+tlc-sum` now selects the
+verdict the same way the Java side does.
+
+### Two real bugs, found by one non-terminating spec
+
+`LivenessConstraintWarning` builds an unbounded `history` sequence bounded **only** by its
+`CONSTRAINT Len(history) < 3`. TLC answers in 1.8 s over 5 distinct states; the port produced no
+verdict in 480 s. Two independent holes, both closed here:
+
+1. **Every liveness graph build dropped the model constraint.** All six sites in `lib/check`
+   passed `~ ~ ~` for `invs`/`cons`/`acons` (the safety and implied-action paths pass them). tlc2
+   never enqueues a constrained state, so liveness runs over the constrained graph. Without it the
+   state space is infinite and `live-graph-cap` only converts the hang into a very slow `%limited`.
+2. **The product build then crashed on the pruned graph.** `+succ-fps:liveness` returned the raw
+   next-state relation and the caller did `~(got by states)` on each successor — fine while the
+   graph was closed under that relation, fatal once it is not. `+succ-fps` now takes `states` and
+   drops successors absent from it, which is what a constrained edge *is*.
+
+Neither is reachable without a CONSTRAINT, and no mc or liveness corpus case has one — which is
+why a 9-spec batch found what 16 liveness fixtures could not.
+
+### What the batch measures now: 3 of 9
+
+| spec | outcome |
+|---|---|
+| `Github1037`, `Github715`, `LivenessConstraintWarning` | agree |
+| `Github1389`, `Github1389Violated`, `Github1389ViolatedB`, `Github710e`, `Test2a` | bail `%tlc-live-wrong-formula-format` |
+| `Github710d` | port reports the temporal violation, TLC reports `Deadlock reached` (same 4 distinct states) |
+
+The six are **frozen and asserted** by the arm, not silenced: a new divergence — or a fixed one —
+fails the test. They are liveness-engine behavior, not decomposition: R1.8.1.1 supplied the
+SPECIFICATION fairness every one of these specs needs (without it they would all report a
+stuttering violation), and it is what lets three of them match at all.
+
+`+class-default:temporal` bails where tlc2 has a case. `Github1389` is upstream's own regression
+test for **recursive operators with temporal bodies**, which tlc2's `Liveness.astToLive` expands
+during tableau construction; the port has no such expansion, so the formula reaches the PEM
+fallback. That demotes `tlc-live-normalize` from `approved-difference` to `partial` — a terminal
+row that bails on in-scope specs was overstated, and the batch is what surfaced it.
+
+### Gates
+
+Full ship suite `-test /=tla-lus=/tests ~` **`ok=%.y`, 1732 OK, 0 FAILED / 0 CRASHED, 0 build
+errors**; `tier2.py --check` byte-reproducible from the pins; `check-parity.py --check` well-formed
+(70 parity / 11 approved-difference / 13 partial / 108 terminal).
+
+### Ledger
+
+Only one of the unit's four rows closes. `tlc-safety-assume` reaches `parity`. `cfg-validate`,
+`cfg-runspec` and `check-opt-cfg` stay `partial` on residues that are now small and precisely
+named — the per-module `<-` substitution checks, `OpRcdValue.toString()` in a 2230 body, EC 2281's
+temporal addendum, and the job kernel's sliced liveness report omitting the 2257/2259 hint. The
+plan's definition of done expected all four; the evidence supports one, and the honest ledger is
+worth more than the flip.

@@ -48,14 +48,23 @@
 ::
 ++  succ-fps
   ::  the fingerprints of a state's successors (the next-state relation, keyed
-  ::  in variable-declaration order); an evaluation failure yields none
-  |=  [s0=state:ne nsb=sem:sm env=eenv:ne order=(list @t)]
+  ::  in variable-declaration order); an evaluation failure yields none.
+  ::
+  ::  Successors ABSENT from the reachable graph are dropped. Without a model
+  ::  CONSTRAINT the graph is closed under this relation, so that is a no-op;
+  ::  with one, tlc2 never enqueues the constrained state, so the edge does not
+  ::  exist for liveness either. The product build used to take the raw relation
+  ::  and then `~(got by states)` the successor, which crashes on a constrained
+  ::  spec (test-model's `LivenessConstraintWarning`). R1.8.1.4
+  |=  [s0=state:ne nsb=sem:sm env=eenv:ne order=(list @t) states=(map @t state:ne)]
   ^-  (list [fp=@t st=state:ne])
   =/  r  (next-states:ne s0 nsb env)
   ?:  ?=(%| -.r)  ~
   |-  ^-  (list [fp=@t st=state:ne])
   ?~  p.r  ~
-  [[(@t (state-fp:fpl order i.p.r)) i.p.r] $(p.r t.p.r)]
+  =/  fp  `@t`(state-fp:fpl order i.p.r)
+  ?.  (~(has by states) fp)  $(p.r t.p.r)
+  [[fp i.p.r] $(p.r t.p.r)]
 ::
 ++  build-product
   ::  the product node count and initial-node count for one OrderOfSolution.
@@ -81,7 +90,7 @@
   ?~  q  [~(wyt in seen) (lent init-keys)]
   =/  s0   (~(got by states) fp.i.q)
   =/  t0   (snag-node:tb tidx.i.q nodes.tabg)
-  =/  ss   (succ-fps s0 nsb env order)
+  =/  ss   (succ-fps s0 nsb env order states)
   =/  new  (succ-keys ss t0 tabg seen env)
   =.  seen  (~(gas in seen) new)
   $(q (weld t.q new))
@@ -365,7 +374,7 @@
   =/  s0  (~(got by states) fp.k)
   =/  t0  (snag-node:tb tidx.k nodes.tabg.pc)
   =.  nodes.pc  (~(put by nodes.pc) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  succs  (succ-fps s0 nsb env order)
+  =/  succs  (succ-fps s0 nsb env order states)
   =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env)
   =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen.pc) x)))
   =.  seen.pc  (~(gas in seen.pc) fresh)
@@ -409,7 +418,7 @@
       %+  turn  ~(tap by states)
       |=  [fp0=@t s0=state:ne]
       ^-  (list pedge)
-      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (succ-fps s0 nsb env order)]
+      %+  turn  `(list [fp=@t st=state:ne])`[[fp0 s0] (succ-fps s0 nsb env order states)]
       |=  [fp1=@t s1=state:ne]
       ^-  pedge
       [[fp0 0] [fp1 0] (ca-bits check-action.o s0 s1 env)]

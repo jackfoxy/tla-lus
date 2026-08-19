@@ -1360,7 +1360,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1405,7 +1405,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1423,7 +1423,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1637,7 +1637,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1827,9 +1827,15 @@
     ::  `live-verdict-lines` used `oss.c` and got these same specs right, which
     ::  is why the differential passed while production did not.
     ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
-    ::  on a large/looping state space; a capped build renders %limited
+    ::  on a large/looping state space; a capped build renders %limited.
+    ::  It also PRUNES with the model CONSTRAINT / ACTION_CONSTRAINT, as every
+    ::  liveness graph build here does: tlc2 drops a constrained state before it
+    ::  is enqueued, so liveness runs over the constrained graph, and a spec
+    ::  whose state space is finite only under its constraint (test-model's
+    ::  `LivenessConstraintWarning`: `history' = history \o <<pc>>` bounded by
+    ::  `Len(history) < 3`) grew without bound here until R1.8.1.4 passed them.
     =/  o=bfs-opts
-      [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | live-graph-cap 0]
+      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | live-graph-cap 0]
     =/  bg    (build-graph-cap is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -2032,7 +2038,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ ~ ~ vars.c order.c perms.c defs.c consts.c | cap 0]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]

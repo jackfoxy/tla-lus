@@ -1345,6 +1345,40 @@ Three residues remain, each narrow and each stated rather than papered over:
   because it is **temporal** raises EC 2261 there instead, with tlc2's abbreviated expression
   rendering (`[]A`); the port emits the 2281 sentence with no addendum for that shape.
 
+## Release R1.8.1 — the tier-2 liveness batch, and what it measured
+
+R1.8.1.4 wired the TLC **liveness** batch that had been deferred since R1.1.8 and re-deferred by
+R1.5.7: nine flat single-file `test-model` specs with a temporal `PROPERTY`, run through
+`check:check` and compared to the pinned TLC verdict + distinct-count. **Three of nine agree.**
+The six that do not are frozen in `desk/test-data/tier2/divergences.txt` and **asserted** by the
+`test-tlc-liveness-batch` arm, so a new divergence — or a fixed one — fails the test rather than
+passing unnoticed.
+
+Two of them were closed on the way, and both were invisible to the existing fixtures:
+
+- **The liveness graph build dropped the model CONSTRAINT.** All six liveness graph builds in
+  `lib/check` passed `~` for `CONSTRAINT`/`ACTION_CONSTRAINT` where the safety and implied-action
+  paths pass them. tlc2 never enqueues a constrained state, so its liveness runs over the
+  constrained graph; the port's ran over the unconstrained one, and a spec whose state space is
+  finite only under its constraint did not terminate. Fixed, along with a second bug it exposed:
+  `+succ-fps:liveness` returned the raw next-state relation while its callers did
+  `~(got by states)` on each successor — safe while the graph is closed under that relation, fatal
+  once it is pruned. `+succ-fps` now drops successors absent from the graph, which is what a
+  constrained edge is. Neither bug is reachable without a `CONSTRAINT`, and no `mc` or `liveness`
+  fixture has one.
+- **The comparator was reading the wrong line.** `+tlc-sum` took the first line of the run's output
+  as the verdict, where the Java side of the same comparator selects the `Model checking completed`
+  / `Error:` line. No safety spec prints anything before its verdict; R1.8.1.2's EC 2255 warning is
+  the first that does, and it made a passing spec read as a divergence.
+
+The six remaining divergences are **liveness-engine** behavior, not config decomposition — five
+bail `%tlc-live-wrong-formula-format` (tlc2's EC 2214) in `+class-default:temporal` on formulas
+tlc2 handles, and one is a deadlock-vs-liveness precedence difference on the same state count.
+`Github1389` names the missing mechanism: it is upstream's regression test for RECURSIVE operators
+with temporal bodies, which `Liveness.astToLive` expands during tableau construction. That is why
+`tlc-live-normalize` moved from `approved-difference` to `partial` — a terminal row that bails on
+in-scope specs was overstated, and only running real specs could show it.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

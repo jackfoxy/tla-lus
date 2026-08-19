@@ -75,12 +75,14 @@ def main() -> int:
           "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2, 142/142 agree), a 14-spec "
           "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3/R1.5.9, 14/14 agree), and a "
           "295-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3/R1.3.5/R1.3.7, "
-          "tier2-sub.hoon, 295/295 agree). "
-          "The census is EMPTY: every in-scope spec agrees with the pinned oracle in both "
-          "shards (SANY closed by R1.3.7, the last TLC one by R1.5.9). "
+          "tier2-sub.hoon, 295/295 agree), plus a 9-spec TLC LIVENESS batch "
+          "(R1.8.1.4, 3/9 agree). "
+          "The SANY and TLC-safety census is EMPTY (SANY closed by R1.3.7, the last TLC "
+          "safety one by R1.5.9); the liveness batch carries 6 frozen divergences, which "
+          "the arm asserts exactly, so a new one -- or a fixed one -- fails the test. "
           "Run on the ship: "
           "-test /=tla-lus=/tests/lib/tier2 ~ (and .../tier2-sub ~). "
-          "Known divergences (now none): desk/test-data/tier2/divergences.txt.")
+          "Known divergences: desk/test-data/tier2/divergences.txt.")
     return 0
 
 
