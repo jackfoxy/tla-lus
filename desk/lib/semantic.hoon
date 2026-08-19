@@ -1278,6 +1278,14 @@
       ::  module's own definitions, matching SemDump), only of the
       ::  evaluation environment
       imports=(list sem-def)
+      ::  per-definition levelParams emptiness (OpDefNode.levelParams, which
+      ::  for an arity-0 operator IS its body's — OpDefNode.java:1123 adds the
+      ::  body's and then removes the formals). SpecProcessor selects between
+      ::  the two EC 2146 message variants on this EMPTINESS, not on the level
+      ::  (SpecProcessor.java:1021), so +validate-config needs it; the level
+      ::  pass computes it as oplev.lp and nothing else kept it. Empty when
+      ::  level checking never ran. R1.8.1.3b
+      lpe=(map @t ?)
   ==
 ::  generator output: ~ when SANY's Generator returns null (the node
 ::  vanishes from the graph), plus diagnostics in report order
@@ -3394,6 +3402,7 @@
       secs.wk
       |
       ~
+      ~
   ==
 ::
 ::  +|  Level Checking (unit 4: LevelNode/OpDefNode/OpApplNode.levelCheck)
@@ -5189,7 +5198,10 @@
           dv=denv
       ==
   ^-  sem-module
-  m:(l-module-core m c ctxs mods dv)
+  =/  r  (l-module-core m c ctxs mods dv)
+  ::  keep each definition's levelParams emptiness (EC 2146's message
+  ::  variant turns on it); the oplev map is otherwise dropped here
+  m.r(lpe (~(run by ops.r) |=(o=oplev =(~ lp.o))))
 ::
 ++  l-deps
   ::  level-check every loaded module except the root, dependency

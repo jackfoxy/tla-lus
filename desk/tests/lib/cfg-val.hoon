@@ -5,6 +5,19 @@
 /=  config  /lib/config
 |%
 ::
+++  test-cfg-val-val-arity-inconsistent
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2242 ~\0aThe arity of the operator Op is inconsistent in the configuration file.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT Op(_)\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT\0aOp(1) = 2\0aOp(1, 2) = 3\0aINIT Init\0aNEXT Next\0a'
+::
 ++  test-cfg-val-val-both-spec-init
   %+  expect-eq
     !>  `@t`'VALIDATE\0a2227 ~\0aThe configuration file cannot specify both INIT/NEXT and SPECIFICATION fields.\0a'
@@ -83,6 +96,45 @@
     ==
   'INIT Init\0aNEXT Next\0aINVARIANT Op\0a'
 ::
+++  test-cfg-val-val-inv-const-true
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0aok\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C = TRUE\0aINIT Init\0aNEXT Next\0aINVARIANT C\0a'
+::
+++  test-cfg-val-val-inv-level-note
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2146 ~\0aThe invariant Inv is not a state predicate (one with no primes or temporal operators).\0aNote that a bug can cause TLC to incorrectly report this error.\0aIf you believe your TLA+ or PlusCal specification to be correct,\0aplease check if this bug described in LevelNode.java starting at line 590ff affects you.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x\' = x\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-cfg-val-val-inv-level-plain
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2146 ~\0aThe invariant Inv is not a state predicate (one with no primes or temporal operators).\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == UNCHANGED x\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-cfg-val-val-inv-undef
   %+  expect-eq
     !>  `@t`'VALIDATE\0a2229 ~\0aThe invariant NoInv specified in the configuration file\0ais not defined in the specification.\0a'
@@ -95,6 +147,19 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aOp(a) == a + 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
     ==
   'INIT Init\0aNEXT Next\0aINVARIANT NoInv\0a'
+::
+++  test-cfg-val-val-inv-value
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2230 ~\0aThe invariant of C is equal to 42\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C = 42\0aINIT Init\0aNEXT Next\0aINVARIANT C\0a'
 ::
 ++  test-cfg-val-val-missing-init
   %+  expect-eq
@@ -161,6 +226,19 @@
     ==
   'SPECIFICATION Spec\0a'
 ::
+++  test-cfg-val-val-override-not-in-spec
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2226 ~\0aIn the configuration file, the identifier Nope does not appear in the specification.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aFoo == 1\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT Nope <- Foo\0aINIT Init\0aNEXT Next\0a'
+::
 ++  test-cfg-val-val-prop-action
   %+  expect-eq
     !>  `@t`'VALIDATE\0a2272 ~\0aThe formula Next at line 5, col 9 to line 5, col 18 of module A is an action-level formula (i.e., it contains no temporal operators). Only temporal-level (or state-level) formulas are allowed under PROPERTY or PROPERTIES. To check that action Next holds in *every* step of the behavior, define a temporal property: Let A be the formula at line 5, col 9 to line 5, col 18 of module A; rewrite A as [][A]_v, where v is a state function (typically the tuple of variables) (compare page 90 of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).\0a'
@@ -173,4 +251,108 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aOp(a) == a + 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
     ==
   'INIT Init\0aNEXT Next\0aPROPERTY Next\0a'
+::
+++  test-cfg-val-val-prop-arg
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2228 ~\0aTLC requires Op not to take any argument.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aOp(a) == a = 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aPROPERTY Op\0a'
+::
+++  test-cfg-val-val-spec-arg
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2228 ~\0aTLC requires Op not to take any argument.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aOp(a) == a = 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+    ==
+  'SPECIFICATION Op\0a'
+::
+++  test-cfg-val-val-spec-value
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2230 ~\0aThe value of C is equal to 42\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C = 42\0aSPECIFICATION C\0a'
+::
+++  test-cfg-val-val-sub-const-nargs
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2225 ~\0aThe configuration file substitutes for C with Bar of different number of arguments.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aBar(a) == a + 1\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C <- Bar\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-sub-nargs
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2225 ~\0aThe configuration file substitutes for Foo with Bar of different number of arguments.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aFoo == 1\0aBar(a) == a\0aInit == x = Foo\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT Foo <- Bar\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-sub-nonconstant
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2281 ~\0aThe configuration file substitutes constant C with non-constant V - specifically: In evaluation, the identifier x is either undefined or not an operator.\0aline 5, col 6 to line 5, col 6 of module A\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aV == x + 1\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C <- V\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-sub-rhs-after-lhs
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2223 ~\0aIn the configuration file, the identifier Foo appears\0aon the right-hand side of a <- after already appearing on the\0aleft-hand side of one.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aFoo == 1\0aBar == 2\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANTS C <- Foo\0aFoo <- Bar\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-sub-undefined
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2224 ~\0aThe configuration file substitutes for C with the undefined identifier Nope.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'CONSTANT C <- Nope\0aINIT Init\0aNEXT Next\0a'
 --

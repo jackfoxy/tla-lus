@@ -1,0 +1,3 @@
+CONSTANT C <- Bar
+INIT Init
+NEXT Next

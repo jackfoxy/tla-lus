@@ -1,0 +1,3 @@
+VALIDATE
+2242 ~
+The arity of the operator Op is inconsistent in the configuration file.

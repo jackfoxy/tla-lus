@@ -507,13 +507,31 @@
 ::
 ::  Port of tlc2.tool.impl.SpecProcessor's config-processing methods over
 ::  the WU3 semantic graph (sem-module). Fail-fast, like the Java: the
-::  first violation is the only diagnostic. Handles the resolution codes
-::  (2222/2227/2228/2229/2230/2231/2232/2233) and the property action-
-::  level code (2272). Deep SPECIFICATION-form unfolding (processConfigSpec)
-::  and substitution/arity-inconsistent codes are 5.3c residue: a valid
-::  arity-0 SPECIFICATION is treated as establishing init and next.
+::  first violation is the only diagnostic. Handles the constant-table and
+::  substitution codes (2242, 2222, 2223/2224/2225/2226, 2281), the
+::  resolution codes (2227/2228/2229/2230/2231/2232/2233), the invariant
+::  level code (2146) and the property action-level code (2272), in
+::  SpecProcessor's own order. Deep SPECIFICATION-form unfolding is
+::  +decompose-spec's (lib/check, R1.8.1.1): here a valid arity-0
+::  SPECIFICATION is treated as establishing init and next.
 ::
 +$  cfg-vdiag  [code=@ud msg=@t]
+::  one entry of the `defns` table SpecProcessor.processSpec builds before
+::  processConfig runs. Every processConfig* method dispatches on exactly
+::  this -- `instanceof OpDefNode` / `== null` / a value -- which is why
+::  2229/2230/2233 cannot be read off the semantic graph alone: a config
+::  `CONSTANT Inv = 42` REPLACES the operator Inv in the table, and a
+::  declared CONSTANT that only an override will fill resolves to null
+::  until the override loop runs. R1.8.1.3b
++$  dentry
+  $%  [%def d=sem-def:sem-lib]
+      [%val v=cfg-value]
+      ::  an OpRcdValue: the `F(a) = v` operator-record lines, with the
+      ::  arity the first line fixed (makeConstantTable)
+      [%opr ary=@ud lines=(list cfg-const)]
+      ::  a declared CONSTANT with no value yet (defns.get -> null)
+      [%none ~]
+  ==
 ::  the typed run specification (unit 5.4): the single hand-off every
 ::  checking mode consumes, superseding the old cfg-word lookups. Mode is
 ::  spec-form (SPECIFICATION) xor init/next-form.
@@ -536,20 +554,6 @@
       alias=(unit @t)
       deadlock=?                         ::  getCheckDeadlock: true unless FALSE
   ==
-::
-++  find-def
-  |=  [m=sem-module:sem-lib nm=@t]
-  ^-  (unit sem-def:sem-lib)
-  =/  dl  defs.m
-  |-  ^-  (unit sem-def:sem-lib)
-  ?~  dl  ~
-  ?:  =(nm name.i.dl)  `i.dl
-  $(dl t.dl)
-::
-++  is-const
-  |=  [m=sem-module:sem-lib nm=@t]
-  ^-  ?
-  (lien consts.m |=([name=@t arity=@ud at=(unit span)] =(name nm)))
 ::
 ++  sem-span
   ::  the source span of an IR expression node (nullodn has none)
@@ -599,42 +603,339 @@
       'https://lamport.azurewebsites.net/tla/book.html).'
   ==
 ::
+++  v-noarg-bare
+  ::  the ONE-parameter TLC_CONFIG_ID_REQUIRES_NO_ARG variant, which
+  ::  SPECIFICATION and PROPERTY use (SpecProcessor.java:799/823) where
+  ::  INVARIANT/INIT/NEXT pass a role and take the two-parameter one
+  |=  nm=@t
+  ^-  @t
+  (rap 3 ~['TLC requires ' nm ' not to take any argument.'])
+::
+++  msg-2230
+  ::  TLC_CONFIG_ID_HAS_VALUE: the third parameter is the VALUE's
+  ::  toString, which +render-value already renders exactly for every
+  ::  shape parseValue produces. An operator record (`F(a) = v`) is the
+  ::  one exception -- OpRcdValue.toString is not ported (compatibility.md)
+  |=  [role=@t nm=@t e=dentry]
+  ^-  @t
+  =/  rv=@t
+    ?:  ?=(%val -.e)  (crip (render-value v.e))
+    '<value>'
+  (rap 3 ~['The ' role ' of ' nm ' is equal to ' rv])
+::
 ++  ck-action
-  ::  INIT/NEXT: absent-def -> 2229; a constant -> 2233; def arity>0 -> 2228
-  |=  [m=sem-module:sem-lib role=@t nm=@t]
+  ::  INIT/NEXT (processConfigInitAndNext): unresolved -> 2229; resolved
+  ::  to a value rather than an operator -> 2233; def arity>0 -> 2228
+  |=  [dm=(map @t dentry) role=@t nm=@t]
   ^-  (unit cfg-vdiag)
-  =/  d  (find-def m nm)
-  ?^  d
-    ?:  (gth arity.u.d 0)  `[2.228 (v-noarg role nm)]
-    ~
-  ?:  (is-const m nm)
+  =/  e  (~(get by dm) nm)
+  ?~  e  `[2.229 (v-notdef role nm)]
+  ?:  ?=(%none -.u.e)  `[2.229 (v-notdef role nm)]
+  ?.  ?=(%def -.u.e)
     `[2.233 (rap 3 ~['The ' role ' ' nm ' cannot be a constant.'])]
-  `[2.229 (v-notdef role nm)]
+  ?:  (gth arity.d.u.e 0)  `[2.228 (v-noarg role nm)]
+  ~
 ::
 ++  ck-formula
-  ::  INVARIANT/PROPERTY resolution: def arity>0 -> 2228; absent -> 2229;
-  ::  a constant/value -> 2230. Returns the resolved def when it is a
-  ::  clean arity-0 operator (for the caller's level dispatch).
-  |=  [m=sem-module:sem-lib role=@t nm=@t]
+  ::  INVARIANT/PROPERTY/SPECIFICATION resolution: unresolved -> 2229;
+  ::  def arity>0 -> 2228 (bare = the one-parameter message); a
+  ::  config-assigned value -> 2230, EXCEPT the boolean TRUE, which tlc2
+  ::  accepts (warning 2149 for an invariant, silently for a property).
+  ::  Returns the resolved def for the caller's level dispatch, or ~ when
+  ::  an accepted TRUE ends the story for that name.
+  |=  [dm=(map @t dentry) role=@t bare=? nm=@t]
   ^-  (each (unit sem-def:sem-lib) cfg-vdiag)
-  =/  d  (find-def m nm)
-  ?^  d
-    ?:  (gth arity.u.d 0)  [%| 2.228 (v-noarg role nm)]
-    [%& `u.d]
-  ?:  (is-const m nm)
-    [%| 2.230 (rap 3 ~['The ' role ' of ' nm ' is equal to <value>'])]
-  [%| 2.229 (v-notdef role nm)]
+  =/  e  (~(get by dm) nm)
+  ?~  e  [%| 2.229 (v-notdef role nm)]
+  ?:  ?=(%none -.u.e)  [%| 2.229 (v-notdef role nm)]
+  ?:  ?=(%def -.u.e)
+    ?.  (gth arity.d.u.e 0)  [%& `d.u.e]
+    [%| 2.228 ?:(bare (v-noarg-bare nm) (v-noarg role nm))]
+  ?.  ?=(%val -.u.e)  [%| 2.230 (msg-2230 role nm u.e)]
+  ?.  ?=(%bool -.v.u.e)  [%| 2.230 (msg-2230 role nm u.e)]
+  ?.  p.v.u.e  [%| 2.230 (msg-2230 role nm u.e)]
+  [%& ~]
+::
+++  const-table
+  ::  makeConstantTable (SpecProcessor.java:2361): a CONSTANT line with no
+  ::  argument list stores its value directly (later lines overwrite);
+  ::  argument lines accumulate into an operator record whose arity the
+  ::  FIRST line fixes -- a later line of a different arity is EC 2242.
+  ::  (tlc2 throws a raw ClassCastException, not a diagnostic, when the two
+  ::  forms are mixed under one name; the port keeps the record form.)
+  |=  cs=(list cfg-const)
+  ^-  (each (map @t dentry) cfg-vdiag)
+  =|  t=(map @t dentry)
+  |-  ^-  (each (map @t dentry) cfg-vdiag)
+  ?~  cs  [%& t]
+  ?~  args.i.cs
+    $(cs t.cs, t (~(put by t) lhs.i.cs [%val val.i.cs]))
+  =/  ar  (lent args.i.cs)
+  =/  ex  (~(get by t) lhs.i.cs)
+  ?~  ex
+    $(cs t.cs, t (~(put by t) lhs.i.cs [%opr ar ~[i.cs]]))
+  ?.  ?=(%opr -.u.ex)
+    $(cs t.cs, t (~(put by t) lhs.i.cs [%opr ar ~[i.cs]]))
+  ?.  =(ary.u.ex ar)
+    :+  %|  2.242
+    %+  rap  3
+    ~['The arity of the operator ' lhs.i.cs ' is inconsistent in the configuration file.']
+  $(cs t.cs, t (~(put by t) lhs.i.cs [%opr ary.u.ex (snoc lines.u.ex i.cs)]))
+::
+++  msg-2223
+  |=  nm=@t
+  ^-  @t
+  %+  rap  3
+  :~  'In the configuration file, the identifier '  nm  ' appears\0a'
+      'on the right-hand side of a <- after already appearing on the\0a'
+      'left-hand side of one.'
+  ==
+::
+++  msg-2224
+  |=  [lhs=@t rhs=@t]
+  ^-  @t
+  %+  rap  3
+  :~  'The configuration file substitutes for '  lhs
+      ' with the undefined identifier '  rhs  '.'
+  ==
+::
+++  msg-2225
+  |=  [lhs=@t rhs=@t]
+  ^-  @t
+  %+  rap  3
+  :~  'The configuration file substitutes for '  lhs
+      ' with '  rhs  ' of different number of arguments.'
+  ==
+::
+++  msg-2226
+  |=  nm=@t
+  ^-  @t
+  %+  rap  3
+  :~  'In the configuration file, the identifier '  nm
+      ' does not appear in the specification.'
+  ==
+::
+++  build-defns
+  ::  SpecProcessor.processSpec's constant/override machinery, in its own
+  ::  order, up to the point processConfig takes over: the constant table
+  ::  (2242), the declared constants (2222), the module's operator
+  ::  definitions, the `<-` substitutions (2223/2224/2225/2226), and
+  ::  processConstantDefns' checks on a constant substituted by an operator
+  ::  (2225/2281). Fail-fast throughout, like the Java. R1.8.1.3b
+  ::
+  ::  RESIDUE (compatibility.md): the same substitution checks over the
+  ::  per-module `mod!lhs <- rhs` tables, which need each non-root module's
+  ::  own operator list rather than the root graph.
+  |=  [m=sem-module:sem-lib a=cfg-ast]
+  ^-  (each (map @t dentry) cfg-vdiag)
+  |^  go
+  ::  ModuleNode.getOpDefs order: EXTENDS-imported definitions first, so
+  ::  the module's own shadow an imported name
+  ++  odefs  `(list sem-def:sem-lib)`(weld imports.m defs.m)
+  ++  go
+    ^-  (each (map @t dentry) cfg-vdiag)
+    =/  ct  (const-table constants.a)
+    ?:  ?=(%| -.ct)  [%| p.ct]
+    =/  base=(map @t dentry)
+      =|  acc=(map @t dentry)
+      =/  dl  odefs
+      |-  ^-  (map @t dentry)
+      ?~  dl  acc
+      $(dl t.dl, acc (~(put by acc) name.i.dl [%def i.dl]))
+    ::  the declared CONSTANTs: assigned by the config, else covered by an
+    ::  override (and still null in the table until it applies), else 2222
+    =/  r1  (put-consts p.ct base)
+    ?:  ?=(%| -.r1)  [%| p.r1]
+    ::  a config value for a DEFINED operator replaces the definition
+    =/  dm
+      =/  acc  p.r1
+      =/  dl  odefs
+      |-  ^-  (map @t dentry)
+      ?~  dl  acc
+      =/  v  (~(get by p.ct) name.i.dl)
+      $(dl t.dl, acc ?~(v acc (~(put by acc) name.i.dl u.v)))
+    ::  the per-module constant tables are built (hence arity-checked) here
+    =/  r2  (mod-tables ~(val by mod-constants.a))
+    ?^  r2  [%| u.r2]
+    =/  r3  (subst dm)
+    ?:  ?=(%| -.r3)  [%| p.r3]
+    =/  r4  unused-overrides
+    ?^  r4  [%| u.r4]
+    =/  r5  (const-defns p.r3)
+    ?^  r5  [%| u.r5]
+    [%& p.r3]
+  ::  2222, in declaration order
+  ++  put-consts
+    |=  [ct=(map @t dentry) acc=(map @t dentry)]
+    ^-  (each (map @t dentry) cfg-vdiag)
+    =/  cl  consts.m
+    |-  ^-  (each (map @t dentry) cfg-vdiag)
+    ?~  cl  [%& acc]
+    =/  v  (~(get by ct) name.i.cl)
+    ?:  ?&(?=(~ v) !(~(has by overrides.a) name.i.cl))
+      :+  %|  2.222
+      %+  rap  3
+      ~['The constant parameter ' name.i.cl ' is not assigned a value by the configuration file.']
+    $(cl t.cl, acc (~(put by acc) name.i.cl ?~(v [%none ~] u.v)))
+  ::  initializeModConstants: only its arity check (2242) is observable
+  ::  here, the tables themselves belong with the deferred module overrides
+  ++  mod-tables
+    |=  ls=(list (list cfg-const))
+    ^-  (unit cfg-vdiag)
+    ?~  ls  ~
+    =/  r  (const-table i.ls)
+    ?:  ?=(%| -.r)  `p.r
+    $(ls t.ls)
+  ::  the `<-` substitutions: declared constants first, then operator
+  ::  definitions, each in the module's own order
+  ++  subst
+    |=  dm=(map @t dentry)
+    ^-  (each (map @t dentry) cfg-vdiag)
+    =/  ns
+      %+  weld
+        (turn consts.m |=([name=@t arity=@ud at=*] [nm=name ar=arity ic=&]))
+      (turn odefs |=(d=sem-def:sem-lib [nm=name.d ar=arity.d ic=|]))
+    =/  acc  dm
+    |-  ^-  (each (map @t dentry) cfg-vdiag)
+    ?~  ns  [%& acc]
+    =/  rhs  (~(get by overrides.a) nm.i.ns)
+    ?~  rhs  $(ns t.ns)
+    ?:  (~(has by overrides.a) u.rhs)  [%| 2.223 (msg-2223 u.rhs)]
+    =/  my  (~(get by acc) u.rhs)
+    ?~  my  [%| 2.224 (msg-2224 nm.i.ns u.rhs)]
+    ?:  ?=(%none -.u.my)  [%| 2.224 (msg-2224 nm.i.ns u.rhs)]
+    ::  the declared-constant loop does NOT compare arities here; that
+    ::  check waits for processConstantDefns (+const-defns)
+    =/  bad=?
+      ?:  ic.i.ns  |
+      ?.  ?=(%def -.u.my)  |
+      !=(ar.i.ns arity.d.u.my)
+    ?:  bad  [%| 2.225 (msg-2225 nm.i.ns u.rhs)]
+    $(ns t.ns, acc (~(put by acc) nm.i.ns u.my))
+  ::  2226: an override whose left-hand side names nothing in the spec
+  ++  unused-overrides
+    ^-  (unit cfg-vdiag)
+    =/  known=(set @t)
+      %-  sy
+      %+  weld  (turn consts.m |=([name=@t arity=@ud at=*] name))
+      (turn odefs |=(d=sem-def:sem-lib name.d))
+    =/  ks  (sort ~(tap in ~(key by overrides.a)) aor)
+    |-  ^-  (unit cfg-vdiag)
+    ?~  ks  ~
+    ?:  (~(has in known) i.ks)  $(ks t.ks)
+    `[2.226 (msg-2226 i.ks)]
+  ::  processConstantDefns: a declared CONSTANT substituted by an operator
+  ::  must have that operator's arity (2225) and, at arity 0, must be
+  ::  constant-level (2281). tlc2 reaches 2281 by EVALUATING the body and,
+  ::  when that throws, checking the body's level bound; the port takes the
+  ::  level first and then names the offending reference (+nonconst-ref)
+  ++  const-defns
+    |=  dm=(map @t dentry)
+    ^-  (unit cfg-vdiag)
+    =/  cl  consts.m
+    |-  ^-  (unit cfg-vdiag)
+    ?~  cl  ~
+    =/  e  (~(get by dm) name.i.cl)
+    ?~  e  $(cl t.cl)
+    ?.  ?=(%def -.u.e)  $(cl t.cl)
+    ?.  =(arity.d.u.e arity.i.cl)
+      `[2.225 (msg-2225 name.i.cl name.d.u.e)]
+    ?.  =(0 arity.d.u.e)  $(cl t.cl)
+    ?:  =(0 lvl.d.u.e)  $(cl t.cl)
+    `[2.281 (msg-2281 name.m name.i.cl d.u.e dm)]
+  --
+::
+++  msg-2281
+  ::  TLC_CONFIG_SUBSTITUTION_NON_CONSTANT. Its third parameter is the
+  ::  message of the exception constant evaluation threw, prefixed with
+  ::  " - specifically: " (empty only for an EvalException). Measured at the
+  ::  pin, the throw is EC 2280 TLC_CONFIG_UNDEFINED_OR_NO_OPERATOR on the
+  ::  first state variable the body reads, so the port names that reference
+  ::  and its location.
+  ::  RESIDUE (compatibility.md): a body that is non-constant because it is
+  ::  TEMPORAL raises EC 2261 there instead, with tlc2's abbreviated
+  ::  expression rendering; the port emits no addendum for that shape.
+  |=  [modname=@t nm=@t d=sem-def:sem-lib dm=(map @t dentry)]
+  ^-  @t
+  =/  add=@t
+    ?~  body.d  ''
+    =/  r  (nonconst-ref u.body.d dm modname | (silt ~[name.d]))
+    ?~  r  ''
+    %+  rap  3
+    :~  ' - specifically: In evaluation, the identifier '  name.u.r
+        ' is either undefined or not an operator.\0a'
+        (loc-str mod.u.r at.u.r)
+    ==
+  %+  rap  3
+  :~  'The configuration file substitutes constant '  nm
+      ' with non-constant '  name.d  add
+  ==
+::
+++  nonconst-ref
+  ::  the first state-variable reference constant evaluation trips over, in
+  ::  evaluation (pre-)order -- a bound range before the body it binds --
+  ::  descending into an applied user operator as tlc2's evaluator does.
+  ::  Under ENABLED a PRIMED variable is assignable, so it is not the
+  ::  failure; that asymmetry is measured against the pin.
+  |=  $:  s=sem:sem-lib
+          dm=(map @t dentry)
+          mod=@t
+          enabled=?
+          seen=(set @t)
+      ==
+  ^-  (unit [name=@t mod=@t at=(unit span)])
+  =|  primed=?
+  |-  ^-  (unit [name=@t mod=@t at=(unit span)])
+  ?:  ?=(%letin -.s)
+    ?~(body.s ~ $(s u.body.s))
+  ?.  ?=(%apply -.s)  ~
+  =/  nm  name.op.s
+  ?:  ?=(%variable kind.op.s)
+    ?:  ?&(enabled primed)  ~
+    `[nm mod at.s]
+  =/  en  |(enabled =('ENABLED' nm))
+  =/  pr  |(primed =('\'' nm))
+  =/  rs=(list sem:sem-lib)
+    %+  murn  bound.s
+    |=(b=sem-bound:sem-lib range.b)
+  =/  kids=(list sem:sem-lib)  (weld rs args.s)
+  =/  here
+    |-  ^-  (unit [name=@t mod=@t at=(unit span)])
+    ?~  kids  ~
+    =/  r  ^$(s i.kids, enabled en, primed pr)
+    ?^(r r $(kids t.kids))
+  ?^  here  here
+  ::  an applied user operator: evaluation enters its body
+  ?:  (~(has in seen) nm)  ~
+  =/  e  (~(get by dm) nm)
+  ?~  e  ~
+  ?.  ?=(%def -.u.e)  ~
+  ?~  body.d.u.e  ~
+  %=  $
+    s        u.body.d.u.e
+    mod      ?:(=('' origin.d.u.e) mod origin.d.u.e)
+    enabled  en
+    seen     (~(put in seen) nm)
+  ==
 ::
 ++  validate-config
+  ::  processConfig (SpecProcessor.java:777) over the `defns` table
+  ::  +build-defns assembled, in the Java's order: invariants, then
+  ::  SPECIFICATION xor INIT/NEXT, then properties, then the two
+  ::  missing-predicate checks. Fail-fast: the first violation is the
+  ::  only diagnostic, exactly as processConfig throws.
   |=  [m=sem-module:sem-lib a=cfg-ast]
   ^-  (each ~ cfg-vdiag)
   =/  modname  name.m
+  =/  bd  (build-defns m a)
+  ?:  ?=(%| -.bd)  [%| p.bd]
+  =/  dm  p.bd
   |^  result
   ++  result
     ^-  (each ~ cfg-vdiag)
     =/  e
       ;:  first
-        chk-const  chk-invariants  chk-spec-init-next
+        chk-invariants  chk-spec-init-next
         chk-properties  chk-missing-init  chk-missing-next
       ==
     ?~  e  [%& ~]
@@ -644,53 +945,57 @@
     |=  [a=(unit cfg-vdiag) b=(unit cfg-vdiag)]
     ^-  (unit cfg-vdiag)
     ?^(a a b)
-  ::  2222: every declared constant must be assigned by the config
-  ++  chk-const
-    ^-  (unit cfg-vdiag)
-    =/  assigned=(set @t)
-      %-  sy
-      %+  weld
-        (turn constants.a |=(c=cfg-const lhs.c))
-      (turn ~(tap by overrides.a) |=([k=@t v=@t] k))
-    =/  cl  consts.m
-    |-  ^-  (unit cfg-vdiag)
-    ?~  cl  ~
-    ?:  (~(has in assigned) name.i.cl)  $(cl t.cl)
-    `[2.222 (rap 3 ~['The constant parameter ' name.i.cl ' is not assigned a value by the configuration file.'])]
-  ::  invariants (resolution only; state-level check is 5.3c residue)
+  ::  invariants: resolution, then the state-predicate level check (2146)
   ++  chk-invariants
     ^-  (unit cfg-vdiag)
     =/  il  invariants.a
     |-  ^-  (unit cfg-vdiag)
     ?~  il  ~
-    =/  r  (ck-formula m 'invariant' i.il)
+    =/  r  (ck-formula dm 'invariant' | i.il)
     ?:  ?=(%| -.r)  `p.r
-    $(il t.il)
+    =/  d  p.r
+    ?~  d  $(il t.il)
+    ?.  (gte lvl.u.d 2)  $(il t.il)
+    `[2.146 (msg-2146 u.d)]
+  ::  2146: an INVARIANT must be a state predicate. The two message
+  ::  variants are selected by the definition's levelParams EMPTINESS, not
+  ::  by its level (SpecProcessor.java:1021): `x' = x` keeps its parameter
+  ::  and takes the LevelNode-bug note, while `UNCHANGED x` (also level 2)
+  ::  has weight 0, empties them, and takes the plain sentence
+  ++  msg-2146
+    |=  d=sem-def:sem-lib
+    ^-  @t
+    =/  plain
+      (rap 3 ~['The invariant ' name.d ' is not a state predicate (one with no primes or temporal operators).'])
+    ?:  (~(gut by lpe.m) name.d &)  plain
+    %+  rap  3
+    :~  plain  '\0aNote that a bug can cause TLC to incorrectly report this error.\0a'
+        'If you believe your TLA+ or PlusCal specification to be correct,\0a'
+        'please check if this bug described in LevelNode.java starting at line 590ff affects you.'
+    ==
   ::  SPECIFICATION xor INIT/NEXT, and their resolution
   ++  chk-spec-init-next
     ^-  (unit cfg-vdiag)
     ?^  spec.a
       ?:  |(?=(^ init.a) ?=(^ next.a))
         `[2.227 'The configuration file cannot specify both INIT/NEXT and SPECIFICATION fields.']
-      =/  d  (find-def m u.spec.a)
-      ?^  d
-        ?:  (gth arity.u.d 0)
-          `[2.228 (v-noarg 'name' u.spec.a)]
-        ~
-      ?:  (is-const m u.spec.a)
-        `[2.230 (rap 3 ~['The value of ' u.spec.a ' is equal to <value>'])]
-      `[2.229 (v-notdef 'name' u.spec.a)]
+      =/  r  (ck-formula dm 'value' & u.spec.a)
+      ?:  ?=(%| -.r)
+        ::  the SPECIFICATION not-defined role is `name`, not `value`
+        ?.  =(2.229 code.p.r)  `p.r
+        `[2.229 (v-notdef 'name' u.spec.a)]
+      ~
     ::  no SPECIFICATION: resolve INIT then NEXT
-    =/  ei  ?~(init.a ~ (ck-action m 'initial predicate' u.init.a))
+    =/  ei  ?~(init.a ~ (ck-action dm 'initial predicate' u.init.a))
     ?^  ei  ei
-    ?~(next.a ~ (ck-action m 'next state action' u.next.a))
+    ?~(next.a ~ (ck-action dm 'next state action' u.next.a))
   ::  properties: resolution + action-level (2272)
   ++  chk-properties
     ^-  (unit cfg-vdiag)
     =/  pl  properties.a
     |-  ^-  (unit cfg-vdiag)
     ?~  pl  ~
-    =/  r  (ck-formula m 'property' i.pl)
+    =/  r  (ck-formula dm 'property' & i.pl)
     ?:  ?=(%| -.r)  `p.r
     =/  d  p.r
     ?~  d  $(pl t.pl)

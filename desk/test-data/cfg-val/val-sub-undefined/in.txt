@@ -1,0 +1,3 @@
+CONSTANT C <- Nope
+INIT Init
+NEXT Next

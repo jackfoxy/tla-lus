@@ -1317,6 +1317,34 @@ rather than a feature. That option remains open and is now costed.
 The consequence to be aware of: **a spec using `Print` is refused here where tlc2 runs
 it.** Reversing the decision is a small change to `+print-op` and the affected goldens.
 
+## Release R1.8.1 — config-validation diagnostics (`SpecProcessor`)
+
+R1.8.1.3b ported the constant-table and substitution half of
+`SpecProcessor.processSpec` — EC 2242 (arity-inconsistent operator record), 2223/2224/2225
+(`<-` substitution), 2226 (an override naming nothing in the spec), 2281 (a constant
+substituted by a non-constant operator) — plus EC 2146 (an INVARIANT that is not a state
+predicate) and the real `TLC_CONFIG_ID_HAS_VALUE` (2230) message body, which had been a
+`<value>` placeholder. `+build-defns` reproduces the `defns` table those checks dispatch on,
+in the Java's order, so `+validate-config` resolves a name the way `processConfig` does
+rather than reading the semantic graph directly.
+
+Three residues remain, each narrow and each stated rather than papered over:
+
+- **Per-module substitutions are not validated.** `CONSTANT mod!lhs <- rhs` and
+  `mod!F(a) = v` are parsed, carried in the `run-spec`, and their constant tables are
+  arity-checked (2242), but the 2223/2224/2225/2226 loop over them is not ported: it needs
+  each non-root module's own operator list, where the port's graph exposes the root module
+  plus its `EXTENDS` imports.
+- **EC 2230 on an operator-record constant** renders `<value>` where tlc2 renders
+  `OpRcdValue.toString()`. Every other value shape `parseValue` can produce (integer,
+  string, boolean, model value, set) renders byte-exactly through `+render-value`.
+- **EC 2281's addendum on a temporal body.** tlc2 appends the message of whatever constant
+  evaluation threw. Measured at the pin, that is EC 2280
+  (`TLC_CONFIG_UNDEFINED_OR_NO_OPERATOR`) naming the first state variable the body reads,
+  which the port reproduces including its `Location.toString()`. A body that is non-constant
+  because it is **temporal** raises EC 2261 there instead, with tlc2's abbreviated expression
+  rendering (`[]A`); the port emits the 2281 sentence with no addendum for that shape.
+
 ## Typed-rejected / unsupported public options — summary
 
 `parity-manifest.md` §"Public request options" is the authoritative,

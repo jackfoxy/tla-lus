@@ -1,0 +1,4 @@
+VALIDATE
+2281 ~
+The configuration file substitutes constant C with non-constant V - specifically: In evaluation, the identifier x is either undefined or not an operator.
+line 5, col 6 to line 5, col 6 of module A

@@ -246,3 +246,68 @@ corrected `live-box`.
 The **job kernel's** liveness path (`job.hoon`, sliced continuation) passes `~` for the gate: it
 does not carry the SPEC name/fairness needed to compute it, so its report omits the 2257/2259
 hint that the console path emits. Recorded here and in the code rather than papered over.
+
+## R1.8.1.3b — `cfg-validate`'s remaining diagnostic codes
+
+### The blocker the plan named was real, and one line wide
+
+EC 2146's two message variants are selected by `!def.getBody().levelParams.isEmpty()`
+(`SpecProcessor.java:1021`), and `sem-def` carries `lvl` but not `lp`. The `lp` set is
+computed — `oplev.lp`, already oracle-verified through the `LEVELS` projection's `lp` segment —
+and then **thrown away**: `+level-module` returns `m:(l-module-core …)` and drops the `ops` map
+the core also returns. `sem-module` gained `lpe=(map @t ?)` (per-definition levelParams
+emptiness) filled from exactly that map. `OpDefNode.levelCheck` adds the body's levelParams and
+then removes the formals (`OpDefNode.java:1123`), so for the arity-0 operator an INVARIANT must
+be, the definition's set *is* the body's.
+
+### What the codes actually needed was not a check, it was a table
+
+Six of the seven codes turned out to be one missing structure rather than six missing tests.
+`SpecProcessor.processConfig` never looks at the semantic graph: it looks up `this.defns`, the
+name→Object table `processSpec` assembled beforehand, and dispatches on `instanceof OpDefNode` /
+`== null` / a value. The port's `+validate-config` had been reading `defs.m`/`consts.m` directly,
+which cannot express the states that produce these diagnostics — a config `CONSTANT Inv = 42`
+**replaces** the operator `Inv` in the table (2230), and a declared CONSTANT covered only by an
+override resolves to *null* until the override loop runs (2229 vs 2224). New `+build-defns`
+reproduces the table in the Java's order, emitting on the way: 2242 (`makeConstantTable`),
+2222, 2242 again for the per-module tables, 2223/2224/2225 (the `<-` loops, constants before
+operator definitions), 2226, then `processConstantDefns`' 2225/2281. `+validate-config` is now
+just `processConfig` over that table.
+
+### Two pre-existing divergences the corpus had never touched
+
+`TLC_CONFIG_ID_REQUIRES_NO_ARG` (2228) has a **one-parameter** variant and a two-parameter one,
+and `MP` picks between them by `parameters.length`. INVARIANT/INIT/NEXT pass a role and get
+`TLC requires invariant not to take any argument, but one was given: Op`; **SPECIFICATION and
+PROPERTY pass only the name** (`SpecProcessor.java:799/823`) and get `TLC requires Op not to
+take any argument.` The port emitted the two-parameter form for all four. Also measured: an
+INVARIANT resolving to the boolean **TRUE** is not 2230 at all — it is warning 2149 and the run
+proceeds. Both were invisible because no corpus case covered them; both now have one
+(`val-spec-arg`, `val-prop-arg`, `val-inv-const-true`).
+
+### EC 2281 is a message about an exception, not about a level
+
+`Assert.fail(TLC_CONFIG_SUBSTITUTION_NON_CONSTANT, …)` fires only when *evaluating* the
+substituting definition throws **and** the body's level bound is above constant, and its third
+parameter is that exception's own message. Probing five body shapes at the pin, the throw is
+always EC 2280 `TLC_CONFIG_UNDEFINED_OR_NO_OPERATOR` naming the first state variable the body
+reads, with the identifier's `Location.toString()` on the next line — so `+nonconst-ref` walks
+the body in evaluation order (a bound range before the body it binds, descending into an applied
+user operator) and names that reference. One asymmetry had to be measured rather than assumed:
+under `ENABLED` a **primed** variable is assignable and does not fail, so `V == ENABLED (x' = x)`
+reports the *unprimed* `x` at col 20, not the primed one at col 15.
+
+### Result
+
+**27/27 cfg-val cases green** (13 → 27), covering 2242, 2223, 2224, 2225 on both of its paths
+(the operator-override loop and `processConstantDefns`' constant-arity check), 2226, 2281, 2146 in
+both variants, the 2230 body for a SPECIFICATION and an INVARIANT, the two 2228 variants, and
+the accepted constant TRUE. `cfg-runspec`, `sem`, `lvl`, `mc`, `job`, `spec-decomp`,
+`safety-gen`, `cfg`, `inv-constraints` and `trace` stay green after the `sem-module` mold change.
+
+### Residues, stated (compatibility.md)
+
+Per-module `mod!lhs <- rhs` substitution checks (they need each non-root module's operator list,
+where the graph exposes the root plus its `EXTENDS` imports); `OpRcdValue.toString()` in a 2230
+body; and 2281's addendum when the body is non-constant because it is **temporal** (EC 2261
+there, with tlc2's abbreviated expression rendering).

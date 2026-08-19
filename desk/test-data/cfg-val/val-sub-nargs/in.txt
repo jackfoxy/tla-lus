@@ -1,0 +1,3 @@
+CONSTANT Foo <- Bar
+INIT Init
+NEXT Next

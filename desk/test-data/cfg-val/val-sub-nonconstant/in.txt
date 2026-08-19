@@ -1,0 +1,3 @@
+CONSTANT C <- V
+INIT Init
+NEXT Next
