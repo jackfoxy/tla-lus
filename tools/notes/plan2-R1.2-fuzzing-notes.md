@@ -371,3 +371,46 @@ next to the measurement. Thin reach is a finding.
 
 `fuzz` **13/13**; 120 mutated safety cases, no bails and no budget hits. `eval` (37) and
 `core-eval` (20) unchanged and green — the labelling touched no behavior — and `node-eval` green.
+
+## R1.2.5 — decoding a persisted continuation
+
+### The only surface whose hostile input is a stored noun
+
+`+load-kont:job` is `;;(kont (cue k.c))` — a bare coercion over an atom that survived a restart, a
+state migration, or a disk. It crashes on anything that is not a valid `kont`, and it is meant to:
+what makes that safe is not the arm but its **call sites**, all three of which wrap it in `mule` and
+turn the failure into a typed outcome. `+step` fails the job with
+`restarted: the in-flight state is from an incompatible engine version; resubmit` (the Work Unit 7.7
+migration contract); the two read-routing arms fall through without absorbing the response.
+
+So the arm under test is not `+load-kont` — testing that in isolation would only re-prove that a
+bare `;;` crashes, which the port never invokes unguarded. The adapter drives **`+step`**, the
+production entry, with a corrupted continuation, and asserts the *event* survives.
+
+### Two generators, because garbage is the easy case
+
+- `+gen-atom` — a random 64-bit atom where a jam should be. Cheap, and it covers `cue`'s special
+  handling of 0 and small atoms.
+- `+gen-corrupt` — a **valid** jammed `kont` with one bit flipped, or truncated at a random bit.
+  This is the shape a real disk or a version skew produces, and it is the one that gets *past* the
+  early structural checks in `cue` before failing somewhere deeper.
+
+400 cases, no bails. `job` re-run green.
+
+### The finding is a negative one, and it was verified rather than assumed
+
+Nothing needed fixing. That is worth recording precisely because the surface *looks* dangerous — a
+bare `;;` over persisted data is exactly the shape that is usually a bug — and the guard is three
+call sites away from the arm that appears to be at fault. Reading `+load-kont` alone would suggest a
+hole; only following its callers, or fuzzing the entry, shows the contract is already met.
+
+The two other `;;` sites in the desk are likewise already guarded: `on-load`'s
+`;;(versioned-state q.old-vase)` sits inside a `mule` with a documented "state corrupt, unable to
+migrate" fallback, and the Clay read's `;;(wain nun)` is wrapped with an `unreadable file body`
+rejection.
+
+### Result
+
+`fuzz` **15/15**. The shard is now the slowest in the suite — `test-fuzz-reach-floors` alone is
+~5 minutes, since it re-runs every stage to count reach — which is worth weighing before `.6` adds
+more.

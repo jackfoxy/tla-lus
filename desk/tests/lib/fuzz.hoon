@@ -24,29 +24,52 @@
 /=  semantic  /lib/semantic
 /=  config  /lib/config
 /=  check  /lib/check
+/=  job  /lib/job
 |%
 +$  fz-outcome  ?(%ok %rejected %bailed %budget)
 ::  a failing case: which run, what it produced, and the input that did it
 +$  fz-fail     [i=@ud out=fz-outcome inp=@t]
 ::
 ++  fz-run
-  ::  run `runs` seeded cases and return only the FAILURES, in order. The seed
-  ::  fixes the whole run, so a reported failure replays exactly.
+  ::  run `runs` seeded cases in ONE pass, returning both the FAILURES (each
+  ::  carrying the input that caused it) and how many cases the stage actually
+  ::  produced a result for.
+  ::
+  ::  Both in one pass on purpose. The two were separate arms until the shard
+  ::  became the slowest in the suite -- every stage ran twice, once to collect
+  ::  failures and once to count reach, for numbers that come from the same
+  ::  seeded sequence. Merging them halves the work and puts each stage's floor
+  ::  next to the run it describes.
   |=  $:  seed=@
           runs=@ud
           gen=$-([@ud _og] [@t _og])
           stage=$-(@t fz-outcome)
       ==
-  ^-  (list fz-fail)
+  ^-  [fails=(list fz-fail) ok=@ud]
   =/  rng  ~(. og seed)
   =/  i  0
+  =/  ok  0
   =|  acc=(list fz-fail)
-  |-  ^-  (list fz-fail)
-  ?:  =(i runs)  (flop acc)
+  |-  ^-  [fails=(list fz-fail) ok=@ud]
+  ?:  =(i runs)  [(flop acc) ok]
   =^  inp  rng  (gen i rng)
   =/  out  (stage inp)
-  ?:  ?=(?(%ok %rejected) out)  $(i +(i), rng rng)
+  ?:  ?=(?(%ok %rejected) out)
+    $(i +(i), rng rng, ok ?:(?=(%ok out) +(ok) ok))
   $(i +(i), rng rng, acc [[i out inp] acc])
+::
+++  expect-clean
+  ::  a stage passes when nothing bailed or hit a cap AND the mutations still
+  ::  REACH it at least `floor` times. Without the floor an arm passes trivially
+  ::  when every mutation is rejected at the parse step and the stage under test
+  ::  never runs -- the fuzz form of a differential that has stopped measuring.
+  ::  Pass a floor of 0 where reach is not a meaningful notion (the parser
+  ::  accepts almost no random token soup, and a decoding arm has no parse step)
+  |=  [r=[fails=(list fz-fail) ok=@ud] floor=@ud]
+  ^-  tang
+  %+  weld
+    (expect-eq !>(`(list fz-fail)`~) !>(fails.r))
+  (expect-eq !>(%.y) !>((gte ok.r floor)))
 ::
 ::  +|  Generators
 ::
@@ -205,28 +228,6 @@
   ==
 ::
 ::
-++  fz-reach
-  ::  the same run, counting how many cases the stage actually PRODUCED A
-  ::  RESULT for. A fuzz arm that only asserts "no bails" passes trivially if
-  ::  every mutation is rejected at the parse step and never reaches the stage
-  ::  under test, so the reach is asserted, not assumed (R1.2.2)
-  |=  $:  seed=@
-          runs=@ud
-          gen=$-([@ud _og] [@t _og])
-          stage=$-(@t fz-outcome)
-      ==
-  ^-  @ud
-  =/  rng  ~(. og seed)
-  =/  i  0
-  =/  ok  0
-  |-  ^-  @ud
-  ?:  =(i runs)  ok
-  =^  inp  rng  (gen i rng)
-  =/  out  (stage inp)
-  $(i +(i), rng rng, ok ?:(?=(%ok out) +(ok) ok))
-::
-::  +|  Stage adapters
-::
 ++  fz-parse
   ::  the parser: any input must give a clean accept or reject, never a bail
   |=  inp=@t
@@ -341,138 +342,155 @@
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
 ::
+::  +|  R1.2.5: decoding a persisted continuation
+::
+::  The only surface where the hostile input is a STORED NOUN rather than a
+::  spec. `+load-kont` is `;;(kont (cue k.c))` -- a bare coercion over an atom
+::  that survived a restart, a state migration, or a disk. It crashes on
+::  anything that is not a valid `kont`, which is FINE only because every one of
+::  its three call sites wraps it in `mule` and treats the failure as a typed
+::  outcome (`+step` fails the job with a restart notice, the two read-routing
+::  arms fall through). This arm drives the PRODUCTION entry, `+step`, so it
+::  tests that contract rather than the unguarded internal arm.
+::
+++  gen-atom
+  ::  a random atom -- garbage where a jammed continuation should be. Includes
+  ::  0 and small atoms, which `cue` treats specially
+  |=  bits=@ud
+  ^-  $-([@ud _og] [@t _og])
+  |=  [i=@ud rng=_og]
+  ^-  [@t _og]
+  =^  a  rng  (rads:rng (bex bits))
+  [`@t`a rng]
+::
+++  gen-corrupt
+  ::  a VALID jammed continuation with one bit flipped, or truncated -- the
+  ::  shapes a real disk or a version skew produces, which pure garbage does not
+  |=  base=@
+  ^-  $-([@ud _og] [@t _og])
+  |=  [i=@ud rng=_og]
+  ^-  [@t _og]
+  =/  w  (met 0 base)
+  ?:  =(0 w)  [`@t`base rng]
+  =^  op  rng  (rads:rng 2)
+  =^  b   rng  (rads:rng w)
+  ?:  =(0 op)  [`@t`(mix base (bex b)) rng]
+  [`@t`(end [0 b] base) rng]
+::
+++  fz-kont
+  ::  a corrupt continuation must fail the JOB, never the event
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  j=job-3:job  *job-3:job
+  =.  cont.j  `[%1 `@`inp]
+  =/  r  (mule |.((step:job j 1 `@da`0)))
+  ?:  ?=(%| -.r)  %bailed
+  %ok
+::
+::
 ::  +|  Arms
 ::
-::  200 reproducible random parses, none may bail
+::  One arm per stage: each runs its seeds ONCE and asserts both "nothing
+::  bailed or hit a cap" and "the mutations still reached the stage at least
+::  N times". The reach numbers are exact and reproducible (fixed seeds);
+::  those measured on the R1.2.2-.5 ship runs are named beside each floor.
+::
+::  200 reproducible random parses, none may bail. No reach floor: a random
+::  token soup essentially never parses, and that is the point of the arm
 ++  test-fuzz-parser-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xdead.beef 200 (gen-module 12) fz-parse))
+  %+  expect-clean
+    (fz-run 0xdead.beef 200 (gen-module 12) fz-parse)
+  0
 ::
 ::  a different seed, longer bodies -- still no bail
 ++  test-fuzz-parser-no-crash-long
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xf00d 120 (gen-module 30) fz-parse))
+  %+  expect-clean
+    (fz-run 0xf00d 120 (gen-module 30) fz-parse)
+  0
 ::
-::  raw non-module garbage parses cleanly (never bails)
 ++  garbage
   ^-  (list @t)
   :~  ''  '~~~~'  '===='  '---- MODULE'  '(((((('  'MODULE x =='
       '\\A \\E \\A :'  '{{{{}}}}'  '[]_[]_'  '<<<<>>>>'
   ==
 ::
+::  raw non-module garbage parses cleanly (never bails)
 ++  test-fuzz-garbage-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0x1 (lent garbage) (gen-fixed garbage) fz-parse))
+  %+  expect-clean
+    (fz-run 0x1 (lent garbage) (gen-fixed garbage) fz-parse)
+  0
 ::
-::  the runner itself: it must REPORT a bail and a budget rather than pass them,
-::  and must carry the offending input back. Synthetic stages, so this stays
-::  true whatever the port does
-::  +|  R1.2.2 arms: semantic graph + config
+::  +|  R1.2.2 arms: semantic graph + config  (reach measured 99 / 91 / 29 / 16)
 ::
-++  test-fuzz-sem-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0001 200 (gen-mutate base-modules) fz-sem))
+++  test-fuzz-sem
+  %+  expect-clean
+    (fz-run 0xbeef.0001 200 (gen-mutate base-modules) fz-sem)
+  60
 ::
-++  test-fuzz-cfg-parse-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0002 200 (gen-mutate base-cfgs) fz-cfg))
+++  test-fuzz-cfg-parse
+  %+  expect-clean
+    (fz-run 0xbeef.0002 200 (gen-mutate base-cfgs) fz-cfg)
+  60
 ::
-++  test-fuzz-runspec-cfg-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>
-  %-  fz-run
-  :*  0xbeef.0003
-      150
-      (gen-mutate base-cfgs)
-      (fz-runspec-cfg (snag 0 `(list @t)`base-modules))
-  ==
+++  test-fuzz-runspec-cfg
+  %+  expect-clean
+    %-  fz-run
+    :*  0xbeef.0003  150
+        (gen-mutate base-cfgs)
+        (fz-runspec-cfg (snag 0 `(list @t)`base-modules))
+    ==
+  15
 ::
-++  test-fuzz-runspec-spec-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>
-  %-  fz-run
-  :*  0xbeef.0004
-      150
-      (gen-mutate base-modules)
-      (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
-  ==
+++  test-fuzz-runspec-spec
+  %+  expect-clean
+    %-  fz-run
+    :*  0xbeef.0004  150
+        (gen-mutate base-modules)
+        (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
+    ==
+  8
 ::
-::  Reach floors. The seeds are fixed, so these counts are exact and
-::  reproducible; measured on the R1.2.2 ship run they are 99 / 91 / 29 / 16.
-::  The floors sit well below, so ordinary drift does not trip them -- but a
-::  change that stops mutations reaching a stage, or makes a stage reject
-::  everything, fails here instead of leaving the arms above passing on nothing.
-++  test-fuzz-reach-floors
-  ;:  weld
-    %+  expect-eq  !>(%.y)
-    !>  (gte (fz-reach 0xbeef.0001 200 (gen-mutate base-modules) fz-sem) 60)
-  ::
-    %+  expect-eq  !>(%.y)
-    !>  (gte (fz-reach 0xbeef.0002 200 (gen-mutate base-cfgs) fz-cfg) 60)
-  ::
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          %-  fz-reach
-          :*  0xbeef.0003  150  (gen-mutate base-cfgs)
-              (fz-runspec-cfg (snag 0 `(list @t)`base-modules))
-          ==
-        15
-  ::
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          %-  fz-reach
-          :*  0xbeef.0004  150  (gen-mutate base-modules)
-              (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
-          ==
-        8
-  ::
-  ::  the liveness arms reach less often -- `check:check` needs a module that
-  ::  parses, resolves AND validates against the .cfg, and a temporal PROPERTY.
-  ::  Measured 10 / 40 and 12 / 40 on the R1.2.3 ship run
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          (fz-reach 0xbeef.0005 40 (gen-mutate ~[live-module]) (fz-check live-cfg))
-        5
-  ::
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          (fz-reach 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module))
-        6
-  ::
-  ::  the SAFETY arms reach least of all: the base has a five-line body, so a
-  ::  single line edit breaks it more often than not. Measured 5 / 40 and
-  ::  8 / 40, which is why the module arm runs 80 cases rather than 40 --
-  ::  thin reach is a finding, not something to hide behind a low floor
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          (fz-reach 0xbeef.0007 80 (gen-mutate ~[safety-module]) (fz-check safety-cfg))
-        5
-  ::
-    %+  expect-eq  !>(%.y)
-    !>  %+  gte
-          (fz-reach 0xbeef.0008 40 (gen-mutate ~[safety-cfg]) (fz-check-cfg safety-module))
-        4
-  ==
+::  +|  R1.2.3 arms: temporal normalizer + liveness  (reach measured 10 / 12)
 ::
-::  +|  R1.2.3 arms: temporal normalizer + liveness
+++  test-fuzz-live-module
+  %+  expect-clean
+    (fz-run 0xbeef.0005 40 (gen-mutate ~[live-module]) (fz-check live-cfg))
+  5
 ::
-++  test-fuzz-live-module-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0005 40 (gen-mutate ~[live-module]) (fz-check live-cfg)))
-::
-++  test-fuzz-live-cfg-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module)))
+++  test-fuzz-live-cfg
+  %+  expect-clean
+    (fz-run 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module))
+  6
 ::
 ::  +|  R1.2.4 arms: the evaluator, through the safety search
 ::
-++  test-fuzz-safety-module-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0007 80 (gen-mutate ~[safety-module]) (fz-check safety-cfg)))
+::  These reach least of all -- the base has a five-line body, so a single line
+::  edit breaks it more often than not. Measured 5 / 40 and 8 / 40, which is why
+::  the module arm runs 80 cases: thin reach is a finding, not something to hide
+::  behind a low floor
+++  test-fuzz-safety-module
+  %+  expect-clean
+    (fz-run 0xbeef.0007 80 (gen-mutate ~[safety-module]) (fz-check safety-cfg))
+  5
 ::
-++  test-fuzz-safety-cfg-no-crash
-  %+  expect-eq  !>(`(list fz-fail)`~)
-  !>((fz-run 0xbeef.0008 40 (gen-mutate ~[safety-cfg]) (fz-check-cfg safety-module)))
+++  test-fuzz-safety-cfg
+  %+  expect-clean
+    (fz-run 0xbeef.0008 40 (gen-mutate ~[safety-cfg]) (fz-check-cfg safety-module))
+  4
+::
+::  +|  R1.2.5 arms: decoding. No reach floor -- there is no parse step to be
+::  rejected at, so every case reaches `+step` by construction
+::
+++  test-fuzz-kont-garbage
+  %+  expect-clean
+    (fz-run 0xbeef.0009 200 (gen-atom 64) fz-kont)
+  0
+::
+::  bit-flips and truncations of a REAL jammed continuation
+++  test-fuzz-kont-corrupt
+  %+  expect-clean
+    (fz-run 0xbeef.000a 200 (gen-corrupt (jam `kont:job`[%load *lcur:job])) fz-kont)
+  0
 ::
 ++  test-fuzz-runner-classifies
   =/  bail-stage  |=(inp=@t ^-(fz-outcome =/(r (mule |.(!!)) ?:(?=(%| -.r) %bailed %ok))))
@@ -481,9 +499,18 @@
   =/  rej-stage  |=(inp=@t `fz-outcome`%rejected)
   =/  one  (gen-fixed ~['abc'])
   ;:  weld
-    (expect-eq !>(`(list fz-fail)`~[[0 %bailed 'abc']]) !>((fz-run 0x2 1 one bail-stage)))
-    (expect-eq !>(`(list fz-fail)`~[[0 %budget 'abc']]) !>((fz-run 0x2 1 one budget-stage)))
-    (expect-eq !>(`(list fz-fail)`~) !>((fz-run 0x2 1 one ok-stage)))
-    (expect-eq !>(`(list fz-fail)`~) !>((fz-run 0x2 1 one rej-stage)))
+    %+  expect-eq  !>(`[(list fz-fail) @ud]`[~[[0 %bailed 'abc']] 0])
+    !>((fz-run 0x2 1 one bail-stage))
+  ::
+    %+  expect-eq  !>(`[(list fz-fail) @ud]`[~[[0 %budget 'abc']] 0])
+    !>((fz-run 0x2 1 one budget-stage))
+  ::
+  ::  the ok stage COUNTS, the rejected stage does not -- that difference is
+  ::  what every reach floor rests on
+    %+  expect-eq  !>(`[(list fz-fail) @ud]`[~ 1])
+    !>((fz-run 0x2 1 one ok-stage))
+  ::
+    %+  expect-eq  !>(`[(list fz-fail) @ud]`[~ 0])
+    !>((fz-run 0x2 1 one rej-stage))
   ==
 --
