@@ -150,6 +150,32 @@
       %2.272  (mp-subst 'The formula %1% at %2% is an action-level formula (i.e., it contains no temporal operators). Only temporal-level (or state-level) formulas are allowed under PROPERTY or PROPERTIES. To check that action %1% holds in *every* step of the behavior, define a temporal property: Let A be the formula at %2%; rewrite A as [][A]_v, where v is a state function (typically the tuple of variables) (compare page 90 of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).' params)
       %2.279  'Declaring symmetry during liveness checking is dangerous. It might cause TLC to miss violations of the stated liveness properties. Please check liveness without symmetry defined.'
       %2.281  (mp-subst 'The configuration file substitutes constant %1% with non-constant %2%%3%' params)
+  ::
+  ::  R1.2.6: the progress / coverage / trace family. These are the codes a
+  ::  real CONSUMER of `-tool` output sees -- measured from the 20 recorded TLC
+  ::  streams in vscode-tlaplus's parser fixtures, which is where this list
+  ::  comes from rather than from what the port happens to emit today.
+      %2.103  (mp-subst 'The error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0a%1%' params)
+      %2.121  'The behavior up to this point is:'
+      %2.189  'Computing initial states...'
+      %2.194  (mp-subst 'The depth of the complete state graph search is %1%.' params)
+      %2.199  (mp-subst '%1% states generated, %2% distinct states found, %3% states left on queue.' params)
+      %2.202  'End of statistics.'
+      %2.212  (mp-subst 'Implied-temporal checking--satisfiability problem has %1% branches.' params)
+      ::  TLAConstants.STUTTERING is appended, not a parameter
+      %2.218  (mp-subst '%1%: Stuttering' params)
+      %2.219  'SANY finished.'
+      %2.220  'Starting SANY...'
+      %2.221  (mp-subst '  %1%: %2%' params)
+      %2.262  (mp-subst 'TLC2 %1%' params)
+      %2.264  (mp-subst 'The following behavior constitutes a counter-example:\0a' params)
+      %2.268  (mp-subst 'The average outdegree of the complete state graph is %2% (minimum is %1%, the maximum %4% and the 95th percentile is %3%).' params)
+      %2.269  (mp-subst 'Computed %1% initial states...' params)
+      %2.772  (mp-subst '%1%: %2%:%3%' params)
+      %2.773  (mp-subst '%1%: %2%:%3%' params)
+      %2.774  (mp-subst '%1%' params)
+      %2.775  (mp-subst '  %1%: %2%:%3%' params)
+      %3.002  'Parsing or semantic analysis failed.'
       %5.001  (mp-subst 'TLC encountered the following error when trying to read the configuration file %1%:\0a%2%' params)
       %5.002  (mp-subst 'TLC found an error in the configuration file at line %1%\0a' params)
       %5.003  (mp-subst 'TLC found an error in the configuration file at line %1%\0aThe keyword %2% was not followed by an identifier.' params)

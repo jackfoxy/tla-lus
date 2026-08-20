@@ -604,17 +604,537 @@
     `diagnostic`[[%tlc 2.281] %error %config 'The configuration file substitutes constant c with non-constant x plus' ~ ~]
   %.n
 ::
-++  test-5001-23-tool
+++  test-2103-23-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2103:1 @!@!@\0aThe error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3\0a@!@!@ENDMSG 2103 @!@!@'
+  !>  (mp-message:diag 1 2.103 ~['line 3'] %.y)
+::
+++  test-2103-23-plain
+  %+  expect-eq
+    !>  'Error: The error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3'
+  !>  (mp-message:diag 1 2.103 ~['line 3'] %.n)
+::
+++  test-dr-2103-23-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2103:1 @!@!@\0aThe error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3\0a@!@!@ENDMSG 2103 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.103] %error %config 'The error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3' ~ ~]
+  %.y
+::
+++  test-dr-2103-23-plain
+  %+  expect-eq
+    !>  'Error: The error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.103] %error %config 'The error occurred when TLC was evaluating the nested\0aexpressions at the following positions:\0aline 3' ~ ~]
+  %.n
+::
+++  test-2121-24-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2121:1 @!@!@\0aThe behavior up to this point is:\0a@!@!@ENDMSG 2121 @!@!@'
+  !>  (mp-message:diag 1 2.121 ~ %.y)
+::
+++  test-2121-24-plain
+  %+  expect-eq
+    !>  'Error: The behavior up to this point is:'
+  !>  (mp-message:diag 1 2.121 ~ %.n)
+::
+++  test-dr-2121-24-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2121:1 @!@!@\0aThe behavior up to this point is:\0a@!@!@ENDMSG 2121 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.121] %error %config 'The behavior up to this point is:' ~ ~]
+  %.y
+::
+++  test-dr-2121-24-plain
+  %+  expect-eq
+    !>  'Error: The behavior up to this point is:'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.121] %error %config 'The behavior up to this point is:' ~ ~]
+  %.n
+::
+++  test-2189-25-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2189:1 @!@!@\0aComputing initial states...\0a@!@!@ENDMSG 2189 @!@!@'
+  !>  (mp-message:diag 1 2.189 ~ %.y)
+::
+++  test-2189-25-plain
+  %+  expect-eq
+    !>  'Error: Computing initial states...'
+  !>  (mp-message:diag 1 2.189 ~ %.n)
+::
+++  test-dr-2189-25-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2189:1 @!@!@\0aComputing initial states...\0a@!@!@ENDMSG 2189 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.189] %error %config 'Computing initial states...' ~ ~]
+  %.y
+::
+++  test-dr-2189-25-plain
+  %+  expect-eq
+    !>  'Error: Computing initial states...'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.189] %error %config 'Computing initial states...' ~ ~]
+  %.n
+::
+++  test-2194-26-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2194:1 @!@!@\0aThe depth of the complete state graph search is 7.\0a@!@!@ENDMSG 2194 @!@!@'
+  !>  (mp-message:diag 1 2.194 ~['7'] %.y)
+::
+++  test-2194-26-plain
+  %+  expect-eq
+    !>  'Error: The depth of the complete state graph search is 7.'
+  !>  (mp-message:diag 1 2.194 ~['7'] %.n)
+::
+++  test-dr-2194-26-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2194:1 @!@!@\0aThe depth of the complete state graph search is 7.\0a@!@!@ENDMSG 2194 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.194] %error %config 'The depth of the complete state graph search is 7.' ~ ~]
+  %.y
+::
+++  test-dr-2194-26-plain
+  %+  expect-eq
+    !>  'Error: The depth of the complete state graph search is 7.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.194] %error %config 'The depth of the complete state graph search is 7.' ~ ~]
+  %.n
+::
+++  test-2199-27-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2199:1 @!@!@\0a10 states generated, 5 distinct states found, 0 states left on queue.\0a@!@!@ENDMSG 2199 @!@!@'
+  !>  (mp-message:diag 1 2.199 ~['10' '5' '0'] %.y)
+::
+++  test-2199-27-plain
+  %+  expect-eq
+    !>  'Error: 10 states generated, 5 distinct states found, 0 states left on queue.'
+  !>  (mp-message:diag 1 2.199 ~['10' '5' '0'] %.n)
+::
+++  test-dr-2199-27-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2199:1 @!@!@\0a10 states generated, 5 distinct states found, 0 states left on queue.\0a@!@!@ENDMSG 2199 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.199] %error %config '10 states generated, 5 distinct states found, 0 states left on queue.' ~ ~]
+  %.y
+::
+++  test-dr-2199-27-plain
+  %+  expect-eq
+    !>  'Error: 10 states generated, 5 distinct states found, 0 states left on queue.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.199] %error %config '10 states generated, 5 distinct states found, 0 states left on queue.' ~ ~]
+  %.n
+::
+++  test-2202-28-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2202:1 @!@!@\0aEnd of statistics.\0a@!@!@ENDMSG 2202 @!@!@'
+  !>  (mp-message:diag 1 2.202 ~ %.y)
+::
+++  test-2202-28-plain
+  %+  expect-eq
+    !>  'Error: End of statistics.'
+  !>  (mp-message:diag 1 2.202 ~ %.n)
+::
+++  test-dr-2202-28-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2202:1 @!@!@\0aEnd of statistics.\0a@!@!@ENDMSG 2202 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.202] %error %config 'End of statistics.' ~ ~]
+  %.y
+::
+++  test-dr-2202-28-plain
+  %+  expect-eq
+    !>  'Error: End of statistics.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.202] %error %config 'End of statistics.' ~ ~]
+  %.n
+::
+++  test-2212-29-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2212:1 @!@!@\0aImplied-temporal checking--satisfiability problem has 2 branches.\0a@!@!@ENDMSG 2212 @!@!@'
+  !>  (mp-message:diag 1 2.212 ~['2'] %.y)
+::
+++  test-2212-29-plain
+  %+  expect-eq
+    !>  'Error: Implied-temporal checking--satisfiability problem has 2 branches.'
+  !>  (mp-message:diag 1 2.212 ~['2'] %.n)
+::
+++  test-dr-2212-29-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2212:1 @!@!@\0aImplied-temporal checking--satisfiability problem has 2 branches.\0a@!@!@ENDMSG 2212 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.212] %error %config 'Implied-temporal checking--satisfiability problem has 2 branches.' ~ ~]
+  %.y
+::
+++  test-dr-2212-29-plain
+  %+  expect-eq
+    !>  'Error: Implied-temporal checking--satisfiability problem has 2 branches.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.212] %error %config 'Implied-temporal checking--satisfiability problem has 2 branches.' ~ ~]
+  %.n
+::
+++  test-2218-30-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2218:1 @!@!@\0a3: Stuttering\0a@!@!@ENDMSG 2218 @!@!@'
+  !>  (mp-message:diag 1 2.218 ~['3'] %.y)
+::
+++  test-2218-30-plain
+  %+  expect-eq
+    !>  'Error: 3: Stuttering'
+  !>  (mp-message:diag 1 2.218 ~['3'] %.n)
+::
+++  test-dr-2218-30-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2218:1 @!@!@\0a3: Stuttering\0a@!@!@ENDMSG 2218 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.218] %error %config '3: Stuttering' ~ ~]
+  %.y
+::
+++  test-dr-2218-30-plain
+  %+  expect-eq
+    !>  'Error: 3: Stuttering'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.218] %error %config '3: Stuttering' ~ ~]
+  %.n
+::
+++  test-2219-31-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2219:1 @!@!@\0aSANY finished.\0a@!@!@ENDMSG 2219 @!@!@'
+  !>  (mp-message:diag 1 2.219 ~ %.y)
+::
+++  test-2219-31-plain
+  %+  expect-eq
+    !>  'Error: SANY finished.'
+  !>  (mp-message:diag 1 2.219 ~ %.n)
+::
+++  test-dr-2219-31-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2219:1 @!@!@\0aSANY finished.\0a@!@!@ENDMSG 2219 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.219] %error %config 'SANY finished.' ~ ~]
+  %.y
+::
+++  test-dr-2219-31-plain
+  %+  expect-eq
+    !>  'Error: SANY finished.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.219] %error %config 'SANY finished.' ~ ~]
+  %.n
+::
+++  test-2220-32-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2220:1 @!@!@\0aStarting SANY...\0a@!@!@ENDMSG 2220 @!@!@'
+  !>  (mp-message:diag 1 2.220 ~ %.y)
+::
+++  test-2220-32-plain
+  %+  expect-eq
+    !>  'Error: Starting SANY...'
+  !>  (mp-message:diag 1 2.220 ~ %.n)
+::
+++  test-dr-2220-32-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2220:1 @!@!@\0aStarting SANY...\0a@!@!@ENDMSG 2220 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.220] %error %config 'Starting SANY...' ~ ~]
+  %.y
+::
+++  test-dr-2220-32-plain
+  %+  expect-eq
+    !>  'Error: Starting SANY...'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.220] %error %config 'Starting SANY...' ~ ~]
+  %.n
+::
+++  test-2221-33-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2221:1 @!@!@\0a  Init: 5\0a@!@!@ENDMSG 2221 @!@!@'
+  !>  (mp-message:diag 1 2.221 ~['Init' '5'] %.y)
+::
+++  test-2221-33-plain
+  %+  expect-eq
+    !>  'Error:   Init: 5'
+  !>  (mp-message:diag 1 2.221 ~['Init' '5'] %.n)
+::
+++  test-dr-2221-33-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2221:1 @!@!@\0a  Init: 5\0a@!@!@ENDMSG 2221 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.221] %error %config '  Init: 5' ~ ~]
+  %.y
+::
+++  test-dr-2221-33-plain
+  %+  expect-eq
+    !>  'Error:   Init: 5'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.221] %error %config '  Init: 5' ~ ~]
+  %.n
+::
+++  test-2262-34-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2262:1 @!@!@\0aTLC2 Version 2.18\0a@!@!@ENDMSG 2262 @!@!@'
+  !>  (mp-message:diag 1 2.262 ~['Version 2.18'] %.y)
+::
+++  test-2262-34-plain
+  %+  expect-eq
+    !>  'Error: TLC2 Version 2.18'
+  !>  (mp-message:diag 1 2.262 ~['Version 2.18'] %.n)
+::
+++  test-dr-2262-34-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2262:1 @!@!@\0aTLC2 Version 2.18\0a@!@!@ENDMSG 2262 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.262] %error %config 'TLC2 Version 2.18' ~ ~]
+  %.y
+::
+++  test-dr-2262-34-plain
+  %+  expect-eq
+    !>  'Error: TLC2 Version 2.18'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.262] %error %config 'TLC2 Version 2.18' ~ ~]
+  %.n
+::
+++  test-2264-35-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2264:1 @!@!@\0aThe following behavior constitutes a counter-example:\0a\0a@!@!@ENDMSG 2264 @!@!@'
+  !>  (mp-message:diag 1 2.264 ~ %.y)
+::
+++  test-2264-35-plain
+  %+  expect-eq
+    !>  'Error: The following behavior constitutes a counter-example:\0a'
+  !>  (mp-message:diag 1 2.264 ~ %.n)
+::
+++  test-dr-2264-35-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2264:1 @!@!@\0aThe following behavior constitutes a counter-example:\0a\0a@!@!@ENDMSG 2264 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.264] %error %config 'The following behavior constitutes a counter-example:\0a' ~ ~]
+  %.y
+::
+++  test-dr-2264-35-plain
+  %+  expect-eq
+    !>  'Error: The following behavior constitutes a counter-example:\0a'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.264] %error %config 'The following behavior constitutes a counter-example:\0a' ~ ~]
+  %.n
+::
+++  test-2268-36-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2268:1 @!@!@\0aThe average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).\0a@!@!@ENDMSG 2268 @!@!@'
+  !>  (mp-message:diag 1 2.268 ~['1' '2' '3' '4'] %.y)
+::
+++  test-2268-36-plain
+  %+  expect-eq
+    !>  'Error: The average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).'
+  !>  (mp-message:diag 1 2.268 ~['1' '2' '3' '4'] %.n)
+::
+++  test-dr-2268-36-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2268:1 @!@!@\0aThe average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).\0a@!@!@ENDMSG 2268 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.268] %error %config 'The average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).' ~ ~]
+  %.y
+::
+++  test-dr-2268-36-plain
+  %+  expect-eq
+    !>  'Error: The average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.268] %error %config 'The average outdegree of the complete state graph is 2 (minimum is 1, the maximum 4 and the 95th percentile is 3).' ~ ~]
+  %.n
+::
+++  test-2269-37-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2269:1 @!@!@\0aComputed 12 initial states...\0a@!@!@ENDMSG 2269 @!@!@'
+  !>  (mp-message:diag 1 2.269 ~['12'] %.y)
+::
+++  test-2269-37-plain
+  %+  expect-eq
+    !>  'Error: Computed 12 initial states...'
+  !>  (mp-message:diag 1 2.269 ~['12'] %.n)
+::
+++  test-dr-2269-37-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2269:1 @!@!@\0aComputed 12 initial states...\0a@!@!@ENDMSG 2269 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.269] %error %config 'Computed 12 initial states...' ~ ~]
+  %.y
+::
+++  test-dr-2269-37-plain
+  %+  expect-eq
+    !>  'Error: Computed 12 initial states...'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.269] %error %config 'Computed 12 initial states...' ~ ~]
+  %.n
+::
+++  test-2772-38-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2772:1 @!@!@\0aNext: 4:9\0a@!@!@ENDMSG 2772 @!@!@'
+  !>  (mp-message:diag 1 2.772 ~['Next' '4' '9'] %.y)
+::
+++  test-2772-38-plain
+  %+  expect-eq
+    !>  'Error: Next: 4:9'
+  !>  (mp-message:diag 1 2.772 ~['Next' '4' '9'] %.n)
+::
+++  test-dr-2772-38-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2772:1 @!@!@\0aNext: 4:9\0a@!@!@ENDMSG 2772 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.772] %error %config 'Next: 4:9' ~ ~]
+  %.y
+::
+++  test-dr-2772-38-plain
+  %+  expect-eq
+    !>  'Error: Next: 4:9'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.772] %error %config 'Next: 4:9' ~ ~]
+  %.n
+::
+++  test-2773-39-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2773:1 @!@!@\0aInit: 1:1\0a@!@!@ENDMSG 2773 @!@!@'
+  !>  (mp-message:diag 1 2.773 ~['Init' '1' '1'] %.y)
+::
+++  test-2773-39-plain
+  %+  expect-eq
+    !>  'Error: Init: 1:1'
+  !>  (mp-message:diag 1 2.773 ~['Init' '1' '1'] %.n)
+::
+++  test-dr-2773-39-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2773:1 @!@!@\0aInit: 1:1\0a@!@!@ENDMSG 2773 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.773] %error %config 'Init: 1:1' ~ ~]
+  %.y
+::
+++  test-dr-2773-39-plain
+  %+  expect-eq
+    !>  'Error: Init: 1:1'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.773] %error %config 'Init: 1:1' ~ ~]
+  %.n
+::
+++  test-2774-40-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2774:1 @!@!@\0aProp\0a@!@!@ENDMSG 2774 @!@!@'
+  !>  (mp-message:diag 1 2.774 ~['Prop'] %.y)
+::
+++  test-2774-40-plain
+  %+  expect-eq
+    !>  'Error: Prop'
+  !>  (mp-message:diag 1 2.774 ~['Prop'] %.n)
+::
+++  test-dr-2774-40-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2774:1 @!@!@\0aProp\0a@!@!@ENDMSG 2774 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.774] %error %config 'Prop' ~ ~]
+  %.y
+::
+++  test-dr-2774-40-plain
+  %+  expect-eq
+    !>  'Error: Prop'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.774] %error %config 'Prop' ~ ~]
+  %.n
+::
+++  test-2775-41-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2775:1 @!@!@\0a  v: 2:3\0a@!@!@ENDMSG 2775 @!@!@'
+  !>  (mp-message:diag 1 2.775 ~['v' '2' '3'] %.y)
+::
+++  test-2775-41-plain
+  %+  expect-eq
+    !>  'Error:   v: 2:3'
+  !>  (mp-message:diag 1 2.775 ~['v' '2' '3'] %.n)
+::
+++  test-dr-2775-41-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 2775:1 @!@!@\0a  v: 2:3\0a@!@!@ENDMSG 2775 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.775] %error %config '  v: 2:3' ~ ~]
+  %.y
+::
+++  test-dr-2775-41-plain
+  %+  expect-eq
+    !>  'Error:   v: 2:3'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 2.775] %error %config '  v: 2:3' ~ ~]
+  %.n
+::
+++  test-3002-42-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 3002:1 @!@!@\0aParsing or semantic analysis failed.\0a@!@!@ENDMSG 3002 @!@!@'
+  !>  (mp-message:diag 1 3.002 ~ %.y)
+::
+++  test-3002-42-plain
+  %+  expect-eq
+    !>  'Error: Parsing or semantic analysis failed.'
+  !>  (mp-message:diag 1 3.002 ~ %.n)
+::
+++  test-dr-3002-42-tool
+  %+  expect-eq
+    !>  '@!@!@STARTMSG 3002:1 @!@!@\0aParsing or semantic analysis failed.\0a@!@!@ENDMSG 3002 @!@!@'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 3.002] %error %config 'Parsing or semantic analysis failed.' ~ ~]
+  %.y
+::
+++  test-dr-3002-42-plain
+  %+  expect-eq
+    !>  'Error: Parsing or semantic analysis failed.'
+  !>
+  %+  diag-render:diag
+    `diagnostic`[[%tlc 3.002] %error %config 'Parsing or semantic analysis failed.' ~ ~]
+  %.n
+::
+++  test-5001-43-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5001:1 @!@!@\0aTLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom\0a@!@!@ENDMSG 5001 @!@!@'
   !>  (mp-message:diag 1 5.001 ~['MC.cfg' 'boom'] %.y)
 ::
-++  test-5001-23-plain
+++  test-5001-43-plain
   %+  expect-eq
     !>  'Error: TLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom'
   !>  (mp-message:diag 1 5.001 ~['MC.cfg' 'boom'] %.n)
 ::
-++  test-dr-5001-23-tool
+++  test-dr-5001-43-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5001:1 @!@!@\0aTLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom\0a@!@!@ENDMSG 5001 @!@!@'
   !>
@@ -622,7 +1142,7 @@
     `diagnostic`[[%tlc 5.001] %error %config 'TLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom' ~ ~]
   %.y
 ::
-++  test-dr-5001-23-plain
+++  test-dr-5001-43-plain
   %+  expect-eq
     !>  'Error: TLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom'
   !>
@@ -630,17 +1150,17 @@
     `diagnostic`[[%tlc 5.001] %error %config 'TLC encountered the following error when trying to read the configuration file MC.cfg:\0aboom' ~ ~]
   %.n
 ::
-++  test-5002-24-tool
+++  test-5002-44-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5002:1 @!@!@\0aTLC found an error in the configuration file at line 5\0a\0a@!@!@ENDMSG 5002 @!@!@'
   !>  (mp-message:diag 1 5.002 ~['5'] %.y)
 ::
-++  test-5002-24-plain
+++  test-5002-44-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0a'
   !>  (mp-message:diag 1 5.002 ~['5'] %.n)
 ::
-++  test-dr-5002-24-tool
+++  test-dr-5002-44-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5002:1 @!@!@\0aTLC found an error in the configuration file at line 5\0a\0a@!@!@ENDMSG 5002 @!@!@'
   !>
@@ -648,7 +1168,7 @@
     `diagnostic`[[%tlc 5.002] %error %config 'TLC found an error in the configuration file at line 5\0a' ~ ~]
   %.y
 ::
-++  test-dr-5002-24-plain
+++  test-dr-5002-44-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0a'
   !>
@@ -656,17 +1176,17 @@
     `diagnostic`[[%tlc 5.002] %error %config 'TLC found an error in the configuration file at line 5\0a' ~ ~]
   %.n
 ::
-++  test-5003-25-tool
+++  test-5003-45-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5003:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.\0a@!@!@ENDMSG 5003 @!@!@'
   !>  (mp-message:diag 1 5.003 ~['5' 'INIT'] %.y)
 ::
-++  test-5003-25-plain
+++  test-5003-45-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.'
   !>  (mp-message:diag 1 5.003 ~['5' 'INIT'] %.n)
 ::
-++  test-dr-5003-25-tool
+++  test-dr-5003-45-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5003:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.\0a@!@!@ENDMSG 5003 @!@!@'
   !>
@@ -674,7 +1194,7 @@
     `diagnostic`[[%tlc 5.003] %error %config 'TLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.' ~ ~]
   %.y
 ::
-++  test-dr-5003-25-plain
+++  test-dr-5003-45-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.'
   !>
@@ -682,17 +1202,17 @@
     `diagnostic`[[%tlc 5.003] %error %config 'TLC found an error in the configuration file at line 5\0aThe keyword INIT was not followed by an identifier.' ~ ~]
   %.n
 ::
-++  test-5004-26-tool
+++  test-5004-46-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5004:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.\0a@!@!@ENDMSG 5004 @!@!@'
   !>  (mp-message:diag 1 5.004 ~['5' 'INIT'] %.y)
 ::
-++  test-5004-26-plain
+++  test-5004-46-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.'
   !>  (mp-message:diag 1 5.004 ~['5' 'INIT'] %.n)
 ::
-++  test-dr-5004-26-tool
+++  test-dr-5004-46-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5004:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.\0a@!@!@ENDMSG 5004 @!@!@'
   !>
@@ -700,7 +1220,7 @@
     `diagnostic`[[%tlc 5.004] %error %config 'TLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.' ~ ~]
   %.y
 ::
-++  test-dr-5004-26-plain
+++  test-dr-5004-46-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.'
   !>
@@ -708,17 +1228,17 @@
     `diagnostic`[[%tlc 5.004] %error %config 'TLC found an error in the configuration file at line 5\0aThe keyword INIT appeared twice.' ~ ~]
   %.n
 ::
-++  test-5006-27-tool
+++  test-5006-47-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5006:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aIt was expecting {, but did not find it.\0a@!@!@ENDMSG 5006 @!@!@'
   !>  (mp-message:diag 1 5.006 ~['5' '{'] %.y)
 ::
-++  test-5006-27-plain
+++  test-5006-47-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aIt was expecting {, but did not find it.'
   !>  (mp-message:diag 1 5.006 ~['5' '{'] %.n)
 ::
-++  test-dr-5006-27-tool
+++  test-dr-5006-47-tool
   %+  expect-eq
     !>  '@!@!@STARTMSG 5006:1 @!@!@\0aTLC found an error in the configuration file at line 5\0aIt was expecting {, but did not find it.\0a@!@!@ENDMSG 5006 @!@!@'
   !>
@@ -726,7 +1246,7 @@
     `diagnostic`[[%tlc 5.006] %error %config 'TLC found an error in the configuration file at line 5\0aIt was expecting {, but did not find it.' ~ ~]
   %.y
 ::
-++  test-dr-5006-27-plain
+++  test-dr-5006-47-plain
   %+  expect-eq
     !>  'Error: TLC found an error in the configuration file at line 5\0aIt was expecting {, but did not find it.'
   !>

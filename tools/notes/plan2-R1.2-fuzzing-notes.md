@@ -414,3 +414,77 @@ rejection.
 `fuzz` **15/15**. The shard is now the slowest in the suite — `test-fuzz-reach-floors` alone is
 ~5 minutes, since it re-runs every stage to count reach — which is worth weighing before `.6` adds
 more.
+
+## R1.2.5b — halving the shard
+
+The shard had become the slowest in the suite, and the reason was structural rather than
+algorithmic: **every stage ran twice**. `+fz-run` walked the seeded sequence to collect failures and
+`+fz-reach` walked the *same* sequence again to count how many cases reached the stage — two passes
+for two numbers that come out of one.
+
+`+fz-run` now returns both (`[fails ok]`), `+fz-reach` is gone, and a new `+expect-clean` asserts
+the pair: nothing bailed or hit a cap, **and** the mutations still reached the stage at least
+`floor` times. The per-stage arm and its floor merged with it, so each stage's threshold now sits
+next to the run it describes instead of in a separate arm at the bottom of the file.
+
+**Measured: 15 arms → 14, and the shard went from roughly 12 minutes to 378 s.**
+
+Two details worth keeping:
+
+- Arms where reach is not a meaningful notion pass `0`: the parser accepts almost no random token
+  soup (that is the point of the arm), and the decoding arms have no parse step to be rejected at,
+  so every case reaches `+step` by construction. Writing the `0` explicitly is better than omitting
+  the concept, because it records that the question was asked.
+- `test-fuzz-runner-classifies` now also pins the **count**: the `%ok` stage contributes 1 and the
+  `%rejected` stage contributes 0. That difference is what every reach floor rests on, so the
+  synthetic test asserts it rather than leaving it implicit.
+
+## R1.2.6 — fixture expansion
+
+### The fixtures are a consumer's, not a producer's — so they are used as a VOCABULARY
+
+`vscode-tlaplus/tests/fixtures/parsers/tlc` holds **20 recorded TLC `-tool` output streams**, and
+the Toolbox has the same shape of resource. They cannot be used as a differential directly: they are
+inputs to a *parser* of TLC output, while this port is a *producer* of it. What they can do is
+answer a question nothing else in the repo could — **which tagged messages does a real consumer
+actually see?**
+
+Extracting every `@!@!@STARTMSG <code>:<class>` from the 20 streams gives **38 distinct EC codes**.
+`gen-mp-tests` covered 24 codes, and only 3 of them overlap. **35 of the 38 codes a consumer sees
+were not in the MP differential at all.**
+
+That is a better target list than the one the port had been working from, which was implicitly
+"the codes the port already emits".
+
+### What landed: 20 codes, and why not all 35
+
+| family | codes added |
+|---|---|
+| progress / stats | 2189, 2194, 2199, 2262, 2268, 2269 |
+| SANY lifecycle | 2219, 2220 |
+| coverage | 2202, 2221, 2772, 2773, 2774, 2775 |
+| trace | 2121, 2218, 2264 |
+| errors | 2103, 2212, 3002 |
+
+`gen-mp-tests` 28 → 48 vectors, 112 → **192 cases**, all green.
+
+The other 15 are censused with reasons rather than skipped silently:
+
+- **Seven embed a timestamp.** `TLC_STARTING`, `TLC_FINISHED`, `TLC_INIT_GENERATED1`,
+  `TLC_CHECKING_TEMPORAL_PROPS(_END)`, `TLC_PROGRESS_STATS`, `TLC_COVERAGE_START` all splice
+  `now()` into the message body. A golden captured from `MP.getMessage` would not reproduce on
+  re-capture, so `validate.py`'s byte-reproducibility gate would fail on them. Pinning these needs
+  a projection that elides the timestamp — a change to `MPDump`, not a vector.
+- **Four are conditional on parameter count or content** (`TLC_SUCCESS`, `TLC_BACK_TO_STATE`,
+  `TLC_STATE_PRINT2`, `GENERAL`), so each needs several vectors and branch-faithful Hoon rather
+  than one template.
+- **Two are out of scope** and already excluded by the ledger: `TLC_ENVIRONMENT_JVM_GC` (a JVM
+  concept) and `TLC_MODULE_OVERRIDE_STDOUT` (a user-supplied Java override class).
+- **Two** (`TLC_MODE_MC` with 13 parameters, `TLC_LIVE_IMPLIED_DEBUG`) are shaped for a run
+  configuration the port does not reproduce.
+
+### One correction the fixtures forced
+
+`TLC_STATE_PRINT3` is `"%1%:"` **plus `TLAConstants.STUTTERING`** — an appended constant, not a
+parameter. Reading the template alone gives `3:`; the oracle says `3: Stuttering`. The differential
+caught it on the first run, which is the argument for adding vectors rather than reading templates.
