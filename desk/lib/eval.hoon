@@ -4,6 +4,24 @@
 |%
   ::  Constant-Expression Evaluation And Canonical TLC Values
   ::
+  ::  SCOPE (R1.2.4): the CST EVALUATOR below (`+eval` over a `node`, and
+  ::  `+eval-text`) is TEST-ONLY. It is reached from `tests/lib/eval` alone --
+  ::  the 37-case `tlc2.REPL` differential -- and from no production path;
+  ::  R1.4.4 retired it when `lib/node-eval` became the production evaluator.
+  ::  What production imports from this library is its TYPES (`value`,
+  ::  `vfield`, `vpair`) and four CST helpers (`kids-of`, `is-kind`, `op-name`,
+  ::  `genid-name`).
+  ::
+  ::  That is why its `!!` sites are exempt from R1.2's no-bail invariant: no
+  ::  user input can reach them. R1.2.4 weighed DELETING the driver to remove
+  ::  them and decided against it -- the 37 REPL expressions are bare
+  ::  expressions with no module context, and `gen-core-eval-tests`'s 20 cases
+  ::  are arity-0 DEFINITIONS inside modules, so the coverage is not duplicated
+  ::  without authoring 37 new fixtures and goldens. Removing 19 unreachable
+  ::  assertions is not worth losing a differential. Every `!!` here is now
+  ::  LABELLED, though: an unlabelled bail costs a debugging cycle to re-derive
+  ::  even in test-only code (R1.6.0 paid exactly that).
+  ::
   ::  A first increment of unit 9: evaluate a constant-level TLA+
   ::  expression (as parsed by lib/syntax) to a canonical TLC value
   ::  and render it exactly as the `tlc2.REPL` oracle does. Values are
@@ -525,9 +543,9 @@
   =/  range
     =/  ks  kids
     |-  ^-  node
-    ?~  ks  !!
+    ?~  ks  ~|(%eval-qbound-no-in !!)
     ?:  &(?=(%leaf -.i.ks) =(%t-in kind.token.i.ks))
-      ?~(t.ks !! i.t.ks)
+      ?~(t.ks ~|(%eval-qbound-no-range !!) i.t.ks)
     $(ks t.ks)
   [vars range]
 ::
@@ -566,8 +584,9 @@
   |=  kids=(list node)
   ^-  node
   |-  ^-  node
-  ?~  kids  !!
-  ?:  &(?=(%leaf -.i.kids) =(%colon kind.token.i.kids))  !!
+  ?~  kids  ~|(%eval-no-expr-before-colon !!)
+  ?:  &(?=(%leaf -.i.kids) =(%colon kind.token.i.kids))
+    ~|(%eval-empty-expr-before-colon !!)
   ?:  ?=(%node -.i.kids)  i.kids
   $(kids t.kids)
 ::
@@ -576,10 +595,10 @@
   |=  kids=(list node)
   ^-  node
   |-  ^-  node
-  ?~  kids  !!
+  ?~  kids  ~|(%eval-no-colon !!)
   ?:  &(?=(%leaf -.i.kids) =(%colon kind.token.i.kids))
     |-  ^-  node
-    ?~  t.kids  !!
+    ?~  t.kids  ~|(%eval-no-expr-after-colon !!)
     ?:  ?=(%node -.i.t.kids)  i.t.kids
     $(t.kids t.t.kids)
   $(kids t.kids)

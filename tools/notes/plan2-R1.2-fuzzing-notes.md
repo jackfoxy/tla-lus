@@ -324,3 +324,50 @@ module that parses, resolves *and* validates against its cfg, with a temporal PR
 
 The wet-gate-on-a-narrowed-list hazard bit twice more in one increment: `(snag …)` and `(lien …)`
 both nest-fail with `-have.%~` after a `?~`. Guard with `=(~ x)` and cast at the call site.
+
+## R1.2.4 — the evaluator
+
+### The CST decision: exempt, not delete — and the reason is a differential, not sentiment
+
+`.0` measured that 19 of the 29 `!!` sites are in `lib/eval`'s CST evaluator, reached only from
+`tests/lib/eval`, and re-scoped this increment to a decision. The decision is **keep it**, and the
+argument is about coverage rather than about the assertions:
+
+- `tests/lib/eval` is the **37-case `tlc2.REPL` differential** over *bare expressions*
+  (`1 + 2 * 3`, `10 \div 3`, `"hello"`), evaluated by `+eval-text`.
+- `gen-core-eval-tests`'s 20 cases are arity-0 **definitions inside modules**, evaluated by
+  `lib/node-eval` against `EvalDump`.
+
+They are not the same corpus and the coverage is not duplicated. Deleting the CST driver would mean
+re-authoring 37 expression cases as module fixtures with new goldens — a real loss of oracle
+coverage, traded for removing assertions **no user input can reach**. Not worth it.
+
+What *was* worth doing is the cheap half: **all six unlabelled `!!` are now labelled**
+(`%eval-qbound-no-in`, `%eval-qbound-no-range`, `%eval-no-expr-before-colon`,
+`%eval-empty-expr-before-colon`, `%eval-no-colon`, `%eval-no-expr-after-colon`). An unlabelled bail
+costs a debugging cycle to re-derive even in test-only code — R1.6.0 paid exactly that price on a
+labelled-but-uninformative one. The scope decision and its reasoning are now in the library header,
+so the exemption is discoverable from the code rather than only from this note.
+
+That discharges DoD item 3: **no unlabelled `!!` remains anywhere in port code**, and the
+test-only carve-out is explicit.
+
+### Fuzzing the production evaluator
+
+`lib/node-eval` has **zero** `!!` — its failures are already typed (`eval-err`). So the target here
+is not a bail surface but the solver: does init/next state solving survive mutated input?
+
+There is no smaller text-driven entry than the checker, so `.4` reuses `.3`'s adapters with
+**safety** bases — `INIT`/`NEXT` with an `INVARIANT`, which drives the BFS and therefore
+`+init-states`/`+next-states`, rather than the liveness engine. Two arms, module-mutated and
+cfg-mutated.
+
+Reach measured **5 / 40** and **8 / 40** — the lowest of any stage, because the safety base has a
+five-line body and a single line edit breaks it more often than not. Rather than hide that behind a
+low floor, the module arm now runs **80** cases instead of 40, and the floors (5 and 4) are recorded
+next to the measurement. Thin reach is a finding.
+
+### Result
+
+`fuzz` **13/13**; 120 mutated safety cases, no bails and no budget hits. `eval` (37) and
+`core-eval` (20) unchanged and green — the labelling touched no behavior — and `node-eval` green.

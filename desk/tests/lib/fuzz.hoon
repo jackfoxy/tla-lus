@@ -328,6 +328,18 @@
   ^-  @t
   'SPECIFICATION Spec\0aPROPERTY Live\0a'
 ::
+++  safety-module
+  ::  a safety base: INIT/NEXT with an INVARIANT, so the run exercises
+  ::  `lib/node-eval`'s init/next SOLVING through the BFS rather than the
+  ::  liveness engine. There is no smaller text-driven entry to the evaluator
+  ::  -- it is reached through the checker (R1.2.4)
+  ^-  @t
+  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x \\in 0..2 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aInv == x \\in 0..2\0a====\0a'
+::
+++  safety-cfg
+  ^-  @t
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ::
 ::  +|  Arms
 ::
@@ -426,6 +438,20 @@
     !>  %+  gte
           (fz-reach 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module))
         6
+  ::
+  ::  the SAFETY arms reach least of all: the base has a five-line body, so a
+  ::  single line edit breaks it more often than not. Measured 5 / 40 and
+  ::  8 / 40, which is why the module arm runs 80 cases rather than 40 --
+  ::  thin reach is a finding, not something to hide behind a low floor
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          (fz-reach 0xbeef.0007 80 (gen-mutate ~[safety-module]) (fz-check safety-cfg))
+        5
+  ::
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          (fz-reach 0xbeef.0008 40 (gen-mutate ~[safety-cfg]) (fz-check-cfg safety-module))
+        4
   ==
 ::
 ::  +|  R1.2.3 arms: temporal normalizer + liveness
@@ -437,6 +463,16 @@
 ++  test-fuzz-live-cfg-no-crash
   %+  expect-eq  !>(`(list fz-fail)`~)
   !>((fz-run 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module)))
+::
+::  +|  R1.2.4 arms: the evaluator, through the safety search
+::
+++  test-fuzz-safety-module-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0007 80 (gen-mutate ~[safety-module]) (fz-check safety-cfg)))
+::
+++  test-fuzz-safety-cfg-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0008 40 (gen-mutate ~[safety-cfg]) (fz-check-cfg safety-module)))
 ::
 ++  test-fuzz-runner-classifies
   =/  bail-stage  |=(inp=@t ^-(fz-outcome =/(r (mule |.(!!)) ?:(?=(%| -.r) %bailed %ok))))
