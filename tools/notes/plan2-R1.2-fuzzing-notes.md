@@ -253,3 +253,74 @@ test pass is a test that has stopped measuring.
 `(snag i bases)` on a list narrowed by `?~ bases` nest-fails the wet gate with `-have.%~` — the
 zuse-408 hazard this repo keeps hitting. Use `=(0 (lent bases))` for the guard and cast at the call
 site: `(snag bi `(list @t)`bases)`.
+
+## R1.2.3 — temporal normalizer + liveness
+
+### The fixture came first, and it found a second bug
+
+Per the reduce-and-freeze procedure, `.0`'s crash was committed **before** being fixed:
+`test-data/liveness/conj-statepred` (`Live == <>(x = 1 /\ y = 0)`), with its oracle goldens captured
+by `gen-liveness-tests.py` — corpus 16 → 17 cases, `temporal-struct` 16 → 17 arms,
+`liveness-product` 15 → 16.
+
+That ordering paid immediately. Fixing the reported bail turned the arm from a crash into a
+**structural mismatch**, which the R1.6.2 `TBGRAPH` projection then made legible:
+
+```
+expected  TABLEAU 1 / TBINIT 1
+          {[]-<line 6, col 12-25>, -<line 6, col 12-25>, ()[]-<line 6, col 12-25>}
+
+actual    TABLEAU 2 / TBINIT 2
+          {[]\/ (-<col 12-16>) \/ (-<col 21-25>), ...}
+```
+
+tlc2 keeps `x = 1 /\ y = 0` as **one** `LNState` leaf spanning the whole conjunction. The port had
+built a `%conj` of two `%state` leaves, so `pushNeg` applied De Morgan to it and produced a
+two-node tableau where tlc2 builds one. Without the projection this would have been a silent
+structural divergence behind a correct verdict.
+
+### Two fixes, and only one of them is the parity fix
+
+**The normalizer (parity).** `+ast:temporal` built `[%conj …]` / `[%disj …]` unconditionally. tlc2's
+`OPCODE_cl`/`OPCODE_dl` build the junction, check its level, and **discard it for a level-based leaf
+of the original expression when it is at or below action level**. That is the same rule the
+negation, the implication, the if-then-else and the user-operator branch already follow here — the
+junction cases were simply missed. With it, `x = 1 /\ y = 0` is one `%state` leaf and the tableau
+matches.
+
+**`+st-pred-bool` (robustness).** It bailed `%tlc-live-statepred-junction` on `%conj`/`%disj` where
+its sibling `+cs-eval` evaluates them, and `+state-preds-of` can hand it a level-1 junction because
+`le-level` of a `%conj` is the max of its children. tlc2 has no case analysis here at all —
+`TBGraphNode.isConsistent` calls `tool.isValid` on the expression whatever its shape. The junction
+cases are now evaluated.
+
+The normalizer fix alone makes `conj-statepred` pass; the `+st-pred-bool` fix is kept because R1.2
+is a robustness unit and a level-1 junction can reach that arm by other routes. The remaining five
+bails there are above state level, where a particle member cannot be a state predicate, so reaching
+them would be a real invariant violation rather than an input shape — that argument is now in the
+code.
+
+### The first adapter over a stage that iterates
+
+`+fz-check` / `+fz-check-cfg` run the whole checker — normalize, tableau, product, SCC, lasso —
+over a mutated module (cfg fixed) and a mutated cfg (module fixed). These are the first adapters
+where `.1`'s budget obligation actually binds, and it is discharged rather than assumed:
+`check:check` carries `live-graph-cap` itself and renders a cap-hit as `Model checking stopped:
+state limit reached.`, which `+fz-check-lines` maps to `%budget`. Reach is measured by whether the
+output carries a `distinct states found` line — i.e. whether the checker really ran.
+
+Measured: **10 / 40** and **12 / 40**, lower than the `.2` stages because `check:check` needs a
+module that parses, resolves *and* validates against its cfg, with a temporal PROPERTY. Floors of
+5 and 6 added to `test-fuzz-reach-floors`.
+
+### Result
+
+`fuzz` **11/11**; 80 mutated liveness cases, no bails and no budget hits. `temporal`,
+`temporal-struct` (17), `tableau`, `liveness-{product,verdict,lasso,message,accept}`, `mc`,
+`sim-live`, `job`, `spec-decomp`, `trace` and `tier2` all green — the tier-2 liveness batch is still
+9/9, which matters because the normalizer change touches every liveness spec.
+
+### Hoon note
+
+The wet-gate-on-a-narrowed-list hazard bit twice more in one increment: `(snag …)` and `(lien …)`
+both nest-fail with `-have.%~` after a `?~`. Guard with `=(~ x)` and cast at the call site.

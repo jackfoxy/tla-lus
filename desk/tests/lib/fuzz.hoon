@@ -23,6 +23,7 @@
 /=  syntax  /lib/syntax
 /=  semantic  /lib/semantic
 /=  config  /lib/config
+/=  check  /lib/check
 |%
 +$  fz-outcome  ?(%ok %rejected %bailed %budget)
 ::  a failing case: which run, what it produced, and the input that did it
@@ -280,6 +281,54 @@
   ?:  ?=(%| -.r)  %bailed
   ?:(?=(%| -.p.r) %rejected %ok)
 ::
+++  fz-check-lines
+  ::  classify `check:check`'s terminal output. A run that produced state
+  ::  COUNTS actually reached the checker; a cap-hit is `%budget`; anything
+  ::  else is a typed rejection before the search
+  ::  `=(~ w)` rather than `?~ w`: a ?~-narrowed list nest-fails the WET `lien`
+  ::  with `-have.%~` (the zuse-408 hazard, hit again here)
+  |=  w=wain
+  ^-  fz-outcome
+  ?:  =(~ w)  %rejected
+  ?:  =('Model checking stopped: state limit reached.' (snag 0 `wain`w))  %budget
+  =/  ran
+    %+  lien  `wain`w
+    |=(l=@t ?=(^ (fand "distinct states found" (trip l))))
+  ?:(ran %ok %rejected)
+::
+++  fz-check
+  ::  the whole checker -- normalize, tableau, product, SCC, lasso -- over a
+  ::  mutated MODULE with the .cfg fixed. This is the first adapter over a stage
+  ::  that ITERATES, so the budget obligation from the header applies: it is
+  ::  discharged because `check:check` carries `live-graph-cap` itself and
+  ::  renders a cap-hit as the `state limit reached` line, which
+  ::  `+fz-check-lines` maps to `%budget`
+  |=  cfg=@t
+  ^-  $-(@t fz-outcome)
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((check:check inp cfg)))
+  ?:(?=(%| -.r) %bailed (fz-check-lines p.r))
+::
+++  fz-check-cfg
+  ::  the same with the MODULE fixed and the .cfg mutated
+  |=  spec=@t
+  ^-  $-(@t fz-outcome)
+  |=  inp=@t
+  ^-  fz-outcome
+  =/  r  (mule |.((check:check spec inp)))
+  ?:(?=(%| -.r) %bailed (fz-check-lines p.r))
+::
+++  live-module
+  ::  a liveness base: a SPECIFICATION with fairness and a temporal PROPERTY
+  ^-  @t
+  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x = 0 /\\ x\' = 1\0aB == x = 1 /\\ x\' = 0\0aNext == A \\/ B\0aSpec == Init /\\ [][Next]_x /\\ WF_x(A)\0aLive == <>[](x = 1)\0a====\0a'
+::
+++  live-cfg
+  ^-  @t
+  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+::
+::
 ::  +|  Arms
 ::
 ::  200 reproducible random parses, none may bail
@@ -364,7 +413,30 @@
               (fz-runspec-spec (snag 0 `(list @t)`base-cfgs))
           ==
         8
+  ::
+  ::  the liveness arms reach less often -- `check:check` needs a module that
+  ::  parses, resolves AND validates against the .cfg, and a temporal PROPERTY.
+  ::  Measured 10 / 40 and 12 / 40 on the R1.2.3 ship run
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          (fz-reach 0xbeef.0005 40 (gen-mutate ~[live-module]) (fz-check live-cfg))
+        5
+  ::
+    %+  expect-eq  !>(%.y)
+    !>  %+  gte
+          (fz-reach 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module))
+        6
   ==
+::
+::  +|  R1.2.3 arms: temporal normalizer + liveness
+::
+++  test-fuzz-live-module-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0005 40 (gen-mutate ~[live-module]) (fz-check live-cfg)))
+::
+++  test-fuzz-live-cfg-no-crash
+  %+  expect-eq  !>(`(list fz-fail)`~)
+  !>((fz-run 0xbeef.0006 40 (gen-mutate ~[live-cfg]) (fz-check-cfg live-module)))
 ::
 ++  test-fuzz-runner-classifies
   =/  bail-stage  |=(inp=@t ^-(fz-outcome =/(r (mule |.(!!)) ?:(?=(%| -.r) %bailed %ok))))

@@ -297,12 +297,27 @@
     (leaf s (sem-lvl s) env)
   =/  op  name.op.s
   =/  as  args.s
+  ::  A JUNCTION IS KEPT ONLY IF IT IS ABOVE ACTION LEVEL. tlc2 builds the
+  ::  LNConj/LNDisj, checks its level, and DISCARDS it for a level-based leaf of
+  ::  the original expression when it is <= ActionLevel (`OPCODE_cl`/`OPCODE_dl`,
+  ::  Liveness.java) -- the same rule the negation, the implication, the
+  ::  if-then-else and the user-operator branch already follow here. Without it
+  ::  `x = 1 /\ y = 0` became a `%conj` of two `%state` leaves instead of ONE
+  ::  `%state` leaf, which pushed the negation inward through De Morgan and
+  ::  built a two-node tableau where tlc2 builds one (corpus `conj-statepred`,
+  ::  found by R1.2.3).
   ?:  |(=(op '$ConjList') =(op '\\land'))
     =/  r  (ast-list as c env)
-    ?:(?=(%| -.r) r [%& [%conj p.r]])
+    ?:  ?=(%| -.r)  r
+    =/  j=live-expr  [%conj p.r]
+    =/  l  (le-level j)
+    ?:((gth l 2) [%& j] (leaf s l env))
   ?:  |(=(op '$DisjList') =(op '\\lor'))
     =/  r  (ast-list as c env)
-    ?:(?=(%| -.r) r [%& [%disj p.r]])
+    ?:  ?=(%| -.r)  r
+    =/  j=live-expr  [%disj p.r]
+    =/  l  (le-level j)
+    ?:((gth l 2) [%& j] (leaf s l env))
   ?:  =(op '[]')
     =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%all p.r]])

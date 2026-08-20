@@ -15,23 +15,36 @@
 +$  pg-key  [fp=@t tidx=@ud]        ::  a product node (state fingerprint, node)
 ::
 ++  st-pred-bool
-  ::  a tableau node's state predicate (level<=1: LNBool/LNState/LNNeg) at a
-  ::  state, via node-eval; an evaluation failure reads as inconsistent
+  ::  a tableau node's state predicate (level<=1) at a state, via node-eval; an
+  ::  evaluation failure reads as inconsistent.
+  ::
+  ::  JUNCTIONS ARE EVALUATED, NOT REFUSED. `+state-preds-of:tableau` keeps a
+  ::  particle member whose `le-level` is <= 1, and the level of a `%conj` is
+  ::  the MAX of its children — so a conjunction of two state predicates is a
+  ::  state predicate and arrives here. It used to bail
+  ::  `%tlc-live-statepred-junction` on `<>(x = 1 /\ y = 0)`, an ordinary
+  ::  liveness property TLC runs to a verdict (R1.2.0 found it by reading this
+  ::  arm against `+cs-eval`, which handles both cases; corpus case
+  ::  `conj-statepred`). tlc2 has no case analysis here at all —
+  ::  `TBGraphNode.isConsistent` calls `tool.isValid` on the expression
+  ::  whatever its shape.
   |=  [x=live-expr s0=state:ne env=eenv:ne]
   ^-  ?
   ?-  -.x
     %bool   b.x
     %neg    !(st-pred-bool b.x s0 env)
+    %conj   (levy cs.x |=(y=live-expr (st-pred-bool y s0 env)))
+    %disj   (lien ds.x |=(y=live-expr (st-pred-bool y s0 env)))
   ::
       %state
     =/  r  (pred-bool:ne p.x s0 ~ env)
     ?:(?=(%& -.r) p.r |)
   ::
+  ::  above state level a particle member cannot be a state predicate, so
+  ::  reaching these is a real invariant violation rather than an input shape
     %next     ~|(%tlc-live-statepred-next !!)
     %all      ~|(%tlc-live-statepred-temporal !!)
     %even     ~|(%tlc-live-statepred-temporal !!)
-    %conj     ~|(%tlc-live-statepred-junction !!)
-    %disj     ~|(%tlc-live-statepred-junction !!)
     %act      ~|(%tlc-live-statepred-action !!)
     %enabled  ~|(%tlc-live-statepred-enabled !!)
   ==

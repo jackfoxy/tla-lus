@@ -56,6 +56,21 @@
     ==
   !>((live-product:check psrc-boxdiamond-stutter pcfg-boxdiamond-stutter))
 ::
+++  psrc-conj-statepred  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = 1 - x /\\ y\' = y\0aLive == <>(x = 1 /\\ y = 0)\0a====\0a'
+++  pcfg-conj-statepred  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-product-conj-statepred
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'PRODUCT'
+        'OOS 1'
+        '--- 0 ---'
+        'NODES 1'
+        'INITS 1'
+        'PNODE 0 0 CS -'
+    ==
+  !>((live-product:check psrc-conj-statepred pcfg-conj-statepred))
+::
 ++  psrc-diamond-const-false  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aLive == <>FALSE\0a====\0a'
 ++  pcfg-diamond-const-false  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-product-diamond-const-false

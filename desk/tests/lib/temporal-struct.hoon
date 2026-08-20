@@ -61,6 +61,33 @@
     ==
   !>((live-struct-full:check src-boxdiamond-stutter cfg-boxdiamond-stutter))
 ::
+++  src-conj-statepred  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = 1 - x /\\ y\' = y\0aLive == <>(x = 1 /\\ y = 0)\0a====\0a'
+++  cfg-conj-statepred  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+++  test-struct-conj-statepred
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'LIVESTRUCT'
+        'OOS 1'
+        '--- 0 ---'
+        'PROMISES 0'
+        'CHECKSTATE 0'
+        'CHECKACTION 0'
+        'PEMS 1'
+        'TABLEAU 1'
+        'TBINIT 1'
+        'TBGRAPH'
+        'Node 0.'
+        '{[]-line 6, col 12 to line 6, col 25 of module A,'
+        ' -line 6, col 12 to line 6, col 25 of module A,'
+        ' ()[]-line 6, col 12 to line 6, col 25 of module A} --> 0 '
+        'ENDTBGRAPH'
+        'TF'
+        '[]-line 6, col 12 to line 6, col 25 of module A'
+        'ENDTF'
+    ==
+  !>((live-struct-full:check src-conj-statepred cfg-conj-statepred))
+::
 ++  src-diamond-const-false  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aLive == <>FALSE\0a====\0a'
 ++  cfg-diamond-const-false  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-struct-diamond-const-false
