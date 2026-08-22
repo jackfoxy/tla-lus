@@ -488,3 +488,72 @@ The other 15 are censused with reasons rather than skipped silently:
 `TLC_STATE_PRINT3` is `"%1%:"` **plus `TLAConstants.STUTTERING`** — an appended constant, not a
 parameter. Reading the template alone gives `3:`; the oracle says `3: Stuttering`. The differential
 caught it on the first run, which is the argument for adding vectors rather than reading templates.
+
+## R1.2.7 — close-out
+
+### The audit found a parity bug, which is the point of auditing rather than asserting
+
+DoD item 2 says every production-reachable `!!` must be **proven unreachable with the argument
+written down, or converted**. Doing that properly means checking each refusal against tlc2's own
+`getLevel()` and `eval()` for the node type — and the first thing that fell out was a divergence:
+
+> `LNNext.getLevel()` returns `ActionLevel` **unconditionally** (`LNNext.java:25`). The port
+> returned the **body's** level.
+
+So a `()P` over a state predicate read as state-level in the port, `+state-preds-of` kept it as a
+tableau state predicate where `TBGraphNode`'s constructor filters it out, and it then hit
+`%tlc-live-statepred-next`. The bail was not guarding an impossible case; it was guarding a case the
+port had created for itself.
+
+Two more conversions came from the same reading:
+
+- **ENABLED is state-level.** `LNStateEnabled extends LNState`, so it survives every `<= 1` filter
+  and tlc2 evaluates it through `tool.enabled`. `+st-pred-bool` and `+cs-eval` refused it. Both now
+  call `+enabled-eval`.
+- **`LNNext.eval` is `body.eval(tool, s2, Empty)`** — the body at the *successor*. `()P` is
+  action-level, so it can be a checkAction entry; `+ca-eval` now evaluates it instead of refusing.
+
+### The final surface: 21 → 16, every one argued in the code
+
+| class | count | argument |
+|---|---|---|
+| unreachable by a level filter | 10 | `+state-preds-of` keeps `le-level <= 1` exactly as `TBGraphNode` does; `+classify` bins checkState at `<= 1` and checkAction at `2`. Above those levels the entry cannot arrive |
+| unreachable by construction | 3 | `+render-value:config` (parseValue produces five shapes), `job`'s unplanned-stage (the plan is built, not supplied), `diagnostics`' unmapped-EC (45 codes mapped as of `.6`) |
+| tlc2 also fails here | 3 | EC 2249 `TLC_LIVE_ENCOUNTERED_ACTIONS`, EC 2214 `TLC_LIVE_WRONG_FORMULA_FORMAT`, EC 2251 `TLC_LIVE_CANNOT_EVAL_FORMULA` |
+
+The third class is the honest one to be careful about. These are **not** assertions the port should
+delete — tlc2 raises a numbered diagnostic and aborts in the same place. The difference is that
+those arms return a bare `?`, so the port has no channel for a typed rejection and bails instead.
+Same input refused, different rendering. Giving them a channel means threading `(each … aerr)`
+through `+consistent-at`, `+cs-bits`, `+ca-bits`, the product build and the SCC search — a
+calling-convention change, costed in `compatibility.md` rather than done.
+
+### Definition of done
+
+1. **Every stage past the parser has a seeded arm** — semantic graph, config parsing, the whole
+   `run-spec` path, the temporal normalizer and liveness engine, the evaluator through the safety
+   search, and the decoding of a persisted continuation. ~1,300 cases per run. ✅
+2. **Every production-reachable `!!` is argued or converted** — 16 sites, each with its reason
+   beside it; 5 were removed by conversion during `.3` and `.7`. ✅
+3. **No unlabelled `!!` in production-reachable code** — the six were all in the test-only CST
+   driver and are labelled anyway; the only remaining bare `!!` in the desk are the TLA+ operator in
+   the lexer and parser tables. ✅
+4. **Non-termination is a recorded failure** — `%budget`, with the adapter obligation documented in
+   three places. ✅
+5. **Every crash found is a committed fixture** — `conj-statepred`, found by `.0` and committed by
+   `.3` before being fixed. ✅
+6. **`doc/testing.md` describes the real coverage** — rewritten at `.1` and again here. ✅
+
+### Gates
+
+Full ship suite `-test /=tla-lus=/tests ~` **`ok=%.y`, 1851 OK, 0 FAILED / 0 CRASHED, 0 build
+errors**; `validate.py` byte-reproducible; `check-parity.py --check` well-formed (72 parity /
+13 approved-difference / 9 partial / 112 terminal, unchanged — R1.2 closes no rows by design).
+
+### What R1.2 actually bought
+
+Two real defects, neither of which any existing differential could see: a liveness bail on an
+ordinary `<>(P /\ Q)` property, and a junction that was normalized one level too eagerly and built
+the wrong tableau. Plus a level divergence found by the close-out audit. And the MP differential
+went from covering the codes the port emits to covering the codes a **consumer** sees — 112 → 192
+cases.

@@ -1122,7 +1122,7 @@
   =/  vars  (var-names:check tree)
   =/  order  (var-order:check tree)
   =/  modn  (module-name-of:check tree)
-  =/  nl    (next-span-label:check u.nb modn)
+  =/  nl    (next-span-label:check u.nx u.nb modn)
   =/  act=next-act
     =/  sp  (span-of:ast u.nb)
     `[u.nx ?~(sp ~ `[modn u.sp])]
@@ -1334,7 +1334,7 @@
       %-  wain-text
       %-  live-render:check
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-          generated.st  distinct.st  depth.st  ~
+          generated.st  distinct.st  depth.st  ~  'Next'
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1365,9 +1365,11 @@
     %-  live-render:check
     ::  the EC 2257/2259 stuttering hint needs the SPEC name/fairness, which the
     ::  sliced continuation does not carry; the console path (`check:check`)
-    ::  emits it. Known gap, R1.8.1.3
+    ::  emits it. Known gap, R1.8.1.3 — and the ROOT ACTION NAME is the same
+    ::  gap: `Next` here, where the console path passes `sctx`'s `aname`
+    ::  (`Action` under a SPECIFICATION). R1.1.R1
     :*  l  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-        generated.st  distinct.st  depth.st  ~
+        generated.st  distinct.st  depth.st  ~  'Next'
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
@@ -1499,7 +1501,7 @@
       ==
     ?~(hit act hit)
   :_  $(sts t.sts, i +(i), prev `i.sts)
-  [i a (state-pairs:check i.sts)]
+  [i a (state-pairs:check order i.sts)]
 ::
 ++  wain-text
   |=  w=wain

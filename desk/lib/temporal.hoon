@@ -145,7 +145,13 @@
     %state    1
     %enabled  1
     %act      2
-    %next     (le-level b.x)
+  ::  `LNNext.getLevel()` is ActionLevel UNCONDITIONALLY, not its body's
+  ::  (LNNext.java:25). The port returned the body's level, which let a `()P`
+  ::  over a state predicate read as state-level -- so `+state-preds-of` kept it
+  ::  as a tableau state predicate, where tlc2 filters it out, and it then hit
+  ::  a bail. Found by R1.2.7's audit of every bail against tlc2's own level
+  ::  and eval methods.
+    %next     2
     %neg      (le-level b.x)
     %all      3
     %even     3

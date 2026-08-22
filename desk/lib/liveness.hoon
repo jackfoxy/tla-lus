@@ -40,13 +40,20 @@
     =/  r  (pred-bool:ne p.x s0 ~ env)
     ?:(?=(%& -.r) p.r |)
   ::
-  ::  above state level a particle member cannot be a state predicate, so
-  ::  reaching these is a real invariant violation rather than an input shape
+  ::  ENABLED is `LNStateEnabled extends LNState`, so its level is VARIABLE and
+  ::  `+state-preds-of` keeps it -- tlc2 evaluates it here through
+  ::  `LNStateEnabled.eval` -> `tool.enabled`, and so must the port (R1.2.7)
+    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+  ::
+  ::  the rest are above state level -- `%act` and `%next` are ActionLevel,
+  ::  `%all`/`%even` TemporalLevel -- so `+state-preds-of`'s `le-level <= 1`
+  ::  filter removes them before they can arrive, exactly as
+  ::  `TBGraphNode`'s constructor does. Reaching one is an invariant violation,
+  ::  not an input shape
     %next     ~|(%tlc-live-statepred-next !!)
     %all      ~|(%tlc-live-statepred-temporal !!)
     %even     ~|(%tlc-live-statepred-temporal !!)
     %act      ~|(%tlc-live-statepred-action !!)
-    %enabled  ~|(%tlc-live-statepred-enabled !!)
   ==
 ::
 ++  consistent-at
@@ -263,8 +270,14 @@
     =/  r  (pred-bool:ne p.x s0 ~ env)
     ?:(?=(%& -.r) p.r |)
   ::
+  ::  ENABLED is state-level (`LNStateEnabled extends LNState`), so it can be a
+  ::  checkState entry and tlc2 evaluates it (R1.2.7)
+    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+  ::
+  ::  the rest are above state level, and a checkState entry is level <= 1 by
+  ::  construction (`+classify` bins `[]<>S` with `le-level <= 1` here and
+  ::  everything else into checkAction), so these cannot arrive
     %act      ~|(%tlc-live-checkstate-action !!)
-    %enabled  ~|(%tlc-live-checkstate-enabled !!)
     %all      ~|(%tlc-live-checkstate-temporal !!)
     %even     ~|(%tlc-live-checkstate-temporal !!)
     %next     ~|(%tlc-live-checkstate-next !!)
@@ -287,9 +300,17 @@
   ::
     %act      (act-eval box.x sub.x a.x s0 s1 env)
     %enabled  (enabled-eval box.x sub.x p.x s0 env)
-    %all      ~|(%tlc-live-checkaction-temporal !!)
-    %even     ~|(%tlc-live-checkaction-temporal !!)
-    %next     ~|(%tlc-live-checkaction-next !!)
+  ::  `LNNext.eval(tool, s1, s2)` is `body.eval(tool, s2, Empty)` -- the body at
+  ::  the SUCCESSOR state. `()P` is ActionLevel, so it can be a checkAction
+  ::  entry and must be evaluated rather than refused (R1.2.7)
+    %next     (cs-eval b.x s1 env)
+  ::
+  ::  `[]`/`<>` cannot be evaluated at a transition at all: tlc2 raises
+  ::  EC 2251 TLC_LIVE_CANNOT_EVAL_FORMULA (`LNAll.eval`/`LNEven.eval`). These
+  ::  arms return a bare `?`, so the port renders that as a bail rather than a
+  ::  diagnostic -- an approved difference, see compatibility.md
+    %all      ~|(%tlc-live-cannot-eval-formula !!)
+    %even     ~|(%tlc-live-cannot-eval-formula !!)
   ==
 ::
 ++  sub-val

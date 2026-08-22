@@ -11,7 +11,8 @@
 # 0 disagree with TLC (14/14 agree):
 
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
-# 0 disagree with TLC (9/9 agree):
+# 1 disagree with TLC (8/9 agree):
+tlc-liveness-batch	Github710d -> Error: Deadlock reached.	after a deadlock tlc2 STILL reports the violated temporal property and its counter-example (a second report block before the statistics); the port's R1.6.6 pre-emption emits the deadlock report alone. Same verdict, missing block — R1.6
 
 # subdir-batch (R1.1.6): 295 small-closure in-scope test-model subdir specs through +sany-verdict;
 # 0 disagree with Java (295/295 agree):

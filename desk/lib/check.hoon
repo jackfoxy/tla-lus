@@ -499,21 +499,35 @@
   ?~(ids '' (leaf-text i.ids))
 ::
 ++  state-pairs
-  ::  sorted [var rendered-value] pairs of a state
-  |=  st=state
+  ::  [var rendered-value] pairs of a state in TLC's DECLARATION order:
+  ::  `TLCStateMut.toString` walks `vars[i]`, which SpecProcessor fills from
+  ::  the root module's `getVariableDecls()` — the same order `+var-order`
+  ::  already computes for the FP64 byte order. A binding the order does not
+  ::  name follows in sorted order, so a rendering can never silently drop one
+  |=  [order=(list @t) st=state]
   ^-  (list [@t @t])
-  %+  turn  (sort ~(tap by st) |=([a=[k=@t *] b=[k=@t *]] (aor k.a k.b)))
-  |=  [k=@t v=value]
-  [k (crip (render:ev v))]
+  =/  named  (skim order |=(k=@t (~(has by st) k)))
+  =/  rest
+    %+  sort
+      %+  skim  ~(tap in ~(key by st))
+      |=(k=@t !(lien order |=(o=@t =(o k))))
+    aor
+  %+  turn  (weld named rest)
+  |=  k=@t
+  [k (crip (render:ev (~(got by st) k)))]
 ::
 ++  render-state
-  ::  variable bindings of a trace state, one `var = value` per line,
-  ::  variables in sorted order
-  |=  st=state
+  ::  a trace state's bindings, one per line. A SINGLE variable renders bare
+  ::  (`x = v`); two or more render as a conjunct list (`/\ x = v`) — exactly
+  ::  `TLCStateMut.toString`'s `vlen == 1` branch and its `else`
+  |=  [order=(list @t) st=state]
   ^-  wain
-  %+  turn  (state-pairs st)
+  =/  ps  (state-pairs order st)
+  =/  bare=?  ?=([* ~] ps)
+  %+  turn  ps
   |=  [k=@t v=@t]
-  (crip "{(trip k)} = {(trip v)}")
+  ?:  bare  (crip "{(trip k)} = {(trip v)}")
+  (crip "/\\ {(trip k)} = {(trip v)}")
 ::
 ++  render-trace
   ::  `State N: <label>` blocks; state 1 is the initial predicate, each later
@@ -538,7 +552,7 @@
   :_  $(trace t.trace, i +(i), prev `i.trace)
   ;:  weld
     ~[(crip "State {(a-tape i)}: {(trip label)}")]
-    (render-state i.trace)
+    (render-state order i.trace)
     ~['']
   ==
 ::
@@ -562,15 +576,20 @@
   ==
 ::
 ++  next-span-label
-  ::  `<Next line BL, col BC to line EL, col EC of module M>`
-  |=  [next-body=node modn=@t]
+  ::  `<NAME line BL, col BC to line EL, col EC of module M>` for the whole
+  ::  next-state relation. `nm` is the ROOT action name: the NEXT operator's
+  ::  name in INIT/NEXT mode, and `Action` when the relation came from a
+  ::  SPECIFICATION — tlc2 builds that action with a null `opDef`, so
+  ::  `Action.isNamed` is false and `getLocation` prints its generic
+  ::  `"Action"` (`Action.java:100-107`)
+  |=  [nm=@t next-body=node modn=@t]
   ^-  @t
   =/  sp  (span-of:ast next-body)
-  ?~  sp  '<Next>'
+  ?~  sp  (crip "<{(trip nm)}>")
   =*  s  u.sp
   %-  crip
   ;:  weld
-    "<Next line "  (a-tape line.from.s)  ", col "  (a-tape col.from.s)
+    "<"  (trip nm)  " line "  (a-tape line.from.s)  ", col "  (a-tape col.from.s)
     " to line "  (a-tape line.to.s)  ", col "  (a-tape col.to.s)
     " of module "  (trip modn)  ">"
   ==
@@ -861,7 +880,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [0 0 0 0 0 0 ~]
   =*  c  p.sc
-  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  pname  ?~(pp.c '' u.pp.c)
   =/  o=sim-opts
     [actions invs.c oss.c pname defs.c consts.c vars.c order.c traces depth]
@@ -916,7 +935,13 @@
       sloc=sspan:sem-lib                     ::  definition span, for the EC 2259
                                              ::  stuttering hint (R1.8.1.3)
       tree=node
-      nl=@t                                  ::  Next span label
+      aname=@t                               ::  ROOT action name: the NEXT
+                                             ::  operator's name, or `Action`
+                                             ::  under a SPECIFICATION (tlc2
+                                             ::  builds that action with a null
+                                             ::  opDef, so `Action.getLocation`
+                                             ::  prints its generic "Action")
+      nl=@t                                  ::  whole-relation span label
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -1164,9 +1189,10 @@
     =/  d  (~(get by defs) u.spec.ca)
     ?~(d ~ at.u.d)
   :-  %&
+  =/  aname=@t  ?~(nname.p.rt 'Action' u.nname.p.rt)
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
-      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree
-      ?~(nb '' (next-span-label u.nb modn))
+      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  aname
+      ?~(nb '' (next-span-label aname u.nb modn))
       p.or
   ==
 ::
@@ -1483,7 +1509,7 @@
   =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
   ?~  l  ~['(no lasso)']
   =/  modn     (module-name-of tree.c)
-  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  np    (lent prefix.u.l)
   =/  stut  =(%stuttering class.u.l)
   =/  marker-num    ?:(stut +(np) loop.u.l)
@@ -1505,7 +1531,7 @@
       ;:  weld
         ~[(crip "STATE {(scow %ud i)} {(fp-hex i.ps)}")]
         ~[label]
-        (render-state st)
+        (render-state order.c st)
         ~['ENDSTATE']
       ==
     $(ps t.ps, i +(i), prev `i.ps)
@@ -1545,6 +1571,7 @@
           gen=@ud  distinct=@ud  depth=@ud
           ::  context for the EC 2257/2259 stuttering hint (R1.8.1.3)
           sname=(unit @t)  sloc=sspan:sem-lib  fair=(list sem:sem-lib)
+          aname=@t                      ::  root action name (`sctx`'s)
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
   ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
@@ -1561,6 +1588,7 @@
   %-  live-render
   :*  l.hit  states  nsb  env  order  modn  defs  pname  gen  distinct  depth
       (stutter-gate o.hit sname sloc fair modn)
+      aname
   ==
 ::
 ++  live-render
@@ -1574,12 +1602,13 @@
           defs=(map @t sem-def:sem-lib)  pname=@t
           gen=@ud  distinct=@ud  depth=@ud
           gate=wain                     ::  EC 2257/2259 hint (R1.8.1.3)
+          aname=@t                      ::  root action name (`sctx`'s)
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
   ?~  l
     ['Model checking completed. No error has been found.' footer]
-  =/  actions  (get-actions nsb 'Next' defs)
+  =/  actions  (get-actions nsb aname defs)
   =/  np       (lent prefix.u.l)
   =/  stut     =(%stuttering class.u.l)
   ::  the numbered prefix states: state 1 is the initial predicate, each later
@@ -1597,7 +1626,7 @@
     %+  weld
       ;:  weld
         ~[(crip "State {(a-tape i)}: {(trip label)}")]
-        (render-state st)
+        (render-state order st)
       ==
     $(ps t.ps, i +(i), prev `i.ps)
   ::  the closer: a stuttering self-loop is a new numbered `State`, a
@@ -1699,7 +1728,7 @@
   =/  r
     %-  live-report
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
-        gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c
+        gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
     ==
   report.r
 ::
@@ -1868,7 +1897,7 @@
     ?^  binner
       =/  o=bfs-opts
         [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
-      =/  actions  (get-actions nsb.c 'Next' defs.c)
+      =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
       (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
@@ -1903,14 +1932,14 @@
     ::  tlc2's final check
     ?:  ?=(?(%deadlock %error) -.out.bg)
       %-  render-outcome
-      :*  out.bg  nl.c  (get-actions nsb.c 'Next' defs.c)
+      :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c)
           (make-env:ne defs.c consts.c vars.c)  order.c  modn
       ==
     =/  r
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
-          gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c
+          gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
       ==
     report.r
   ::  safety: an INVARIANT
@@ -1965,7 +1994,7 @@
   ?~  bad  [warn (safety-run c)]
   :+  warn
     (crip "Error: Property {(trip pname)} is violated by the initial state:")
-  (render-state u.bad)
+  (render-state order.c u.bad)
 ::
 ++  implied-action-run
   ::  an IMPLIED ACTION: tlc2 checks `[][A]_v`'s A on every transition, so a
@@ -1979,7 +2008,7 @@
   =/  o=bfs-opts
     [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
   =/  env      (make-env:ne defs.c consts.c vars.c)
-  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  modn     (module-name-of tree.c)
   ::  build the whole reachability graph, then scan every transition for the
   ::  first state whose successor breaks A. The trace is the behavior reaching
@@ -2025,7 +2054,7 @@
   |=  c=sctx
   ^-  wain
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
-  =/  actions  (get-actions nsb.c 'Next' defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
   (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
@@ -2059,7 +2088,7 @@
       ::  the recursive state mold fuse-loops the zuse-408 compiler)
       %+  weld
         ~[(crip "Error: Invariant {(trip name.res)} is violated by the initial state:")]
-      ?~(trace.res ~ (render-state i.trace.res))
+      ?~(trace.res ~ (render-state order i.trace.res))
     ;:  weld
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']

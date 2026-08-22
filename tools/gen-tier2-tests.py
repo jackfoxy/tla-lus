@@ -336,14 +336,30 @@ TLC_BATCH_REASONS = {}
 # and the arm ASSERTS this exact list, so a new divergence (or a fixed one)
 # fails the test rather than passing unnoticed.
 #
-# 9 of 9 agree. R1.6 closed the batch: R1.6.1 built the user-defined-operator
-# branch of `astToLiveAppl` (five `%tlc-live-wrong-formula-format` bails), and
-# R1.6.6 turned deadlock checking ON for the liveness graph build, so a deadlock
-# reached in the state search pre-empts the final liveness check exactly as it
-# does in tlc2 (`Github710d`/`Github710e`).
-TLC_LIVENESS_DIVERGENCES = []
+# 8 of 9 agree on the WHOLE projection (verdict + counts + depth + labelled
+# trace, R1.1.R1). R1.6 closed the batch on verdict+counts: R1.6.1 built the
+# user-defined-operator branch of `astToLiveAppl` (five
+# `%tlc-live-wrong-formula-format` bails), and R1.6.6 turned deadlock checking
+# ON for the liveness graph build, so a deadlock reached in the state search
+# pre-empts the final liveness report.
+#
+# R1.1.R1's trace comparison reopened exactly one of those: `Github710d`. Its
+# VERDICT is right (`Error: Deadlock reached.` on both sides) — what R1.6.6 got
+# wrong is the claim that tlc2's final liveness check "never runs". It does:
+# tlc2 prints the deadlock trace, THEN `Error: Temporal property NeverThree was
+# violated.` with its own counter-example, and only then the statistics. The
+# port emits the deadlock report alone. A second report block, not a different
+# answer — owned by R1.6, and reachable only by restructuring the `%deadlock`
+# path to append a liveness report before the counts.
+TLC_LIVENESS_DIVERGENCES = ["Github710d -> Error: Deadlock reached."]
 # grouped cause, keyed by module
-TLC_LIVENESS_REASONS = {}
+TLC_LIVENESS_REASONS = {
+    "Github710d": "after a deadlock tlc2 STILL reports the violated temporal "
+                  "property and its counter-example (a second report block "
+                  "before the statistics); the port's R1.6.6 pre-emption emits "
+                  "the deadlock report alone. Same verdict, missing block — "
+                  "R1.6",
+}
 # `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE
 # (no verdict in 480 s where TLC answers in 1.8 s over 5 distinct states). Root
 # cause found and fixed in R1.8.1.4 rather than censused: every liveness graph
@@ -565,28 +581,78 @@ def write_sany_shard():
         "  =/  ix  (fand \", \" t)",
         "  ?~  ix  l",
         "  (crip (slag (add 2 i.ix) t))",
-        "++  tlc-sum",
-        "  ::  verdict line + the distinct/queue counts (trace labels/depth are a",
-        "  ::  safety `partial` residue, compared in a later increment). The",
-        "  ::  verdict is SELECTED, not taken as the first line: tlc2 prints",
-        "  ::  warnings (EC 2255 state-level PROPERTY, 2279 symmetry) BEFORE it,",
-        "  ::  and the Java side of this comparator already skips them",
-        "  ::  (`tlc_summary`). Taking `i.w` compared a warning against a verdict",
-        "  ::  and read as a port divergence -- surfaced by R1.8.1.4's liveness",
-        "  ::  batch, the first specs here that warn.",
+        "++  sort-bindings",
+        "  ::  the bindings of each state block SORTED. tlc2 prints them in",
+        "  ::  `getVariableDecls()` order -- `java.util.Hashtable` bucket order",
+        "  ::  at the module context's final capacity, reversed by ModuleNode --",
+        "  ::  which is neither source nor sorted order (`DieHard`'s four",
+        "  ::  variables reproduce TLC's printed order only at capacity 191) and",
+        "  ::  which a different implementation cannot produce without emulating",
+        "  ::  the Java table. An APPROVED DIFFERENCE: same bindings, same",
+        "  ::  values, a line order that carries no meaning -- so both sides are",
+        "  ::  sorted before compare. See `doc/compatibility.md`.",
+        "  |=  t=(list @t)",
+        "  ^-  (list @t)",
+        "  =|  acc=(list @t)",
+        "  =|  blk=(list @t)",
+        "  |-  ^-  (list @t)",
+        "  ?~  t  (weld acc (sort blk aor))",
+        "  =/  s  (trip i.t)",
+        "  ?:  ?|(=(\"State \" (scag 6 s)) =(\"Back to state \" (scag 14 s)))",
+        "    $(t t.t, acc (weld acc (snoc (sort blk aor) i.t)), blk ~)",
+        "  $(t t.t, blk (snoc blk i.t))",
+        "++  trace-of",
+        "  ::  the labelled behavior trace: every non-blank line between tlc2's",
+        "  ::  `Error: The behavior up to this point is:` marker and the counts",
+        "  ::  line. Kept whole, bindings included -- a single-variable state",
+        "  ::  renders its binding bare (`x = 0`), so a `/\\\\ `-only filter would",
+        "  ::  compare labels over a trace whose values nothing checked.",
         "  |=  w=wain",
         "  ^-  (list @t)",
-        "  :~  =/  v",
-        "        %+  skim  w",
-        "        |=  l=@t",
-        "        =/  t  (trip l)",
-        "        ?|  =(\"Model checking completed\" (scag 24 t))",
-        "            =(\"Error:\" (scag 6 t))",
-        "        ==",
-        "      ?~(v '' i.v)",
-        "      =/  c  (skim w |=(l=@t ?=(^ (fand \"distinct states found\" (trip l)))))",
-        "      ?~(c '' (drop-gen i.c))",
-        "  ==",
+        "  =|  out=(list @t)",
+        "  =/  in=?  |",
+        "  |-  ^-  (list @t)",
+        "  ?~  w  (flop out)",
+        "  =/  t  (trip i.w)",
+        "  ?:  ?|  =(\"Error: The behavior up to this point is:\" t)",
+        "      =(\"Error: The following behavior constitutes a counter-example:\" t)",
+        "      ==",
+        "    $(w t.w, in &)",
+        "  ?.  in  $(w t.w)",
+        "  ?:  ?=(^ (fand \"states generated\" t))  (flop out)",
+        "  ?:  =(~ t)  $(w t.w)",
+        "  $(w t.w, out [i.w out])",
+        "++  tlc-sum",
+        "  ::  the WHOLE projection the tier-2 goldens carry (R1.1.R1): verdict",
+        "  ::  line, the distinct/queue counts, the search-depth line, and the",
+        "  ::  labelled behavior trace. The generated count stays dropped --",
+        "  ::  R1.1.R0 measured it still diverging on `DieHard` (253 vs 252) and",
+        "  ::  `Continue` (4 vs 3), a named two-spec residue. The verdict is",
+        "  ::  SELECTED, not taken as the first line: tlc2 prints warnings (EC",
+        "  ::  2255 state-level PROPERTY, 2279 symmetry) BEFORE it, and the Java",
+        "  ::  side of this comparator already skips them (`tlc_projection`).",
+        "  ::  Taking `i.w` compared a warning against a verdict and read as a",
+        "  ::  port divergence -- surfaced by R1.8.1.4's liveness batch, the",
+        "  ::  first specs here that warn.",
+        "  |=  w=wain",
+        "  ^-  (list @t)",
+        "  =/  v",
+        "    %+  skim  w",
+        "    |=  l=@t",
+        "    =/  t  (trip l)",
+        "    ?|  =(\"Model checking completed\" (scag 24 t))",
+        "        =(\"Error:\" (scag 6 t))",
+        "    ==",
+        "  =/  c  (skim w |=(l=@t ?=(^ (fand \"distinct states found\" (trip l)))))",
+        "  =/  d",
+        "    %+  skim  w",
+        "    |=(l=@t ?=(^ (fand \"depth of the complete state graph\" (trip l))))",
+        "  %+  weld",
+        "    :~  ?~(v '' i.v)",
+        "        ?~(c '' (drop-gen i.c))",
+        "        ?~(d '' i.d)",
+        "    ==",
+        "  (sort-bindings (trace-of w))",
         "++  sany-batch-run",
         "  ::  run each batch spec through +sany-verdict under +mule (a crash",
         "  ::  becomes a recorded outcome, not a test abort) and return the sorted",
@@ -640,8 +706,7 @@ def write_sany_shard():
             lines.append(f"      ['{name}' '{hcord(text)}']")
         lines += ["  =="]
     for corpus, sdir, module, cfg in TLC_CURATED:
-        verdict, counts = tlc_summary(module, Path(sdir), cfg)
-        counts = counts.split(", ", 1)[1] if ", " in counts else counts
+        proj = tlc_projection(module, Path(sdir), cfg)
         spec_text = read(Path(sdir) / f"{module}.tla")
         cfg_text = read(Path(sdir) / cfg)
         arm = module.lower().replace("_", "-")
@@ -650,8 +715,7 @@ def write_sany_shard():
             f"++  test-tlc-{arm}",
             "  %+  expect-eq",
             "    !>  ^-  (list @t)",
-            "    :~  '" + hcord(verdict) + "'",
-            "        '" + hcord(counts) + "'",
+            "    :~  " + "\n        ".join(f"'{hcord(l)}'" for l in proj),
             "    ==",
             "  !>",
             "  %-  tlc-sum",
@@ -700,11 +764,10 @@ def write_sany_shard():
         "  :~",
     ]
     for module in TLC_BATCH:
-        verdict, counts = tlc_summary(module, TESTMODEL, f"{module}.cfg")
-        dist = counts.split(", ", 1)[1] if ", " in counts else counts
+        proj = tlc_projection(module, TESTMODEL, f"{module}.cfg")
         spec_text = read(TESTMODEL / f"{module}.tla")
         cfg_text = read(TESTMODEL / f"{module}.cfg")
-        exp = f"~['{hcord(verdict)}' '{hcord(dist)}']"
+        exp = "~[" + " ".join(f"'{hcord(l)}'" for l in proj) + "]"
         lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
                      f"'{hcord(cfg_text)}']")
     lines += ["  =="]
@@ -727,11 +790,10 @@ def write_sany_shard():
         "  :~",
     ]
     for module in TLC_LIVENESS_BATCH:
-        verdict, counts = tlc_summary(module, TESTMODEL, f"{module}.cfg")
-        dist = counts.split(", ", 1)[1] if ", " in counts else counts
+        proj = tlc_projection(module, TESTMODEL, f"{module}.cfg")
         spec_text = read(TESTMODEL / f"{module}.tla")
         cfg_text = read(TESTMODEL / f"{module}.cfg")
-        exp = f"~['{hcord(verdict)}' '{hcord(dist)}']"
+        exp = "~[" + " ".join(f"'{hcord(l)}'" for l in proj) + "]"
         lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
                      f"'{hcord(cfg_text)}']")
     lines += ["  =="]
@@ -849,19 +911,71 @@ def run_tlc(module: str, spec_dir: Path, cfg: str) -> str:
     return r.stdout + r.stderr
 
 
-def tlc_summary(module: str, spec_dir: Path, cfg: str) -> tuple:
-    """The robust at-parity TLC signal a Hoon run reproduces: the raw verdict
-    line and the distinct-count line (trace-label / depth parity is a `partial`
-    residue, compared later). Returns (verdict-line, counts-line) exactly as
-    `check:check` renders them."""
-    verdict = counts = ""
-    for s in (l.rstrip() for l in run_tlc(module, spec_dir, cfg).splitlines()):
+def tlc_projection(module: str, spec_dir: Path, cfg: str) -> list:
+    """The WHOLE projection the tier-2 goldens carry (R1.1.R1), as `check:check`
+    renders it: the verdict line, the counts line MINUS the generated count, the
+    search-depth line, and the labelled behavior trace.
+
+    The generated count stays dropped: R1.1.R0 measured it still diverging on
+    `DieHard` (253 vs 252) and `Continue` (4 vs 3), so `+drop-gen` is a named
+    two-spec residue, not a stale workaround.
+
+    Unlike `norm_tlc`'s golden projection this keeps EVERY non-blank trace line,
+    not just the `/\\ ` ones: a single-variable state renders its binding bare
+    (`x = 0`, `TLCStateMut.toString`'s `vlen == 1` branch), and dropping those
+    would compare the labels of a trace whose bindings nothing checked."""
+    verdict = counts = depth = ""
+    trace, in_trace = [], False
+    for ln in run_tlc(module, spec_dir, cfg).splitlines():
+        s = ln.rstrip()
         if not verdict and (s.startswith("Model checking completed")
                             or s.startswith("Error:")):
             verdict = s
         if "distinct states found" in s:
             counts = s
-    return verdict, counts
+        if s.startswith("The depth of the complete state graph"):
+            depth = s
+        if (s.startswith("Error: The behavior up to this point is")
+                or s.startswith("Error: The following behavior "
+                                "constitutes a counter-example")):
+            in_trace = True
+            continue
+        if in_trace:
+            if "states generated" in s or s.startswith("Finished"):
+                in_trace = False
+            elif s:
+                trace.append(TEMP_PATH.sub("<path>", s))
+    if ", " in counts:
+        counts = counts.split(", ", 1)[1]
+    return [verdict, counts, depth] + sort_bindings(trace)
+
+
+def sort_bindings(trace: list) -> list:
+    """A trace with the bindings of each state block SORTED.
+
+    tlc2 prints them in `TLCStateMut.toString`'s `vars[i]` order, which is
+    SpecProcessor's `rootModule.getVariableDecls()` — and that is
+    `Context.getVariableDecls()` walking a `java.util.Hashtable`'s buckets,
+    reversed by `ModuleNode`. So the printed order is a HASH order over the
+    variable names at whatever capacity the module context's table happens to
+    have grown to: `DieHard`'s four variables reproduce TLC's printed order
+    (`action, smallBucket, bigBucket, water_to_pour`) at capacity 191 and at no
+    other capacity in the 11/23/47/95/191/383 growth sequence, and match
+    neither source order nor sorted order.
+
+    Reproducing it means emulating a Java hash table whose capacity depends on
+    the total symbol count of the module context (every operator EXTENDS drags
+    in), so it is an APPROVED DIFFERENCE — same bindings, same values, one line
+    order that carries no meaning — and both sides are sorted before compare.
+    See `doc/compatibility.md`."""
+    out, blk = [], []
+    for l in trace:
+        if l.startswith("State ") or l.startswith("Back to state "):
+            out += sorted(blk) + [l]
+            blk = []
+        else:
+            blk.append(l)
+    return out + sorted(blk)
 
 
 def norm_tlc(module: str, spec_dir: Path, cfg: str) -> str:

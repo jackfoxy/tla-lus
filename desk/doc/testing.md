@@ -122,6 +122,39 @@ eagerly enumerates `SUBSET`), and `ConstantOperatorConfiguration` (a cfg CONSTAN
 operator override not applied) — all owned by **R1.5**. The census is the point:
 tier 2 hands R1.5 a concrete target list.
 
+**Trace + depth comparison (R1.1.R1).** The comparator was `[verdict,
+distinct-counts]` while the goldens had carried `DEPTH` and the whole labelled
+`TRACE` since R1.1.0 — `DieHard.txt` is 41 lines, 35 of them a seven-state
+counterexample. `+tlc-sum` now compares the **whole projection**: verdict, the
+distinct/queue counts, the search-depth line, and every trace line (state
+headers with their per-action `getActions` labels, and every binding). Both
+batches were re-frozen against it, and it found three real divergences where a
+count could not:
+
+1. **No `/\ ` conjunct prefix.** `TLCStateMut.toString` renders a single
+   variable bare (`x = 0`) and two or more as a conjunct list (`/\ x = 0`); the
+   port always rendered bare. Invisible to tier 1, whose only multi-variable mc
+   case (`twobit`) has no violation and therefore no trace. **Fixed.**
+2. **The unnamed action prints `Action`, not `Next`.** A next-state relation
+   that comes from a `SPECIFICATION` has no `OpDefNode`, so `Action.isNamed()`
+   is false and `getLocation` prints its generic `"Action"`
+   (`Action.java:100-107`); the port labelled it `Next`. `sctx` now carries the
+   root action name (`aname`) — the NEXT operator's name in INIT/NEXT mode,
+   `Action` under a SPECIFICATION. **Fixed**; it was the whole of the safety
+   batch's remaining divergence (`DepthFirstErrorTrace`,
+   `TraceWithLargeSetOfInitialStatesTest`), now **14/14 on the full trace**.
+3. **`Github710d`:** after a deadlock tlc2 *still* reports the violated temporal
+   property and its counter-example, before the statistics; the port's R1.6.6
+   pre-emption emits the deadlock report alone. Same verdict, a missing second
+   block — censused and owned by R1.6, leaving the liveness batch **8/9**.
+
+Two projections are deliberately normalized, each measured rather than assumed.
+The **generated** count stays dropped: R1.1.R0 measured it still diverging on
+`DieHard` (253 vs 252) and `Continue` (4 vs 3), so `+drop-gen` is a named
+two-spec residue, not a stale workaround. And each state's **bindings are
+sorted** on both sides, because tlc2 prints them in `java.util.Hashtable` bucket
+order — an approved difference argued in `compatibility.md`.
+
 **Subdir batch (R1.1.6–R1.1.9).** Tests cannot scry Clay (the framework passes no
 `our`/`now`), and the full 310-spec subdir closure set is ~1.2 MB — past the
 embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **closure < 16 KB
@@ -212,10 +245,17 @@ Do **not** fix it in place. In order:
 
 ### Coverage today
 
-The invariant is enforced for the **lexer and parser** (`+fz-parse`). The stages
-past them — config validation, the semantic graph, the evaluator, the temporal
-normalizer, action generation, persisted-cursor decoding — hold the same
-contract and are not yet fuzzed; that is R1.2's remaining scope.
+Every stage has at least one seeded arm (R1.2 close-out): the lexer and parser
+(`+fz-parse`), the semantic graph (`+fz-sem`), config parsing and the whole
+`run-spec` path (`+fz-cfg`, `+fz-runspec-*`), the temporal normalizer and
+liveness engine and the evaluator through the checker (`+fz-check*`, with
+liveness and safety bases), and the decoding of a persisted continuation
+(`+fz-kont`). Roughly 1,300 seeded cases per run.
+
+Each arm asserts two things: that nothing bailed or hit a cap, **and** that the
+mutations still reached the stage at least N times. The second is not decoration
+— an arm that only asserts "no bails" passes trivially when every mutation is
+rejected at the parse step and the stage under test never runs.
 
 The gap is not hypothetical. R1.6.0 measured `+ast:temporal` **bailing**
 (`%tlc-live-wrong-formula-format`) on five ordinary `test-model` specs, and

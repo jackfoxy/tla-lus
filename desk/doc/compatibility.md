@@ -480,6 +480,31 @@ limitations below are now at parity, tested):
   SafetyDump's LABEL. `\E`-action splitting (per-element binding) still uses the
   whole-`\E` span, and the job-kernel wire trace keeps the single label — both
   residual.
+- **Trace state-binding ORDER is an approved difference** (settled R1.1.R1).
+  `TLCStateMut.toString` renders a state by walking `vars[i]`, which
+  `SpecProcessor` fills from `rootModule.getVariableDecls()` — and that is
+  `Context.getVariableDecls()` enumerating a **`java.util.Hashtable`**'s buckets
+  (`Context.java:320-332`), reversed by `ModuleNode` (`ModuleNode.java:400-409`).
+  So the printed order is a hash order over the variable names at whatever
+  capacity the module's context table happened to grow to. Measured on
+  `DieHard` (`VARIABLES bigBucket, smallBucket, action, water_to_pour`): tlc2
+  prints `action, smallBucket, bigBucket, water_to_pour`, which is neither
+  source nor sorted order, and which the bucket rule reproduces at capacity
+  **191** and at no other capacity in Hashtable's 11/23/47/95/191/383 growth
+  sequence. Reproducing it means emulating a Java hash table whose capacity
+  depends on the total symbol count of the module context (every operator an
+  EXTENDS drags in), so the port renders **declaration order** instead and the
+  tier-2 comparator sorts the bindings of each state block on both sides
+  (`+sort-bindings`). Same bindings, same values, one line order that carries
+  no meaning.
+  What IS reproduced and compared: the `/\ ` conjunct prefix (R1.1.R1 fixed
+  this — `TLCStateMut.toString` renders a single variable bare and two or more
+  as a conjunct list, and the port had always rendered bare), the per-action
+  labels, the state count and numbering, and every binding and value.
+  The same artifact governs the FP64 **byte order** (`TLCStateMut.fingerPrint`
+  folds the same `vars[i]`), so a spec whose declaration order differs from its
+  context order fingerprints consistently differently — a different internal
+  identity for the same state partition, never a different verdict or count.
 - **`TLC_COVERAGE_INIT/NEXT` counts are an approved difference** (settled
   R1.5.11; the ledger row is `approved-difference`). Re-read from the pin:
   `ActionWrapper` reports INIT as `[printLocation(), getEvalCount(),
@@ -1398,6 +1423,30 @@ which discovered product nodes that neither tlc2 nor the port's own `+build-prod
 had. That was a defect, not a difference, and R1.6.3 fixed it: the stutter edge is now a pure
 self-loop on `(fp, tidx)` and discovers nothing. Its own path (`LiveCheck.checkTrace`) does add a
 stutter successor for a simulated behavior, and the port matches that.
+
+## Release R1.2 — bails where tlc2 raises a typed diagnostic
+
+**Approved difference, audited in R1.2.7.** Sixteen `!!` sites remain in production-reachable port
+code. Every one is labelled, and every one has an argument recorded beside it; they fall into two
+classes.
+
+**Unreachable by construction (13).** `+st-pred-bool` and `+cs-eval` refuse anything above state
+level, and `+ca-eval` anything above action level, because the entries they are given are filtered
+to those levels first — `+state-preds-of` keeps `le-level <= 1` exactly as `TBGraphNode`'s
+constructor does, and `+classify` bins `[]<>S` into checkState only when its level is `<= 1`.
+Reaching one is an invariant violation, not an input shape. The same holds for
+`+render-value:config` (`+parse-cfg` produces only the five value shapes it renders),
+`+job`'s unplanned-stage (the stage plan is built, not supplied) and `+diagnostics`' unmapped-EC
+(now 45 codes mapped, R1.2.6).
+
+**tlc2's own typed failure, rendered as a bail (3).** `%tlc-live-encountered-actions`
+(EC 2249), `%tlc-live-wrong-formula-format` (EC 2214) and `%tlc-live-cannot-eval-formula`
+(EC 2251, `LNAll.eval`/`LNEven.eval`) are places where **tlc2 also fails** — it raises the numbered
+diagnostic and aborts the run. The difference is mechanism, not outcome: these arms return a bare
+`?` or a `par`, so the port has no channel for a typed rejection there and bails instead. The same
+input is refused by both; only the rendering differs. Giving them a channel means threading an
+`(each … aerr)` through `+consistent-at`, `+cs-bits`, `+ca-bits`, the product build and the SCC
+search — a calling-convention change, not a feature, and it is costed here rather than done.
 
 ## Typed-rejected / unsupported public options — summary
 
