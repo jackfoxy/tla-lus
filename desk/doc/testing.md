@@ -202,12 +202,50 @@ Deliberately deferred (each with a concrete unblock condition), tracked in
   R1.6, and compared on the full trace by R1.1.R1 (8/9, one censused entry).
 - ~~**Trace + coverage comparison**~~ — **DONE (R1.1.R1)**; its `Tool.getActions`
   dependency landed in R1.5.4. Coverage counters are an approved difference.
-- **Tier-3 performance models** — the pre-release scale/perf harness.
+- ~~**Tier-3 performance models**~~ — **not deferred, DESCOPED (R1.1.R3)**: a
+  performance harness measures the port against itself, so it cannot feed R1's
+  parity gate. Moved to future work; see the tier-3 section below.
 
-## Tier 3 — pre-release
+## Tier 3 — a performance harness, and deliberately not part of R1
 
-Broader `tlaplus-Examples` coverage and bounded performance models
-(queue/evaluator/enumeration/fingerprinting/safety/liveness hot paths).
+Tier 3 was scoped as "broader `tlaplus-Examples` coverage and bounded
+performance models (queue / evaluator / enumeration / fingerprinting / safety /
+liveness hot paths)". **R1.1.R3 decided it is out of scope for R1, and it is a
+decision rather than another deferral.** The reasoning, so a later reader does
+not have to reconstruct it:
+
+**It measures the port against itself, not against Java.** Every other tier here
+is a *differential*: a Hoon result is compared to a pinned Java result, and the
+verdict is agree / disagree. A performance model has no Java answer to compare
+to — the interesting quantity is this implementation's time and space on a
+workload, tracked over its own history. That is a different discipline with
+different tooling (a baseline store, a noise model, a regression threshold) and
+its own failure modes, of which the worst is a flaky gate that everyone learns
+to ignore.
+
+**R1's definition of done is a parity statement.** R1.9 asserts closure over the
+parity work: every in-scope ledger row `parity` or a tested
+`approved-difference`, every differential green and byte-reproducible. Tier 3
+cannot contribute evidence to that statement, and holding R1 open for a harness
+that answers a different question would only make the parity claim later without
+making it stronger.
+
+**Its measurement substrate is not stable enough to baseline yet.** The port is
+still changing shape where it would be measured — R1.1.R2 alone moved a nightly
+SANY arm by ~365 s by embedding 15 more specs, and the checker's own cost model
+(`live-graph-cap`, `+expand-cap`, `fuel:eenv`) is tuned per increment. Baselines
+taken now would be re-baselined repeatedly, which teaches a team to re-baseline
+on failure — the exact habit a performance gate must not create.
+
+**What tier 3 would still be worth, later.** The broader `tlaplus-Examples`
+coverage half is real differential value and is *not* blocked by any of the
+above; it is simply more of what tier 2 already does, gated by nightly runtime
+rather than by capability. The performance half wants a spec-shaped workload set,
+a stored baseline per pinned runtime, and a threshold wide enough to survive
+ordinary variance. Neither is scheduled here.
+
+**Where it lives now.** Future work, tracked in `R1-release-work-breakdown.md`,
+not as an R1 deferral. Nothing in tiers 1 and 2 depends on it.
 
 ## Fuzzing
 

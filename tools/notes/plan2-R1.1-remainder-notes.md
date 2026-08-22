@@ -323,3 +323,142 @@ unblocked it.
 
 `divergences.txt`'s census header also stopped saying "small-closure": there is no longer a
 small-closure subset, it is every in-scope subdir spec.
+
+## R1.1.R3 — close the tier-3 line
+
+No code. The point of this increment is that tier 3 stops being a **deferral with an unblock
+condition** and becomes a **decision with a reason**, because a deferral implies someone is waiting
+for something, and nobody is.
+
+### The argument, written down once
+
+**Tier 3 measures the port against itself.** Every other tier is a differential: a Hoon result
+against a pinned Java result, verdict agree/disagree. A performance model has no Java answer — the
+quantity of interest is this implementation's time and space on a workload, tracked over its own
+history. Different discipline, different tooling (baseline store, noise model, regression
+threshold), different failure modes, the worst being a flaky gate everyone learns to ignore.
+
+**R1's definition of done is a parity statement.** R1.9 asserts every in-scope ledger row is
+`parity` or a tested `approved-difference` and every differential is green and byte-reproducible.
+Tier 3 cannot contribute evidence to that sentence. Holding R1 open for it would make the parity
+claim later without making it stronger.
+
+**The substrate is still moving.** R1.1.R2 alone shifted a nightly SANY arm by ~365 s by embedding
+15 more specs, and the checker's cost model (`live-graph-cap`, `+expand-cap`, `fuel:eenv`) is tuned
+per increment. Baselines taken now get re-baselined repeatedly — which teaches exactly the habit a
+performance gate must not create.
+
+### The half that is NOT descoped for a reason
+
+Tier 3 was always two things. The **broader `tlaplus-Examples` coverage** half is ordinary
+differential value and is blocked by nothing — it is more of what tier 2 already does, bounded by
+nightly runtime rather than capability, and the cap discipline `.R2` established (a measured runtime
+budget, not a wall) applies to it unchanged. It moves to future work because it is unscheduled, not
+because it is hard. Only the **performance harness** half is descoped on principle.
+
+### Where the claim lived
+
+Five places asserted tier 3 as an R1 gate, and all five now agree:
+
+| file | was | now |
+|---|---|---|
+| `doc/testing.md` "Tier 3" | a two-line stub of scope | the scoping decision + what it would take later |
+| `doc/testing.md` deferral list | "Tier-3 performance models — the pre-release scale/perf harness" | struck through, `DESCOPED (R1.1.R3)` |
+| breakdown, R1 goal line | "tiers 1-3 green" | "tiers 1 and 2 green (tier 3 descoped)" |
+| breakdown, R1.9 row | scaffold gate replaces "tiers 1-3" | "tiers 1-2" |
+| breakdown, Done (R1) | "every automated gate (tiers 1-3)" | "**tiers 1 and 2** — tier 3 is descoped" |
+
+plus `tools/validate.py`'s tier list, whose third line described tier 3 as `(pre-release)`, and the
+R1.1 row itself, which had listed tier-3 models as part of the unit's scope. The breakdown gained a
+**Future work (explicitly not R1)** table carrying both halves with why-not and what-it-would-take.
+
+`port-map.md`'s historical R1.1.x rows still say "NEXT: … tier-3 perf models". Those are a
+narrative log of what was true at the time and are deliberately left alone.
+
+### Gates
+
+Docs only — no generator, no shard, no ship run. The one code file touched is `validate.py`'s module
+DOCSTRING, which no golden reads (`evidence-counts.md` does not mention tier 3, and nothing
+interpolates `__doc__`), so the tier-1 reproducibility gate is unaffected.
+
+## R1.1.R4 — close-out
+
+### What the remainder actually was
+
+The row this unit retires listed four deferrals, each with a stated unblock condition. **Two of the
+four conditions were wrong, and measuring them is what closed the unit** — no engine work, no new
+harness:
+
+| deferred item | stated unblock | what was true |
+|---|---|---|
+| 15 monster SANY specs | "need Clay-read (tests can't scry Clay)" | **Wrong.** There is no embedding wall: all 310 subdir specs embed as a 1 338 723-byte shard that builds and runs `ok=%.y`. The cap was a number nobody had measured. (`.R0` → `.R2`) |
+| TLC liveness batch | needs a bounded liveness-graph build | Right, and discharged elsewhere — wired by R1.8.1.4, taken to 9/9 by R1.6, and now compared on the full trace by `.R1` (8/9, one censused). |
+| trace + coverage comparison | needs `Tool.getActions` | Right, and its dependency landed in R1.5.4 — but **the comparison itself was never wired**, which is why `.R1` found two live rendering defects. |
+| tier-3 perf harness | "its own effort" | **Wrong shape.** Not a scheduling question: it measures the port against itself, so it can never feed R1's parity gate. Descoped by `.R3`, not deferred again. |
+
+The lesson worth keeping: **an unblock condition that has never been measured is a guess**, and two
+of these four had been carried as fact across nine increments and three documents.
+
+### Final state of the tier-2 layer
+
+| | |
+|---|---|
+| SANY | 142 flat + 310 subdir = **452/452 agree** |
+| TLC curated | 3 arms, whole projection (verdict + counts + depth + labelled trace) |
+| TLC safety batch | **14/14** on the whole projection |
+| TLC liveness batch | **8/9**, one frozen entry (`Github710d`, R1.6) |
+| census | empty except that one entry |
+| normalized, with measured cause | generated count (`+drop-gen`); state-binding order (Hashtable artifact, approved difference) |
+
+### Ledger
+
+**R1.1 closes no ledger row, by design.** Tier 2 is a differential layer that gates the other units
+rather than owning rows: it hands R1.3/R1.5/R1.6 a target list and then asserts their closure. The
+machine-checked tally is unchanged by this unit — 72 parity / 13 approved-difference / 6 replaced /
+21 excluded / 9 partial / 4 oracle-only, 112 terminal of 125. The 13 owed rows belong to R1.7, R1.8
+and R1.9.
+
+### The full suite earned its place: it caught a cross-shard breakage
+
+`.R1` changed `+render-state`'s signature (it now takes the variable order) and I re-ran the shards
+I judged touched — `mc`, `trace`, `liveness-lasso`, `liveness-message`, `safety-gen`,
+`inv-constraints`, `symmetry`, `stats`, `job`, `spec-decomp`, `tests/app`. That list was wrong, and
+only the FULL suite could show it:
+
+```
+FAILED  /tests/lib/stream/hoon (build)
+```
+
+`tests/lib/stream.hoon` called `render-state:check` with the old arity. Fixing the arity then
+exposed a second, more interesting problem: three arms (`pass-init`, `pass-next-0`,
+`diamond-init` — the corpus's two-variable cases) failed on VALUES, because the console renderer had
+correctly started emitting `/\ ` and this projection must not have it. **The Java side settles it:**
+
+```java
+if (t.startsWith("/\\")) t = t.substring(2).trim();   // TLC renders conjuncts
+```
+
+`StreamDump.java:45` strips the prefix deliberately, because the stream differential compares
+successor ORDER, not console rendering. The Hoon side had matched only by accident — it never
+emitted the prefix. So `render-stream` now builds its own `var = value` pairs from `+state-pairs`
+instead of borrowing the console `+render-state`, which decouples the two projections permanently.
+`-test /=tla-lus=/tests/lib/stream ~` green (35 cases).
+
+The lesson is the same shape as `.R0`'s: **a judgement about which shards are touched is a guess
+until something checks it.** Touched-shard runs are the right default per-increment discipline, but
+a signature change to a widely-imported library arm needs the full suite, and this unit's close-out
+is where that cost belongs.
+
+### Gates
+
+- Full ship suite `-test /=tla-lus=/tests ~`
+- `tools/tier2.py --check` — byte-reproducible from the pins
+- `tools/validate.py --check` — tier-1 goldens byte-reproducible
+- `tools/check-parity.py` — ledger well-formed
+
+### Breakdown
+
+The "R1.1 remainder (deferred)" row is **gone**, replaced by an `R1.1.R0–.R4 ✅` row; `R1.1` itself
+is marked ✅ DONE; the objective and the R1 acceptance line dropped tier 3; and a dated
+machine-checked tally was added so the stale 2026-08-02 "52 parity / 34 partial" basis is not the
+only number a reader finds.

@@ -13,7 +13,9 @@ ship is validating against the real oracle rather than a stale snapshot.
 Tiers (see desk/doc/testing.md):
   tier 1  this script + `-test /=tla-lus=/tests ~`  (every change)
   tier 2  tlaplus/test-model + a tlaplus-Examples matrix   (CI/nightly)
-  tier 3  broader examples + bounded performance models    (pre-release)
+  tier 3  DESCOPED by R1.1.R3 -- a performance harness measures the port
+          against itself, not against Java, so it feeds no parity gate;
+          moved to future work (see testing.md "Tier 3")
 
 The oracle jar must be built from the pinned commit; each generator and
 tools/oracle/*.java refuse to run off-pin (or are guarded here).

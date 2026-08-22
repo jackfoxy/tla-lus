@@ -7,6 +7,18 @@
 /=  check  /lib/check
 |%
 ++  wc  |=(w=wain ^-(@t (rap 3 (join '\0a' w))))
+::  `var = value` per binding, with NO `/\ ` conjunct prefix -- the Java
+::  side strips it too (`StreamDump.java:45`, "TLC renders conjuncts"),
+::  because this projection compares stream ORDER, not console rendering.
+::  Using the console `+render-state` here would couple the two: it gained
+::  the faithful `TLCStateMut.toString` prefix in R1.1.R1 and broke these
+::  two-variable cases. `~` for the variable order feeds `+state-pairs`'s
+::  sorted tail (the binding-order approved difference, compatibility.md).
+++  binds
+  |=  st=state:check
+  ^-  (list @t)
+  %+  turn  (state-pairs:check ~ st)
+  |=([k=@t v=@t] (rap 3 ~[k ' = ' v]))
 ::  one `S <i> <var = v; var = v>` line per state, in stream order
 ++  render-stream
   |=  sts=(list state:check)
@@ -16,7 +28,7 @@
   ?~  sts  ~
   :_  $(sts t.sts, i +(i))
   %-  crip
-  "S {(a-co:co i)} {(trip (rap 3 (join '; ' (render-state:check i.sts))))}"
+  "S {(a-co:co i)} {(trip (rap 3 (join '; ' (binds i.sts))))}"
 ::
 ++  test-stream-action-constraint-init
   %+  expect-eq
