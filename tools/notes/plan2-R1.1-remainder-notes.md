@@ -286,3 +286,40 @@ Tier-1 shards re-run after the `check.hoon`/`job.hoon` changes, all green: `mc`,
 `test-tlc-tcommit` and `test-tlc-batch` green on the full projection; `test-tlc-liveness-batch`
 asserts the one frozen `Github710d` entry. Goldens unchanged — only the comparator grew, exactly as
 the plan required.
+
+## R1.1.R2 — the monsters
+
+`.R0` measured the wall and there isn't one, so this is the cheap route the plan's option 1 named:
+`SUBDIR_CLOSURE_MAX` 16 000 → **70 000**, regenerate, and retire the claim wherever it is written
+down. No new harness, no Clay route.
+
+| | before | after |
+|---|---|---|
+| subdir specs compared | 295 | **310** (every in-scope spec whose closure resolves) |
+| `tier2-sub.hoon` | 862 812 B, 6 arms | **1 338 723 B**, 6 arms |
+| subdir agreement | 295/295 | **310/310** |
+| combined SANY | 437 specs | **452** (142 flat + 310 subdir), all agreeing |
+
+The 15 arrive with **zero** census entries — `.R0` had already run them and every one agrees with
+Java (all `accept`). So the cost of this increment is entirely runtime: ~24 s/spec for the 15 against
+~4 s/spec averaged over the 310, about +365 s on a nightly arm.
+
+### What the cap means now
+
+It is a **runtime budget**, not a capacity limit, and the code says so. 70 000 sits above the largest
+in-scope closure at the pin (`suite/test211`, 63 594 raw bytes in one module) with headroom, so its
+only job is to stop a future upstream spec from silently adding minutes to a nightly arm — a number
+to raise deliberately after measuring, which is exactly what R1.1.6–.9 did not do.
+
+### The claim that was retired
+
+Three places asserted the same unmeasured thing — the generator NB, `doc/testing.md`, and the
+R1.1.9 breakdown row: that the 15 were "past the embedding limit" and "would need Clay-read, which
+the ship's test framework cannot do (no `our`/`now`)". The Clay half is true and irrelevant: tests
+still cannot scry Clay, and they do not need to, because embedding was never the constraint. All
+three now carry the measured numbers instead, and `doc/testing.md`'s deferral list has the row struck
+through rather than deleted, so the wrong unblock condition stays visible next to what actually
+unblocked it.
+
+`divergences.txt`'s census header also stopped saying "small-closure": there is no longer a
+small-closure subset, it is every in-scope subdir spec.

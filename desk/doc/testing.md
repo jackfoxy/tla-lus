@@ -155,21 +155,30 @@ two-spec residue, not a stale workaround. And each state's **bindings are
 sorted** on both sides, because tlc2 prints them in `java.util.Hashtable` bucket
 order — an approved difference argued in `compatibility.md`.
 
-**Subdir batch (R1.1.6–R1.1.9).** Tests cannot scry Clay (the framework passes no
-`our`/`now`), and the full 310-spec subdir closure set is ~1.2 MB — past the
-embedding limit. So `desk/tests/lib/tier2-sub.hoon` covers the **closure < 16 KB
-subset (295 specs; grown across R1.1.6–R1.1.9: 162 → 240 → 270 → 295)** via
-chunked `mule`-isolated arms; a spec's identity is its relative **path** (root
-module names collide across subdirs), and the embedded closure is emitted in
-sorted module order so the shard is byte-reproducible. Result: **263/295 agree**;
-all 32 divergences are front-end (R1.3) residues on SANY's own adversarial
-conformance specs (`suite/`, `coverage/`, `EWD840/`, `EWD998/`, `gh1134/`,
-`examples/`) — LAMBDA, higher-order operator parameters, INSTANCE-`WITH` (some
-over RECURSIVE / with temporal), and semantic/level conformance edges. Combined
-SANY coverage is now **403/437** embedded test-model specs (142 flat + 295 subdir). The **15 largest** (> 16 KB
-closure, e.g. `suite/test211` 63 KB, `VoteProof/MC` 50 KB) are the embedded
-batch's ceiling — they would need Clay-read, which the ship's test framework
-cannot do (no `our`/`now`); they are the documented tier-2 SANY remainder.
+**Subdir batch (R1.1.6–R1.1.9, completed R1.1.R2).**
+`desk/tests/lib/tier2-sub.hoon` runs **every in-scope test-model subdir spec
+whose module closure resolves — all 310** — through `+sany-verdict` in chunked
+`mule`-isolated arms. A spec's identity is its relative **path** (root module
+names collide across subdirs), and the embedded closure is emitted in sorted
+module order so the shard is byte-reproducible. Result: **310/310 agree**; the
+census is empty (R1.3 closed the last front-end divergence). Combined SANY
+coverage is **452/452** embedded test-model specs (142 flat + 310 subdir).
+
+R1.1.6–.9 raised the closure cap 1.5 KB → 4 → 8 → 16 KB and stopped there, and
+this document, the generator NB and the R1.1.9 row all then said the 15 specs
+above 16 KB were "past the embedding limit" and "would need Clay-read, which the
+ship's test framework cannot do". **That was never measured, and R1.1.R0
+measured it false.** The 15 alone embed as a 476 598-byte single-arm shard that
+builds and runs OK in 365 s; all 310 embed as a **1 338 467-byte** 6-arm shard
+that builds and comes back `ok=%.y` in 1 683 s. The largest single closure,
+`suite/test211`, is **63 594** raw bytes in one module (66 390 escaped). Nothing
+failed per-file, per-arm or per-build.
+
+What the 15 actually cost is **time** — ~24 s/spec against ~4 s/spec averaged
+over the 310 — so `SUBDIR_CLOSURE_MAX` is now **70 000**, above every in-scope
+spec at the pin, and it exists to bound what a future upstream spec can add to a
+nightly arm rather than to mark a wall. No Clay-read harness is needed, and none
+should be built for this.
 
 ## Tier-2 close-out (R1.1)
 
@@ -177,20 +186,22 @@ R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
 (all byte-reproducible via `tools/tier2.py --check`, drift-guarded):
 
 - **Classified scope inventory** over both corpora (`inventory.txt`).
-- **SANY comparator** — 142 flat + 295 subdir = **437 test-model specs through
-  the Hoon front-end vs Java SANY, 403 agreeing**; every divergence pinned to a
-  front-end (R1.3) residue in `divergences.txt`.
+- **SANY comparator** — 142 flat + 310 subdir = **452 test-model specs through
+  the Hoon front-end vs Java SANY, all 452 agreeing** (R1.3 closed the front-end
+  divergences; R1.1.R2 added the last 15 subdir specs).
 - **TLC safety comparator** — a curated set + a 14-spec batch through the Hoon
   checker vs TLC; the divergences pin the evaluation residues (R1.5).
 
 Deliberately deferred (each with a concrete unblock condition), tracked in
 `port-map.md`:
 
-- **The 15 > 16 KB subdir SANY specs** — need Clay-read (tests cannot scry Clay).
-- **A TLC liveness batch** — needs a *bounded* liveness-graph build (the current
-  `check:check`/`run-check` temporal path is unbounded); engine work, R1.5/R1.6.
-- **Trace + coverage comparison** — needs the `Tool.getActions` decomposition
-  (per-action labels / coverage counters), R1.5.
+- ~~**The 15 > 16 KB subdir SANY specs**~~ — **DONE (R1.1.R2)**. The stated
+  unblock condition ("need Clay-read") was wrong: R1.1.R0 measured the embedding
+  wall and there isn't one, so the cap simply moved to 70 000.
+- ~~**A TLC liveness batch**~~ — **DONE**: wired by R1.8.1.4, taken to 9/9 by
+  R1.6, and compared on the full trace by R1.1.R1 (8/9, one censused entry).
+- ~~**Trace + coverage comparison**~~ — **DONE (R1.1.R1)**; its `Tool.getActions`
+  dependency landed in R1.5.4. Coverage counters are an approved difference.
 - **Tier-3 performance models** — the pre-release scale/perf harness.
 
 ## Tier 3 — pre-release

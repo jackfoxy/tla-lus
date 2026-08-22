@@ -370,13 +370,27 @@ TLC_LIVENESS_REASONS = {
 # build crashed `~(got by states)` on a constrained successor. It now agrees.
 
 
-# R1.1.6: subdir SANY specs. Tests cannot scry Clay (the framework passes no
-# our/now) and the full 310-spec / 1.2 MB closure set is past the embedding
-# limit, so this covers the small-closure subset (< 1.5 KB) via chunked embedded
-# arms in a separate shard (`tests/lib/tier2-sub.hoon`). Larger-closure subdir
-# specs are a follow-on. Root module names collide across subdirs (`MC` ×3), so
-# a spec's identity is its relative PATH, not its module name.
-SUBDIR_CLOSURE_MAX = 16000
+# R1.1.6: subdir SANY specs, embedded in chunked `mule`-isolated arms in their
+# own shard (`tests/lib/tier2-sub.hoon`). Root module names collide across
+# subdirs (`MC` ×3), so a spec's identity is its relative PATH, not its module
+# name.
+#
+# THE CAP IS A RUNTIME BUDGET, NOT AN EMBEDDING LIMIT (R1.1.R0 measured it;
+# R1.1.R2 raised it). R1.1.6-.9 raised it 1.5 KB → 4 → 8 → 16 KB and stopped,
+# and the NB here, `doc/testing.md` and the R1.1.9 row all then claimed the 15
+# specs above 16 KB were "past the embedding limit" and "would need Clay-read,
+# which the ship's test framework cannot do". That was never measured and is
+# false: the 15 alone embed as a 476 598-byte single-arm shard that BUILDS and
+# runs OK in 365 s, and all 310 in-scope subdir specs embed as a 1 338 467-byte
+# 6-arm shard that builds and comes back `ok=%.y` in 1 683 s. The largest single
+# closure, `suite/test211`, is 63 594 raw bytes in ONE module (66 390 escaped).
+# Nothing failed per-file, per-arm or per-build.
+#
+# What the 15 actually cost is TIME: ~24 s/spec against ~4 s/spec averaged over
+# the 310. So the cap now sits above every in-scope spec at the pin (largest
+# 63 594) and exists to bound what a future upstream spec can add to a nightly
+# arm — a number to raise deliberately, not a wall.
+SUBDIR_CLOSURE_MAX = 70000
 SUBDIR_CHUNK = 55
 
 # Frozen from the ship run, one `<path> -> <outcome>` per divergent spec, in
@@ -851,8 +865,9 @@ def write_sany_shard():
     nsub = len(sany_subdir_specs())
     dl += [
         "",
-        f"# subdir-batch (R1.1.6): {nsub} small-closure in-scope test-model "
-        "subdir specs through +sany-verdict;",
+        f"# subdir-batch (R1.1.6-.9, completed R1.1.R2): {nsub} in-scope "
+        "test-model subdir specs -- EVERY one whose closure resolves -- "
+        "through +sany-verdict;",
         f"# {len(SUB_BATCH_DIVERGENCES)} disagree with Java "
         f"({nsub - len(SUB_BATCH_DIVERGENCES)}/{nsub} agree):",
     ]
