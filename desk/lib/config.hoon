@@ -611,15 +611,39 @@
   ^-  @t
   (rap 3 ~['TLC requires ' nm ' not to take any argument.'])
 ::
+++  render-oprcd
+  ::  OpRcdValue.toString (OpRcdValue.java:247): `{ ` then the lines in
+  ::  addLine order, each `<a1, a2, val>` -- every argument followed by
+  ::  `, `, then the value -- separated by `, `, then `}` with no space
+  ::  before it. An empty record is `{ }`. addLine appends and never
+  ::  dedups, so the config's line order IS the rendering order. R1.8.2
+  |=  ls=(list cfg-const)
+  ^-  @t
+  =/  out=tape  (trip '{ ')
+  =/  cs  ls
+  =/  first=?  &
+  |-  ^-  @t
+  ?~  cs  (crip (weld out (trip '}')))
+  =.  out  ?:(first out (weld out ", "))
+  =.  out  (weld out "<")
+  =.  out
+    =/  as  args.i.cs
+    |-  ^-  tape
+    ?~  as  out
+    $(as t.as, out :(weld out (render-value i.as) ", "))
+  =.  out  :(weld out (render-value val.i.cs) ">")
+  $(cs t.cs, first |)
+::
 ++  msg-2230
   ::  TLC_CONFIG_ID_HAS_VALUE: the third parameter is the VALUE's
-  ::  toString, which +render-value already renders exactly for every
-  ::  shape parseValue produces. An operator record (`F(a) = v`) is the
-  ::  one exception -- OpRcdValue.toString is not ported (compatibility.md)
+  ::  toString, which +render-value renders exactly for every shape
+  ::  parseValue produces, and +render-oprcd for an operator record
+  ::  (`F(a) = v`) -- the shape makeConstantTable builds. R1.8.2
   |=  [role=@t nm=@t e=dentry]
   ^-  @t
   =/  rv=@t
     ?:  ?=(%val -.e)  (crip (render-value v.e))
+    ?:  ?=(%opr -.e)  (render-oprcd lines.e)
     '<value>'
   (rap 3 ~['The ' role ' of ' nm ' is equal to ' rv])
 ::
@@ -723,9 +747,11 @@
   ::  processConstantDefns' checks on a constant substituted by an operator
   ::  (2225/2281). Fail-fast throughout, like the Java. R1.8.1.3b
   ::
-  ::  RESIDUE (compatibility.md): the same substitution checks over the
-  ::  per-module `mod!lhs <- rhs` tables, which need each non-root module's
-  ::  own operator list rather than the root graph.
+  ::  R1.8.2 added the per-module `mod!lhs <- rhs` half (+mod-subst):
+  ::  the same 2223/2224/2225/2226 loop over each module's own
+  ::  getOpDefs(), plus TLC_NO_MODULES (2245) for a config module name the
+  ::  spec does not define. It reads `modops.m`, which the graph now
+  ::  carries for every module.
   |=  [m=sem-module:sem-lib a=cfg-ast]
   ^-  (each (map @t dentry) cfg-vdiag)
   |^  go
@@ -761,8 +787,14 @@
     ?:  ?=(%| -.r3)  [%| p.r3]
     =/  r4  unused-overrides
     ?^  r4  [%| u.r4]
-    =/  r5  (const-defns p.r3)
+    ::  the per-module override tables, then the module-name check --
+    ::  SpecProcessor.java:711-770, in that order
+    =/  r5  (mod-subst p.r3)
     ?^  r5  [%| u.r5]
+    =/  r6  unknown-modules
+    ?^  r6  [%| u.r6]
+    =/  r7  (const-defns p.r3)
+    ?^  r7  [%| u.r7]
     [%& p.r3]
   ::  2222, in declaration order
   ++  put-consts
@@ -824,6 +856,69 @@
     ?~  ks  ~
     ?:  (~(has in known) i.ks)  $(ks t.ks)
     `[2.226 (msg-2226 i.ks)]
+  ::  the per-module `mod!lhs <- rhs` tables (SpecProcessor.java:711-760).
+  ::  Structurally the root loop with three differences the Java makes
+  ::  explicit: the 2223 self-reference test is against THIS MODULE'S table,
+  ::  not the root's; the rhs is still resolved in the ROOT defns table
+  ::  ("The rhs comes from the root module"); and the arity check (2225)
+  ::  fires here for every operator, where the root loop defers a declared
+  ::  constant's to processConstantDefns. A substitution applies to the
+  ::  module's own definition, so nothing is written back to the root table.
+  ::  Modules are visited in the graph's dependency-first order and each
+  ::  module's operators in getOpDefs() order; the 2226 sweep over a
+  ::  module's own keys is sorted, as the root sweep is -- both stand in
+  ::  for a java.util.Hashtable enumeration (compatibility.md). R1.8.2
+  ++  mod-subst
+    |=  dm=(map @t dentry)
+    ^-  (unit cfg-vdiag)
+    =/  ms  (sort ~(tap in ~(key by mod-overrides.a)) aor)
+    |-  ^-  (unit cfg-vdiag)
+    ?~  ms  ~
+    =/  ops  (~(get by modops.m) i.ms)
+    ::  a module the spec does not define is 2245, checked after this loop
+    ?~  ops  $(ms t.ms)
+    =/  tbl  (~(gut by mod-overrides.a) i.ms ~)
+    =/  r  (one-module tbl u.ops dm)
+    ?^  r  r
+    $(ms t.ms)
+  ::  one module's table against its own operator list
+  ++  one-module
+    |=  [tbl=(map @t @t) ops=(list [name=@t arity=@ud]) dm=(map @t dentry)]
+    ^-  (unit cfg-vdiag)
+    =|  done=(set @t)
+    =/  os  ops
+    |-  ^-  (unit cfg-vdiag)
+    ?^  os
+      =/  rhs  (~(get by tbl) name.i.os)
+      ?~  rhs  $(os t.os)
+      ?:  (~(has by tbl) u.rhs)  `[2.223 (msg-2223 u.rhs)]
+      =/  my  (~(get by dm) u.rhs)
+      ?~  my  `[2.224 (msg-2224 name.i.os u.rhs)]
+      ?:  ?=(%none -.u.my)  `[2.224 (msg-2224 name.i.os u.rhs)]
+      ?:  ?&(?=(%def -.u.my) !=(arity.i.os arity.d.u.my))
+        `[2.225 (msg-2225 name.i.os u.rhs)]
+      $(os t.os, done (~(put in done) name.i.os))
+    ::  2226 over this module's own keys
+    =/  ks  (sort ~(tap in ~(key by tbl)) aor)
+    |-  ^-  (unit cfg-vdiag)
+    ?~  ks  ~
+    ?:  (~(has in done) i.ks)  $(ks t.ks)
+    `[2.226 (msg-2226 i.ks)]
+  ::  TLC_NO_MODULES (2245): a config `MODULE M` naming no module of the
+  ::  specification. Checked after every per-module table has been applied,
+  ::  as the Java does (SpecProcessor.java:763-770)
+  ++  unknown-modules
+    ^-  (unit cfg-vdiag)
+    =/  ms  (sort ~(tap in ~(key by mod-overrides.a)) aor)
+    |-  ^-  (unit cfg-vdiag)
+    ?~  ms  ~
+    ?:  (~(has by modops.m) i.ms)  $(ms t.ms)
+    :-  ~
+    :-  2.245
+    %+  rap  3
+    :~  'In the configuration file, the module name '  i.ms
+        ' is not a module in the specification.'
+    ==
   ::  processConstantDefns: a declared CONSTANT substituted by an operator
   ::  must have that operator's arity (2225) and, at arity 0, must be
   ::  constant-level (2281). tlc2 reaches 2281 by EVALUATING the body and,
@@ -852,15 +947,25 @@
   ::  pin, the throw is EC 2280 TLC_CONFIG_UNDEFINED_OR_NO_OPERATOR on the
   ::  first state variable the body reads, so the port names that reference
   ::  and its location.
-  ::  RESIDUE (compatibility.md): a body that is non-constant because it is
-  ::  TEMPORAL raises EC 2261 there instead, with tlc2's abbreviated
-  ::  expression rendering; the port emits no addendum for that shape.
+  ::  A body that is non-constant because it is TEMPORAL throws EC 2261
+  ::  (TLC_ENCOUNTERED_FORMULA_IN_PREDICATE, Tool.java:2808-2846) instead,
+  ::  and its addendum carries that message. Measured at the pin: the
+  ::  message's second parameter is `expr.toString()`, and
+  ::  SemanticNode.toString returns `getLocation().toString()` unless the
+  ::  `showPlainFormulae` system property is set -- so it is the LOCATION,
+  ::  not an expression rendering, and +loc-str already produces it. R1.8.2
   |=  [modname=@t nm=@t d=sem-def:sem-lib dm=(map @t dentry)]
   ^-  @t
   =/  add=@t
     ?~  body.d  ''
     =/  r  (nonconst-ref u.body.d dm modname | (silt ~[name.d]))
     ?~  r  ''
+    ?:  ?=(%temporal -.u.r)
+      %+  rap  3
+      :~  ' - specifically: TLC encountered a temporal formula ('  op.u.r
+          ') when evaluating a predicate or action.\0a'
+          (loc-str mod.u.r at.u.r)
+      ==
     %+  rap  3
     :~  ' - specifically: In evaluation, the identifier '  name.u.r
         ' is either undefined or not an operator.\0a'
@@ -871,10 +976,43 @@
       ' with non-constant '  name.d  add
   ==
 ::
+::  what constant evaluation of a substituting body trips over first
++$  ncref
+  $%  ::  a state-variable reference -> EC 2280 in the 2281 addendum
+      [%ident name=@t mod=@t at=(unit span)]
+      ::  a temporal operator -> EC 2261 there instead, `op` being the
+      ::  label Tool.java passes as that message's first parameter
+      [%temporal op=@t mod=@t at=(unit span)]
+  ==
+::
+++  temporal-label
+  ::  the eight OPCODEs Tool.evalImpl answers with
+  ::  TLC_ENCOUNTERED_FORMULA_IN_PREDICATE, and the literal each passes as
+  ::  the message's first parameter (Tool.java:2808-2846)
+  |=  nm=@t
+  ^-  (unit @t)
+  (~(get by (malt temporal-labels)) nm)
+::
+++  temporal-labels
+  ^-  (list [@t @t])
+  :~  ['[]' '[]A']
+      ['<>' '<>A']
+      ['$WF' 'WF']
+      ['$SF' 'SF']
+      ['$TemporalExists' '\\EE']
+      ['$TemporalForall' '\\AA']
+      ['~>' 'a ~> b']
+      ['-+->' 'a -+-> formula']
+  ==
+::
 ++  nonconst-ref
-  ::  the first state-variable reference constant evaluation trips over, in
-  ::  evaluation (pre-)order -- a bound range before the body it binds --
-  ::  descending into an applied user operator as tlc2's evaluator does.
+  ::  the first thing constant evaluation trips over, in evaluation
+  ::  (pre-)order -- a bound range before the body it binds -- descending
+  ::  into an applied user operator as tlc2's evaluator does. Two shapes
+  ::  end the walk: a state-variable reference (EC 2280) and a temporal
+  ::  operator (EC 2261). Tool.evalImpl switches on the node's OPCODE
+  ::  BEFORE evaluating its arguments, so a temporal node fails without
+  ::  descending -- `C <- []P` names the box, never P's contents.
   ::  Under ENABLED a PRIMED variable is assignable, so it is not the
   ::  failure; that asymmetry is measured against the pin.
   |=  $:  s=sem:sem-lib
@@ -883,16 +1021,18 @@
           enabled=?
           seen=(set @t)
       ==
-  ^-  (unit [name=@t mod=@t at=(unit span)])
+  ^-  (unit ncref)
   =|  primed=?
-  |-  ^-  (unit [name=@t mod=@t at=(unit span)])
+  |-  ^-  (unit ncref)
   ?:  ?=(%letin -.s)
     ?~(body.s ~ $(s u.body.s))
   ?.  ?=(%apply -.s)  ~
   =/  nm  name.op.s
   ?:  ?=(%variable kind.op.s)
     ?:  ?&(enabled primed)  ~
-    `[nm mod at.s]
+    `[%ident nm mod at.s]
+  =/  tl  (temporal-label nm)
+  ?^  tl  `[%temporal u.tl mod at.s]
   =/  en  |(enabled =('ENABLED' nm))
   =/  pr  |(primed =('\'' nm))
   =/  rs=(list sem:sem-lib)
@@ -900,7 +1040,7 @@
     |=(b=sem-bound:sem-lib range.b)
   =/  kids=(list sem:sem-lib)  (weld rs args.s)
   =/  here
-    |-  ^-  (unit [name=@t mod=@t at=(unit span)])
+    |-  ^-  (unit ncref)
     ?~  kids  ~
     =/  r  ^$(s i.kids, enabled en, primed pr)
     ?^(r r $(kids t.kids))

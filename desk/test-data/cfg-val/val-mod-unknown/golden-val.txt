@@ -1,0 +1,3 @@
+VALIDATE
+2245 ~
+In the configuration file, the module name Zork is not a module in the specification.

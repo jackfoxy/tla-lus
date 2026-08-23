@@ -1,0 +1,3 @@
+VALIDATE
+2224 ~
+The configuration file substitutes for Op with the undefined identifier Nope.

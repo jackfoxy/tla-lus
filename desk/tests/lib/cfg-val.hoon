@@ -135,6 +135,19 @@
     ==
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
+++  test-cfg-val-val-inv-oprcd
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2230 ~\0aThe invariant of F is equal to { <1, 2>, <3, 4>}\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aF(a) == a\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aINVARIANT F\0aCONSTANT F(1) = 2\0aCONSTANT F(3) = 4\0a'
+::
 ++  test-cfg-val-val-inv-undef
   %+  expect-eq
     !>  `@t`'VALIDATE\0a2229 ~\0aThe invariant NoInv specified in the configuration file\0ais not defined in the specification.\0a'
@@ -173,6 +186,96 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aOp(a) == a + 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
     ==
   'INVARIANT Inv\0a'
+::
+++  test-cfg-val-val-mod-sub-nargs
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2225 ~\0aThe configuration file substitutes for Op with Repl of different number of arguments.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aRepl(a, b) == a\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aOp(a) == a\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT Op <-[B] Repl\0a'
+::
+++  test-cfg-val-val-mod-sub-not-in-spec
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2226 ~\0aIn the configuration file, the identifier Nope does not appear in the specification.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aRepl == 7\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aOp == 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT Nope <-[B] Repl\0a'
+::
+++  test-cfg-val-val-mod-sub-ok
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0aok\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aRepl == 7\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aOp == 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT Op <-[B] Repl\0a'
+::
+++  test-cfg-val-val-mod-sub-rhs-after-lhs
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2223 ~\0aIn the configuration file, the identifier Q appears\0aon the right-hand side of a <- after already appearing on the\0aleft-hand side of one.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aP == 1\0aQ == 2\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT P <-[B] Q\0aCONSTANT Q <-[B] P\0a'
+::
+++  test-cfg-val-val-mod-sub-undefined
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2224 ~\0aThe configuration file substitutes for Op with the undefined identifier Nope.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aRepl == 7\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aOp == 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT Op <-[B] Nope\0a'
+::
+++  test-cfg-val-val-mod-unknown
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2245 ~\0aIn the configuration file, the module name Zork is not a module in the specification.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals, B\0aVARIABLE x\0aRepl == 7\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aOp == 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT Op <-[Zork] Repl\0a'
 ::
 ++  test-cfg-val-val-ok-const
   %+  expect-eq
@@ -342,6 +445,19 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aFoo == 1\0aBar == 2\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
     ==
   'CONSTANTS C <- Foo\0aFoo <- Bar\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-sub-temporal
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2281 ~\0aThe configuration file substitutes constant C with non-constant T - specifically: TLC encountered a temporal formula ([]A) when evaluating a predicate or action.\0aline 5, col 6 to line 5, col 14 of module A\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aT == [](x = 0)\0aInit == x = 0\0aNext == x\' = x\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aCONSTANT C <- T\0a'
 ::
 ++  test-cfg-val-val-sub-undefined
   %+  expect-eq

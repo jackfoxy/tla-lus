@@ -46,7 +46,8 @@ def hcord(s: str) -> str:
 def golden(case: Path) -> str:
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
-        shutil.copy(case / "A.tla", tdp / "A.tla")
+        for f in sorted(case.glob("*.tla")):
+            shutil.copy(f, tdp / f.name)
         shutil.copy(case / "in.txt", tdp / "A.cfg")
         r = subprocess.run(["java", "-cp", DUMP_CP, "ConfigValidate", "A"],
                            cwd=td, capture_output=True, text=True)

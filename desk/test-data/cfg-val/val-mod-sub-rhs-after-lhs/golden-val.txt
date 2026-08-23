@@ -1,0 +1,5 @@
+VALIDATE
+2223 ~
+In the configuration file, the identifier Q appears
+on the right-hand side of a <- after already appearing on the
+left-hand side of one.

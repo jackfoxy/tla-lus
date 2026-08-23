@@ -1026,7 +1026,8 @@
   =/  dv  (l-deps root sem-order.g ctxs mods.g)
   =/  mo  (level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
   =.  defs.mo  (stamp-origin root defs.mo)
-  `mo(imports (ext-defs root sem-order.g ctxs mods.g))
+  =.  mo  mo(imports (ext-defs root sem-order.g ctxs mods.g))
+  `mo(modops (mod-opdefs root sem-order.g ctxs mods.g))
 ::
 ++  stamp-origin
   ::  record the defining module on each definition (unit 6C.1). Explicit
@@ -1115,6 +1116,58 @@
     ?:  |(local.i.ds (~(has in seen) name.i.ds))  $(ds t.ds)
     $(ds t.ds, seen (~(put in seen) name.i.ds), out [i.ds out])
   $(ms t.ms, seen seen.acc, out out.acc)
+::
+++  mod-opdefs
+  ::  every module in the spec, mapped to the operator names and arities
+  ::  its own `ModuleNode.getOpDefs()` exposes: the EXTENDS closure first
+  ::  (dependency-first, first definer wins, LOCAL definitions not
+  ::  exported) then the module's own definitions, whose LOCALs ARE in the
+  ::  module and so are listed. This is what SpecProcessor's per-module
+  ::  `mod!lhs <- rhs` loop (SpecProcessor.java:711-770) iterates, and the
+  ::  key set is the `modSet` its TLC_NO_MODULES check tests against.
+  ::  Names and arities only -- a per-module override resolves its rhs
+  ::  against the ROOT defns table, never the module's, so no body is
+  ::  needed here (R1.8.2)
+  |=  [root=@t order=(list @t) ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (map @t (list [name=@t arity=@ud]))
+  ::  each module's OWN definitions, in definition order, generated once
+  =/  own=(map @t (list sem-def))
+    =|  acc=(map @t (list sem-def))
+    =/  os  order
+    |-  ^-  (map @t (list sem-def))
+    ?~  os  acc
+    =/  ld  (~(get by mods) i.os)
+    ?~  ld  $(os t.os)
+    =/  std  (~(has by standard-modules:stdmods:modules) i.os)
+    =/  ds=(list sem-def)
+      ?:  &(std !(~(has in body-modules) i.os))
+        (ctx-defs i.os (~(gut by ctxs) i.os ~))
+      =/  fc  (full-ctx tree.u.ld ctxs)
+      (stamp-origin i.os defs:(gen-module tree.u.ld fc ctxs mods))
+    $(os t.os, acc (~(put by acc) i.os ds))
+  =|  out=(map @t (list [name=@t arity=@ud]))
+  =/  os  order
+  |-  ^-  (map @t (list [name=@t arity=@ud]))
+  ?~  os  out
+  ::  the inherited half: this module's own EXTENDS closure, first definer
+  ::  winning, LOCALs skipped -- +ext-defs' rule, applied per module
+  =/  inh
+    =|  seen=(set @t)
+    =|  acc=(list [name=@t arity=@ud])
+    =/  ms  (ext-reach i.os order mods)
+    |-  ^-  (list [name=@t arity=@ud])
+    ?~  ms  (flop acc)
+    =/  ds  (~(gut by own) i.ms ~)
+    =/  r
+      |-  ^-  [seen=(set @t) acc=(list [name=@t arity=@ud])]
+      ?~  ds  [seen acc]
+      ?:  |(local.i.ds (~(has in seen) name.i.ds))  $(ds t.ds)
+      $(ds t.ds, seen (~(put in seen) name.i.ds), acc [[name.i.ds arity.i.ds] acc])
+    $(ms t.ms, seen seen.r, acc acc.r)
+  =/  mine
+    %+  turn  (~(gut by own) i.os ~)
+    |=(d=sem-def [name.d arity.d])
+  $(os t.os, out (~(put by out) i.os (weld inh mine)))
 ::
 ++  analyze-graph
   ::  the analyze pipeline's entry (unit 4.8): resolve, generate, level
@@ -1286,6 +1339,14 @@
       ::  pass computes it as oplev.lp and nothing else kept it. Empty when
       ::  level checking never ran. R1.8.1.3b
       lpe=(map @t ?)
+      ::  every module in the spec (the root included), mapped to the
+      ::  operator names and arities its own ModuleNode.getOpDefs()
+      ::  exposes. SpecProcessor's per-module `mod!lhs <- rhs` loop
+      ::  iterates exactly this, and its key set is the `modSet` that
+      ::  TLC_NO_MODULES tests against; +validate-config has no other way
+      ::  to see a non-root module's operators. Empty for a graph built
+      ::  without it. R1.8.2
+      modops=(map @t (list [name=@t arity=@ud]))
   ==
 ::  generator output: ~ when SANY's Generator returns null (the node
 ::  vanishes from the graph), plus diagnostics in report order
@@ -3401,6 +3462,7 @@
       ds.wk
       secs.wk
       |
+      ~
       ~
       ~
   ==

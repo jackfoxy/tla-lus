@@ -1354,22 +1354,66 @@ predicate) and the real `TLC_CONFIG_ID_HAS_VALUE` (2230) message body, which had
 in the Java's order, so `+validate-config` resolves a name the way `processConfig` does
 rather than reading the semantic graph directly.
 
-Three residues remain, each narrow and each stated rather than papered over:
+## Release R1.8.2 — the last three `cfg-validate` residues — at parity
 
-- **Per-module substitutions are not validated.** `CONSTANT mod!lhs <- rhs` and
-  `mod!F(a) = v` are parsed, carried in the `run-spec`, and their constant tables are
-  arity-checked (2242), but the 2223/2224/2225/2226 loop over them is not ported: it needs
-  each non-root module's own operator list, where the port's graph exposes the root module
-  plus its `EXTENDS` imports.
-- **EC 2230 on an operator-record constant** renders `<value>` where tlc2 renders
-  `OpRcdValue.toString()`. Every other value shape `parseValue` can produce (integer,
-  string, boolean, model value, set) renders byte-exactly through `+render-value`.
-- **EC 2281's addendum on a temporal body.** tlc2 appends the message of whatever constant
-  evaluation threw. Measured at the pin, that is EC 2280
-  (`TLC_CONFIG_UNDEFINED_OR_NO_OPERATOR`) naming the first state variable the body reads,
-  which the port reproduces including its `Location.toString()`. A body that is non-constant
-  because it is **temporal** raises EC 2261 there instead, with tlc2's abbreviated expression
-  rendering (`[]A`); the port emits the 2281 sentence with no addendum for that shape.
+R1.8.1.3b left three narrow residues. R1.8.2 closed all three, and the third one
+turned out to be smaller than its own residue text claimed.
+
+**Per-module substitutions are validated.** `+mod-subst`/`+one-module` run the
+2223/2224/2225/2226 loop over each module's `mod!lhs <- rhs` table, then
+`+unknown-modules` raises TLC_NO_MODULES (2245) for a config module name the
+specification does not define — `SpecProcessor.java:711-770`, in the Java's
+position: after the root 2226 sweep and before `processConstantDefns`. It is not
+simply the root loop repeated; three asymmetries are explicit in the Java and
+reproduced here:
+
+- the **2223** self-reference test is against *this module's* table
+  (`mDefs.containsKey(rhs)`), not the root's `overrides`;
+- the **rhs still resolves in the root `defns` table** — the Java says so in a
+  comment, "The rhs comes from the root module" — so a per-module override may
+  name a root definition and nothing else;
+- **2225 fires here for every operator**, where the root loop defers a declared
+  constant's arity check to `processConstantDefns`.
+
+What made this residue real was the missing input, not the loop: the port's graph
+exposed the root module plus its `EXTENDS` imports, never a *non-root* module's
+own operator list. `sem-module` now carries `modops` (`+mod-opdefs`), every module
+in the spec mapped to the names and arities its own `ModuleNode.getOpDefs()`
+exposes — the EXTENDS closure first, first definer winning and LOCALs not
+exported, then the module's own definitions, whose LOCALs are in the module and so
+are listed. Its key set is also the `modSet` the 2245 check tests against.
+
+**EC 2230 renders an operator record.** `+render-oprcd` is `OpRcdValue.toString()`
+(`OpRcdValue.java:247`): `{ ` then one `<arg, arg, val>` record per config line
+joined by `, `, then `}` with no space before it; an empty record is `{ }`.
+`addLine` appends and never dedups, so the config's line order *is* the rendering
+order. Measured against the pin: `F(1) = 2` with `F(3) = 4` renders
+`{ <1, 2>, <3, 4>}`.
+
+**EC 2281's temporal addendum — and a correction.** A substituting body that is
+non-constant because it is *temporal* throws EC 2261
+(`TLC_ENCOUNTERED_FORMULA_IN_PREDICATE`, `Tool.java:2808-2846`) rather than EC
+2280, and 2281's addendum carries that message. The residue text had said tlc2
+renders it with "its abbreviated expression rendering" — **it does not.**
+`SemanticNode.toString()` returns `getLocation().toString()` unless the
+`SemanticNode.showPlainFormulae` system property is set, which no default run
+sets. So the message's second parameter is a *location*, which `+loc-str` already
+produced for the 2280 case, and the whole residue was one message template and one
+walk result away.
+
+`+nonconst-ref` now returns a typed `ncref` — `%ident` (2280) or `%temporal`
+(2261) — and stops at a temporal node **without descending into it**, because
+`Tool.evalImpl` switches on a node's OPCODE before evaluating its arguments. So
+`C <- []P` names the box, never P's contents. The eight labels are the ones
+`Tool.java` passes as the message's first parameter: `[]A`, `<>A`, `WF`, `SF`,
+`\EE`, `\AA`, `a ~> b`, `a -+-> formula`.
+
+The `cfg-val` corpus went 27 -> 35: one case per per-module code (2223, 2224,
+2225, 2226, 2245) plus a valid per-module override, an operator-record 2230 body,
+and a temporal 2281 addendum. All green, and `check-opt-cfg` — which owned no
+residue of its own, only these three through `lib/config` — reaches `parity` with
+this row.
+
 
 ## Release R1.8.1 — the tier-2 liveness batch, and what it measured
 
