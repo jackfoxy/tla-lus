@@ -11,8 +11,8 @@ here is a deliberate, documented divergence rather than a latent bug.
 |---|---|
 | Oracle pin (SANY/PlusCal/TLC) | `tlaplus@4ba7d8811` (MIT) |
 | Example/fixture pins | `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6` (MIT) |
-| Agent state version | `%3` — `versioned-state` in `app/tla-lus`; nothing has been released, so R1.5.12b collapsed the pre-`%3` chain rather than carrying it |
-| Public API version | `api-version` 2 (`sur/tla-lus`, reported at `/x/version`) |
+| Agent state version | `%0` — `versioned-state` in `app/tla-lus`. Nothing has been released, so exactly one version exists: the one that ships. Pre-release reshapes are not versions and the desk carries no record of them |
+| Public API version | `api-version` 1 (`sur/tla-lus`, reported at `/x/version` with the state version, `[1 0]`) |
 | Kelvin | `sys.kelvin` = `[%zuse 411 410 409 408]` |
 | Scaffold gate | `tools/scaffold-gate.sh` (11 gates) — proves scaffold hygiene, not parity; passes whatever the ledger owes |
 | **Release gate** | `tools/release-gate.sh` (R1.9.3) — the scaffold gate **plus** ledger closure, tier 2, no stubs in port code, refusals documented both ways, upgrade/restart, reproducible artifacts; then `-test /=tla-lus=/tests ~` on the ship |
@@ -1074,54 +1074,57 @@ at all; a monotonic counter would need a state field (unit 10.6).
 
 ### 10.6 API versioning and state migration — at parity
 
-**The public API now carries a revision.** `sur/tla-lus` exports
-`api-version`, and `/x/version` returns `[api state]` so a caller can tell
-what it is talking to.
+**The public API carries a revision.** `sur/tla-lus` exports `api-version`,
+and `/x/version` returns `[api state]` so a caller can tell what it is
+talking to. Nothing has been released, so both numbers are the *first*:
+`[1 0]`.
 
-| revision | what changed |
-|---|---|
-| 1 | the unit-2 frozen wire |
-| 2 | a `%clay` bundle's `root` is a **module name** (it was a path); `source-ref`/`read-request`/`read-response` exist; `step-result` gained `%await` |
+**There is no pre-release version history, deliberately.** The desk went
+through several internal reshapes of the job record, the state and the
+`%clay` bundle while it was being built. None of them is a version: no ship
+ever held that state and no caller ever saw that wire. Carrying the chain
+would have meant shipping conversion arms for states that cannot exist, and
+inviting a reader to reconstruct a lineage that means nothing to them. So
+the counters were reset to the shipping value and the intermediate names
+retired — `state-0`/`%0` is the state, `jobstate` and `step-out` are the
+kernel's own molds, and `api-version` is 1.
 
-The `action` and `update` shells are unchanged — no caller-visible change
-required a bump there. The `on-peek` `$job` projection and the artifact
-scry shape are untouched.
+**What survives is the mechanism, which is the point.** The agent's saved
+state is a version-tagged union with one arm today:
 
-**State is `%3`** (`job-3`). The record's fields are the same as `%2`; what
-moved under it is the request's source bundle. `jobs-2-to-3` carries
-terminal jobs over whole (submit time, statistics, artifacts, diagnostics)
-and seals an active job `%failed 'restarted: the source-load stage is new;
-resubmit'` — its continuation predates the `%modules` stage and cannot be
-resumed honestly across it. (The Work Unit 7.7 contract would catch the
-incompatible cursor at the next step anyway; the migration says so up
-front.) The async-load cursor lives in the jammed continuation, the pinned
-case in the request, and quota accounting is derived, so none of them
-needed a field on the job.
+```hoon
++$  versioned-state  $%(state-0)
++$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
+```
 
-Two defects in the old migration path are fixed here, both found by
-running it:
+and `on-load` **coerces** the stored noun rather than requiring it to nest:
 
-- **Historical molds named live types.** `state-1` was defined as
-  `(map req-id job)` — the *current* `/sur` `$job`. When unit 10 reshaped
-  the `%clay` bundle, every "frozen" mold silently changed with it, so the
-  molds no longer described what had actually been stored. They are now
-  frozen copies (`source-bundle-2`, `request-2`, `job-1`, `job-2`) in
-  `lib/migrate`. *(Historical: R1.5.12b later deleted `lib/migrate` and
-  collapsed the pre-`%3` chain — nothing had been released, so there was no
-  stored `%0`/`%1`/`%2` state to migrate from. The frozen-copy rule survives
-  in `app/tla-lus`'s `versioned-state`; the file does not.)*
-- **`on-load` required the stored type to nest.** `!<` type-checks the
-  vase as stored, so *any* change to a mold reachable from the state made
-  the whole load fail — and the fallback wipes every job, including
-  completed results a caller had not collected. `on-load` now coerces the
-  noun (`;;`) through the frozen molds, still inside `mule`. A genuinely
-  unreadable state still falls back to empty; a merely restyled one no
-  longer does.
+```hoon
+=/  old  ;;(versioned-state q.old-vase)
+?-  -.old
+  %0  old
+==
+```
 
-A pre-unit-10 `%clay` job cannot actually appear in a stored state — the
-bundle was typed-rejected at `validate` for the whole life of `%1` and
-`%2` — so the root-path-to-module-name conversion is frozen for the type,
-not for data anyone has. It converts `/die-hard/tla` to `die-hard`.
+Two properties of that shape were learned by running the old chain, and both
+are why it is written this way:
+
+- **A frozen mold must be a frozen COPY, never a reference to a live
+  `/sur` type.** The pre-release chain once defined a historical state as
+  `(map req-id job)` using the *current* `$job`; when the `%clay` bundle was
+  reshaped, every "frozen" mold silently changed with it and no longer
+  described what had actually been stored. A future `state-1` must copy the
+  molds it freezes.
+- **`!<` is the wrong tool for `on-load`.** It type-checks the vase as
+  stored, so *any* change to a mold reachable from the state fails the whole
+  load — and the fallback wipes every job, including completed results a
+  caller never collected. `;;` inside `mule` loads a merely restyled state
+  and still falls back on a genuinely unreadable one.
+
+`tools/scaffold-gate.sh` gate 6 and `tools/release-gate.sh` R5 both assert
+this mechanism — the union, the coercion, the dispatch, and a state tag
+matching the gate's own `DESK_STATE` — so the next version bump has to touch
+the gate, and the gate will say so.
 
 ### 10.7 Close: what a Clay run is, and what it still is not
 

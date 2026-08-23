@@ -204,11 +204,11 @@ The agent is deliberately small. It:
   `on-save` vase type.
 - **Publishes** — subscribers to `/job/<id>` get a replayed snapshot then live
   ordered events; `%result` is terminal and fires once.
-- **Persists** — all jobs live in `state-2 = [%2 jobs=(map req-id job-2)]`.
-  `on-save`/`on-load` carry them across upgrades; `migrate.hoon` owns the
-  frozen `%0`/`%1` molds and the `%0 → %1 → %2` chain (active `%1` stub
-  jobs terminate `%failed` rather than fake a resumable state). Scries
-  expose the public `$job` projection, never the internal continuation.
+- **Persists** — all jobs live in `state-0 = [%0 jobs=(map req-id jobstate)]`.
+  `on-save`/`on-load` carry them across upgrades: `on-load` **coerces** the
+  stored noun (`;;`) inside `mule` rather than requiring it to nest, so a
+  mold change cannot discard completed results. Scries expose the public
+  `$job` projection, never the internal continuation.
 
 ## Dependency graph (units)
 
@@ -226,8 +226,10 @@ is validated back through units 4–7.
 
 ## Persistence and recovery
 
-State is a versioned tagged union (`versioned-state = $%(state-0 state-1
-state-2)`), so upgrades are explicit migrations, never in-place reshaping. A
+State is a versioned tagged union (`versioned-state = $%(state-0)` — one arm,
+since nothing has been released), so upgrades are explicit migrations, never
+in-place reshaping: a future version adds its `state-N` alongside the frozen
+copy of this one and converts in `on-load`'s `?-`. A
 job's noun contains everything needed to resume byte-identically: the
 request, the current stage, the remaining `pending` stages, accumulated
 stats/diags/artifacts, the submit time (for `max-time`), the jammed in-stage

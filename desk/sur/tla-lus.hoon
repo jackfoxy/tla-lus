@@ -15,11 +15,10 @@
   ::
 ::  +|  API Revision
 ::
-::  Bumped when a caller-visible noun changes. 1 = the unit-2 frozen wire;
-::  2 = unit 10 — a %clay bundle's `root` is a module name (it was a
-::  path), the async read nouns below exist, and `step-result` gained
-::  %await. The action/update shells are unchanged.
-++  api-version  2
+::  Bumped when a caller-visible noun changes AFTER a release. Nothing has
+::  been released, so this is 1: the wire as it ships, with no pre-release
+::  revision history to carry.
+++  api-version  1
 ::
 ::  +|  Identifiers
 ::
@@ -235,13 +234,6 @@
   ==
 ::  one bounded slice of work: more work remains, or the job is terminal
 ::  (result distinguishes ok/failed/violated/cancelled/limited)
-+$  step-result
-  $%  [%more events=(list event) =job]
-      [%stop events=(list event) =job]
-      ::  a pure stage requests external Clay reads and pauses; the agent
-      ::  performs them and resumes the job with the responses (unit 10)
-      [%await events=(list event) reads=(list read-request) =job]
-  ==
 ::
 ::  +|  Poke Actions
 ::

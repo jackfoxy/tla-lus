@@ -381,7 +381,7 @@
   ::  a corrupt continuation must fail the JOB, never the event
   |=  inp=@t
   ^-  fz-outcome
-  =/  j=job-3:job  *job-3:job
+  =/  j=jobstate:job  *jobstate:job
   =.  cont.j  `[%1 `@`inp]
   =/  r  (mule |.((step:job j 1 `@da`0)))
   ?:  ?=(%| -.r)  %bailed

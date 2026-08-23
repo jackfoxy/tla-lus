@@ -22,7 +22,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DESK="$REPO/desk"
 TLA_REPO="${TLA_REPO:-/mnt/mars/gitrepos/tlaplus}"
 PIN="4ba7d8811289fb8e95dac4d5e554c05216ba3100"
-DESK_STATE="%3"           # agent state version (app/tla-lus.hoon)
+DESK_STATE="%0"           # agent state version (app/tla-lus.hoon)
 FAIL=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }

@@ -14,7 +14,7 @@
   ::
   ::  Texts mirror desk/test-data/clay/{multi,single}.
   ::
-+$  jb  job-3:job-lib
++$  jb  jobstate:job-lib
 ::  an in-test Clay: full file path -> body
 +$  fs  (map path @t)
 ::

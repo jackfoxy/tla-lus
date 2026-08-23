@@ -570,7 +570,7 @@
   ::  a caller can ask what it is talking to
   =/  res  (~(on-peek agent bol) /x/version)
   %+  expect-eq
-    !>([api-version 3])
+    !>([api-version 0])
   !>(!<([api=@ud state=@ud] q:(need (need res))))
 ++  test-on-load-coerces-a-stale-type
   ::  the stored *type* may name molds this version has since changed (during
@@ -584,7 +584,7 @@
     !>  1
   !>  (lent !<((list [req-id stage]) q:(need (need (~(on-peek ag2 bol) /x/jobs)))))
 ::
-++  test-on-load-keeps-v3
+++  test-on-load-keeps-current
   ::  a current state loads unchanged
   =/  ag   `agent:gall`agent
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])

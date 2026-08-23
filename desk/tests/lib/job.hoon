@@ -10,7 +10,7 @@
   ::  persisted continuation, pause/resume identity at every slice
   ::  boundary, and limit enforcement at the point of growth.
   ::
-+$  jb  job-3:job-lib
++$  jb  jobstate:job-lib
 ::
 ++  t0  ~2026.7.16
 ::

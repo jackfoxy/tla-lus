@@ -122,7 +122,7 @@ wake. No single event contains a full search; the per-event budget is
 engine configuration, separate from the request's `limits`, which are
 enforced where each resource grows (`max-states`/`max-depth` per state
 registered, `max-time` per slice, `max-artifact` at artifact store). Jobs
-are stored in agent state (`state-3 = [%3 jobs=(map req-id job-3)]`), so
+are stored in agent state (`state-0 = [%0 jobs=(map req-id jobstate)]`), so
 they survive a ship restart and resume mid-search from the persisted
 cursor with an identical result; a job cancelled or deleted between
 scheduling and wake-up is a no-op.
@@ -210,7 +210,7 @@ wire and not listed here.
 | `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth])` | `[%exhaustive &]` / `[%simulate 42 100 20]` |
 | `check-opts` | `[translate=? cfg=(unit source-name) mode=check-mode]` | `[| ~ [%exhaustive &]]` |
 | `op` | `$%(%translate %analyze %check)` | `[%check [| ~ [%exhaustive &]]]` |
-| `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** (api-version 2) |
+| `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** |
 | `source-ref` | `[=ship =desk cas=case =path]` | `[~zod %tla-lus da+now /counter/tla]` — only `lib/source-path` builds one |
 | `read-request` | `[tag=@ud =source-ref]` | `[1 [~zod %tla-lus da+now /counter/tla]]` |
 | `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
@@ -229,7 +229,6 @@ wire and not listed here.
 | `progress` | `[done=@ud total=@ud]` | `[3 3]` — stages, not states |
 | `job` | `[request stage pending progress stats diags artifacts result]` | the public projection — **no** `id` field (the id is the map key) and **never** the internal cursors; `result` is `~` until terminal |
 | `event` | `$%(%stage %progress %diagnostic %result)` | `[%stage %parse]`, `[%result [%ok …]]` |
-| `step-result` | `$%(%more %stop %await)`, each carrying `events` + `job` | kernel-internal: `%more` schedules another slice, `%stop` is terminal, `%await` (api-version 2) pauses on `reads=(list read-request)` until Clay answers |
 | `action` | `$%(%submit %cancel %delete-result)` | `[%submit ~.counter req]` |
 | `update` | `$%(%ack %rejected %deleted %job)` | `[%job ~.counter [%result [%ok …]]]` |
 

@@ -15,10 +15,10 @@
 ::  The agent's saved state is a VERSION-TAGGED union, which is the whole
 ::  migration mechanism: to change the state's shape, add the new `state-N`
 ::  here, keep the previous mold alongside it, and convert in `on-load`'s `?-`.
-::  Nothing has been released, so the pre-`%3` chain that used to live in
-::  /lib/migrate was collapsed rather than carried (R1.5.12b).
-+$  versioned-state  $%(state-3)
-+$  state-3  [%3 jobs=(map req-id job-3:job-lib)]
+::  Nothing has been released, so there is no history to carry and exactly one
+::  version exists — the one that ships. Pre-release reshapes are not versions.
++$  versioned-state  $%(state-0)
++$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
 +$  card     card:agent:gall
 ::
 ::  +|  Card Helpers
@@ -108,7 +108,7 @@
 ::
 ++  snapshot
   ::  Current state of a job as updates, for (re)joining watchers
-  |=  [id=req-id j=job-3:job-lib]
+  |=  [id=req-id j=jobstate:job-lib]
   ^-  (list update)
   ?^  result.j
     [%job id [%result u.result.j]]~
@@ -118,15 +118,15 @@
 ::
 ++  terminal
   ::  Only terminal jobs may be deleted or expose artifacts
-  |=  j=job-3:job-lib
+  |=  j=jobstate:job-lib
   ^-  ?
   ?=(^ result.j)
 ::
 ++  retain
   ::  a job that just finished may have pushed the artifact store over
   ::  its bound; reclaim only then, so the scan is not paid every slice
-  |=  [j=job-3:job-lib js=(map req-id job-3:job-lib)]
-  ^-  (map req-id job-3:job-lib)
+  |=  [j=jobstate:job-lib js=(map req-id jobstate:job-lib)]
+  ^-  (map req-id jobstate:job-lib)
   ?.  (terminal j)  js
   (reclaim:job-lib js max-retained:default-quota:job-lib)
 ::
@@ -135,8 +135,8 @@
   ::  bounded step, nothing (terminal), or the Clay reads the job is
   ::  waiting on. Reads that cannot exist are answered immediately and a
   ::  step is scheduled, so a paused job always makes progress
-  |=  [id=req-id r=step-result-3:job-lib now=@da]
-  ^-  [(list card) job-3:job-lib]
+  |=  [id=req-id r=step-out:job-lib now=@da]
+  ^-  [(list card) jobstate:job-lib]
   ?-    -.r
       %more  [(snoc (efacts id events.r) (wait id now)) job.r]
       %stop  [(efacts id events.r) job.r]
@@ -151,7 +151,7 @@
   ==
 --
 %-  agent:dbug
-=|  state-3
+=|  state-0
 =*  state  -
 ^-  agent:gall
 |_  =bowl:gall
@@ -167,7 +167,7 @@
 ++  on-load
   |=  old-vase=vase
   ^-  (quip card _this)
-  =/  res=(each state-3 tang)
+  =/  res=(each state-0 tang)
     %-  mule  |.
     ::  the stored noun is COERCED (`;;`) rather than required to nest as
     ::  stored, so a mold change anywhere inside a request cannot throw away
@@ -175,11 +175,11 @@
     ::  `versioned-state` and its conversion arm to this `?-`.
     =/  old  ;;(versioned-state q.old-vase)
     ?-  -.old
-      %3  old
+      %0  old
     ==
   ?:  ?=(%.y -.res)  `this(state p.res)
   %-  (slog 'tla-lus: state corrupt, unable to migrate' ~)
-  `this(state *state-3)
+  `this(state *state-0)
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -275,13 +275,13 @@
     ::  agent's state version
     :^  ~  ~  %noun
     !>  ^-  [api=@ud state=@ud]
-    [api-version 3]
+    [api-version 0]
   ::
       [%x %jobs ~]
     :^  ~  ~  %noun
     !>  ^-  (list [req-id stage])
     %+  turn  ~(tap by jobs.state)
-    |=([id=req-id j=job-3:job-lib] [id stage.j])
+    |=([id=req-id j=jobstate:job-lib] [id stage.j])
   ::
       [%x %job @ ~]
     =/  cur  (~(get by jobs.state) `req-id`i.t.t.path)
