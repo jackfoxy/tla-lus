@@ -1444,6 +1444,17 @@ and now pinned.
 VIEW-based fingerprinting and ALIAS trace rendering remain unimplemented; they
 are now honest refusals rather than wrong answers.
 
+**R1.8.8's full-suite run proved the point.** `Github746` — a tier-2 safety-batch
+spec whose `.cfg` carries `ALIAS Alias` — had been *agreeing* with TLC. It agreed
+on the verdict, the counts and the depth, and disagreed on every state line
+underneath: TLC renders the violating initial state through the alias
+(`/\ i = 1 /\ foo = "bar" /\ j = TRUE`) where the port printed the raw binding
+`i = 1`. The comparator could not see it, because `tlc_projection` captures trace
+lines only after the two counter-example markers, and an initial-state violation
+is announced by neither. The typed rejection is what surfaced it. It is now
+censused (safety batch: 13/14 agree, 1 listed), which is the honest state — a
+silently wrong trace was traded for a visible refusal.
+
 ## Release R1.8.3 — the job kernel's report is the console path's — at parity
 
 R1.8.0's audit found `cfg-runspec`'s one named residue had a twin at the same

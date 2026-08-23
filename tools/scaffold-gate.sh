@@ -57,12 +57,26 @@ echo "== gate 5: kelvin compatibility =="
   || fail "no sys.kelvin"
 
 echo "== gate 6: state migration =="
-MIGCHAIN=1
-for STEP in jobs-0-to-1 jobs-1-to-2 jobs-2-to-3; do
-  grep -q "$STEP" "$DESK/app/tla-lus.hoon" || MIGCHAIN=0
-done
-[ "$MIGCHAIN" -eq 1 ] && pass "on-load migrates %0 -> %1 -> %2 -> %3 (lib/migrate)" \
-  || fail "missing migration chain in on-load"
+# R1.8.8: this gate used to require the literal chain jobs-0-to-1 / 1-to-2 /
+# 2-to-3 in lib/migrate. R1.5.12b DELETED that chain on purpose — nothing has
+# been released, so the pre-%3 versions were collapsed rather than carried —
+# and the gate was not updated with it, so it had been failing silently since
+# 2026-08-17. What the design actually guarantees is the MECHANISM, so that is
+# what is checked: a version-tagged state union, an on-load that coerces the
+# stored noun (`;;`) instead of requiring it to nest, a `?-` dispatch on the
+# version tag, and a state tag matching DESK_STATE.
+MIGOK=1
+MIGWHY=""
+grep -q '+\$  versioned-state' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="no versioned-state union"; }
+grep -q ';;(versioned-state' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="on-load does not coerce the stored noun"; }
+grep -q '?-  -.old' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="on-load has no version dispatch"; }
+grep -q "^+\$  state-${DESK_STATE#%}  \[${DESK_STATE} " "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="state mold is not ${DESK_STATE}"; }
+[ "$MIGOK" -eq 1 ] && pass "on-load coerces + dispatches a version-tagged state ($DESK_STATE)" \
+  || fail "state migration mechanism: $MIGWHY"
 
 echo "== gate 7: no synchronous Clay read in a stage =="
 # the pure pipeline may not touch Clay: every external read is a

@@ -8,7 +8,8 @@
 # in one mule-isolated arm; 0 disagree with Java (142/142 agree):
 
 # tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
-# 0 disagree with TLC (14/14 agree):
+# 1 disagree with TLC (13/14 agree):
+tlc-batch	Github746 -> Error: unsupported: ALIAS (trace rendering through an alias; unit 7)	ALIAS trace rendering is not ported; typed rejection (R1.8.6)
 
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
 # 1 disagree with TLC (8/9 agree):

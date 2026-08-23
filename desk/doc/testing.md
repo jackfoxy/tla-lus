@@ -206,6 +206,55 @@ Deliberately deferred (each with a concrete unblock condition), tracked in
   performance harness measures the port against itself, so it cannot feed R1's
   parity gate. Moved to future work; see the tier-3 section below.
 
+## Close-out gates, and why they are their own unit (R1.8.8)
+
+A unit runs the shards it touched. That discipline is right — it keeps
+increments fast — but it is structurally blind to two things, and R1 has now
+been bitten by both:
+
+- **Cross-shard breakage.** R1.1.R1 changed `+render-state`'s arity and re-ran
+  every shard judged touched; `tests/lib/stream.hoon` also called it and failed
+  to *build*. Only the full suite saw it.
+- **A gate nobody runs.** R1.5.12b deliberately deleted the pre-`%3` migration
+  chain (nothing had been released, so it was collapsed rather than carried) but
+  did not update `scaffold-gate.sh` gate 6, which still required
+  `jobs-0-to-1`/`jobs-1-to-2`/`jobs-2-to-3`. The gate went **red on 2026-08-17
+  and stayed red through nine units** — R1.6, R1.7, R1.1.R0–R4, R1.8.0–.6 —
+  because none of them ran it. R1.8.8 found it. The code was right; the gate was
+  stale, and it now checks the mechanism the design guarantees (a version-tagged
+  union, an `on-load` that *coerces* rather than nests, a `?-` dispatch, and a
+  state mold matching the script's own `DESK_STATE`) instead of one historical
+  chain.
+
+So a close-out unit runs, in this order:
+
+| | command | proves |
+|---|---|---|
+| tier 1 | `python3 tools/validate.py --check` | every golden reproduces byte-identically from the pin |
+| tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
+| ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
+| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 10 gates (runs tier 1 as its gate 2) |
+| suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
+
+A gate that never runs is not a gate. It is a claim.
+
+**And the suite earns its slot every time.** R1.8.8's run failed one arm,
+`tier2/test-tlc-batch`, on `Github746` — a spec whose `.cfg` carries `ALIAS`.
+R1.8.6 had turned the silent ALIAS no-op into a typed rejection, so the first
+reading was "the close-out broke a passing spec". It had not: TLC renders that
+spec's violating initial state *through the alias*, the port had been printing
+the raw binding, and the comparator could not see the difference because
+`tlc_projection` captures trace lines only after the two counter-example markers
+— and an initial-state violation prints neither. The spec agreed on
+`[verdict, counts, depth]` and disagreed on every line beneath. Censused, not
+silenced: the safety batch now reads 13/14 agree, 1 listed.
+
+The lesson generalizes past this one spec: **a projection that does not look at
+something cannot report it as agreeing.** The dropped generated-count is a
+deliberate, documented normalization; the dropped alias-rendered initial state
+was an accident nobody had written down. When a differential passes, it is worth
+knowing which of the two it is.
+
 ## Tier 3 — a performance harness, and deliberately not part of R1
 
 Tier 3 was scoped as "broader `tlaplus-Examples` coverage and bounded
