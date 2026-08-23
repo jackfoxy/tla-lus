@@ -19,7 +19,12 @@ they share with each other and with the tree. That is what this checks:
   2. the pinned oracle commit in port-map §1 is the one the tooling uses;
   3. every ledger `unit` value appears in port-map's inventory unit column
      (i.e. no ledger row is attributed to a unit port-map never heard of);
-  4. the ledger tally the docs quote is the one `check-parity.py` computes.
+  4. the ledger tally the docs quote is the one `check-parity.py` computes
+     (port-map's §7 progress log is exempt: it quotes each increment's figure
+     on purpose, as it does superseded file names);
+  5. every `approved-difference` ledger row appears in compatibility.md's
+     support matrix (R1.9.1) — a deliberate divergence cannot be added to the
+     ledger and left out of the document that is supposed to enumerate them.
 
 Exit 0 clean, 1 on any drift, with the offending reference named.
 """
@@ -135,15 +140,61 @@ def check_tally() -> None:
     m2 = re.search(r"terminal \(parity/approved-difference/replaced/excluded\): (\d+)", r.stdout)
     terminal = int(m2.group(1)) if m2 else -1
     stale = []
+    pats = [
+        # "still owed (...): N"  and  "N still owed"  and  "N rows"
+        (r"still owed[^)\n]*?\)?:\s*(\d+)", owed),
+        (r"\*\*(\d+) still owed", owed),
+        (r"(\d+) still owed", owed),
+        (r"\*\*(\d+) rows, (?:\d+) still owed", None),
+    ]
     for doc in (PORTMAP, LEDGER, DESK / "doc/compatibility.md"):
-        for q in re.findall(r"still owed[^)\n]*?\)?: (\d+)", doc.read_text()):
-            if int(q) != owed:
-                stale.append(f"{doc.name} quotes owed={q}, computed {owed}")
+        text = doc.read_text()
+        # port-map's §7 progress log quotes the tally AS IT WAS at each
+        # increment -- the same reason check (1) exempts it from the
+        # file-existence sweep. A log that could not cite a superseded figure
+        # would not be a log.
+        if doc is PORTMAP and "## 7. Progress Log" in text:
+            text = text[:text.index("## 7. Progress Log")]
+        for pat, want in pats[:3]:
+            for q in re.findall(pat, text):
+                if int(q) != want:
+                    stale.append(f"{doc.name} quotes owed={q}, computed {want}")
+        # a bare "(N rows, M still owed)" phrasing
+        for rows, om in re.findall(r"\((\d+) rows, (\d+) still owed\)", text):
+            if int(om) != owed:
+                stale.append(f"{doc.name} quotes owed={om}, computed {owed}")
+            if int(rows) != terminal + owed:
+                stale.append(f"{doc.name} quotes rows={rows}, computed {terminal + owed}")
     if stale:
         for s in stale:
             bad(s)
     else:
         ok(f"quoted tallies agree with check-parity.py ({terminal} terminal, {owed} owed)")
+
+
+def check_approved_differences() -> None:
+    """(5) Every approved-difference row must appear in the support matrix."""
+    compat = (DESK / "doc/compatibility.md").read_text()
+    try:
+        i = compat.index("## Support matrix")
+        j = compat.index("\n## ", i + 1)
+    except ValueError:
+        bad("compatibility.md has no '## Support matrix' section")
+        return
+    matrix = compat[i:j]
+    rows = []
+    for line in LEDGER.read_text().split("\n"):
+        if not line.startswith("| ") or line.count("|") < 7:
+            continue
+        cells = line.split("|")
+        if cells[5].strip() == "approved-difference":
+            rows.append(cells[1].strip())
+    absent = [r for r in rows if f"`{r}`" not in matrix]
+    if absent:
+        bad("approved-difference rows missing from the support matrix: "
+            + ", ".join(absent))
+    else:
+        ok(f"all {len(rows)} approved-difference rows appear in the support matrix")
 
 
 def main() -> int:
@@ -152,6 +203,7 @@ def main() -> int:
     check_pin()
     check_units()
     check_tally()
+    check_approved_differences()
     if fails:
         print(f"\nDRIFT: {len(fails)} problem(s).")
         return 1
