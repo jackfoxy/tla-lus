@@ -99,7 +99,17 @@ BIG=$(find "$DESK/test-data" -type f -size +100k 2>/dev/null | wc -l)
 echo "== gate 9: desk manifest =="
 [ -f "$DESK/desk.bill" ] && pass "desk.bill present" || fail "no desk.bill"
 
-echo "== gate 10: parity ledger well-formed =="
+echo "== gate 10: port-map / ledger coherence =="
+# R1.9.0: the two documents are orthogonal projections and neither can be
+# generated from the other, so what is enforced is the facts they SHARE —
+# owner files that exist, one pin, units that resolve, quoted tallies.
+if python3 "$REPO/tools/check-portmap.py" >/tmp/tla-portmap.log 2>&1; then
+  pass "port-map and the ledger are coherent with each other and the tree"
+else
+  fail "port-map/ledger drift — see /tmp/tla-portmap.log"; tail -8 /tmp/tla-portmap.log
+fi
+
+echo "== gate 11: parity ledger well-formed =="
 if python3 "$REPO/tools/check-parity.py" --check >/tmp/tla-parity.log 2>&1; then
   LEDGER=$(grep -m1 'parity ledger:' /tmp/tla-parity.log)
   OWED=$(grep -m1 'still owed' /tmp/tla-parity.log)
