@@ -24,7 +24,9 @@ they share with each other and with the tree. That is what this checks:
      on purpose, as it does superseded file names);
   5. every `approved-difference` ledger row appears in compatibility.md's
      support matrix (R1.9.1) — a deliberate divergence cannot be added to the
-     ledger and left out of the document that is supposed to enumerate them.
+     ledger and left out of the document that is supposed to enumerate them;
+  6. every `+$` on the public wire (`sur/tla-lus.hoon`) appears in api.md
+     (R1.9.2) — a noun a consumer can receive cannot ship undocumented.
 
 Exit 0 clean, 1 on any drift, with the offending reference named.
 """
@@ -197,6 +199,18 @@ def check_approved_differences() -> None:
         ok(f"all {len(rows)} approved-difference rows appear in the support matrix")
 
 
+def check_wire_documented() -> None:
+    """(6) Every public mold must appear in api.md."""
+    sur = (DESK / "sur/tla-lus.hoon").read_text()
+    api = (DESK / "doc/api.md").read_text()
+    molds = re.findall(r"^\+\$\s+([a-z0-9-]+)", sur, re.M)
+    absent = [m for m in molds if f"`{m}`" not in api]
+    if absent:
+        bad("public molds missing from api.md: " + ", ".join(absent))
+    else:
+        ok(f"all {len(molds)} public wire molds appear in api.md")
+
+
 def main() -> int:
     print("== port-map / ledger coherence ==")
     check_owners()
@@ -204,6 +218,7 @@ def main() -> int:
     check_units()
     check_tally()
     check_approved_differences()
+    check_wire_documented()
     if fails:
         print(f"\nDRIFT: {len(fails)} problem(s).")
         return 1

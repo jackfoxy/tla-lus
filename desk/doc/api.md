@@ -52,7 +52,7 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
   ==
 +$  source-bundle
   $%  [%inline root=module-name modules=(map module-name @t) cfg=(unit @t)]
-      [%clay =ship =desk cas=case root=path cfg=(unit path) roots=(list path)]
+      [%clay =ship =desk cas=case root=module-name cfg=(unit path) roots=(list path)]
   ==
 +$  limits  [max-source=@ud max-modules=@ud max-states=@ud max-depth=@ud max-time=@dr max-artifact=@ud]
 +$  check-opts  [translate=? cfg=(unit source-name) mode=check-mode]
@@ -122,7 +122,7 @@ wake. No single event contains a full search; the per-event budget is
 engine configuration, separate from the request's `limits`, which are
 enforced where each resource grows (`max-states`/`max-depth` per state
 registered, `max-time` per slice, `max-artifact` at artifact store). Jobs
-are stored in agent state (`state-2 = [%2 jobs=(map req-id job-2)]`), so
+are stored in agent state (`state-3 = [%3 jobs=(map req-id job-3)]`), so
 they survive a ship restart and resume mid-search from the persisted
 cursor with an identical result; a job cancelled or deleted between
 scheduling and wake-up is a no-op.
@@ -158,14 +158,105 @@ Inv  == x < 4
 :tla-lus &tla-lus-action [%delete-result ~.counter]
 ```
 
+## Mold reference — every public noun, with a value
+
+Every `+$` in `sur/tla-lus.hoon`, in declaration order, with a value a consumer
+would actually see. The values are taken from green test assertions and live
+runs, not invented; `tools/check-portmap.py` fails if a mold is added to the
+wire and not listed here.
+
+### Identifiers, positions, sources
+
+| Mold | Shape | Example |
+|---|---|---|
+| `req-id` | `@ta` | `~.counter` — caller-chosen; a duplicate **active** id is rejected |
+| `module-name` | `@t` | `'Counter'` — the TLA+ module name, not a file name |
+| `source-name` | `@t` | `'Counter'`, or `'inline'` for the config |
+| `pos` | `[line=@ud col=@ud]` | `[5 12]` — 1-indexed, SANY semantics |
+| `span` | `[from=pos to=pos]` | `[[5 12] [5 18]]` — inclusive |
+| `loc` | `[src=source-name =span]` | `['Counter' [[5 12] [5 18]]]` |
+| `source-id` | `$%([%inline name=source-name] [%clay =ship =desk cas=case =path])` | `[%inline 'Counter']` / `[%clay ~zod %tla-lus da+now /counter/tla]` |
+| `source-text` | `[id=source-id text=@t]` | `[[%inline 'Counter'] '---- MODULE Counter ----…']` |
+| `resolver` | `$-(module-name (unit source-text))` | a gate; `inline-resolver:modules` builds one from a `(map module-name @t)` |
+
+### Lexical and diagnostic
+
+| Mold | Shape | Example |
+|---|---|---|
+| `token` | `[kind=@tas text=@t =span]` | `[%ident 'Init' [[4 1] [4 4]]]` |
+| `severity` | `?(%error %warning %info)` | `%error` |
+| `code-family` | `?(%sany %pcal %tlc %lus)` | `%tlc` — `%lus` is engine-specific, everything else is the pin's |
+| `diag-code` | `[family=code-family num=@ud]` | `[%tlc 2.103]`, `[%sany 4.802]`, `[%lus 402]` |
+| `stage` | 14 tags | `%parse`, `%config`, `%explore`, `%liveness`, `%terminal` |
+| `diagnostic` | `[code severity stage message at related]` | `[[%sany 4.200] %error %parse 'Encountered "==" …' `['Counter' [[4 6] [4 7]]] ~]` |
+
+### Traces and artifacts
+
+| Mold | Shape | Example |
+|---|---|---|
+| `binding` | `[var=@t val=@t]` | `['x' '1']` — the value is already **rendered**, as TLC prints it |
+| `trace-state` | `[index=@ud action=(unit [name=@t at=(unit loc)]) bindings=(list binding)]` | `[2 `['Next' `['Counter' [[5 9] [5 18]]]] ~[['x' '1']]]` — `action` is `~` on the initial state |
+| `trace` | `[kind=?(%safety %lasso %simulate) states=(list trace-state) loop-start=(unit @ud)]` | `[%lasso ~[…] `1]` — `loop-start` is set only for `%lasso` |
+| `artifact-name` | `@ta` | `%report`, `%trace`, `%sources` |
+| `artifact` | `$%([%text text=@t] [%trace =trace])` | `[%text 'Model checking completed. No error has been found.…']` |
+
+### Request
+
+| Mold | Shape | Example |
+|---|---|---|
+| `fairness` | `?(%none %wf %sf %wf-next)` | `%wf` — PlusCal only |
+| `pcal-opts` | `[=fairness termination=? gen-cfg=?]` | `[%none | |]` — `%translate` is a typed rejection today |
+| `analyze-flags` | `[syntax=? semantic=? level=? lint=?]` | `[& & & &]` |
+| `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth])` | `[%exhaustive &]` / `[%simulate 42 100 20]` |
+| `check-opts` | `[translate=? cfg=(unit source-name) mode=check-mode]` | `[| ~ [%exhaustive &]]` |
+| `op` | `$%(%translate %analyze %check)` | `[%check [| ~ [%exhaustive &]]]` |
+| `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** (api-version 2) |
+| `source-ref` | `[=ship =desk cas=case =path]` | `[~zod %tla-lus da+now /counter/tla]` — only `lib/source-path` builds one |
+| `read-request` | `[tag=@ud =source-ref]` | `[1 [~zod %tla-lus da+now /counter/tla]]` |
+| `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
+| `limits` | six bounds | `default-limits:job-lib` = `[1.000.000 64 100.000 1.000 ~m10 1.000.000]` |
+| `request` | `[=op src=source-bundle =limits allow-write=?]` | see the Dojo example |
+
+### Result and job
+
+| Mold | Shape | Example |
+|---|---|---|
+| `violation` | `$%(%invariant %deadlock %property %liveness %assumption)` | `[%invariant 'Inv']`, `[%deadlock ~]`, `[%property 'Lead']` |
+| `limit-kind` | `?(%source %modules %states %depth %time %artifact %noun)` | `%artifact` |
+| `out-degree` | `[min mean p95 max]` | `[0 1 1 1]` — one sample per **dequeued** state, so a sink pulls `min` to 0 |
+| `run-stats` | `[generated distinct queued depth outdeg]` | `[5 4 0 4 [0 1 1 1]]` |
+| `result` | five arms | `[%ok [5 4 0 4 [0 1 1 1]]]`, `[%violated [%invariant 'PBad'] [3 3 0 3 [1 1 1 1]]]`, `[%failed 'unsupported: VIEW …']`, `[%limited %artifact [5 4 0 4 [0 1 1 1]]]`, `[%cancelled ~]` |
+| `progress` | `[done=@ud total=@ud]` | `[3 3]` — stages, not states |
+| `job` | `[request stage pending progress stats diags artifacts result]` | the public projection — **no** `id` field (the id is the map key) and **never** the internal cursors; `result` is `~` until terminal |
+| `event` | `$%(%stage %progress %diagnostic %result)` | `[%stage %parse]`, `[%result [%ok …]]` |
+| `step-result` | `$%(%more %stop %await)`, each carrying `events` + `job` | kernel-internal: `%more` schedules another slice, `%stop` is terminal, `%await` (api-version 2) pauses on `reads=(list read-request)` until Clay answers |
+| `action` | `$%(%submit %cancel %delete-result)` | `[%submit ~.counter req]` |
+| `update` | `$%(%ack %rejected %deleted %job)` | `[%job ~.counter [%result [%ok …]]]` |
+
+Three reading notes that save a round trip:
+
+- **`%violated` is never collapsed into `%failed`.** A counterexample is a
+  successful run that found something; `%failed` means the engine could not
+  answer.
+- **`run-stats` means different things per mode.** In `%simulate`, `generated`
+  is transitions taken and `depth` the deepest transition index; `distinct` and
+  `queued` stay 0, because simulation keeps no frontier.
+- **`binding.val` is already rendered text**, matching what TLC prints — the
+  wire does not ship a structured value.
+
 ## Current surface
 
 The wire contract is complete, and stable in practice — it changes only when a
 parity gap needs a field the contract cannot express (most recently the
-state-graph out-degree distribution in `run-stats`). It freezes at release. The
-pipeline behind it is being
-filled in unit by unit (see `port-map.md`): `%check` runs the real safety and
-liveness model checker for inline sources that carry a config; the PlusCal
-translation, semantic/level diagnostics, and Clay-source paths are documented
-in `compatibility.md` as they land. Deferred behaviors reject or fall back
-rather than crash.
+state-graph out-degree distribution in `run-stats`). It freezes at release.
+
+The pipeline behind it is now filled in: the parity ledger
+(`parity-manifest.md`) is closed — 125 rows, none owed — so `%check` runs the
+real safety, liveness and simulation engines over **both** `%inline` and
+`%clay` sources, and `%analyze` runs the real semantic/level/lint pipeline.
+What remains unsupported is unsupported **by decision**, not by omission, and
+every case is a typed rejection naming what is missing: PlusCal translation,
+`VIEW`, `ALIAS`, and a cfg source override. `compatibility.md` carries the full
+support matrix — every one of the thirteen approved differences with its
+evidence — and its "Typed-rejected / unsupported public options" table is the
+list of things a caller can ask for and not get. Nothing degrades silently.
