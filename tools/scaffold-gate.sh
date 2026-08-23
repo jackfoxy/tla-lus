@@ -3,9 +3,14 @@
 # unit 0): audit the %tla-lus desk for SCAFFOLD hygiene — not Java parity.
 # It proves the pin, golden reproducibility, provenance, kelvin, migration,
 # fixture sizes, and that the parity ledger is well-formed. It does NOT prove
-# the toolchain is at parity: the ledger still has `partial`/`absent`/
-# `oracle-only` rows (see `check-parity.py`). The real release gate (unit 12)
-# additionally requires the ledger to be closed to terminal statuses.
+# the toolchain is at parity, and it passes whatever the ledger's owed count
+# is — it only reports it.
+#
+# The REAL release gate is `tools/release-gate.sh` (R1.9.3). It runs this
+# script and then adds what a release requires: the ledger CLOSED (zero
+# partial/absent/oracle-only), tier 2 as well as tier 1, no stubs or TODOs in
+# port code, every `unsupported:` refusal documented in both directions,
+# upgrade/restart, and reproducible oracle artifacts.
 #
 #   tools/scaffold-gate.sh
 #
@@ -114,7 +119,7 @@ if python3 "$REPO/tools/check-parity.py" --check >/tmp/tla-parity.log 2>&1; then
   LEDGER=$(grep -m1 'parity ledger:' /tmp/tla-parity.log)
   OWED=$(grep -m1 'still owed' /tmp/tla-parity.log)
   pass "$LEDGER — no unclassified rows"
-  echo "        $OWED (scaffold gate; the real release gate requires 0)"
+  echo "        $OWED (scaffold gate; release-gate.sh requires 0)"
 else
   fail "parity ledger malformed — see /tmp/tla-parity.log"; tail -6 /tmp/tla-parity.log
 fi
@@ -129,6 +134,7 @@ if [ "$FAIL" -eq 0 ]; then
   echo "    evidence    : desk/doc/evidence-counts.md (generated)"
   echo "    parity      : desk/doc/parity-manifest.md ($(grep -m1 'still owed' /tmp/tla-parity.log 2>/dev/null || echo 'see check-parity.py'))"
   echo "  remaining ship gate:  -test /=tla-lus=/tests ~   must report ok=%.y"
+  echo "  for release:          tools/release-gate.sh"
 else
   echo "SCAFFOLD GATE: FAIL"
 fi

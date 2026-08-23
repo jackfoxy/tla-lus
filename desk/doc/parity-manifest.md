@@ -21,10 +21,12 @@ Status values:
 - `oracle-only` — goldens are captured from the pin but no Hoon comparator
   exists yet.
 
-This is a scaffold ledger: the release gate is a scaffold gate until every
-in-scope row is `parity`, `approved-difference`, `replaced`, or `excluded`
-(no `partial`, `absent`, or `oracle-only`). Counts are cited from the
-generated `evidence-counts.md`, never hand-written.
+This was a scaffold ledger while any in-scope row was still `partial`,
+`absent` or `oracle-only`. **It is now closed** — every one of the 125 rows is
+`parity`, `approved-difference`, `replaced` or `excluded` — which is the
+condition `tools/release-gate.sh` (R1.9.3) enforces and `tools/scaffold-gate.sh`
+only reports. Counts are cited from the generated `evidence-counts.md`, never
+hand-written.
 
 ## Java source clusters
 

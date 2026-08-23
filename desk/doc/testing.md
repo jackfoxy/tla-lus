@@ -233,7 +233,8 @@ So a close-out unit runs, in this order:
 | tier 1 | `python3 tools/validate.py --check` | every golden reproduces byte-identically from the pin |
 | tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
-| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 10 gates (runs tier 1 as its gate 2) |
+| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 11 gates (runs tier 1 as its gate 2) |
+| release | `bash tools/release-gate.sh` | the real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
 
 A gate that never runs is not a gate. It is a claim.
