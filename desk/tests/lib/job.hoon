@@ -290,6 +290,35 @@
     !>((validate:job-lib (clay-req '' `/src/cfg/txt ~[/src])))
   ==
 ::
+++  test-validate-allow-write-rejected
+  ::  R2.1: `allow-write` was read by NO Hoon file — a caller setting it got
+  ::  silence. The agent is read-only end to end (no `%c %info` anywhere), so
+  ::  until R2.2 builds the write mechanism this is a refusal, not a no-op.
+  =/  req=request
+    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim &]
+  %+  expect-eq
+    !>(`'unsupported: Clay write-back (allow-write); the agent is read-only')
+  !>((validate:job-lib req))
+::
+++  test-validate-allow-write-off-accepted
+  ::  the default is untouched: the refusal keys on the flag being SET
+  =/  req=request
+    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim |]
+  (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-syntax-off-rejected
+  ::  R2.1: `analyze-flags.syntax` could never mean anything — parsing is
+  ::  mandatory, a parse error is fatal (never suppressible), and a SUCCESSFUL
+  ::  parse emits no diagnostics (`parse-typed` returns `diags=~`). It was
+  ::  accepted and ignored; it is now refused rather than given an invented
+  ::  meaning.
+  %+  expect-eq
+    !>  `'unsupported: syntactic analysis cannot be skipped; every later stage consumes the tree'
+  !>((validate:job-lib (analyze-req-f ~[['spec' cyc-spec]] [| & & &])))
+::
+++  test-validate-syntax-on-accepted
+  (expect-eq !>(~) !>((validate:job-lib (analyze-req-f ~[['spec' cyc-spec]] [& & & &]))))
+::
 ++  test-validate-translate-rejected
   =/  req=request
     [[%translate [%none | &]] (bundle cyc-spec ~) lim |]

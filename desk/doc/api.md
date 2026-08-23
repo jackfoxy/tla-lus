@@ -61,7 +61,9 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 +$  pcal-opts  [=fairness termination=? gen-cfg=?]
 ```
 
-`allow-write` gates Clay write-back; Clay is read-only otherwise.
+`allow-write` gates Clay write-back. The agent is read-only end to end today,
+so **setting it is a typed rejection at submit** (R2.1) rather than a no-op;
+R2.2 builds the write mechanism.
 `default-limits:job-lib` is a sane starting point.
 
 ## Updates (fact `%tla-lus-update`, path `/job/<id>`)
@@ -206,7 +208,7 @@ wire and not listed here.
 |---|---|---|
 | `fairness` | `?(%none %wf %sf %wf-next)` | `%wf` — PlusCal only |
 | `pcal-opts` | `[=fairness termination=? gen-cfg=?]` | `[%none | |]` — `%translate` is a typed rejection today |
-| `analyze-flags` | `[syntax=? semantic=? level=? lint=?]` | `[& & & &]` |
+| `analyze-flags` | `[syntax=? semantic=? level=? lint=?]` | `[& & & &]` — `semantic`/`level`/`lint` each gate whether that stage runs and reports. **`syntax` must be `&`**: parsing is mandatory (every later stage consumes the tree), so `syntax=\|` is a typed rejection rather than a flag that does nothing |
 | `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth])` | `[%exhaustive &]` / `[%simulate 42 100 20]` |
 | `check-opts` | `[translate=? cfg=(unit source-name) mode=check-mode]` | `[| ~ [%exhaustive &]]` |
 | `op` | `$%(%translate %analyze %check)` | `[%check [| ~ [%exhaustive &]]]` |

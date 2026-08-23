@@ -322,9 +322,24 @@
   ::  accepted into a stage that would fake success.
   |=  req=request
   ^-  (unit @t)
+  ::  `allow-write` gates Clay write-back, which no engine path performs --
+  ::  the agent is read-only end to end. Until R2.2 builds the write
+  ::  mechanism this is a REJECTION, not a no-op: an option that is accepted
+  ::  and ignored is the weakest form of unsupported (R2.1)
+  ?:  allow-write.req
+    `'unsupported: Clay write-back (allow-write); the agent is read-only'
   ?:  ?=(%translate -.op.req)
     `'unsupported: PlusCal translation is not ported yet (unit 8)'
+  ::  `analyze-flags.syntax` cannot mean anything here and must not pretend
+  ::  to. Parsing is mandatory (every later stage consumes the tree), a parse
+  ::  ERROR is fatal (`parse-typed` reports every one as fatal, so it can never
+  ::  be suppressed), and a SUCCESSFUL parse emits no diagnostics at all --
+  ::  measured, `parse-typed` returns `diags=~`. So `syntax=|` has no possible
+  ::  behaviour, and R2.1 refuses it rather than accepting it and doing
+  ::  nothing, which is what it did before
   ?:  ?=(%analyze -.op.req)
+    ?.  syntax.flags.op.req
+      `'unsupported: syntactic analysis cannot be skipped; every later stage consumes the tree'
     (validate-src req)
   ?:  translate.opts.op.req
     `'unsupported: translate-before-check is not ported yet (unit 8)'

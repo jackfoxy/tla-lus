@@ -234,11 +234,21 @@ So a close-out unit runs, in this order:
 | tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
 | gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 11 gates (runs tier 1 as its gate 2) |
-| release | `bash tools/release-gate.sh` | the real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
+| release | `bash tools/release-gate.sh` | **fails by design for the whole of R2** — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
 | acceptance | `python3 tools/r1-acceptance.py --suite-log <captured suite output>` | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
 
 A gate that never runs is not a gate. It is a claim.
+
+**A gate that fails on purpose needs saying so, too.** R2.0 re-opened the parity
+ledger — R2 brings excluded capability into scope and withdraws approval from
+six differences — so `release-gate.sh` gate R1 (ledger closed) and
+`r1-acceptance.py` both fail for the whole of R2. That is the intended state.
+The failure mode this guards against is someone "fixing" the gate: **do not edit
+`r1-acceptance.py` to pass.** It is the record of what R1 proved, asserted
+against R1's closing state; R2 gets its own `r2-acceptance.py` at R2.9. A red
+gate mid-R2 reads as "R2 in progress", and the number to watch is the owed count
+in `check-parity.py`, which should fall monotonically toward zero.
 
 **And the suite earns its slot every time.** R1.8.8's run failed one arm,
 `tier2/test-tlc-batch`, on `Github746` — a spec whose `.cfg` carries `ALIAS`.
