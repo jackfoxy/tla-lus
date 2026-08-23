@@ -841,15 +841,16 @@ the same module graph, verdict, and statistics as an inline bundle of the
 same files (`tests/lib/clay-load`, 17 cases; verified live on a fake ship
 against `test-data/clay/multi` → `[%ok [5 4 0 4]]`).
 
-Not yet done in this subunit (each has a named owner):
+Deferred out of this subunit at the time it landed, **each since closed by
+its own section below** — 10.2 (path canonicalization and escape prevention),
+10.3 (revision and content identity), 10.4 (quotas, retention, noun size),
+10.5 (idempotency and delivery robustness), 10.6 (API versioning and state
+migration). §10.7 is the measured close.
 
-| Behavior | Owner |
-|---|---|
-| path canonicalization + escape prevention (`..`, absolute, out-of-root) | 10.2 `lib/source-path` |
-| `[ship desk case hash]` on every loaded module, hash-keyed parse cache, provenance in the artifact | 10.3 |
-| global agent quotas, artifact retention/cleanup, `%noun` on the load cursor | 10.4 |
-| `%writ` generation guard, reorder/duplicate matrix, terminal resubmit policy | 10.5 |
-| `job-3`/state-3 migration | 10.6 |
+> Corrected by the R1.8.0 residue audit. This table previously still listed
+> 10.2-10.6 as owed, long after each had landed, and it is where the
+> `src-clay-async-load` ledger row's stale residue text had been copied from.
+> Both are fixed together.
 
 Known deviations recorded now:
 

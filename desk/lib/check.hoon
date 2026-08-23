@@ -660,8 +660,11 @@
       var=@ud          ::  Var(X) = round(m2 / (traces + 1))
       sd=@ud           ::  round(sqrt(m2 / (traces + 1)))
       ::  the first violating behavior, if any: an invariant broken on a
-      ::  successor, or a temporal PROPERTY broken by a completed behavior
-      viol=(unit [kind=?(%invariant %property) name=@t path=(list state)])
+      ::  successor, a temporal PROPERTY broken by a completed behavior, or a
+      ::  DEADLOCK -- a state with no surviving successor, which ends the whole
+      ::  simulation when deadlock checking is on (R1.7c). `name` is '' for a
+      ::  deadlock, which has none.
+      viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
   ==
 ::  fixed parameters of one simulation run (built once from search-ctx). The
 ::  successor generation is the unit-7 semantic path (node-eval), and the RNG is
@@ -675,6 +678,7 @@
       invs=(list [name=@t body=sem:sem-lib])     ::  invariants, decl order
       cons=(list sem:sem-lib)                    ::  CONSTRAINT (R1.7)
       acons=(list sem:sem-lib)                   ::  ACTION_CONSTRAINT (R1.7)
+      ddl=?       ::  check deadlock (TLC's `deadlock && getCheckDeadlock()`)
       oss=(list oos:tp)          ::  normalized temporal PROPERTY (~ none; 9.3a)
       pname=@t                   ::  PROPERTY name (for the temporal verdict)
       defs=(map @t sem-def:sem-lib)              ::  operator definitions
@@ -774,7 +778,7 @@
   ::  trace-length stats, as collectPostTrace runs only on a clean behavior).
   ::  Var(X) and SD use TLC's `genTrace + 1` div-by-zero guard.
   |=  $:  gt=@ud  cur=sim-cursor
-          viol=(unit [kind=?(%invariant %property) name=@t path=(list state)])
+          viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
       ==
   ^-  sim-result
   =/  m2   (abs:si tm2.cur)
@@ -856,9 +860,25 @@
     ?^  nx.r  r(ngen (add acc ngen.r))
     $(tries +(tries), index (mod (add index p) alen), acc (add acc ngen.r))
   ?:  ?=(%none -.found)
-    ::  deadlock: no action produced a SURVIVING successor. Anything it did
-    ::  generate was still counted before the constraint dropped it.
+    ::  no action produced a SURVIVING successor. Anything it did generate was
+    ::  still counted before the constraint dropped it.
     =.  gen.cur  (add gen.cur ngen.found)
+    ::  tlc2 SimulationWorker.java:692-698 --
+    ::
+    ::      if (nextStates.empty()) {
+    ::        if (checkDeadlock) { return ... EC.TLC_DEADLOCK_REACHED ... }
+    ::        break;
+    ::      }
+    ::
+    ::  so with deadlock checking ON this ends the WHOLE simulation with the
+    ::  behavior up to and including the deadlocked state (`getTrace(curState)`
+    ::  -- there is no successor to extend it by), and the temporal PROPERTY is
+    ::  NOT checked first: the `return` pre-empts the post-trace path that runs
+    ::  the liveness check, the same deadlock-over-liveness precedence R1.6.6
+    ::  established for the exhaustive checker. With it OFF, `break` just ends
+    ::  this behavior and the next one starts -- the fold below.
+    ?:  ddl.o
+      [%done (mk-result +(t.cur) cur `[%deadlock '' (flop path.w)]) cur]
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
       [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
@@ -913,7 +933,7 @@
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  pname  ?~(pp.c '' u.pp.c)
   =/  o=sim-opts
-    :*  actions  invs.c  cons.c  acons.c  oss.c  pname
+    :*  actions  invs.c  cons.c  acons.c  ddl.c  oss.c  pname
         defs.c  consts.c  vars.c  order.c  traces  depth
     ==
   (simulate o is.c seed)

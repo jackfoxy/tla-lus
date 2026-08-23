@@ -327,7 +327,8 @@
 ++  validate-src
   ::  what can be checked before any work is scheduled: an inline bundle
   ::  against the size limits, a Clay bundle against its reference shape
-  ::  (path canonicalization and escape prevention land in unit 10.2)
+  ::  (path canonicalization and escape prevention run inside +validate-clay,
+  ::  through lib/source-path, the only constructor of a source-ref)
   |=  req=request
   ^-  (unit @t)
   ?-  -.src.req
@@ -1176,7 +1177,13 @@
       (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=sim-opts:check
-      :*  actions  invs  cons  acons  p.osr  ?~(pp '' u.pp)
+      ::  the effective deadlock flag. The exhaustive mode ANDs a request-side
+      ::  toggle with the cfg's (`?&(deadlock.mode deadlock.rs)`, TLC's
+      ::  `deadlock && getCheckDeadlock()`), but `[%simulate ...]` carries no
+      ::  such toggle on this wire -- only `[%exhaustive deadlock=?]` does --
+      ::  so here the cfg's CHECK_DEADLOCK is the whole story.
+      :*  actions  invs  cons  acons  deadlock.rs
+          p.osr  ?~(pp '' u.pp)
           defs  consts  vars  order  num.mode  dep
       ==
     =.  cont.j  (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode)])
@@ -1425,6 +1432,7 @@
     ?-  vk
       %invariant  (crip "Error: Invariant {(trip vname)} is violated.")
       %property   (crip "Error: Temporal property {(trip vname)} is violated.")
+      %deadlock   'Error: Deadlock reached.'
     ==
   =/  report
     %-  wain-text
@@ -1435,7 +1443,12 @@
       ~[head]
     ==
   =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '') ~]
-  =/  vn  ?-(vk %invariant [%invariant vname], %property [%property vname])
+  =/  vn
+    ?-  vk
+      %invariant  [%invariant vname]
+      %property   [%property vname]
+      %deadlock   [%deadlock ~]
+    ==
   (finish-arts j [%violated vn st] report `typed pre)
 ::
 ::  +|  Stage: %terminal

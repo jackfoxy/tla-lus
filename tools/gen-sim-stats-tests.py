@@ -40,7 +40,19 @@ Next == A \\/ B
     # successor in `collectPreSuccessor`, which runs BEFORE the
     # `isInModel(t) && isInActions(s, t)` filter -- so a state the constraint
     # prunes is still GENERATED. This case only distinguishes the two if some
-    # successors are actually pruned, so the bound bites partway up the walk.
+    # successors are actually pruned, so the bound bites partway up the walk
+    # (B is pruned from x >= 10 on).
+    #
+    # The bound and depths are chosen so no walk can DEAD-END inside the depth:
+    # a dead end needs x = 19 exactly, and 8 steps reach at most 10 + 7 = 17.
+    # That matters because TLC's post-error accounting is not reproducible --
+    # after a deadlock the worker KEEPS generating behaviors until the
+    # Simulator terminates it *asynchronously* (`SimulationWorker.java:483-489`,
+    # "this is at the discretion of Simulator ... will signal termination
+    # asynchronously"), so the reported trace and state counts after an error
+    # are a scheduling race. Verified at the pin: neither run below prints a
+    # deadlock. The deadlock PATH itself is pinned by gen-sim-tests' `deadlock`
+    # case, whose trace is deterministic and printed before any of this.
     ("constrained", """---- MODULE spec ----
 EXTENDS Naturals
 VARIABLE x
@@ -48,9 +60,9 @@ Init == x = 0
 A == x' = x + 1
 B == x' = x + 10
 Next == A \\/ B
-Constr == x =< 20
+Constr == x =< 19
 ====
-""", "INIT Init\nNEXT Next\nCONSTRAINT Constr\n", [(3, 8), (5, 12)]),
+""", "INIT Init\nNEXT Next\nCONSTRAINT Constr\n", [(3, 6), (5, 8)]),
     # R1.7: the same rule under an ACTION_CONSTRAINT (isInActions).
     ("actconstrained", """---- MODULE spec ----
 EXTENDS Naturals
@@ -65,18 +77,13 @@ ActConstr == x' =< x + 5
 ]
 SEED = 1
 
-# Cases asserted on states-generated ALONE, with the reason. `constrained`
-# pins R1.7's counting rule (a successor the CONSTRAINT prunes was already
-# counted by collectPreSuccessor) -- `gen` matches TLC exactly. Its
-# trace-length statistics do NOT, and the cause is a SEPARATE divergence R1.7
-# measured but does not fix: when a constraint empties the successor set,
-# `tlc2.TLC -simulate` reports `Error: Deadlock reached.` and stops, where the
-# port ends that behavior quietly and starts the next one -- which consumes
-# the RNG differently and desynchronizes every later trace. Verified against
-# the pin with `CONSTRAINT x =< 0`: TLC prints the deadlock error and
-# `trace length: mean=0`. Asserting mean/var/sd here would freeze the port's
-# wrong answer as a golden.
-GEN_ONLY = {"constrained"}
+# Cases asserted on states-generated ALONE. Empty since R1.7c: `constrained`
+# was here because its trace-length statistics diverged through the
+# deadlock-in-simulation defect (a constraint-emptied successor set is
+# `Error: Deadlock reached.` in tlc2, where the port ended the behavior
+# quietly and started the next, desynchronizing the RNG). R1.7c fixed that,
+# so the full mean/var/sd is asserted again.
+GEN_ONLY: set = set()
 
 
 def hcord(s: str) -> str:

@@ -169,4 +169,21 @@
     !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
   !>  %-  render-states:ne
       path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 42 1 40))
+++  src-deadlock  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aConstr == x =< 3\0a====\0a'
+++  cfg-deadlock  'INIT Init\0aNEXT Next\0aCONSTRAINT Constr\0a'
+++  test-sim-deadlock-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-deadlock cfg-deadlock 1 1 40))
+++  test-sim-deadlock-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-deadlock cfg-deadlock 2 1 40))
+++  test-sim-deadlock-42
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-deadlock cfg-deadlock 42 1 40))
 --

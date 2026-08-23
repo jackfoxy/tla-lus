@@ -97,6 +97,20 @@ Inv == x # 7
 ====
 """, "INIT Init\nNEXT Next\nACTION_CONSTRAINT ActConstr\nINVARIANT Inv\n", 40,
      [1, 2, 3, 7, 42]),
+    # R1.7c: DEADLOCK in simulation. The constraint dead-ends the walk at x = 3
+    # (the only action's successor is pruned), and with deadlock checking on --
+    # the default -- tlc2 reports `Error: Deadlock reached.` and STOPS the whole
+    # simulation, printing the behavior up to and including the deadlocked
+    # state (`SimulationWorker.java:692-698`). One action, so the path is
+    # deterministic and every seed must produce it.
+    ("deadlock", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+Next == x' = x + 1
+Constr == x =< 3
+====
+""", "INIT Init\nNEXT Next\nCONSTRAINT Constr\n", 40, [1, 2, 42]),
 ]
 
 
