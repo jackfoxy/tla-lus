@@ -235,6 +235,7 @@ So a close-out unit runs, in this order:
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
 | gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 11 gates (runs tier 1 as its gate 2) |
 | release | `bash tools/release-gate.sh` | the real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
+| acceptance | `python3 tools/r1-acceptance.py --suite-log <captured suite output>` | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
 
 A gate that never runs is not a gate. It is a claim.
@@ -273,9 +274,12 @@ different tooling (a baseline store, a noise model, a regression threshold) and
 its own failure modes, of which the worst is a flaky gate that everyone learns
 to ignore.
 
-**R1's definition of done is a parity statement.** R1.9 asserts closure over the
-parity work: every in-scope ledger row `parity` or a tested
-`approved-difference`, every differential green and byte-reproducible. Tier 3
+**R1's definition of done is a parity statement, and it is now computed rather
+than declared.** `tools/r1-acceptance.py` (R1.9.4) evaluates the acceptance
+sentence clause by clause and prints `R1 ACCEPTED` only when all four hold.
+R1.9 asserts closure over the parity work: every in-scope ledger row `parity`
+or a tested `approved-difference`, every differential green and
+byte-reproducible. Tier 3
 cannot contribute evidence to that statement, and holding R1 open for a harness
 that answers a different question would only make the parity claim later without
 making it stronger.
