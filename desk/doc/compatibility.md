@@ -1354,6 +1354,44 @@ predicate) and the real `TLC_CONFIG_ID_HAS_VALUE` (2230) message body, which had
 in the Java's order, so `+validate-config` resolves a name the way `processConfig` does
 rather than reading the semantic graph directly.
 
+## Release R1.8.3 — the job kernel's report is the console path's — at parity
+
+R1.8.0's audit found `cfg-runspec`'s one named residue had a twin at the same
+call site; R1.8.2 found a third symptom of the same defect. All three came from
+one thing: **the `%live` continuation carried no SPECIFICATION-form state.**
+
+| Symptom | Where it showed |
+|---|---|
+| the sliced liveness report omitted the EC 2257/2259 stuttering hint | `job.hoon` passed `~` for the gate — it had no SPEC name, span or fairness to build one from |
+| the trace's root action name was always `Next` | where the console path passes `sctx`'s `aname` (`Action` under a SPECIFICATION) |
+| a SPECIFICATION-form config was typed-rejected **by the kernel** | although R1.8.1 landed the decomposition and `check:check` ran it |
+
+Fixed once. The `%live` continuation gained `sname`, `sloc`, `fair` and `aname`;
+the `%bfs` continuation gained `aname` (a SPECIFICATION now reaches the safety
+path too, where the trace's action attribution needs the same fallback name).
+`+resolve-targets` was generalized to take the three config NAMES rather than a
+whole `cfg-ast`, so the kernel calls it with a `run-mode` and the console path
+with its ast, and **both decompose a SPECIFICATION through the same code**.
+`+do-config` split: its mode-specific half keeps INIT/NEXT's name-level
+diagnostics, and the new `+config-run` — everything from the resolved Init/Next
+bodies down to the engine continuation — is reached by both modes.
+
+Two consequences worth stating. The kernel's `oss-of` call now passes the real
+fairness conjuncts instead of `~`, so a SPECIFICATION's WF_/SF_ conjuncts take
+part in the normalization exactly as they do on the console path. And the
+stuttering gate is tested against **the OrderOfSolution being reported**, not the
+whole list — tlc2 tests `this.oos`, so a spec whose first violated property has
+empty PEMs prints no hint even when a later one would.
+
+**How this is tested is the point.** Rather than freezing another golden per
+path, `tests/lib/job` now asserts the kernel's `%report` artifact **equals**
+`check:check`'s output for the same spec and config, over four shapes: a
+STUTTERING counterexample under INIT/NEXT (EC 2257), the same property under a
+SPECIFICATION carrying no fairness (EC 2259, which names the spec and its source
+location), a SPECIFICATION *with* fairness (no hint, and trace labels from the
+decomposed action), and a plain safety run under a SPECIFICATION. Two reports
+that drift apart now fail a test instead of both looking plausible.
+
 ## Release R1.8.2 — the last three `cfg-validate` residues — at parity
 
 R1.8.1.3b left three narrow residues. R1.8.2 closed all three, and the third one
@@ -1510,6 +1548,5 @@ ignored):
 | `src` = `%clay …` with an empty root name | `empty root module name` |
 | `src` = `%clay …` on an unknown desk / unsettled case | `cannot resolve the Clay revision: unknown desk or unsettled case` |
 | malformed / invalid config | the real TLC `CFG_*` (5001-5006) or `TLC_CONFIG_*` (2222-2281) diagnostic at `%config`, byte-matching ModelConfig/SpecProcessor (unit 5) |
-| `SPECIFICATION`-form config | `unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)` (at `%config`) |
 | unsupported temporal property form | `unsupported: temporal property form (only <>P, []<>P, []P; unit 8)` (at `%config`) |
 | `allow-write` = `&` | accepted but ignored (no write-back; unit 13) — the one remaining silent option |

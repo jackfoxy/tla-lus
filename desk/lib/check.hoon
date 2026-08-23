@@ -1137,19 +1137,20 @@
 ::
 ++  resolve-targets
   ::  resolve the Init body, Next body, fairness conjuncts, and the Next
-  ::  operator name from either INIT/NEXT config keys or a SPECIFICATION
-  |=  [ca=cfg-ast:config defs=(map @t sem-def:sem-lib)]
+  ::  operator name from either INIT/NEXT config keys or a SPECIFICATION.
+  ::  Takes the three NAMES rather than a whole `cfg-ast`, so the job kernel
+  ::  can call it with a `run-mode` and the console path with its ast, and
+  ::  both resolve a SPECIFICATION the same way (R1.8.3)
+  |=  [[in=(unit @t) nx=(unit @t) sp=(unit @t)] defs=(map @t sem-def:sem-lib)]
   ^-  (each [init=sem:sem-lib next=sem:sem-lib fair=(list sem:sem-lib) nname=(unit @t)] @t)
-  =/  in  init.ca
-  =/  nx  next.ca
   ?:  &(?=(^ in) ?=(^ nx))
     =/  isb  (sem-body defs u.in)
     =/  nsb  (sem-body defs u.nx)
     ?~  isb  [%| 'no Init definition']
     ?~  nsb  [%| 'no Next definition']
     [%& u.isb u.nsb ~ `u.nx]
-  ?~  spec.ca  [%| 'no INIT/NEXT or SPECIFICATION in config']
-  =/  sb  (sem-body defs u.spec.ca)
+  ?~  sp  [%| 'no INIT/NEXT or SPECIFICATION in config']
+  =/  sb  (sem-body defs u.sp)
   ?~  sb  [%| 'no specification definition']
   =/  d  (decompose-spec u.sb defs)
   ?^  err.d  [%| u.err.d]
@@ -1184,7 +1185,7 @@
   ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
   ::  resolve Init/Next (and fairness) from INIT/NEXT keys or a SPECIFICATION
-  =/  rt  (resolve-targets ca defs)
+  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs)
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  isb   init.p.rt
   =/  nsb   next.p.rt
@@ -1890,7 +1891,7 @@
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
-  =/  rt  (resolve-targets ca defs)
+  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs)
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  pbods=(list sem:sem-lib)
     =/  ps  properties.ca

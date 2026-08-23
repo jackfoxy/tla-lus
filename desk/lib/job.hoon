@@ -125,7 +125,11 @@
       ::  parsed root module, consumed by the %config stage
       [%tree t=node:check src=(unit srcs)]
       ::  safety search
-      [%bfs nl=@t act=next-act o=bfs-opts:check cur=bfs-cursor:check]
+      ::  `aname` is the ROOT ACTION NAME the trace's action attribution falls
+      ::  back to -- `Action` under a SPECIFICATION, the NEXT operator's name
+      ::  otherwise. Carried since R1.8.3, when a SPECIFICATION first reached
+      ::  this path at all
+      [%bfs nl=@t act=next-act aname=@t o=bfs-opts:check cur=bfs-cursor:check]
       ::  liveness (unit 8.8/8.9): full graph build (%build) then the 8.2–8.6
       ::  tableau/product/SCC/lasso check (%check). Pure []P box-state is a state
       ::  invariant and runs on the safety %bfs path instead (do-config), so no
@@ -142,6 +146,16 @@
           ::  still to try, and the current one's bounded product-build cursor
           otodo=(list oos:tp)
           pcur=(unit pcursor:lv)
+          ::  what the sliced report needs and used to lack (R1.8.3): the
+          ::  SPECIFICATION's name and definition span and its fairness
+          ::  conjuncts, for the EC 2257/2259 stuttering hint, plus the ROOT
+          ::  ACTION NAME (`Action` under a SPECIFICATION, the NEXT operator's
+          ::  name otherwise). Without these the kernel's report differed from
+          ::  the console path's on exactly these three things
+          sname=(unit @t)
+          sloc=sspan:semantic
+          fair=(list sem:semantic)
+          aname=@t
       ==
       ::  seeded simulation
       $:  %sim
@@ -1096,44 +1110,97 @@
   =/  rso  (run-spec-with:config u.mo cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
   =/  rs  p.rso
-  ?.  ?=(%init-next -.mode.rs)
-    (finish j [%failed 'unsupported: SPECIFICATION form config (deep processConfigSpec, unit 5 residue)'] pre)
-  =/  in  init.mode.rs
-  =/  nx  next.mode.rs
   ::  all invariants are checked in declaration order (7.3); `iv` is the first
   ::  one, still used for the INVARIANT/PROPERTY-conflict guard and definition
   ::  existence checks below
   =/  iv=(unit @t)  ?~(invariants.rs ~ `i.invariants.rs)
   =/  pp=(unit @t)  ?~(properties.rs ~ `i.properties.rs)
-  ?~  in  (finish j [%failed 'no INIT in config'] pre)
-  ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
+  ::  INIT/NEXT mode keeps its own name-level diagnostics; both modes then
+  ::  resolve through the SAME +resolve-targets the console path uses, so a
+  ::  SPECIFICATION decomposes here exactly as it does there (R1.8.3 --
+  ::  this branch used to be a flat typed rejection)
+  ?:  ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs))
+    (finish j [%failed 'no INIT in config'] pre)
+  ?:  ?&(?=(%init-next -.mode.rs) ?=(~ next.mode.rs))
+    (finish j [%failed 'no NEXT in config'] pre)
   ?:  &(?=(^ iv) ?=(^ pp))
     %^  finish  j
       [%failed 'unsupported: INVARIANT and PROPERTY in one config (unit 7)']
     pre
-  =/  ib  (body-of-def:check tree u.in)
-  =/  nb  (body-of-def:check tree u.nx)
-  ?~  ib  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
-  ?~  nb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+  ?:  ?=(%init-next -.mode.rs)
+    =/  in  init.mode.rs
+    =/  nx  next.mode.rs
+    ?~  in  (finish j [%failed 'no INIT in config'] pre)
+    ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
+    =/  ib  (body-of-def:check tree u.in)
+    ?~  ib  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
+    =/  nb  (body-of-def:check tree u.nx)
+    ?~  nb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+    (config-run j tree src rs iv pp u.mo pre)
+  (config-run j tree src rs iv pp u.mo pre)
+::
+++  config-run
+  ::  the mode-independent half of +do-config: everything from the resolved
+  ::  Init/Next bodies down to the engine continuation. Both INIT/NEXT and
+  ::  SPECIFICATION reach it, which is what makes a SPECIFICATION run in the
+  ::  job kernel at all (R1.8.3)
+  |=  $:  j=job-3
+          tree=node:check
+          src=srcs
+          rs=run-spec:config
+          iv=(unit @t)
+          pp=(unit @t)
+          mo=sem-module:semantic
+          pre=(list event)
+      ==
+  ^-  step-result-3
+  ?>  ?=(%check -.op.request.j)
+  =/  mode  mode.opts.op.request.j
+  =/  lims  limits.request.j
+  =/  vars  (var-names:check tree)
+  =/  order  (var-order:check tree)
+  =/  modn  (module-name-of:check tree)
+  =/  defs    (defmap-of:ne mo)
   =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
   ?:  &(?=(^ iv) ?=(~ ivb))
     %^  finish  j
       [%failed (rap 3 ~['no definition for INVARIANT ' u.iv])]
     pre
-  =/  vars  (var-names:check tree)
-  =/  order  (var-order:check tree)
-  =/  modn  (module-name-of:check tree)
-  =/  nl    (next-span-label:check u.nx u.nb modn)
+  ::  the SAME resolver the console path uses: INIT/NEXT keys or a
+  ::  SPECIFICATION decomposition (init conjuncts, the [A]_v action, the
+  ::  WF_/SF_/[]temporal fairness conjuncts)
+  =/  tg
+    ?-  -.mode.rs
+      %init-next  [init.mode.rs next.mode.rs `(unit @t)`~]
+      %spec       [`(unit @t)`~ `(unit @t)`~ `name.mode.rs]
+    ==
+  =/  rt  (resolve-targets:check tg defs)
+  ?:  ?=(%| -.rt)  (finish j [%failed p.rt] pre)
+  =/  isb=sem:semantic  init.p.rt
+  =/  nsb=sem:semantic  next.p.rt
+  =/  fair  fair.p.rt
+  =/  nname  nname.p.rt
+  ::  ROOT ACTION NAME: `Action` when the relation came from a SPECIFICATION
+  ::  (tlc2 builds that action with a null opDef, so Action.getLocation prints
+  ::  the generic "Action"), else the NEXT operator's name
+  =/  aname=@t  ?~(nname 'Action' u.nname)
+  =/  sname=(unit @t)  ?:(?=(%spec -.mode.rs) `name.mode.rs ~)
+  =/  sloc=sspan:semantic
+    ?~  sname  ~
+    =/  d  (~(get by defs) u.sname)
+    ?~(d ~ at.u.d)
+  =/  nb  ?~(nname ~ (body-of-def:check tree u.nname))
+  =/  nl    ?~(nb '' (next-span-label:check aname u.nb modn))
   =/  act=next-act
+    ?~  nb  ~
     =/  sp  (span-of:ast u.nb)
-    `[u.nx ?~(sp ~ `[modn u.sp])]
+    `[?~(nname '' u.nname) ?~(sp ~ `[modn u.sp])]
   ::  safety, liveness, and simulation all run on the Work Unit 3 SEMANTIC
   ::  graph via node-eval (unit 9.2 retired simulation's CST solver).
-  =/  defs    (defmap-of:ne u.mo)
   =/  consts  (consts-of:check constants.rs)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
-  =/  ae  (check-assumes:check assumes.u.mo (make-env:ne defs consts vars))
+  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars))
   ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
   ::  symmetry group (SYMMETRY) with a temporal property: TLC warns (2279) and
   ::  continues, but the port cannot yet run liveness on the reduced graph, so it
@@ -1150,14 +1217,10 @@
   =/  pr  (symmetry-perms:check defs consts vars symmetry.rs)
   ?:  ?=(%| -.pr)  (finish j [%failed p.pr] pre)
   =/  perms  p.pr
-  =/  isb  (sem-body:check defs u.in)
-  =/  nsb  (sem-body:check defs u.nx)
-  ?~  isb  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
-  ?~  nsb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
   =/  invs   (resolve-invs:check defs invariants.rs)
   =/  cons   (resolve-bodies:check defs constraints.rs)
   =/  acons  (resolve-bodies:check defs action-constraints.rs)
-  =/  isr  (init-states:ne u.isb (make-env:ne defs consts vars))
+  =/  isr  (init-states:ne isb (make-env:ne defs consts vars))
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
   ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
@@ -1167,7 +1230,7 @@
   ?:  ?=(%simulate -.mode)
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
-    =/  actions  (get-actions:check u.nsb 'Next' defs)
+    =/  actions  (get-actions:check nsb aname defs)
     ::  normalize the PROPERTY (if any) into the OrderOfSolution form; an
     ::  unsupported property is a typed rejection, never a silent %ok
     =/  osr=(each (list oos:tp) aerr:tp)
@@ -1205,10 +1268,10 @@
           progress  [done.progress.j (dec total.progress.j)]
         ==
       =/  o=bfs-opts:check
-        :*  u.nsb  ~[[u.pp u.binner]]  cons  acons  vars  order  perms  defs
+        :*  nsb  ~[[u.pp u.binner]]  cons  acons  vars  order  perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         ==
-      =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
+      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
       (more j pre)
     ::  a genuine temporal property runs the 8.2–8.6 engine in the %liveness
     ::  stage; a %clay run could not know it needs that stage until its config
@@ -1220,24 +1283,28 @@
       ==
     ::  normalize the property into the 8.1 OrderOfSolution form (no fairness in
     ::  %init-next mode); a non-boolean/unsupported leaf is a typed rejection
-    =/  osr  (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
+    ::  under a SPECIFICATION the fairness conjuncts are part of the
+    ::  normalization, exactly as the console path does it (R1.8.3); in
+    ::  INIT/NEXT mode `fair` is empty and this is the old call
+    =/  osr  (oss-of:check ~[u.psb] modn fair (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=bfs-opts:check
-      [u.nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
+      [nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  p.osr  u.pp  modn  act
           o  (bfs-init:check is)  ~  ~
+          sname  sloc  fair  aname
       ==
     (more j pre)
   ::  safety search: all invariants (ordered), state/action constraints, and
   ::  the effective deadlock flag (CLI flag AND the cfg CHECK_DEADLOCK flag,
   ::  matching TLC's `deadlock && getCheckDeadlock()`)
   =/  o=bfs-opts:check
-    :*  u.nsb  invs  cons  acons  vars  order  perms  defs  consts
+    :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
     ==
-  =.  cont.j  (save-kont [%bfs nl act o (bfs-init:check is)])
+  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -1262,7 +1329,7 @@
       ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
-    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk pre)
+    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk pre)
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
@@ -1290,7 +1357,9 @@
 ::
 ++  finish-bfs
   ::  seal a safety search: wire result, stats, report + trace artifacts
-  |=  [j=job-3 out=outcome:check od=out-degree o=bfs-opts:check nl=@t act=next-act pre=(list event)]
+  |=  $:  j=job-3  out=outcome:check  od=out-degree  o=bfs-opts:check
+          nl=@t  act=next-act  aname=@t  pre=(list event)
+      ==
   ^-  step-result-3
   ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
   =/  st=run-stats
@@ -1311,7 +1380,7 @@
   ::  per-action attribution for the wire trace: the getActions leaves plus the
   ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
   ::  keeps the whole-Next label it has always rendered.
-  =/  acts  (get-actions:check next.o 'Next' defs.o)
+  =/  acts  (get-actions:check next.o aname defs.o)
   =/  env   (make-env:ne defs.o consts.o vars.o)
   =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
   =/  report  (wain-text (render-outcome:check out nl ~ *eenv:ne ~ ''))
@@ -1342,8 +1411,11 @@
     =/  report
       %-  wain-text
       %-  live-render:check
+      ::  a pass renders only `Model checking completed.` + counts, so the gate
+      ::  is empty by construction; `aname` is carried anyway so the two call
+      ::  sites cannot drift (R1.8.3)
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-          generated.st  distinct.st  depth.st  ~  'Next'
+          generated.st  distinct.st  depth.st  ~  aname.kk
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1372,13 +1444,15 @@
   =/  report
     %-  wain-text
     %-  live-render:check
-    ::  the EC 2257/2259 stuttering hint needs the SPEC name/fairness, which the
-    ::  sliced continuation does not carry; the console path (`check:check`)
-    ::  emits it. Known gap, R1.8.1.3 — and the ROOT ACTION NAME is the same
-    ::  gap: `Next` here, where the console path passes `sctx`'s `aname`
-    ::  (`Action` under a SPECIFICATION). R1.1.R1
+    ::  R1.8.3: the continuation now carries the SPEC name/span, the fairness
+    ::  conjuncts and the root action name, so the sliced report is the console
+    ::  path's. The gate is tested against the OOS BEING REPORTED (`~[o]`), not
+    ::  the whole list -- tlc2 tests `this.oos`, so a spec whose first violated
+    ::  property has empty PEMs prints no hint even when a later one would
     :*  l  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-        generated.st  distinct.st  depth.st  ~  'Next'
+        generated.st  distinct.st  depth.st
+        (stutter-gate:check ~[o] sname.kk sloc.kk fair.kk modn.kk)
+        aname.kk
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))

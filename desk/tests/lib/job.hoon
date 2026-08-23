@@ -1,6 +1,7 @@
 /-  *tla-lus
 /+  *test
 /=  job-lib  /lib/job
+/=  check     /lib/check
 |%
   ::  Tests For The Resumable Job Kernel (unit P2-1)
   ::
@@ -928,4 +929,94 @@
     (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
   ==
 
+::
+::  +|  Kernel Report == Console Report (R1.8.3)
+::
+::  The job kernel's sliced %liveness path and `check:check` used to render
+::  DIFFERENT reports for the same spec: the kernel passed `~` for the EC
+::  2257/2259 stuttering gate (its continuation carried no SPEC name, span or
+::  fairness) and `'Next'` for the root action name where the console path
+::  passes `sctx`'s `aname` (`Action` under a SPECIFICATION). Both are now on
+::  the %live continuation, so the two paths are asserted EQUAL rather than
+::  each being spot-checked against its own frozen golden.
+++  kernel-report
+  ::  run a %check to completion through the kernel and return its %report
+  |=  [spec=@t cfg=@t]
+  ^-  @t
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec cfg) t0) 256)
+  =/  a  (~(get by artifacts.j) %report)
+  ?~  a  ''
+  ?.  ?=(%text -.u.a)  ''
+  text.u.a
+::
+++  console-report
+  |=  [spec=@t cfg=@t]
+  ^-  @t
+  (rap 3 (join '\0a' (check:check spec cfg)))
+::
+++  same-report
+  |=  [spec=@t cfg=@t]
+  ^-  tang
+  %+  expect-eq
+    !>((console-report spec cfg))
+  !>((kernel-report spec cfg))
+::
+::  a STUTTERING counterexample under INIT/NEXT: the console path appends the
+::  EC 2257 hint, and the kernel used to drop it
+++  test-kernel-report-equals-console-2257
+  %+  same-report  live-spec  lead-cfg
+::
+::  the same property under a SPECIFICATION that carries NO fairness: EC 2259,
+::  which names the spec and its source location -- unreachable from the kernel
+::  before this unit, because a SPECIFICATION-form config was typed-rejected
+++  spec-nofair
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == \/ x' = x
+          \/ (x = 0 /\ x' = 1)
+  Spec == Init /\ [][Next]_x
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+++  test-kernel-report-equals-console-2259
+  %+  same-report  spec-nofair  'SPECIFICATION Spec\0aPROPERTY Lead\0a'
+::
+::  a SPECIFICATION WITH fairness: no hint at all, and the trace labels come
+::  from the decomposed action
+++  spec-fair
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = 1 - x
+  Spec == Init /\ [][Next]_x /\ WF_x(Next)
+  Live == <>[](x = 1)
+  ====
+  '''
+++  test-kernel-report-equals-console-fair
+  %+  same-report  spec-fair  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+::
+::  and a plain safety run under a SPECIFICATION: the verdict the console path
+::  reaches, through the kernel
+++  spec-safety
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 3 /\ x' = x + 1
+  Inv == x < 9
+  Spec == Init /\ [][Next]_x
+  ====
+  '''
+++  test-kernel-report-equals-console-safety-spec
+  %+  same-report  spec-safety  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 --
