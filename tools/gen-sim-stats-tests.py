@@ -36,8 +36,47 @@ B == x' = x + 2
 Next == A \\/ B
 ====
 """, "INIT Init\nNEXT Next\n", [(3, 4), (5, 6)]),
+    # R1.7: states-generated under a CONSTRAINT. SimulationWorker counts a
+    # successor in `collectPreSuccessor`, which runs BEFORE the
+    # `isInModel(t) && isInActions(s, t)` filter -- so a state the constraint
+    # prunes is still GENERATED. This case only distinguishes the two if some
+    # successors are actually pruned, so the bound bites partway up the walk.
+    ("constrained", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+A == x' = x + 1
+B == x' = x + 10
+Next == A \\/ B
+Constr == x =< 20
+====
+""", "INIT Init\nNEXT Next\nCONSTRAINT Constr\n", [(3, 8), (5, 12)]),
+    # R1.7: the same rule under an ACTION_CONSTRAINT (isInActions).
+    ("actconstrained", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+A == x' = x + 1
+B == x' = x + 10
+Next == A \\/ B
+ActConstr == x' =< x + 5
+====
+""", "INIT Init\nNEXT Next\nACTION_CONSTRAINT ActConstr\n", [(3, 8), (5, 12)]),
 ]
 SEED = 1
+
+# Cases asserted on states-generated ALONE, with the reason. `constrained`
+# pins R1.7's counting rule (a successor the CONSTRAINT prunes was already
+# counted by collectPreSuccessor) -- `gen` matches TLC exactly. Its
+# trace-length statistics do NOT, and the cause is a SEPARATE divergence R1.7
+# measured but does not fix: when a constraint empties the successor set,
+# `tlc2.TLC -simulate` reports `Error: Deadlock reached.` and stops, where the
+# port ends that behavior quietly and starts the next one -- which consumes
+# the RNG differently and desynchronizes every later trace. Verified against
+# the pin with `CONSTRAINT x =< 0`: TLC prints the deadlock error and
+# `trace length: mean=0`. Asserting mean/var/sd here would freeze the port's
+# wrong answer as a golden.
+GEN_ONLY = {"constrained"}
 
 
 def hcord(s: str) -> str:
@@ -77,7 +116,20 @@ def main() -> None:
         arms.append(f"++  cfg-{name}  '{hcord(cfg)}'\n")
         for num, depth in runs:
             gen, mean, var, sd, traces = tlc_stats(src, cfg, num, depth)
-            arms.append(f"""++  test-sim-stats-{name}-{num}-{depth}
+            if name in GEN_ONLY:
+                arms.append(f"""++  test-sim-stats-{name}-{num}-{depth}
+  ::  states-generated ONLY -- see GEN_ONLY in tools/gen-sim-stats-tests.py:
+  ::  the trace-length statistics diverge through a SEPARATE, measured defect
+  ::  (constraint-emptied successor set = `Error: Deadlock reached.` in tlc2,
+  ::  a quiet behavior end in the port), and asserting them here would freeze
+  ::  the port's wrong answer as a golden.
+  =/  r  (simulate-spec:check src-{name} cfg-{name} {SEED} {num} {depth})
+  %+  expect-eq
+    !>  [gen={gen} traces={traces}]
+  !>  [gen.r traces.r]
+""")
+            else:
+                arms.append(f"""++  test-sim-stats-{name}-{num}-{depth}
   =/  r  (simulate-spec:check src-{name} cfg-{name} {SEED} {num} {depth})
   %+  expect-eq
     !>  [gen={gen} mean={mean} var={var} sd={sd} traces={traces}]

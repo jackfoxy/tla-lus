@@ -88,4 +88,85 @@
     !>  `(list tape)`~["x=0,y=0" "x=1,y=0" "x=2,y=0" "x=2,y=1" "x=2,y=2" "x=3,y=2" "x=3,y=3"]
   !>  %-  render-states:ne
       path:(need viol:(simulate-spec:check src-twovar cfg-twovar 42 1 40))
+++  src-nondet  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x\' \\in {x + 1, x + 2}\0aB == x\' = x + 5\0aNext == A \\/ B\0aInv == x < 25\0a====\0a'
+++  cfg-nondet  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+++  test-sim-nondet-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=5" "x=7" "x=8" "x=10" "x=12" "x=14" "x=19" "x=21" "x=26"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-nondet cfg-nondet 1 1 40))
+++  test-sim-nondet-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=2" "x=3" "x=8" "x=13" "x=18" "x=19" "x=24" "x=29"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-nondet cfg-nondet 2 1 40))
+++  test-sim-nondet-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=2" "x=3" "x=8" "x=9" "x=11" "x=16" "x=21" "x=22" "x=27"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-nondet cfg-nondet 3 1 40))
+++  test-sim-nondet-7
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=6" "x=11" "x=16" "x=18" "x=20" "x=21" "x=26"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-nondet cfg-nondet 7 1 40))
+++  test-sim-nondet-42
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=7" "x=12" "x=13" "x=18" "x=23" "x=25"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-nondet cfg-nondet 42 1 40))
+++  src-constraint  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x\' = x + 1\0aB == x\' = x + 10\0aNext == A \\/ B\0aConstr == x =< 20\0aInv == x # 13\0a====\0a'
+++  cfg-constraint  'INIT Init\0aNEXT Next\0aCONSTRAINT Constr\0aINVARIANT Inv\0a'
+++  test-sim-constraint-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=10" "x=11" "x=12" "x=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-constraint cfg-constraint 1 1 40))
+++  test-sim-constraint-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=12" "x=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-constraint cfg-constraint 2 1 40))
+++  test-sim-constraint-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=12" "x=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-constraint cfg-constraint 3 1 40))
+++  test-sim-constraint-7
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=11" "x=12" "x=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-constraint cfg-constraint 7 1 40))
+++  test-sim-constraint-42
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=12" "x=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-constraint cfg-constraint 42 1 40))
+++  src-actconstraint  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x\' = x + 1\0aB == x\' = x + 10\0aNext == A \\/ B\0aActConstr == x\' =< x + 5\0aInv == x # 7\0a====\0a'
+++  cfg-actconstraint  'INIT Init\0aNEXT Next\0aACTION_CONSTRAINT ActConstr\0aINVARIANT Inv\0a'
+++  test-sim-actconstraint-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 1 1 40))
+++  test-sim-actconstraint-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 2 1 40))
+++  test-sim-actconstraint-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 3 1 40))
+++  test-sim-actconstraint-7
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 7 1 40))
+++  test-sim-actconstraint-42
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5" "x=6" "x=7"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-actconstraint cfg-actconstraint 42 1 40))
 --

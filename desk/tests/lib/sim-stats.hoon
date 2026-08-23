@@ -43,4 +43,38 @@
   %+  expect-eq
     !>  [gen=31 mean=6 var=0 sd=0 traces=5]
   !>  [gen.r mean.r var.r sd.r traces.r]
+++  src-constrained  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x\' = x + 1\0aB == x\' = x + 10\0aNext == A \\/ B\0aConstr == x =< 20\0a====\0a'
+++  cfg-constrained  'INIT Init\0aNEXT Next\0aCONSTRAINT Constr\0a'
+++  test-sim-stats-constrained-3-8
+  ::  states-generated ONLY -- see GEN_ONLY in tools/gen-sim-stats-tests.py:
+  ::  the trace-length statistics diverge through a SEPARATE, measured defect
+  ::  (constraint-emptied successor set = `Error: Deadlock reached.` in tlc2,
+  ::  a quiet behavior end in the port), and asserting them here would freeze
+  ::  the port's wrong answer as a golden.
+  =/  r  (simulate-spec:check src-constrained cfg-constrained 1 3 8)
+  %+  expect-eq
+    !>  [gen=24 traces=3]
+  !>  [gen.r traces.r]
+++  test-sim-stats-constrained-5-12
+  ::  states-generated ONLY -- see GEN_ONLY in tools/gen-sim-stats-tests.py:
+  ::  the trace-length statistics diverge through a SEPARATE, measured defect
+  ::  (constraint-emptied successor set = `Error: Deadlock reached.` in tlc2,
+  ::  a quiet behavior end in the port), and asserting them here would freeze
+  ::  the port's wrong answer as a golden.
+  =/  r  (simulate-spec:check src-constrained cfg-constrained 1 5 12)
+  %+  expect-eq
+    !>  [gen=71 traces=5]
+  !>  [gen.r traces.r]
+++  src-actconstrained  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA == x\' = x + 1\0aB == x\' = x + 10\0aNext == A \\/ B\0aActConstr == x\' =< x + 5\0a====\0a'
+++  cfg-actconstrained  'INIT Init\0aNEXT Next\0aACTION_CONSTRAINT ActConstr\0a'
+++  test-sim-stats-actconstrained-3-8
+  =/  r  (simulate-spec:check src-actconstrained cfg-actconstrained 1 3 8)
+  %+  expect-eq
+    !>  [gen=35 mean=8 var=0 sd=0 traces=3]
+  !>  [gen.r mean.r var.r sd.r traces.r]
+++  test-sim-stats-actconstrained-5-12
+  =/  r  (simulate-spec:check src-actconstrained cfg-actconstrained 1 5 12)
+  %+  expect-eq
+    !>  [gen=87 mean=12 var=0 sd=0 traces=5]
+  !>  [gen.r mean.r var.r sd.r traces.r]
 --

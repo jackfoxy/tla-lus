@@ -53,6 +53,50 @@ Next == A \\/ B
 Inv == x + y < 6
 ====
 """, "INIT Init\nNEXT Next\nINVARIANT Inv\n", 40, [1, 2, 3, 7, 42]),
+    # R1.7: `x' \in S` in simulation -- one action yielding TWO successors, so
+    # the successor-pick draw actually branches (the old residue claimed this
+    # was unsupported; R1.5.1 closed it in the node-eval solver).
+    ("nondet", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+A == x' \\in {x + 1, x + 2}
+B == x' = x + 5
+Next == A \\/ B
+Inv == x < 25
+====
+""", "INIT Init\nNEXT Next\nINVARIANT Inv\n", 40, [1, 2, 3, 7, 42]),
+    # R1.7: a state CONSTRAINT. Successors above the bound are DROPPED from the
+    # successor set (SimulationWorker's functor: `isInModel(t) && isInActions`),
+    # so once x >= 11 action B yields nothing and the retry stride must fall
+    # through to A -- a different RNG consumption and a different path than an
+    # engine that ignores the constraint.
+    ("constraint", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+A == x' = x + 1
+B == x' = x + 10
+Next == A \\/ B
+Constr == x =< 20
+Inv == x # 13
+====
+""", "INIT Init\nNEXT Next\nCONSTRAINT Constr\nINVARIANT Inv\n", 40,
+     [1, 2, 3, 7, 42]),
+    # R1.7: an ACTION_CONSTRAINT -- forbids the +10 step on every transition, so
+    # only A ever contributes a successor.
+    ("actconstraint", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+A == x' = x + 1
+B == x' = x + 10
+Next == A \\/ B
+ActConstr == x' =< x + 5
+Inv == x # 7
+====
+""", "INIT Init\nNEXT Next\nACTION_CONSTRAINT ActConstr\nINVARIANT Inv\n", 40,
+     [1, 2, 3, 7, 42]),
 ]
 
 

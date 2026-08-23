@@ -1176,7 +1176,9 @@
       (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=sim-opts:check
-      [actions invs p.osr ?~(pp '' u.pp) defs consts vars order num.mode dep]
+      :*  actions  invs  cons  acons  p.osr  ?~(pp '' u.pp)
+          defs  consts  vars  order  num.mode  dep
+      ==
     =.  cont.j  (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode)])
     (more j pre)
   ?^  pp
