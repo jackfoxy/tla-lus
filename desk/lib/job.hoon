@@ -1157,6 +1157,19 @@
   ?>  ?=(%check -.op.request.j)
   =/  mode  mode.opts.op.request.j
   =/  lims  limits.request.j
+  ::  VIEW and ALIAS are parsed, validated (2229/2233/2228, R1.8.6) and carried
+  ::  in the run-spec, but NO engine path applies them: a VIEW changes what TLC
+  ::  fingerprints, so ignoring one would silently report more distinct states
+  ::  than tlc2 and could even change termination. Refuse instead of degrading
+  ::  -- the release doctrine for every unsupported option (R1.8.6)
+  ?^  view.rs
+    %^  finish  j
+      [%failed 'unsupported: VIEW (state fingerprinting through a view function; unit 7)']
+    pre
+  ?^  alias.rs
+    %^  finish  j
+      [%failed 'unsupported: ALIAS (trace rendering through an alias; unit 7)']
+    pre
   =/  vars  (var-names:check tree)
   =/  order  (var-order:check tree)
   =/  modn  (module-name-of:check tree)

@@ -1019,4 +1019,43 @@
   '''
 ++  test-kernel-report-equals-console-safety-spec
   %+  same-report  spec-safety  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+::  +|  Unsupported Options Are Refused, Never Ignored (R1.8.6)
+::
+::  VIEW and ALIAS are parsed, carried in the run-spec, and — until R1.8.6 —
+::  silently dropped by every engine path. A dropped VIEW is not cosmetic: tlc2
+::  fingerprints the VIEW's value, so ignoring one reports MORE distinct states
+::  than tlc2 and can change whether a run terminates. Both are now refused.
+++  view-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 9
+  V == x % 2
+  ====
+  '''
+++  test-view-refused-not-ignored
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW V\0a') t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: VIEW (state fingerprinting through a view function; unit 7)'])
+  !>(result.j)
+::
+++  test-alias-refused-not-ignored
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS V\0a') t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: ALIAS (trace rendering through an alias; unit 7)'])
+  !>(result.j)
+::
+::  the same spec WITHOUT the VIEW line still runs: the refusal is keyed on the
+::  option, not on the definition being present in the module
+++  test-view-definition-alone-is-fine
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a') t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
 --

@@ -1354,6 +1354,96 @@ predicate) and the real `TLC_CONFIG_ID_HAS_VALUE` (2230) message body, which had
 in the Java's order, so `+validate-config` resolves a name the way `processConfig` does
 rather than reading the semantic graph directly.
 
+## Release R1.8.6 — the `tlc2.TLC` driver surface, flag by flag — replaced
+
+`tlc-driver`'s residue said only *"exhaustive/simulate modes partial; flags map
+to request mold"*, which names no behaviour. R1.8.0's audit replaced that with an
+inventory; this unit **decides** each entry. `tlc2.TLC`'s argument loop accepts
+**46 flag literals**. The port has no CLI: its driver is the typed Gall request
+(`check-opts` / `check-mode` / `limits`), so the row is `replaced` in the same
+sense `sany-pipeline` is — with every flag accounted for rather than waved at.
+
+### Mapped to the request (5)
+
+`-modelcheck` → `[%exhaustive …]`; `-simulate` → `[%simulate seed num depth]`
+(its `num=` suboption included); `-deadlock` → `deadlock=?`; `-seed` → `seed`;
+`-depth` → `max-depth` / the simulate `depth`.
+
+### Excluded by an already-terminal row (19)
+
+`-dfid` (`tlc-dfid`); `-workers` (single-worker); `-checkpoint` `-recover`
+`-cleanup` `-metadir` (`tlc-resumable`, whose disk byte format is `replaced` by
+Gall noun-state); `-fp` `-fpmem` `-fpbits` `-gzip` (fingerprint-set internals);
+`-coverage`; `-debug` `-debugger`; and the six trace-explorer flags
+(`-generateSpecTE`, `-noGenerateSpecTE`, `-noGenerateSpecTEBin`, `-teSpecOutDir`,
+`-noTE`, `-noTEBin` — `tlc-module-excluded`).
+
+### No output channel or filesystem on this engine (7)
+
+`-dump` `-dumpTrace` `-loadTrace` `-userFile` `-tool` `-postCondition` `-aril`.
+The engine returns typed artifacts to a caller; it does not write files or hold a
+console. Recorded here because "excluded by construction" was true but had never
+been *written down*, which is part of why the row read open.
+
+### Dispositioned elsewhere (3)
+
+`-config` is the cfg source override (typed rejection, `check-opt-cfg`); `-h` and
+`-help` are usage.
+
+### Decided here (12)
+
+| Flag | Decision | Why |
+|---|---|---|
+| `-maxSetSize` | excluded | `TLCGlobals.setBound`, default 1,000,000, is a defensive **array cap** on `StateVec.grow` (EC 2172) and `ValueVec.ensureCapacity`. The port bounds the same resources through `limits` (`max-states`, `max-depth`, `max-artifact`) and `max-noun-bytes`, and returns a typed `%limited` **naming the resource** — strictly more informative than "Too many possible next states for the last state in the trace." |
+| `-difftrace` | excluded | `TLCGlobals.printDiffsOnly` is console rendering. The wire returns a typed `trace` with every binding of every state; rendering only the changed ones is the caller's to do, and nothing is lost |
+| `-terse` | excluded | `TLCGlobals.expand = false` suppresses expansion of a lazy set value's `toString` (`SetCupValue`, `UnionValue`, `SetOfFcnsValue`). `tlc-enum` already records — as a tested approved-difference — that the port has no lazy-set *representation* class, so there is nothing here to leave unexpanded |
+| `-continue` | excluded | `TLCGlobals.continuation` keeps the search running past the first invariant violation (`ModelChecker.java:507`, printing EC 2110 per violation). One job yields one typed `result` on this wire; a run that continued would have no single verdict to return. A caller wanting the next violation submits again with the first one excluded |
+| `-invlevel` | excluded | builds an `InvariantTemplate` on `ParameterizedSpecObj` — the inductive-invariant machinery, not `processConfig`. A different subsystem, not a driver flag |
+| `-inv` | excluded | same subsystem (`TLC.java:581-598`) |
+| `-lncheck` | **documented equivalence** | `TLCGlobals.lnCheck` has exactly three effects: `doLiveCheck()` (`!(final\|seqfinal\|off)`), `isSeqLiveCheck()` (`startsWith("seq")`), and `LiveCheck.java:238` (`off` disables). The port's kernel runs `%explore` to completion and *then* the `%liveness` stage — structurally **`-lncheck final`**, and `off` is expressible by omitting `PROPERTY`. The port has one strategy and it is a named TLC one |
+| `-generate` | excluded | `-simulate` with `Tool.probabilistic` set (`TLC.java:465-470`). The port's simulation is the seeded `SimulationWorker` that `tlc-sim-*` reproduces byte-for-byte; a probabilistic successor pick is a different engine, not a flag |
+| `-view` | **found a defect — fixed** | see below |
+| `-nowarning` | excluded | `TLCGlobals.warn`. Note it is not purely cosmetic: at `Tool.java:1005` it also selects a fast path that *skips* the UNCHANGED-and-changed diagnostic. The port emits typed diagnostics with codes and severities and never takes a different evaluation path to avoid one |
+| `-suppressMessages` | excluded | filters by message code; the wire returns typed diagnostics carrying those codes, so filtering is the caller's |
+| `-messagesAsErrors` | excluded | promotes codes to errors; same reasoning — severity is on the wire |
+
+`-simulate stats=basic|full` (`TLC.java:487-490`) selects the action-statistics
+table. The port reports those statistics **unconditionally**, so it behaves as
+`stats=full`; there is nothing to toggle, only something to record.
+
+### What measuring `-view` turned up
+
+`-view` is *not* a command-line VIEW override, which is what R1.8.0's inventory
+had guessed. It sets `TLCGlobals.useView`, which makes `TLCStateMut.toString()`
+render the VIEW's value instead of the bindings. Chasing that down surfaced a
+real defect one level below:
+
+**`VIEW` and `ALIAS` were parsed, validated, carried in the `run-spec` — and
+silently ignored by every engine path.** Neither `lib/job` nor `lib/check` ever
+read those fields. That is not cosmetic: tlc2 fingerprints the **VIEW's value**
+(`TLCStateMutExt.fingerPrint`, line 262ff), so dropping a VIEW makes the port
+report *more distinct states* than tlc2 and can change whether a run terminates
+at all.
+
+Two changes, in the release's standing doctrine that an unsupported option is
+refused or documented, never silently degraded:
+
+- **`VIEW` is now validated exactly as `Spec.getViewSpec` does** — EC 2229 (not
+  defined), 2233 (resolves to a constant), 2228 (takes an argument), all with the
+  role string `view function`. The port's existing `+ck-action` already produced
+  those three codes and message bodies for INIT/NEXT.
+- **Both are then typed rejections** at `%config` (kernel) and in `search-ctx`
+  (console), naming what is missing.
+
+`ALIAS` is deliberately **not** validated. `Spec.getAliasSpec` runs only when a
+trace is printed, so an undefined `ALIAS` is `ok` at config time — measured
+against the pin, and `val-alias-undef` asserts exactly that so a later "symmetry"
+cleanup cannot over-validate it. That asymmetry between VIEW and ALIAS is real
+and now pinned.
+
+VIEW-based fingerprinting and ALIAS trace rendering remain unimplemented; they
+are now honest refusals rather than wrong answers.
+
 ## Release R1.8.3 — the job kernel's report is the console path's — at parity
 
 R1.8.0's audit found `cfg-runspec`'s one named residue had a twin at the same
@@ -1549,4 +1639,6 @@ ignored):
 | `src` = `%clay …` on an unknown desk / unsettled case | `cannot resolve the Clay revision: unknown desk or unsettled case` |
 | malformed / invalid config | the real TLC `CFG_*` (5001-5006) or `TLC_CONFIG_*` (2222-2281) diagnostic at `%config`, byte-matching ModelConfig/SpecProcessor (unit 5) |
 | unsupported temporal property form | `unsupported: temporal property form (only <>P, []<>P, []P; unit 8)` (at `%config`) |
+| `VIEW` in the config | `unsupported: VIEW (state fingerprinting through a view function; unit 7)` (at `%config`). The NAME is still resolved first, so a bad VIEW gets tlc2's own 2229/2233/2228 |
+| `ALIAS` in the config | `unsupported: ALIAS (trace rendering through an alias; unit 7)` (at `%config`). Not name-resolved — `getAliasSpec` runs only when a trace prints, so tlc2 accepts an undefined ALIAS at config time |
 | `allow-write` = `&` | accepted but ignored (no write-back; unit 13) — the one remaining silent option |

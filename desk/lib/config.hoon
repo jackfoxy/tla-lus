@@ -1077,6 +1077,7 @@
       ;:  first
         chk-invariants  chk-spec-init-next
         chk-properties  chk-missing-init  chk-missing-next
+        chk-view
       ==
     ?~  e  [%& ~]
     [%| u.e]
@@ -1149,6 +1150,18 @@
     ?:  established  ~
     ?.  |(?=(^ vars.m) ?=(^ invariants.a) ?=(^ properties.a))  ~
     `[2.231 'The configuration file did not specify the initial state predicate.']
+  ::  VIEW resolves in `Spec.getViewSpec` (Spec.java:243), which runs with the
+  ::  rest of spec construction -- hence last here, after every processConfig
+  ::  check. It takes the same three codes the INIT/NEXT resolution does (2229
+  ::  not defined, 2233 a constant, 2228 takes an argument) with the role string
+  ::  `view function`.
+  ::  ALIAS is deliberately NOT checked here. `getAliasSpec` runs only when a
+  ::  trace is printed, so an undefined ALIAS is `ok` at config time -- measured
+  ::  against the pin (`val-alias-undef`), which is why that case asserts `ok`
+  ::  and guards against "symmetric" over-validation. R1.8.6
+  ++  chk-view
+    ^-  (unit cfg-vdiag)
+    ?~(view.a ~ (ck-action dm 'view function' u.view.a))
   ::  2232: no next established while invariants/actions need one
   ++  chk-missing-next
     ^-  (unit cfg-vdiag)

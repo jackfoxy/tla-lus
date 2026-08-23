@@ -5,6 +5,19 @@
 /=  config  /lib/config
 |%
 ::
+++  test-cfg-val-val-alias-undef
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0aok\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aALIAS Nope\0a'
+::
 ++  test-cfg-val-val-arity-inconsistent
   %+  expect-eq
     !>  `@t`'VALIDATE\0a2242 ~\0aThe arity of the operator Op is inconsistent in the configuration file.\0a'
@@ -471,4 +484,43 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aCONSTANT C\0aVARIABLE x\0aInit == x = C\0aNext == x\' = x + 1\0a====\0a'
     ==
   'CONSTANT C <- Nope\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-cfg-val-val-view-arg
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2228 ~\0aTLC requires view function not to take any argument, but one was given: V\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aV(a) == a\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aVIEW V\0a'
+::
+++  test-cfg-val-val-view-const
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2233 ~\0aThe view function V cannot be a constant.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aV == 1\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aVIEW V\0aCONSTANT V = 42\0a'
+::
+++  test-cfg-val-val-view-undef
+  %+  expect-eq
+    !>  `@t`'VALIDATE\0a2229 ~\0aThe view function Nope specified in the configuration file\0ais not defined in the specification.\0a'
+  !>
+  %^  dump-validate:config  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0a====\0a'
+    ==
+  'INIT Init\0aNEXT Next\0aVIEW Nope\0a'
 --

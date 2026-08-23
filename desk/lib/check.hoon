@@ -1206,6 +1206,13 @@
       %^  cat  3
         'It might cause TLC to miss violations of the stated liveness properties. '
       'Please check liveness without symmetry defined.'
+  ::  VIEW/ALIAS: validated but not applied by any engine path, so refused
+  ::  rather than silently ignored -- a dropped VIEW would report more distinct
+  ::  states than tlc2, which fingerprints the view's value (R1.8.6)
+  ?^  view.ca
+    [%| 'unsupported: VIEW (state fingerprinting through a view function; unit 7)']
+  ?^  alias.ca
+    [%| 'unsupported: ALIAS (trace rendering through an alias; unit 7)']
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
