@@ -130,6 +130,44 @@
   ?.  (terminal j)  js
   (reclaim:job-lib js max-retained:default-quota:job-lib)
 ::
+++  write-cards
+  ::  R2.2: a terminal job with a write target persists its artifacts to Clay.
+  ::
+  ::  This lives in the AGENT, not the kernel: `+step` is pure and returns
+  ::  `[%stop events job]` with no cards, which is what lets the scaffold
+  ::  gate assert no `desk/lib` file touches Clay. The kernel decides WHAT a
+  ::  run produced; the agent decides where it goes.
+  ::
+  ::  Clay's `%info` is an internal edit and carries NO ack gift (`lull`:
+  ::  `[%info des=desk dit=nori]`, and the gift set is `%writ`/`%wris` only).
+  ::  There is therefore no round trip to await and no failure to report back
+  ::  through the job's result — which is exactly why `+write-err` validates
+  ::  the target at SUBMIT, before a job exists. By the time a card is emitted
+  ::  the desk and path are known good, so a refusal here would be a Clay bug,
+  ::  the same argument compatibility.md 10.7 makes for the absent `%writ`
+  ::  watchdog.
+  |=  j=jobstate:job-lib
+  ^-  (list card)
+  =/  w  write.request.j
+  ?~  w  ~
+  =/  as  ~(tap by artifacts.j)
+  |-  ^-  (list card)
+  ?~  as  ~
+  =/  nom  p.i.as
+  =/  art  q.i.as
+  ::  a text artifact is written as `%txt` (a `wain`, the desk's own mark);
+  ::  a typed trace is a noun and is written as `%noun`. The artifact NAME
+  ::  becomes the final path segment, so `%report` lands at <pax>/report/txt
+  =/  =cage
+    ?-  -.art
+      %text   [%txt !>(`wain`(to-wain:format text.art))]
+      %trace  [%noun !>(`trace`trace.art)]
+    ==
+  =/  ext  ?-(-.art %text %txt, %trace %noun)
+  =/  pax  `path`(weld pax.u.w ~[nom ext])
+  :_  $(as t.as)
+  [%pass [%job %write nom ~] %arvo %c %info desk.u.w %& ~[[pax %ins cage]]]
+::
 ++  advance
   ::  Fan out a step's events and schedule what comes next: another
   ::  bounded step, nothing (terminal), or the Clay reads the job is
@@ -139,7 +177,7 @@
   ^-  [(list card) jobstate:job-lib]
   ?-    -.r
       %more  [(snoc (efacts id events.r) (wait id now)) job.r]
-      %stop  [(efacts id events.r) job.r]
+      %stop  [(weld (efacts id events.r) (write-cards job.r)) job.r]
       %await
     =/  dr  (do-reads id started.job.r reads.r)
     :_  (deliver:job-lib job.r miss.dr)

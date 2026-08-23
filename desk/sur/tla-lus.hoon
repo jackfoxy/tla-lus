@@ -174,10 +174,19 @@
   $:  =op
       src=source-bundle
       =limits
-      ::  Clay is read-only unless the caller opts in; writing still
-      ::  requires the explicit write action (unit 13)
-      allow-write=?
+      ::  where a terminal run's artifacts are written, if anywhere. `~` is
+      ::  read-only, which is the default and was the ONLY behaviour before
+      ::  R2.2. A boolean could not express this: "may write" says nothing
+      ::  about WHERE, and an %inline bundle has no desk to infer one from
+      write=(unit write-target)
   ==
+::  a write destination: the desk and the directory under it. The ship is
+::  always our own — Clay cannot write to another ship's desk — and the
+::  revision is always the head, so unlike a `source-ref` there is no case:
+::  a write that landed at a pinned past revision would be meaningless.
+::  Built only by `+write-ref:source-path`, which additionally refuses a
+::  target that lies under the run's own read roots
++$  write-target  [=desk pax=path]
 ::
 ::  +|  Results
 ::

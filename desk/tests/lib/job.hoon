@@ -24,12 +24,12 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| ~ [%exhaustive &]]] (bundle spec `cfg) lim |]
+  [[%check [| ~ [%exhaustive &]]] (bundle spec `cfg) lim ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| ~ [%simulate seed num depth]]] (bundle spec `cfg) lim |]
+  [[%check [| ~ [%simulate seed num depth]]] (bundle spec `cfg) lim ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
@@ -37,21 +37,21 @@
   ^-  request
   :*  [%check [| ~ [%exhaustive &]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  |
+      lim  ~
   ==
 ::
 ++  analyze-req
   |=  mods=(list [module-name @t])
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim |]
+  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~]
 ::
 ++  analyze-req-f
   ::  an %analyze request with explicit flags [syntax semantic level lint]
   |=  [mods=(list [module-name @t]) flags=analyze-flags]
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze flags] [%inline root (malt mods) ~] lim |]
+  [[%analyze flags] [%inline root (malt mods) ~] lim ~]
 ::
 ++  cyc-spec
   ^~
@@ -290,21 +290,43 @@
     !>((validate:job-lib (clay-req '' `/src/cfg/txt ~[/src])))
   ==
 ::
-++  test-validate-allow-write-rejected
-  ::  R2.1: `allow-write` was read by NO Hoon file — a caller setting it got
-  ::  silence. The agent is read-only end to end (no `%c %info` anywhere), so
-  ::  until R2.2 builds the write mechanism this is a refusal, not a no-op.
+++  test-validate-write-over-source-rejected
+  ::  R2.2: a run must not be able to write over the sources it is checking.
+  ::  `+write-ref` refuses overlap in EITHER direction, so a target under a
+  ::  read root and a read root under the target are both refused.
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim &]
+    :*  [%check [| ~ [%exhaustive &]]]
+        [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
+        lim
+        `[%base /spec]
+    ==
   %+  expect-eq
-    !>(`'unsupported: Clay write-back (allow-write); the agent is read-only')
+    !>  `'write target /spec overlaps a module-search root; a run may not write over its own sources'
   !>((validate:job-lib req))
 ::
-++  test-validate-allow-write-off-accepted
-  ::  the default is untouched: the refusal keys on the flag being SET
+++  test-validate-write-outside-roots-accepted
+  ::  the same request with a target that shares no prefix with the roots
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim |]
+    :*  [%check [| ~ [%exhaustive &]]]
+        [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
+        lim
+        `[%base /out]
+    ==
   (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-write-inline-accepted
+  ::  an %inline bundle declares no search roots, so nothing of its own can
+  ::  be written over
+  =/  req=request
+    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out]]
+  (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-write-bad-desk-rejected
+  =/  req=request
+    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out]]
+  %+  expect-eq
+    !>(`'invalid desk name \'Bad Desk\'')
+  !>((validate:job-lib req))
 ::
 ++  test-validate-syntax-off-rejected
   ::  R2.1: `analyze-flags.syntax` could never mean anything — parsing is
@@ -321,7 +343,7 @@
 ::
 ++  test-validate-translate-rejected
   =/  req=request
-    [[%translate [%none | &]] (bundle cyc-spec ~) lim |]
+    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~]
   %+  expect-eq
     !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
   !>((validate:job-lib req))
@@ -330,33 +352,33 @@
   ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
   ::  bundle validates
   =/  req=request
-    [[%analyze [& & & &]] (bundle cyc-spec ~) lim |]
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim |]
+    [[%check [& ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec ~) lim |]
+    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec ~) lim ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim |]
+    [[%check [| ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
     :*  [%check [| ~ [%exhaustive &]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
-        lim  |
+        lim  ~
     ==
   (expect-eq !>(`'root module not in bundle') !>((validate:job-lib req)))
 ::
@@ -369,7 +391,7 @@
   =/  req=request
     :*  [%check [| ~ [%exhaustive &]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
-        lim  |
+        lim  ~
     ==
   =.  max-modules.limits.req  1
   (expect-eq !>(`'too many modules') !>((validate:job-lib req)))
@@ -536,7 +558,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim |]
+    [[%check [| ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -555,7 +577,7 @@
   =/  req=request
     :*  [%check [| ~ [%exhaustive &]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
-        lim  |
+        lim  ~
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))

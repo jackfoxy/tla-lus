@@ -41,8 +41,13 @@
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
       default-limits:job-lib
-      |
+      ~
   ==
+::  the same request, but persisting its artifacts to Clay (R2.2)
+++  demo-req-write
+  ^-  request
+  =/  r  demo-req
+  r(write `[%base /tlaout])
 ::  (plan:job-lib demo-req) is ~[%parse %config %explore]
 ++  total  3
 ::
@@ -53,7 +58,7 @@
       :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
-      default-limits:job-lib  |
+      default-limits:job-lib  ~
   ==
 ::
 ++  live-src
@@ -76,7 +81,7 @@
       :*  %inline  'spec'  (malt ~[['spec' live-src]])
           `'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
       ==
-      default-limits:job-lib  |
+      default-limits:job-lib  ~
   ==
 ::
 ++  do-poke
@@ -591,4 +596,38 @@
   =/  ag2  `agent:gall`+:(~(on-load agent bol) ~(on-save ag bol))
   (expect-eq !>(q:~(on-save ag bol)) !>(q:~(on-save ag2 bol)))
 
+::
+::  +|  Clay write-back (R2.2)
+::
+::  The kernel is pure and emits no cards; the AGENT turns a terminal job with
+::  a write target into `%c %info` edits. These assert the cards themselves,
+::  which is the only observable — Clay's `%info` has no ack gift, so there is
+::  no response to wait for.
+++  write-cards-of
+  |=  caz=(list card)
+  ^-  (list card)
+  %+  skim  caz
+  |=  c=card
+  ?=([%pass * %arvo %c %info *] c)
+::
+++  test-write-target-emits-clay-edits
+  =/  ag   `agent:gall`agent
+  =^  c1   ag  (do-poke ag [%submit ~.jw demo-req-write])
+  =^  caz  ag  (wake-n ag ~.jw total)
+  =/  ws   (write-cards-of caz)
+  ;:  weld
+    ::  one edit per stored artifact; a passing safety run stores %report
+    ::  and %sources (no %trace without a violation)
+    (expect-eq !>(2) !>((lent ws)))
+    ::  and the job still reached its normal verdict
+    %+  expect-eq  !>(`[%ok [5 4 0 4 [0 1 1 1]]])
+    !>(result:(need (scry-job ag ~.jw)))
+  ==
+::
+++  test-no-write-target-emits-no-edits
+  ::  the default is unchanged: read-only, exactly as before R2.2
+  =/  ag   `agent:gall`agent
+  =^  c1   ag  (do-poke ag [%submit ~.jr demo-req])
+  =^  caz  ag  (wake-n ag ~.jr total)
+  (expect-eq !>(0) !>((lent (write-cards-of caz))))
 --

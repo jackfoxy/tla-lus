@@ -34,6 +34,9 @@
       [%escape seg=@ta at=path]
       [%bad-segment seg=@ta why=@t at=path]
       [%out-of-root at=path]
+      ::  a write target that overlaps the run's own read roots: a run must
+      ::  not be able to overwrite the sources it is checking (R2.2)
+      [%write-over-source at=path]
   ==
 ::
 ::  +|  Rendering
@@ -53,6 +56,12 @@
   ::
       %unpinned
     'the Clay revision was not pinned to a concrete number'
+  ::
+      %write-over-source
+    %+  rap  3
+    :~  'write target '  (spat at.e)
+        ' overlaps a module-search root; a run may not write over its own sources'
+    ==
   ::
       %escape
     %+  rap  3
@@ -175,6 +184,41 @@
   ?^  pe  [%| u.pe]
   ?.  (under-root roots pax)  [%| [%out-of-root pax]]
   [%& [ship desk cas pax]]
+::
+++  write-ref
+  ::  the only way to name a write destination. Deliberately NOT `+read-ref`
+  ::  with a flag — the two differ in every rule that matters:
+  ::
+  ::    - a read needs a PINNED case so a mid-run commit cannot split the
+  ::      source set; a write always lands at the head, so it carries no case
+  ::      at all. A write to a past revision would be meaningless.
+  ::    - a read must lie UNDER a declared search root; a write must lie
+  ::      OUTSIDE every one of them, or a run could overwrite the very
+  ::      sources it is checking — and then re-read them on a resumed slice.
+  ::
+  ::  Segment canonicalization is shared, because escape is escape.
+  |=  [=desk roots=(list path) pax=path]
+  ^-  (each write-target path-err)
+  =/  de  (check-desk desk)
+  ?^  de  [%| u.de]
+  =/  pe  (check-path pax)
+  ?^  pe  [%| u.pe]
+  ::  overlap in EITHER direction is refused: a target under a read root
+  ::  (`/spec` vs root `/`) and a read root under the target (`/out` root
+  ::  `/out/sub`) both let a write reach a source
+  ?:  (overlaps roots pax)  [%| [%write-over-source pax]]
+  [%& [desk pax]]
+::
+++  overlaps
+  ::  does `pax` share a prefix with any root, in either direction?
+  |=  [roots=(list path) pax=path]
+  ^-  ?
+  |-  ^-  ?
+  ?~  roots  |
+  ?|  =(i.roots (scag (lent i.roots) `path`pax))
+      =(pax (scag (lent pax) `path`i.roots))
+      $(roots t.roots)
+  ==
 ::
 ++  check-bundle
   ::  what a %clay bundle can be judged on before any read: the desk, the

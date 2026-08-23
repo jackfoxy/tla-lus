@@ -322,12 +322,12 @@
   ::  accepted into a stage that would fake success.
   |=  req=request
   ^-  (unit @t)
-  ::  `allow-write` gates Clay write-back, which no engine path performs --
-  ::  the agent is read-only end to end. Until R2.2 builds the write
-  ::  mechanism this is a REJECTION, not a no-op: an option that is accepted
-  ::  and ignored is the weakest form of unsupported (R2.1)
-  ?:  allow-write.req
-    `'unsupported: Clay write-back (allow-write); the agent is read-only'
+  ::  a write target is validated at SUBMIT, before a job exists, because
+  ::  Clay's `%info` is fire-and-forget: it carries no ack gift, so a bad
+  ::  target cannot be reported back through the job's result. Everything
+  ::  knowable must therefore be known now (R2.2)
+  =/  we  (write-err req)
+  ?^  we  we
   ?:  ?=(%translate -.op.req)
     `'unsupported: PlusCal translation is not ported yet (unit 8)'
   ::  `analyze-flags.syntax` cannot mean anything here and must not pretend
@@ -352,6 +352,18 @@
   ?~  cfg.src.req
     `'a %check request requires a config'
   (validate-src req)
+::
+++  write-err
+  ::  validate the write target against the request that carries it. An
+  ::  %inline bundle declares no search roots, so nothing of its own can be
+  ::  written over; a %clay bundle's roots are exactly what the target must
+  ::  avoid (+write-ref refuses overlap in either direction)
+  |=  req=request
+  ^-  (unit @t)
+  ?~  write.req  ~
+  =/  roots  ?:(?=(%clay -.src.req) roots.src.req ~)
+  =/  r  (write-ref:sp desk.u.write.req roots pax.u.write.req)
+  ?:(?=(%& -.r) ~ `(err-text:sp p.r))
 ::
 ++  validate-src
   ::  what can be checked before any work is scheduled: an inline bundle

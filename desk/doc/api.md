@@ -44,7 +44,8 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 ### `request`
 
 ```hoon
-+$  request  [=op src=source-bundle =limits allow-write=?]
++$  request  [=op src=source-bundle =limits write=(unit write-target)]
++$  write-target  [=desk pax=path]
 +$  op
   $%  [%translate opts=pcal-opts]      ::  PlusCal → TLA+
       [%analyze flags=analyze-flags]   ::  lex/parse/semantic/level/lint
@@ -61,9 +62,13 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 +$  pcal-opts  [=fairness termination=? gen-cfg=?]
 ```
 
-`allow-write` gates Clay write-back. The agent is read-only end to end today,
-so **setting it is a typed rejection at submit** (R2.1) rather than a no-op;
-R2.2 builds the write mechanism.
+`write` is where a terminal run's artifacts are persisted to Clay; `~` is
+read-only and is the default. It is a **target**, not a flag: "may write" says
+nothing about where, and an `%inline` bundle has no desk to infer one from. The
+target is validated at submit — Clay's `%info` carries no ack, so a bad target
+cannot be reported later — and a target overlapping the run's own module-search
+roots is refused in either direction, because a run may not write over the
+sources it is checking.
 `default-limits:job-lib` is a sane starting point.
 
 ## Updates (fact `%tla-lus-update`, path `/job/<id>`)
@@ -145,7 +150,7 @@ Inv  == x < 4
 =req  :*  op=[%check [translate=| cfg=~ mode=[%exhaustive deadlock=&]]]
           src=[%inline 'Counter' (malt ~[['Counter' spec]]) `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a']
           limits=*limits          ::  or default-limits:job-lib
-          allow-write=|
+          write=~                  ::  or `[%base /tlaout] to persist artifacts
       ==
 ::  the request id is a @ta of your choosing
 :tla-lus &tla-lus-action [%submit ~.counter req]
@@ -217,7 +222,8 @@ wire and not listed here.
 | `read-request` | `[tag=@ud =source-ref]` | `[1 [~zod %tla-lus da+now /counter/tla]]` |
 | `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
 | `limits` | six bounds | `default-limits:job-lib` = `[1.000.000 64 100.000 1.000 ~m10 1.000.000]` |
-| `request` | `[=op src=source-bundle =limits allow-write=?]` | see the Dojo example |
+| `write-target` | `[=desk pax=path]` | `[%base /tlaout]` — no `case`: a write lands at the head. `%report` lands at `<pax>/report/txt`, a `%trace` at `<pax>/trace/noun` |
+| `request` | `[=op src=source-bundle =limits write=(unit write-target)]` | see the Dojo example |
 
 ### Result and job
 
