@@ -1189,9 +1189,13 @@
   ::  fingerprints, so ignoring one would silently report more distinct states
   ::  than tlc2 and could even change termination. Refuse instead of degrading
   ::  -- the release doctrine for every unsupported option (R1.8.6)
-  ?^  view.rs
+  ::  VIEW is live as of R2.3.1 — resolved below and carried on `bfs-opts` —
+  ::  except alongside a temporal PROPERTY, where the liveness module
+  ::  recomputes plain state fingerprints that a view-keyed graph would not
+  ::  match. Narrowed, not ignored (see check.hoon's matching guard)
+  ?:  &(?=(^ view.rs) ?=(^ pp))
     %^  finish  j
-      [%failed 'unsupported: VIEW (state fingerprinting through a view function; unit 7)']
+      [%failed 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
     pre
   ?^  alias.rs
     %^  finish  j
@@ -1201,6 +1205,8 @@
   =/  order  (var-order:check tree)
   =/  modn  (module-name-of:check tree)
   =/  defs    (defmap-of:ne mo)
+  ::  the VIEW body, resolved like any other config target (R2.3.1)
+  =/  vwb=(unit sem:semantic)  ?~(view.rs ~ (sem-body:check defs u.view.rs))
   =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
   ?:  &(?=(^ iv) ?=(~ ivb))
     %^  finish  j
@@ -1310,6 +1316,7 @@
       =/  o=bfs-opts:check
         :*  nsb  ~[[u.pp u.binner]]  cons  acons  vars  order  perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
+            vwb
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
       (more j pre)
@@ -1329,7 +1336,7 @@
     =/  osr  (oss-of:check ~[u.psb] modn fair (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=bfs-opts:check
-      [nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims]
+      [nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  p.osr  u.pp  modn  act
@@ -1343,6 +1350,7 @@
   =/  o=bfs-opts:check
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
+        vwb
     ==
   =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
   (more j pre)

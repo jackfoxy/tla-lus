@@ -219,6 +219,11 @@
       deadlock=?     ::  report deadlocked states as violations
       cap=@ud        ::  distinct-state bound (0 = unbounded)
       maxd=@ud       ::  graph-depth bound (0 = unbounded)
+      ::  VIEW body, if the config declares one. A state's IDENTITY is then
+      ::  the fingerprint of this expression's value rather than of its
+      ::  bindings, so a view changes `distinct`, the graph's shape, and
+      ::  whether a run terminates (R2.3.1)
+      view=(unit sem:sem-lib)
   ==
 ::
 ++  env-of
@@ -366,8 +371,16 @@
   ::  the state's identity is its symmetry-orbit representative (7.5); with no
   ::  symmetry group `canon` is `st` and `fp` is the plain FP64 state fingerprint
   =/  ob   (orbit-fp:fp perms.o order.o st)
-  =/  fp   (@t fp.ob)   ::  worn @t for the existing @t-keyed seen/queue molds
   =/  cst  canon.ob
+  ::  under a VIEW the identity is the view's VALUE, evaluated on the
+  ::  symmetry representative — tlc2's order exactly (R2.3.1). A view that
+  ::  fails to evaluate falls back to the plain fingerprint rather than
+  ::  silently conflating states
+  =/  fp=@t
+    ?~  view.o  (@t fp.ob)
+    =/  vr  (eval:ne u.view.o e(s0 cst, s1 cst, primed |))
+    ?:  ?=(%| -.vr)  (@t fp.ob)
+    (@t (view-fp:fp p.vr))
   ?:  (~(has by seen.cur) fp)  [~ cur]
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
     [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
@@ -987,6 +1000,9 @@
       sloc=sspan:sem-lib                     ::  definition span, for the EC 2259
                                              ::  stuttering hint (R1.8.1.3)
       tree=node
+      view=(unit sem:sem-lib)                ::  VIEW body (R2.3.1): a state's
+                                             ::  identity is this expression's
+                                             ::  value, not its bindings
       aname=@t                               ::  ROOT action name: the NEXT
                                              ::  operator's name, or `Action`
                                              ::  under a SPECIFICATION (tlc2
@@ -1206,11 +1222,15 @@
       %^  cat  3
         'It might cause TLC to miss violations of the stated liveness properties. '
       'Please check liveness without symmetry defined.'
-  ::  VIEW/ALIAS: validated but not applied by any engine path, so refused
-  ::  rather than silently ignored -- a dropped VIEW would report more distinct
-  ::  states than tlc2, which fingerprints the view's value (R1.8.6)
-  ?^  view.ca
-    [%| 'unsupported: VIEW (state fingerprinting through a view function; unit 7)']
+  ::  ALIAS is still refused: it is validated but no renderer applies it, and
+  ::  a dropped alias prints the wrong trace (R1.8.6). VIEW is LIVE as of
+  ::  R2.3.1 -- resolved below and carried on `sctx` -- except alongside a
+  ::  temporal PROPERTY, where the liveness module recomputes plain state
+  ::  fingerprints (`+succ-fps`, `+trace-graph`) that would not match a
+  ::  view-keyed graph. That is the same latent mismatch symmetry+liveness is
+  ::  refused for; it is narrowed, not ignored
+  ?:  &(?=(^ view.ca) ?=(^ pp))
+    [%| 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
   ?^  alias.ca
     [%| 'unsupported: ALIAS (trace rendering through an alias; unit 7)']
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
@@ -1250,8 +1270,10 @@
     ?~(d ~ at.u.d)
   :-  %&
   =/  aname=@t  ?~(nname.p.rt 'Action' u.nname.p.rt)
+  ::  the VIEW body, resolved like any other config target (R2.3.1)
+  =/  vwb=(unit sem:sem-lib)  ?~(view.ca ~ (sem-body defs u.view.ca))
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
-      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  aname
+      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  vwb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
       p.or
   ==
@@ -1463,7 +1485,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1506,7 +1528,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1544,7 +1566,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1562,7 +1584,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1779,7 +1801,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1956,7 +1978,7 @@
       (implied-action-run c u.pp.c u.iact)
     ?^  binner
       =/  o=bfs-opts
-        [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
+        [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
@@ -1981,7 +2003,7 @@
     ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
     ::  violation the port used to report over the same state count.
     =/  o=bfs-opts
-      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0]
+      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -2066,7 +2088,7 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  modn     (module-name-of tree.c)
@@ -2113,7 +2135,7 @@
   ::  on with the ordinary model check
   |=  c=sctx
   ^-  wain
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
@@ -2192,7 +2214,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -2205,11 +2227,11 @@
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
     =/  er  (explore is.c o)
     (explore-outcome out.er od.er)
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
   =/  er  (explore is.c o)
   (explore-outcome out.er od.er)
 ::
@@ -2236,7 +2258,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

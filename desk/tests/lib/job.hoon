@@ -1089,12 +1089,14 @@
   V == x % 2
   ====
   '''
-++  test-view-refused-not-ignored
+++  test-view-collapses-states
+  ::  R2.3.1: VIEW is live. `view-spec` cycles x over 0..3 and the view is
+  ::  `x % 2`, so the four states collapse to two — the identity is the
+  ::  fingerprint of the VIEW'S VALUE, not of the bindings. This is the
+  ::  behaviour R1.8.6 refused rather than fake, and R2.3.1 implements.
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW V\0a') t0) 256)
-  %+  expect-eq
-    !>(`[%failed 'unsupported: VIEW (state fingerprinting through a view function; unit 7)'])
-  !>(result.j)
+  (expect-eq !>(`[%ok [3 2 0 2 [0 1 1 1]]]) !>(result.j))
 ::
 ++  test-alias-refused-not-ignored
   =/  [evs=(list event) j=jb]

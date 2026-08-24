@@ -176,6 +176,17 @@
   =/  canon  (canonicalize perms order st)
   [(state-fp order canon) canon]
 ::
+++  view-fp
+  ::  a state's identity under a VIEW: tlc2 fingerprints the VIEW's VALUE
+  ::  rather than the state's bindings (`TLCStateMutExt.fingerPrint`, the
+  ::  `viewMap != null` branch), and evaluates it on `minVals` -- the
+  ::  SYMMETRY REPRESENTATIVE, not the raw state. `+orbit-fp` already returns
+  ::  that representative as `canon`, so the two compose in the pin's order:
+  ::  canonicalize first, then view (R2.3.1)
+  |=  v=value:vl
+  ^-  fp
+  (fp-value v)
+::
 ::  FPSet observable semantics (FPSet.put / FPSet.contains; memory model).
 ::
 ++  fs-empty  ^-(fp-set ~)

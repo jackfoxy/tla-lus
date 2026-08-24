@@ -249,4 +249,32 @@
   %+  check:check
     '---- MODULE spec ----\0aVARIABLES a, b\0aInit == a = FALSE /\\ b = FALSE\0aNext == \\/ a\' = ~a /\\ b\' = b\0a        \\/ b\' = ~b /\\ a\' = a\0aInv == TRUE\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-view
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ x\' = (x + 1) % 3\0a        /\\ y\' = (y + 1) % 2\0aInv == x < 3\0aVw == x\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW Vw\0a'
+::
+++  test-mc-view-off
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '7 states generated, 6 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 6.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ x\' = (x + 1) % 3\0a        /\\ y\' = (y + 1) % 2\0aInv == x < 3\0aVw == x\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 --
