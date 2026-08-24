@@ -130,6 +130,15 @@
   ==
 +$  check-opts
   $:  translate=?
+      ::  tlc2's `-view` (R2.4.3): render every trace state as the VIEW's
+      ::  VALUE instead of its bindings (`TLCGlobals.useView`). Needs a VIEW in
+      ::  the config; without one it has nothing to render and is refused
+      view=?
+      ::  tlc2's `-difftrace` (R2.4.3): print only the bindings that CHANGED
+      ::  from the previous state. Measured at the pin, this is honoured in
+      ::  SIMULATION only -- an exhaustive run's output is byte-identical with
+      ::  and without the flag -- so it is refused outside `%simulate`
+      difftrace=?
       ::  tlc2's `-continue` (R2.4.2): keep searching past a violation and
       ::  report every one, instead of stopping at the first. The run then
       ::  COMPLETES, so `result` is still `%ok`/`%limited` and the

@@ -143,6 +143,8 @@
           o=bfs-opts:check
           cur=bfs-cursor:check
           al=(unit sem:semantic)
+          ::  `-view` render body (R2.4.3); ~ unless the flag is set
+          vr=(unit sem:semantic)
       ==
       ::  liveness (unit 8.8/8.9): full graph build (%build) then the 8.2–8.6
       ::  tableau/product/SCC/lasso check (%check). Pure []P box-state is a state
@@ -181,6 +183,9 @@
           act=next-act
           o=sim-opts:check
           cur=sim-cursor:check
+          ::  `-difftrace` (R2.4.3): tlc2 honours it in SIMULATION only, so it
+          ::  rides on this kont and nowhere else
+          df=?
       ==
   ==
 ::
@@ -369,6 +374,12 @@
   ::  `cfg` field. An unknown name is refused HERE, at submit, so nothing
   ::  downstream can silently fall back to the bundle's cfg and check a
   ::  different config than the caller asked for
+  ::  `-difftrace` is honoured by tlc2 in SIMULATION only -- measured at the
+  ::  pin, an exhaustive run's output is byte-identical with and without it.
+  ::  Accepting it on an exhaustive request would be accepting an option that
+  ::  does nothing, which R2.1 forbids (R2.4.3)
+  ?:  ?&(difftrace.opts.op.req ?=(%exhaustive -.mode.opts.op.req))
+    `'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)'
   ?:  ?=(%clay -.src.req)
     ::  a %clay bundle selects its config by PATH, not by name: the desk has
     ::  no `%cfg` mark, so the file's mark is part of the reference (hence
@@ -1263,6 +1274,14 @@
   =/  vwb=(unit sem:semantic)  ?~(view.rs ~ (sem-body:check defs u.view.rs))
   ::  the ALIAS body, resolved like any other config target (R2.3.2)
   =/  alb=(unit sem:semantic)  ?~(alias.rs ~ (sem-body:check defs u.alias.rs))
+  ::  `-view` (R2.4.3) renders through the VIEW body. With the flag set but no
+  ::  VIEW in the config there is nothing to render, so it is refused rather
+  ::  than silently ignored
+  ?:  ?&(view.opts.op.request.j ?=(~ vwb))
+    %^  finish  j
+      [%failed 'unsupported: -view without a VIEW in the config (nothing to render)']
+    pre
+  =/  vrb=(unit sem:semantic)  ?:(view.opts.op.request.j vwb ~)
   =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
   ?:  &(?=(^ iv) ?=(~ ivb))
     %^  finish  j
@@ -1362,7 +1381,9 @@
           p.osr  ?~(pp '' u.pp)
           defs  consts  vars  order  num.mode  dep
       ==
-    =.  cont.j  (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode)])
+    ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
+    =.  cont.j
+      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j])
     (more j pre)
   ?^  pp
     =/  psb  (sem-body:check defs u.pp)
@@ -1389,7 +1410,7 @@
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
             vwb  max-set-size.lims  continue.opts.op.request.j
         ==
-      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
+      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
       (more j pre)
     ::  the lasso trace is rendered by the %liveness stage, which takes no
     ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
@@ -1434,7 +1455,7 @@
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb  max-set-size.lims  continue.opts.op.request.j
     ==
-  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
+  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -1459,7 +1480,7 @@
       ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
-    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk al.kk pre)
+    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk al.kk vr.kk pre)
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
@@ -1484,7 +1505,7 @@
     ?:  ?=(%inv -.out.r)
       %:  finish-bfs
         j  out.r  (od-stats:check outdeg.cur.r)  o.kk
-        nl.kk  act.kk  aname.kk  ~  pre
+        nl.kk  act.kk  aname.kk  ~  ~  pre
       ==
     ?.  ?=(%ok -.out.r)
       (finish j [%failed 'internal: unexpected graph outcome'] pre)
@@ -1499,6 +1520,7 @@
   ::  seal a safety search: wire result, stats, report + trace artifacts
   |=  $:  j=jobstate  out=outcome:check  od=out-degree  o=bfs-opts:check
           nl=@t  act=next-act  aname=@t  al=(unit sem:semantic)
+          vr=(unit sem:semantic)
           pre=(list event)
       ==
   ^-  step-out
@@ -1529,7 +1551,7 @@
   ::  passed where `*eenv:ne` used to be because evaluating the alias needs it;
   ::  it changes nothing else, since `actions` stays `~` and the only other
   ::  reader of `e` is the per-action label that `~` disables
-  =/  report  (wain-text (render-outcome:check out nl ~ env ~ '' al))
+  =/  report  (wain-text (render-outcome:check out nl ~ env ~ '' al vr |))
   =/  tr=(unit trace)
     ?+  -.out  ~
       %inv       `[%safety (trace-states trace.out act acts env order.o modn al) ~]
@@ -1681,7 +1703,7 @@
     ;:  weld
       ~[headline]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '' ~)
+      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '' ~ ~ df.kk)
       ~[head]
     ==
   =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '' ~) ~]

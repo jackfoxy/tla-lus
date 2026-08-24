@@ -35,7 +35,7 @@
 ++  demo-req
   ::  a real inline %check request the %2 kernel runs end to end
   ^-  request
-  :*  [%check [| | ~ [%exhaustive &]]]
+  :*  [%check [| | | | ~ [%exhaustive &]]]
       :*  %inline  'spec'
           (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
@@ -54,7 +54,7 @@
 ++  sim-demo-req
   ::  a seeded simulation over cyc-spec (Inv holds, so it completes num behaviors)
   ^-  request
-  :*  [%check [| | ~ [%simulate 1 2 6]]]
+  :*  [%check [| | | | ~ [%simulate 1 2 6]]]
       :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
@@ -77,7 +77,7 @@
 ++  live-demo-req
   ::  a temporal-property run (exercises the %live build/check kont end to end)
   ^-  request
-  :*  [%check [| | ~ [%exhaustive &]]]
+  :*  [%check [| | | | ~ [%exhaustive &]]]
       :*  %inline  'spec'  (malt ~[['spec' live-src]])
           `'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
       ==

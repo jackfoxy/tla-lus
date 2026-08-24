@@ -612,9 +612,31 @@
   ::  a trace state's bindings, one per line. A SINGLE variable renders bare
   ::  (`x = v`); two or more render as a conjunct list (`/\ x = v`) — exactly
   ::  `TLCStateMut.toString`'s `vlen == 1` branch and its `else`
-  |=  [order=(list @t) st=state]
+  ::  `-view` (R2.4.3): `TLCGlobals.useView` makes `TLCStateMut.toString()`
+  ::  render the VIEW'S VALUE instead of the bindings -- measured at the pin,
+  ::  a bare `0` / `1` / `2`: no `/\\`, no names, no separator. `vw` is the
+  ::  VIEW body, non-~ only when the flag is set; an unevaluable view falls
+  ::  back to the bindings rather than printing nothing
+  ::  `-difftrace` (R2.4.3): `dif` is the PREVIOUS state; a binding equal to
+  ::  its value is omitted (`TLCStateMut.toString(lastState)`). Measured at the
+  ::  pin, tlc2 honours this in SIMULATION only, so only that path passes it
+  |=  $:  order=(list @t)  st=state
+          vw=(unit sem:sem-lib)  e=eenv:ne
+          dif=(unit state)
+      ==
   ^-  wain
-  =/  ps  (state-pairs order st)
+  ?^  vw
+    =/  r  (eval:ne u.vw e(s0 st, s1 st, primed |))
+    ?:  ?=(%& -.r)  ~[(crip (render:ev p.r))]
+    $(vw ~)
+  ^-  wain
+  =/  ps0  (state-pairs order st)
+  =/  ps
+    ?~  dif  ps0
+    %+  skip  ps0
+    |=  [k=@t v=@t]
+    =/  o  (~(get by u.dif) k)
+    ?~(o | =(v (crip (render:ev u.o))))
   =/  bare=?  ?=([* ~] ps)
   %+  turn  ps
   |=  [k=@t v=@t]
@@ -631,6 +653,11 @@
           actions=(list [name=@t body=sem:sem-lib])
           e=eenv:ne  order=(list @t)  modn=@t
           al=(unit sem:sem-lib)
+          ::  `-view` (R2.4.3): the VIEW body when the flag is set, so every
+          ::  rendered state prints its VALUE instead of its bindings
+          vw=(unit sem:sem-lib)
+          ::  `-difftrace` (R2.4.3): print only CHANGED bindings
+          dif=?
       ==
   ^-  wain
   =/  i  1
@@ -652,7 +679,7 @@
   :_  $(trace t.trace, i +(i), prev `i.trace)
   ;:  weld
     ~[(crip "State {(a-tape i)}: {(trip label)}")]
-    (render-state order.shown st.shown)
+    (render-state order.shown st.shown vw e ?:(dif prev ~))
     ~['']
   ==
 ::
@@ -1100,6 +1127,8 @@
                                              ::  opDef, so `Action.getLocation`
                                              ::  prints its generic "Action")
       nl=@t                                  ::  whole-relation span label
+      vrend=(unit sem:sem-lib)               ::  `-view` (R2.4.3): the VIEW body
+                                             ::  when the render flag is set
       swarn=(list @t)                        ::  SPECIFICATION-decomposition
                                              ::  warnings, printed BEFORE the
                                              ::  verdict (R2.3.5): today the
@@ -1553,6 +1582,9 @@
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
+      ::  `-view` is a REQUEST option; `check:check` takes none, so the console
+      ::  path never sets it. The kernel supplies it via `+check-opts` (R2.4.3)
+      `(unit sem:sem-lib)`~
       warn.p.rt
       p.or
   ==
@@ -1892,7 +1924,7 @@
       ;:  weld
         ~[(crip "STATE {(scow %ud i)} {(fp-hex i.ps)}")]
         ~[label]
-        (render-state order.c st)
+        (render-state order.c st ~ *eenv:ne ~)
         ~['ENDSTATE']
       ==
     $(ps t.ps, i +(i), prev `i.ps)
@@ -1987,7 +2019,7 @@
     %+  weld
       ;:  weld
         ~[(crip "State {(a-tape i)}: {(trip label)}")]
-        (render-state order st)
+        (render-state order st ~ *eenv:ne ~)
       ==
     $(ps t.ps, i +(i), prev `i.ps)
   ::  the closer: a stuttering self-loop is a new numbered `State`, a
@@ -2277,7 +2309,7 @@
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
-      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
+      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c |)
     ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
     ::  includes the fairness conjuncts `decompose-spec` extracted from the
     ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
@@ -2328,7 +2360,7 @@
     ?:  ?=(?(%inv %deadlock %error) -.out.bg)
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c)
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c
+          (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
       ==
     =/  r
       %-  live-report
@@ -2411,7 +2443,7 @@
       (crip "Error: Invariant {(trip name.u.bad)} is violated by the initial state:")
     (crip "Error: Property {(trip name.u.bad)} is violated by the initial state:")
   :+  warn  head
-  (render-state order.shown st.shown)
+  (render-state order.shown st.shown vrend.c env ~)
 ::
 ++  implied-action-run
   ::  an IMPLIED ACTION: tlc2 checks `[][A]_v`'s A on every transition, so a
@@ -2447,13 +2479,13 @@
   ?:  ?&  ?=(%inv -.out.bg)
           ?|(?=(~ viol) (lte (lent trace.out.bg) (lent u.viol)))
       ==
-    (render-outcome out.bg nl.c actions env order.c modn alias.c)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c |)
   ?~  viol
-    (render-outcome out.bg nl.c actions env order.c modn alias.c)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c |)
   ;:  weld
     ~[(crip "Error: Action property {(trip pname)} is violated.")]
     ~['Error: The behavior up to this point is:']
-    (render-trace u.viol nl.c actions env order.c modn alias.c)
+    (render-trace u.viol nl.c actions env order.c modn alias.c vrend.c |)
     (counts-lines gen.g distinct.g 0 depth.g)
   ==
 ::
@@ -2490,7 +2522,7 @@
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
-  (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
+  (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c |)
 ::
 ++  render-outcome
   ::  TLC's terminal lines for a safety outcome. `actions`/`e`/`order`/`modn`
@@ -2500,6 +2532,11 @@
           actions=(list [name=@t body=sem:sem-lib])
           e=eenv:ne  order=(list @t)  modn=@t
           al=(unit sem:sem-lib)
+          ::  `-view` (R2.4.3): the VIEW body when the flag is set, so every
+          ::  rendered state prints its VALUE instead of its bindings
+          vw=(unit sem:sem-lib)
+          ::  `-difftrace` (R2.4.3): print only CHANGED bindings
+          dif=?
       ==
   ^-  wain
   ?-    -.res
@@ -2522,7 +2559,7 @@
         ;:  weld
           ~[(crip "Error: Invariant {(trip name.i.vs)} is violated.")]
           ~['Error: The behavior up to this point is:']
-          (render-trace trace.i.vs nl actions e order modn al)
+          (render-trace trace.i.vs nl actions e order modn al vw dif)
         ==
       $(vs t.vs, acc [blk acc])
     %+  weld  vlines
@@ -2552,11 +2589,11 @@
       =/  shown=[order=(list @t) st=state]
         ?~  al  [order i.trace.res]
         (alias-state u.al e i.trace.res i.trace.res)
-      (render-state order.shown st.shown)
+      (render-state order.shown st.shown vw e ~)
     ;:  weld
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl actions e order modn al)
+      (render-trace trace.res nl actions e order modn al vw dif)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
@@ -2564,7 +2601,7 @@
     ;:  weld
       ~['Error: Deadlock reached.']
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl actions e order modn al)
+      (render-trace trace.res nl actions e order modn al vw dif)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
