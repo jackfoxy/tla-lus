@@ -1,7 +1,8 @@
 # R2.3.5 — `cfg-runspec`'s three named non-ports
 
-Two of three landed. `cfg-runspec` stays **`partial`** for the third, which is
-now refused **by name** instead of by accident. Owed stays 12.
+**All three landed. `cfg-runspec` → `parity`.** The unit also *found* a new
+residue and re-opened `semantic-graph` for it, so the owed count is unchanged
+at 12 — one row closed, one opened, which is the honest accounting.
 
 ## Measured first
 
@@ -70,34 +71,66 @@ cover this arm directly (`mc`, `spec-decomp`) both passed the broken version.
 Only the real-spec batch saw it. A decomposition change is exactly the kind of
 edit whose blast radius is wider than its unit tests.
 
-## (c) INSTANCE substitution — refused by name, and why
+## (c) INSTANCE substitution — ported
 
-Peeling `$SubstIn` is trivial: `+substin-parts` already returns
-`[mod names exprs inner lvl at]`, and `+rewrap-substin` already re-wraps —
-the port has both halves of `Specs.addSubsts`.
+The first pass refused it, on the reasoning that peeling `$SubstIn` is trivial
+(`+substin-parts` and `+rewrap-substin` both existed) but *evaluating* the
+peeled body needs a renaming frame `node-eval` did not have. That reasoning was
+right; the conclusion — that it was too big for this unit — was not, and one
+measurement settled it.
 
-**The blocker is evaluation, not decomposition.** `lib/node-eval` has no
-`$SubstIn` case. An inner module's `v` must resolve through `v <- x` to the
-**outer state's** binding — a variable *renaming* frame on `eenv`, touching
-variable reads, primed reads, assignability and UNCHANGED — not a value
-binding. Constants substitute easily; variables do not. That is unit-6 engine
-work.
+**The measurement**: a fixture using INIT/NEXT keys through `I!InitI` /
+`I!NextI`, which bypasses SPECIFICATION decomposition entirely and isolates the
+evaluator. It failed with `unsupported builtin operator: $SubstIn:inner` —
+meaning name resolution already worked and the *only* blocker was the missing
+case. That is a much smaller thing than "a renaming frame touching four
+subsystems."
 
-So `+decompose-spec` now says exactly that, where before the conjunct fell
-through to `the SPECIFICATION has no next-state relation` — a message true of
-nothing the caller wrote. R2.1 doctrine applied to a *deferral*: refuse by
-name, not by side effect.
+What it took:
 
-`tests/lib/spec-decomp` asserts the rejection, so the non-support is **tested**
-rather than merely documented. The `spec-inst` mc fixture was removed rather
-than left red: a permanently failing corpus case trains people to ignore the
-shard.
+- `+bind-substs` makes the same split `+bind-psub` does, and for the same
+  reason: a substitution onto a bare state variable (`v <- x`) is kept as a
+  **node**, so the inner module's `v' = ...` is still an assignment to the
+  outer `x`; a value substitution (`k <- 3`) is evaluated once into `vals`,
+  where a CONSTANT reference reads from.
+- `%variable` consults `psub`, exactly as `%formal-param` already did.
+- `+deref-sem` chases a substituted variable, so the action solver sees the
+  renaming. Bounded, because `x <- x` would otherwise spin.
+- `+unchanged-vars` derefs, so `UNCHANGED v` under `v <- x` is `UNCHANGED x`.
+- `+solve` descends into a substitution in action position, binding first —
+  otherwise the inner `v' = ...` is evaluated as a boolean filter instead of
+  solved as an assignment.
+- `+decompose-spec` peels and carries a `subs` stack, re-wrapping every leaf
+  (`+add-subs` = `Specs.addSubsts`), because leaves are evaluated later and
+  must still carry the bindings.
+- `+subst-var-name` translates subscript names through the substitutions, or
+  the EC 2145 check from (a) warns spuriously on every instanced spec — caught
+  by `spec-inst-flat`, which ran correctly but emitted a bogus warning.
+
+## The residue this unit FOUND
+
+An instanced member that references a **sibling** member of its own module
+(`SpecI == InitI /\ [][NextI]_v`) resolves to nothing: the generated `$SubstIn`
+body carries a bare `InitI`, while the root `defs` map holds instanced members
+**qualified** (`I!InitI`). tlc2 has no such problem — `SpecI`'s body links
+straight to `InitI`'s `OpDefNode`.
+
+**This is not a substitution gap.** Substitution works: `inst-keys` and
+`spec-inst-flat` both run byte-exact. It is instance *generation*, so it is
+recorded on `semantic-graph`, which owns that, and refused by name in
+`+decompose-spec` — dropping it produced `the SPECIFICATION has no initial
+predicate`, true of nothing the caller wrote.
+
+Worth noting why it went unseen: **no existing `test-data/sem/inst*` fixture
+has an inner definition that references a sibling.** Five instance fixtures,
+none exercising the shape.
 
 ## Evidence
 
-`mc` gains `spec-sub` and `spec-lazy` (byte-exact against the pin);
-`spec-decomp` gains `test-lazy-parameter-inlining` and
-`test-instance-substitution-refused-by-name`.
+`mc` gains `spec-sub`, `spec-lazy`, `spec-inst-flat` and `inst-keys`, all
+byte-exact against the pin; `spec-decomp` gains
+`test-lazy-parameter-inlining`, `test-instance-substitution-runs` and
+`test-instance-sibling-reference-refused-by-name`.
 
 Two things worth keeping. The first cut of the warning used a wet
 `turn`/`skip` and `fuse-loop`ed the zuse-408 compiler against

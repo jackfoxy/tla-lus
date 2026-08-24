@@ -63,6 +63,39 @@
   EXTENDS Naturals
   VARIABLE v
   CONSTANT k
+  SpecI == (v = 0) /\ [][v' = (v + 1) % k]_v
+  ====
+  I == INSTANCE inner WITH v <- x, k <- 3
+  Spec == I!SpecI
+  Inv == x < 9
+  ====
+  '''
+::
+++  test-instance-substitution-runs
+  ::  R2.3.5: a SPECIFICATION reached THROUGH an instance decomposes and runs.
+  ::  `+decompose-spec` peels the `$SubstIn` and re-wraps every leaf with the
+  ::  instance's bindings (`Specs.addSubsts`); `node-eval` binds them, keeping
+  ::  a substitution onto a bare state variable as a NODE so the inner module's
+  ::  `v' = ...` is still an assignment to the OUTER `x`
+  %+  expect-eq
+    !>  ^-  wain
+    :~  'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>  (check:check mod-inst 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
+::
+++  mod-inst-sibling
+  ::  the residue R2.3.5 FOUND rather than inherited: an instanced member that
+  ::  references a SIBLING member of its own module
+  '''
+  ---- MODULE A ----
+  EXTENDS Naturals
+  VARIABLE x
+  ---- MODULE inner ----
+  EXTENDS Naturals
+  VARIABLE v
+  CONSTANT k
   InitI == v = 0
   NextI == v' = (v + 1) % k
   SpecI == InitI /\ [][NextI]_v
@@ -73,17 +106,18 @@
   ====
   '''
 ::
-++  test-instance-substitution-refused-by-name
-  ::  tlc2 runs this (peeling `SubstInNode` and re-wrapping the leaves with
-  ::  `Specs.addSubsts`). The port does not, because evaluating the peeled body
-  ::  needs a variable RENAMING frame in `node-eval` that does not exist -- so
-  ::  it says SO, rather than reporting `the SPECIFICATION has no next-state
-  ::  relation`, which is what fell out before and told the caller nothing true
+++  test-instance-sibling-reference-refused-by-name
+  ::  NOT a substitution failure -- substitution works, as the arm above shows.
+  ::  The root `defs` map holds instanced members QUALIFIED (`I!InitI`), so a
+  ::  bare sibling reference inside the substitution resolves to nothing. That
+  ::  is instance GENERATION (unit 3), and it is refused by name because
+  ::  dropping it produced `the SPECIFICATION has no initial predicate` --
+  ::  true of nothing the caller wrote
   %+  expect-eq
     !>  ^-  wain
-    :~  'Error: unsupported: INSTANCE substitution in a SPECIFICATION (the substituted body is not evaluable; unit 6)'
+    :~  'Error: unsupported: instanced member references a sibling of its own module (InitI); the root defs map holds instanced members qualified (unit 3)'
     ==
-  !>  (check:check mod-inst 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
+  !>  (check:check mod-inst-sibling 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
 ::
 ++  mod-lazy
   ::  a parameterized operator as the behaviour spec (Github1244's shape)

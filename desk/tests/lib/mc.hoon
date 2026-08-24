@@ -205,6 +205,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {0, 3}\0aNext == x\' = x\0aSpec == Init /\\ [][Next]_x\0aImpInit == x = 0\0a====\0a'
   'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
 ::
+++  test-mc-inst-keys
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE inner ----\0aEXTENDS Naturals\0aVARIABLE v\0aCONSTANT k\0aInitI == v = 0\0aNextI == v\' = (v + 1) % k\0a====\0aI == INSTANCE inner WITH v <- x, k <- 3\0aInit2 == I!InitI\0aNext2 == I!NextI\0aInv == x < 9\0a====\0a'
+  'INIT Init2\0aNEXT Next2\0aINVARIANT Inv\0a'
+::
 ++  test-mc-inv-initial
   %+  expect-eq
     !>  ^-  wain
@@ -409,6 +423,20 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
+::
+++  test-mc-spec-inst-flat
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE inner ----\0aEXTENDS Naturals\0aVARIABLE v\0aCONSTANT k\0aSpecI == (v = 0) /\\ [][v\' = (v + 1) % k]_v\0a====\0aI == INSTANCE inner WITH v <- x, k <- 3\0aSpec == I!SpecI\0aInv == x < 9\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
 ++  test-mc-spec-lazy
   %+  expect-eq

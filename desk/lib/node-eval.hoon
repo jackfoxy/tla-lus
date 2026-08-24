@@ -148,7 +148,13 @@
     =/  s  (~(get by psub.e) nm)
     ?~(s (lookup-val nm e) (eval u.s e))
   ::
-    %variable         (lookup-var nm e)
+    ::  a substituted name resolves to the node it was bound to, in the
+    ::  OUTER scope -- `v <- x` makes the inner module's `v` read the outer
+    ::  state's `x`. Same call-by-name shape `%formal-param` uses (R2.3.5)
+      %variable
+    =/  s  (~(get by psub.e) nm)
+    ?~(s (lookup-var nm e) (eval u.s e))
+  ::
     %thm-assump       [%| 0 'a theorem/assumption is not an evaluable value.']
     %module-instance  [%| 0 'a module instance is not an evaluable value.']
   ==
@@ -384,6 +390,16 @@
   ?:  |(=(nm '$FcnConstructor') =(nm '$NonRecursiveFcnSpec'))
     (eval-fcncon n e)
   ?:  =(nm '$RecursiveFcnSpec')  (eval-recfcn n e)
+  ::  INSTANCE substitution (R2.3.5): `$SubstIn:M` / `$APSubstIn:M` wraps an
+  ::  instanced member's body in the instance's `WITH` bindings. tlc2 threads
+  ::  these as a `Context` (`Specs.addSubsts` / `SubstInNode`); the port binds
+  ::  them into the environment and evaluates the inner body
+  ?^  (anysubstin-mod:sm nm)
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  [%| 0 (rap 3 ~['malformed substitution wrapper: ' nm])]
+    =/  e2  (bind-substs e names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e2)  e2
+    (eval inner.u.sp p.e2)
   [%| 0 (rap 3 ~['unsupported builtin operator: ' nm])]
 ::
 ++  set-ctor-names
@@ -1198,13 +1214,22 @@
   ::  resolve a call-by-name parameter to the argument node it was bound to
   ::  (R1.5.1); non-params and unbound params pass through. Substituted nodes
   ::  are always plain variable references, so chasing cannot self-loop.
+  ::  R2.3.5: an INSTANCE substitution binds a %variable name the same way, so
+  ::  `v <- x` has to be chased here too or the action solver will not see the
+  ::  inner `v'` as an assignment to the outer `x`. Bounded: a self-substitution
+  ::  (`x <- x`) would otherwise spin
   |=  [n=sem:sm psub=(map @t sem:sm)]
   ^-  sem:sm
+  =/  fuel  32
+  |-  ^-  sem:sm
+  ?:  =(0 fuel)  n
   ?.  ?=(%apply -.n)  n
-  ?.  ?=(%formal-param kind.op.n)  n
+  ?.  ?=(?(%formal-param %variable) kind.op.n)  n
   ?.  ?=(~ args.n)  n
   =/  s  (~(get by psub) name.op.n)
-  ?~(s n $(n u.s))
+  ?~  s  n
+  ?:  =(u.s n)  n
+  $(n u.s, fuel (dec fuel))
 ::
 ++  deref-letin
   ::  unwrap a LET whose body just names one of its own 0-ary definitions:
@@ -1255,14 +1280,18 @@
   nm
 ::
 ++  unchanged-vars
-  ::  the variable names of UNCHANGED e (a variable or a tuple of variables)
-  |=  n=sem:sm
+  ::  the variable names of UNCHANGED e (a variable or a tuple of variables).
+  ::  `psub` is consulted so a SUBSTITUTED variable names its outer target --
+  ::  `UNCHANGED v` under `v <- x` is `UNCHANGED x` (R2.3.5)
+  |=  [n=sem:sm psub=(map @t sem:sm)]
   ^-  (list @t)
+  =.  n  (deref-sem n psub)
   ?.  ?=(%apply -.n)  ~
   ?:  ?=(%variable kind.op.n)  ~[name.op.n]
   ?.  =('$Tuple' name.op.n)  ~
   %+  murn  args.n
   |=  a=sem:sm
+  =.  a  (deref-sem a psub)
   ?:(&(?=(%apply -.a) ?=(%variable kind.op.a)) `name.op.a ~)
 ::
 ++  complete
@@ -1295,6 +1324,23 @@
   ?.  ?=(~ args.n)  |
   ?.  ?=(%variable kind.op.n)  |
   (~(has in vars.e) name.op.n)
+::
+++  bind-substs
+  ::  bind an INSTANCE's `WITH` substitutions (R2.3.5). Same split `+bind-psub`
+  ::  makes for operator parameters, and for the same reason: a substitution
+  ::  onto a bare state variable (`v <- x`) is kept as a NODE so the inner
+  ::  module's `v'` is still an assignment to the outer `x`, while a value
+  ::  substitution (`k <- 3`) is evaluated once and bound through `vals`, which
+  ::  is where a CONSTANT reference reads from
+  |=  [e=eenv ns=(list sbind:sm) as=(list sem:sm)]
+  ^-  (each eenv eval-err:v)
+  ?~  ns  [%& e]
+  ?~  as  [%& e]
+  ?:  (state-var-ref i.as e)
+    $(ns t.ns, as t.as, e e(psub (~(put by psub.e) name.i.ns i.as)))
+  =/  av  (eval i.as e)
+  ?:  ?=(%| -.av)  av
+  $(ns t.ns, as t.as, e e(vals (~(put by vals.e) name.i.ns p.av)))
 ::
 ++  bind-psub
   ::  bind an operator's parameters for solving: a bare state-variable argument
@@ -1364,6 +1410,15 @@
   ::  filtered as a boolean. Parameters are bound call-by-name (`+bind-psub`):
   ::  an assignable variable passed as an argument (`Init(s)`, `Next(s)`) stays
   ::  assignable, mirroring tlc2's Context substitution.
+  ::  an INSTANCE substitution in ACTION position binds and descends, exactly as
+  ::  a user-op expands: otherwise the inner module's `v' = ...` would be
+  ::  evaluated as a boolean filter instead of solved as an assignment (R2.3.5)
+  ?:  ?=(^ (anysubstin-mod:sm nm))
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  (solve-filter n mode cur part e)
+    =/  e2  (bind-substs (senv mode cur part e) names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e2)  e2
+    (solve inner.u.sp mode cur part p.e2)
   ?:  ?=(%user-op kind.op.n)
     =/  d  (~(get by ops.e) nm)
     ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e)
@@ -1482,7 +1537,7 @@
   ::  UNCHANGED e assigns each named variable to its current value
   |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
   ^-  sres
-  =/  names  (unchanged-vars arg)
+  =/  names  (unchanged-vars arg psub.e)
   =/  out=state  part
   =.  out
     |-  ^-  state

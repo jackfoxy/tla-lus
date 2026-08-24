@@ -1167,6 +1167,9 @@
   =|  inits=(list sem:sem-lib)
   =|  fair=(list sem:sem-lib)
   =|  warn=(list @t)
+  ::  the INSTANCE substitution wrappers peeled so far, innermost FIRST --
+  ::  tlc2's `subs` list, consumed by `Specs.addSubsts` at every leaf
+  =|  subs=(list [mod=@t names=(list sbind:sem-lib) exprs=(list sem:sem-lib) inner=sem:sem-lib lvl=@ud at=sspan:sem-lib])
   =/  next=(unit sem:sem-lib)  ~
   |-  ^-  [(list sem:sem-lib) (unit sem:sem-lib) (list sem:sem-lib) (unit @t) (list @t)]
   ?~  work  [(rev-sem inits) next (rev-sem fair) ~ (flop warn)]
@@ -1178,8 +1181,8 @@
       $(work [u.body.p rest])
     ::  a literal/atref conjunct: route by level
     =/  l  (sem-lvl p)
-    ?:  (lte l 1)  $(work rest, inits [p inits])
-    ?:  =(3 l)     $(work rest, fair [p fair])
+    ?:  (lte l 1)  $(work rest, inits [(add-subs p subs) inits])
+    ?:  =(3 l)     $(work rest, fair [(add-subs p subs) fair])
     [inits next fair `'cannot handle this conjunct in the SPECIFICATION' warn]
   =/  op  name.op.p
   ::  EC 2237: a conjunct that is constantly FALSE makes the whole spec
@@ -1187,22 +1190,16 @@
   ::  name for `Falsy == FALSE`, the literal for an inline `FALSE` (R1.8.1.3)
   ?:  &(?=(%builtin kind.op.p) =('FALSE' op))
     [inits next fair `'The spec is trivially false because FALSE is false.' warn]
-  ::  INSTANCE substitution ($SubstIn / $APSubstIn) is REFUSED here, by name.
-  ::  R2.3.5 measured why it is not merely deferred: peeling the wrapper is
-  ::  trivial (`+substin-parts` already returns its parts), but the peeled body
-  ::  then has to be EVALUATED, and `lib/node-eval` has no `$SubstIn` case --
-  ::  an inner module's `v` must resolve through `v <- x` to the OUTER state's
-  ::  binding, which is a variable RENAMING frame on `eenv` (touching variable
-  ::  reads, primed reads, assignability and UNCHANGED), not a value binding.
-  ::  Until that exists, the honest answer is this message rather than
-  ::  `the SPECIFICATION has no next-state relation`, which is what fell out
-  ::  before and told the caller nothing true (R2.1 doctrine)
-  ?:  ?&  ?=(%builtin kind.op.p)
-          ?=(^ (anysubstin-mod:sem-lib op))
-      ==
-    :^  inits  next  fair
-    :-  `'unsupported: INSTANCE substitution in a SPECIFICATION (the substituted body is not evaluable; unit 6)'
-    warn
+  ::  INSTANCE substitution (R2.3.5): `Spec == I!SpecI` reaches the behaviour
+  ::  spec THROUGH an instance, so the conjunct is a `$SubstIn` wrapper. tlc2
+  ::  pushes the wrapper onto `subs`, decomposes the body, and re-wraps every
+  ::  leaf with `Specs.addSubsts` -- the leaves are evaluated later and must
+  ::  still carry the bindings. `+substin-parts` peels and `+rewrap-substin`
+  ::  re-wraps, so `subs` is that stack, applied at each emission point
+  ?:  ?=(^ (anysubstin-mod:sem-lib op))
+    =/  sp  (substin-parts:sem-lib p)
+    ?~  sp  $(work rest)
+    $(work [inner.u.sp rest], subs [u.sp subs])
   ::  LazyValue parameter inlining (R2.3.5), in the one shape the port can
   ::  soundly do it: `Op(A)` where `Op(i) == i`. The body IS the formal, so the
   ::  apply simply DENOTES `A` and decomposition continues on `A` -- no context
@@ -1233,6 +1230,18 @@
   ?:  &(?=(%user-op kind.op.p) =(~ args.p))
     ::  arity-0 user operator: expand its body (init if state-level, else recurse)
     =/  d  (~(get by defs) op)
+    ::  R2.3.5: inside an INSTANCE substitution a bare name is the INNER
+    ::  module's, and the root `defs` map holds instanced members under their
+    ::  qualified names (`I!InitI`) -- a member referencing a SIBLING member
+    ::  (`SpecI == InitI /\ [][NextI]_v`) therefore resolves to nothing here.
+    ::  That is a gap in instance GENERATION, not in substitution (which works:
+    ::  `inst-keys` and `spec-inst-flat` both run), so it is refused by name
+    ::  rather than dropped -- dropping it produced `the SPECIFICATION has no
+    ::  initial predicate`, which described nothing the caller wrote
+    ?:  &(?=(~ d) ?=(^ subs))
+      :^  inits  next  fair
+      :-  `(crip "unsupported: instanced member references a sibling of its own module ({(trip op)}); the root defs map holds instanced members qualified (unit 3)")
+      warn
     ?~  d  $(work rest)
     ?~  body.u.d  $(work rest)
     ?:  (is-false-body u.body.u.d)
@@ -1240,7 +1249,7 @@
       :-  `(crip "The spec is trivially false because {(trip op)} is false.")
       warn
     ?:  =(1 (sem-lvl u.body.u.d))
-      $(work rest, inits [u.body.u.d inits])
+      $(work rest, inits [(add-subs u.body.u.d subs) inits])
     $(work [u.body.u.d rest])
   ?:  |(=(op '$ConjList') =(op '\\land'))
     $(work (weld-sem args.p rest))
@@ -1260,22 +1269,65 @@
       ::  (`SpecProcessor.java:1327-1339`), which is what makes this a warning
       ::  worth having rather than a rejection: the run still produces a result,
       ::  it is just a result about a smaller relation than the author wrote
-      =/  subv  ?~(t.args.arg ~ (subscript-vars i.t.args.arg defs))
+      ::  the subscript is read in the INNER scope when the spec was reached
+      ::  through an INSTANCE, so `[NextI]_v` under `v <- x` covers `x`, not
+      ::  `v`. Translate through the substitutions before comparing against the
+      ::  declared variables, or every instanced spec warns spuriously (R2.3.5)
+      =/  subv
+        %+  turn  ?~(t.args.arg ~ (subscript-vars i.t.args.arg defs))
+        |=(nm=@t (subst-var-name nm subs))
       ::  the message is TWO console lines, so it is two `wain` entries -- not
       ::  one entry with an embedded newline. Built by an EXPLICIT loop: a wet
       ::  `turn`/`skip` here fuses against this arm's own recursive product
       ::  type and `fuse-loop`s the zuse-408 compiler, the same trap
       ::  `+render-outcome` records for its initial-state branch
       =.  warn  (subscript-warns vars subv warn)
-      $(work rest, next `i.args.arg)
+      $(work rest, next `(add-subs i.args.arg subs))
     ?:  (lte (sem-lvl arg) 1)
       [inits next fair `'TLC cannot handle a [] of a state predicate in the SPECIFICATION' warn]
-    $(work rest, fair [p fair])
+    $(work rest, fair [(add-subs p subs) fair])
   ::  any other conjunct: route by level
   =/  l  (sem-lvl p)
-  ?:  (lte l 1)  $(work rest, inits [p inits])
-  ?:  =(3 l)     $(work rest, fair [p fair])
+  ?:  (lte l 1)  $(work rest, inits [(add-subs p subs) inits])
+  ?:  =(3 l)     $(work rest, fair [(add-subs p subs) fair])
   [inits next fair `'cannot handle this conjunct in the SPECIFICATION' warn]
+::
+++  subst-var-name
+  ::  translate a name through the INSTANCE substitutions it was read under,
+  ::  innermost outward: `v` under `v <- x` is `x`. A substitution onto
+  ::  anything but a bare variable leaves the name alone -- it names no single
+  ::  declared variable, which is exactly the case EC 2145 should still warn on
+  |=  $:  nm=@t
+          subs=(list [mod=@t names=(list sbind:sem-lib) exprs=(list sem:sem-lib) inner=sem:sem-lib lvl=@ud at=sspan:sem-lib])
+      ==
+  ^-  @t
+  ?~  subs  nm
+  =/  hit
+    =/  ns  names.i.subs
+    =/  xs  exprs.i.subs
+    |-  ^-  (unit sem:sem-lib)
+    ?~  ns  ~
+    ?~  xs  ~
+    ?:(=(name.i.ns nm) `i.xs $(ns t.ns, xs t.xs))
+  ?~  hit  $(subs t.subs)
+  =/  x  u.hit
+  ?.  ?&(?=(%apply -.x) ?=(%variable kind.op.x) ?=(~ args.x))
+    $(subs t.subs)
+  $(nm name.op.x, subs t.subs)
+::
+++  add-subs
+  ::  re-wrap a decomposed leaf in the INSTANCE substitutions it was reached
+  ::  through -- `Specs.addSubsts` (`Specs.java:82`). Innermost first, so each
+  ::  wrap goes OUTSIDE the last and the nesting matches the source (R2.3.5)
+  |=  $:  n=sem:sem-lib
+          subs=(list [mod=@t names=(list sbind:sem-lib) exprs=(list sem:sem-lib) inner=sem:sem-lib lvl=@ud at=sspan:sem-lib])
+      ==
+  ^-  sem:sem-lib
+  ?~  subs  n
+  %=  $
+    subs  t.subs
+    n     (rewrap-substin:sem-lib mod.i.subs names.i.subs exprs.i.subs n lvl.i.subs at.i.subs)
+  ==
 ::
 ++  subscript-warns
   ::  EC 2145 lines for every declared variable the subscript does not cover.
