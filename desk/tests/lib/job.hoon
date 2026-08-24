@@ -1228,4 +1228,83 @@
   %+  expect-eq
     !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
   !>((validate:job-lib req))
+::
+::  +|  INVARIANT And PROPERTY In One Config (R2.3.4)
+::
+::  The kernel refused this combination because NEITHER path could do it: the
+::  liveness branch built its graph with `~` for invariants and the box-state
+::  branch substituted the property for them. Both now carry the config's
+::  invariant list, so the combination RUNS -- and a safety violation
+::  pre-empts the temporal check, exactly as `ModelChecker.doNext` returning
+::  pre-empts tlc2's final pass.
+++  ip-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Spec == Init /\ [][Next]_x
+  Inv == x < 9
+  Tight == x < 2
+  BoxSmall == [](x < 9)
+  BoxTight == [](x < 2)
+  Live == <>(x = 3)
+  ====
+  '''
+::
+++  ip-inv-wins   'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY Live\0a'
+++  ip-prop-runs  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY Live\0a'
+++  ip-box-order  'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY BoxTight\0a'
+++  ip-both-ok    'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY BoxSmall\0a'
+::
+++  test-inv-prop-accepted-not-refused
+  ::  the submit-time refusal is gone: the combination validates
+  (expect-eq !>(~) !>((validate:job-lib (check-req ip-spec ip-prop-runs))))
+::
+++  test-inv-prop-invariant-preempts-liveness
+  ::  the INVARIANT is violated at x = 2, so the run stops there with a SAFETY
+  ::  verdict and the temporal property is never reported -- the kernel used to
+  ::  refuse this config outright, and before that would not have checked `Tight`
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-inv-wins) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Tight']) !>(violation.u.result.j))
+::
+++  test-inv-prop-liveness-runs-when-invariant-holds
+  ::  the matched half: same spec, an invariant that HOLDS, so the run reaches
+  ::  the temporal check and reports the PROPERTY. A different verdict from the
+  ::  arm above, off one word of config
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-prop-runs) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%property 'Live']) !>(violation.u.result.j))
+::
+++  test-inv-prop-box-state-invariant-order
+  ::  a `[]P` box-state PROPERTY is checked as an INVARIANT, and the config's
+  ::  own invariants come FIRST: `processConfigInvariants()` fills `invVec`
+  ::  before `processConfigProps` appends to it. Both are false at x = 2 and
+  ::  tlc2 names `Tight`, so the port must too
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-box-order) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Tight']) !>(violation.u.result.j))
+::
+++  test-inv-prop-both-hold
+  ::  both hold: the run completes
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-both-ok) t0) 256)
+  ?>  ?=(^ result.j)
+  (expect-eq !>(%ok) !>(-.u.result.j))
+::
+++  test-kernel-report-equals-console-inv-prop
+  ::  the kernel's rendered report is the console's, for the pre-empting case
+  %+  same-report  ip-spec  ip-inv-wins
+::
+++  test-kernel-report-equals-console-inv-prop-box
+  %+  same-report  ip-spec  ip-box-order
 --

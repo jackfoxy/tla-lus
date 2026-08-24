@@ -149,6 +149,10 @@
           pname=@t
           modn=@t
           act=next-act
+          ::  the whole-Next label, carried since R2.3.4: an INVARIANT
+          ::  violation during the graph build is reported by `+finish-bfs`,
+          ::  which renders a safety trace and needs it
+          nl=@t
           o=bfs-opts:check
           cur=bfs-cursor:check
           ::  %check-phase product slicing (unit 8.8.2a): the OrderOfSolutions
@@ -1195,10 +1199,6 @@
     (finish j [%failed 'no INIT in config'] pre)
   ?:  ?&(?=(%init-next -.mode.rs) ?=(~ next.mode.rs))
     (finish j [%failed 'no NEXT in config'] pre)
-  ?:  &(?=(^ iv) ?=(^ pp))
-    %^  finish  j
-      [%failed 'unsupported: INVARIANT and PROPERTY in one config (unit 7)']
-    pre
   ?:  ?=(%init-next -.mode.rs)
     =/  in  init.mode.rs
     =/  nx  next.mode.rs
@@ -1369,8 +1369,12 @@
           pending   (skip pending.j |=(s=stage =(%liveness s)))
           progress  [done.progress.j (dec total.progress.j)]
         ==
+      ::  R2.3.4: the config's own INVARIANTs are checked alongside the
+      ::  box-state property, and BEFORE it -- `processConfigInvariants()`
+      ::  fills `invVec` first and `processConfigProps` appends to it
       =/  o=bfs-opts:check
-        :*  nsb  ~[[u.pp u.binner]]  cons  acons  vars  order  perms  defs
+        :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
+            perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
             vwb
         ==
@@ -1398,11 +1402,15 @@
     ::  INIT/NEXT mode `fair` is empty and this is the old call
     =/  osr  (oss-of:check ~[u.psb] modn fair (make-env:ne defs consts vars))
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
+    ::  R2.3.4: the temporal graph build carries the config's INVARIANTs, so an
+    ::  INVARIANT alongside a PROPERTY is CHECKED rather than refused. A
+    ::  violation is the state search's own verdict and pre-empts the liveness
+    ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
-      [nsb ~ ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb]
+      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb]
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  p.osr  u.pp  modn  act
+      :*  %live  %build  p.osr  u.pp  modn  act  nl
           o  (bfs-init:check is)  ~  ~
           sname  sloc  fair  aname
       ==
@@ -1457,6 +1465,16 @@
       =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
       =.  stats.j  st
       (finish j [%limited what.out.r st] pre)
+    ::  R2.3.4: with INVARIANTs carried here, `%inv` is now reachable and is a
+    ::  real verdict -- the safety violation pre-empts the temporal check, as
+    ::  `ModelChecker.doNext` returning pre-empts tlc2's. `+finish-bfs` renders
+    ::  it exactly as the plain safety path does. ALIAS is refused alongside a
+    ::  temporal PROPERTY (R2.3.2), so `~` is the whole story for the alias
+    ?:  ?=(%inv -.out.r)
+      %:  finish-bfs
+        j  out.r  (od-stats:check outdeg.cur.r)  o.kk
+        nl.kk  act.kk  aname.kk  ~  pre
+      ==
     ?.  ?=(%ok -.out.r)
       (finish j [%failed 'internal: unexpected graph outcome'] pre)
     =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]

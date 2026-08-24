@@ -2033,8 +2033,18 @@
     ?:  &(?=(~ binner) ?=(^ iact))
       (implied-action-run c u.pp.c u.iact)
     ?^  binner
+      ::  R2.3.4: the config's own INVARIANTs are checked ALONGSIDE the
+      ::  box-state property, and BEFORE it. `processConfigInvariants()` runs
+      ::  first and fills `invVec` from the config's INVARIANT list; a `[]P`
+      ::  with a state-level P is appended to that SAME vector by
+      ::  `processConfigProps` (`SpecProcessor.java:1552`). Measured at the pin:
+      ::  with `INVARIANT Tight` and `PROPERTY BoxTight` both false at the same
+      ::  state, tlc2 names `Tight` -- the config's, not the property's. This
+      ::  branch used to pass ONLY the property, silently dropping the config's
       =/  o=bfs-opts
-        [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
+        :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
+            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c
+        ==
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
@@ -2068,17 +2078,25 @@
     ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
     ?^  alias.c
       ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
+    ::  R2.3.4: the graph build carries the config's INVARIANTs. It used to
+    ::  pass `~`, so an INVARIANT alongside a temporal PROPERTY was simply not
+    ::  checked -- which is why the kernel refused the combination rather than
+    ::  running it. `+bfs-step` already checks `invs` and stops at the first
+    ::  violation, so no new checking machinery was needed here, only the list
     =/  o=bfs-opts
-      [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c]
+      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
       :-  'Model checking stopped: state limit reached.'
       (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
-    ::  a deadlock (or a typed evaluation failure) is the state search's own
-    ::  verdict and pre-empts the liveness report, exactly as it pre-empts
-    ::  tlc2's final check
-    ?:  ?=(?(%deadlock %error) -.out.bg)
+    ::  an INVARIANT violation, a deadlock, or a typed evaluation failure is
+    ::  the state search's own verdict and pre-empts the liveness report,
+    ::  exactly as it pre-empts tlc2's final check: `ModelChecker.doNext`
+    ::  returns on the violation and `modelCheck` never reaches the temporal
+    ::  pass. Measured at the pin -- `INVARIANT Tight` + `PROPERTY Live` prints
+    ::  the safety trace and counts, and NO temporal verdict (R2.3.4)
+    ?:  ?=(?(%inv %deadlock %error) -.out.bg)
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c)
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c
@@ -2132,21 +2150,38 @@
       "of every behavior. See https://explain.tlapl.us/invariants-and-properties "
       "for additional details."
     ==
+  ::  R2.3.4: `ModelChecker.doInit` is STATE-MAJOR -- for each initial state it
+  ::  checks every INVARIANT (EC 2107, `:1187`) and only then every implied
+  ::  init (EC 2108, `:1199`). So an INVARIANT false on the same initial state
+  ::  wins, and the port must look for one FIRST rather than reaching it later
+  ::  through `+safety-run`. Measured at the pin: `INVARIANT FalseInv` with
+  ::  `PROPERTY FalseProp`, both false at `x = 0`, names FalseInv
   =/  bad
     =/  sts  is.c
-    |-  ^-  (unit state)
+    |-  ^-  (unit [kind=?(%inv %prop) name=@t st=state])
     ?~  sts  ~
+    =/  iv
+      =/  vs  invs.c
+      |-  ^-  (unit @t)
+      ?~  vs  ~
+      =/  r  (pred-bool:ne body.i.vs i.sts ~ env)
+      ?:  ?&(?=(%& -.r) p.r)  $(vs t.vs)
+      `name.i.vs
+    ?^  iv  `[%inv u.iv i.sts]
     =/  r  (pred-bool:ne body i.sts ~ env)
     ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
-    `i.sts
+    `[%prop pname i.sts]
   ?~  bad  [warn (safety-run c)]
   ::  EC 2108 is built from `evalAlias(curState, curState)` exactly as EC 2107
   ::  is (`ModelChecker.java:1199`), so an ALIAS renders this state too
   =/  shown=[order=(list @t) st=state]
-    ?~  alias.c  [order.c u.bad]
-    (alias-state u.alias.c env u.bad u.bad)
-  :+  warn
-    (crip "Error: Property {(trip pname)} is violated by the initial state:")
+    ?~  alias.c  [order.c st.u.bad]
+    (alias-state u.alias.c env st.u.bad st.u.bad)
+  =/  head=@t
+    ?:  ?=(%inv kind.u.bad)
+      (crip "Error: Invariant {(trip name.u.bad)} is violated by the initial state:")
+    (crip "Error: Property {(trip name.u.bad)} is violated by the initial state:")
+  :+  warn  head
   (render-state order.shown st.shown)
 ::
 ++  implied-action-run
@@ -2166,10 +2201,26 @@
   ::  build the whole reachability graph, then scan every transition for the
   ::  first state whose successor breaks A. The trace is the behavior reaching
   ::  that state plus the offending successor
-  =/  g  (build-graph is.c o)
+  =/  bg  (build-graph-out is.c o)
+  =/  g   g.bg
   =/  viol  (first-bad-step g nsb.c env body)
+  ::  R2.3.4: this branch has always carried the config's INVARIANTs, so with
+  ::  the combination now allowed both can be violated in one run. Measured at
+  ::  the pin: on the SAME transition the INVARIANT wins (`INVARIANT Zero` +
+  ::  `PROPERTY NoStep`, both false on 0->1, names `Zero`), while an action
+  ::  violation reached EARLIER wins over a later invariant one (`Tight` fails
+  ::  at x=2, `NoStep` on the first step, names `NoStep`). So the SHORTER
+  ::  behavior reports, ties going to the invariant.
+  ::  RESIDUAL, recorded rather than hidden: at equal depth but different queue
+  ::  position tlc2's order is its BFS order, and `+first-bad-step` scans the
+  ::  fingerprint map, not the queue -- a pre-existing approximation this unit
+  ::  narrows (ties now resolve as tlc2 resolves them) without removing
+  ?:  ?&  ?=(%inv -.out.bg)
+          ?|(?=(~ viol) (lte (lent trace.out.bg) (lent u.viol)))
+      ==
+    (render-outcome out.bg nl.c actions env order.c modn alias.c)
   ?~  viol
-    (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c)
   ;:  weld
     ~[(crip "Error: Action property {(trip pname)} is violated.")]
     ~['Error: The behavior up to this point is:']

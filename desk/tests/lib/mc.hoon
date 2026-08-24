@@ -218,6 +218,138 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 5\0aNext == x\' = x\0aInv == x < 3\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
+++  test-mc-inv-prop-action
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Zero is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        '2 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aZero == x < 1\0aNoStep == [][x\' = x]_x\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Zero\0aPROPERTY NoStep\0a'
+::
+++  test-mc-inv-prop-both-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0aTight == x < 2\0aBoxSmall == [](x < 9)\0aBoxTight == [](x < 2)\0aLive == <>(x = 3)\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY BoxSmall\0a'
+::
+++  test-mc-inv-prop-box-order
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Tight is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0aTight == x < 2\0aBoxSmall == [](x < 9)\0aBoxTight == [](x < 2)\0aLive == <>(x = 3)\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY BoxTight\0a'
+::
+++  test-mc-inv-prop-box-prop
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant BoxTight is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0aTight == x < 2\0aBoxSmall == [](x < 9)\0aBoxTight == [](x < 2)\0aLive == <>(x = 3)\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY BoxTight\0a'
+::
+++  test-mc-inv-prop-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula FalseProp is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula FalseProp holds in all states of every behavior, use INVARIANT FalseProp instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula FalseProp changes it into a temporal formula, asserting that FalseProp holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Invariant FalseInv is violated by the initial state:'
+        'x = 0'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aFalseInv == x > 100\0aFalseProp == x > 200\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT FalseInv\0aPROPERTY FalseProp\0a'
+::
+++  test-mc-inv-prop-inv-wins
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Tight is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0aTight == x < 2\0aBoxSmall == [](x < 9)\0aBoxTight == [](x < 2)\0aLive == <>(x = 3)\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY Live\0a'
+::
+++  test-mc-inv-prop-prop-runs
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0aTight == x < 2\0aBoxSmall == [](x < 9)\0aBoxTight == [](x < 2)\0aLive == <>(x = 3)\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY Live\0a'
+::
 ++  test-mc-invfail
   %+  expect-eq
     !>  ^-  wain
