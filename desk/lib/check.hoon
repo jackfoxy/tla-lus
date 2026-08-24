@@ -224,13 +224,17 @@
       ::  bindings, so a view changes `distinct`, the graph's shape, and
       ::  whether a run terminates (R2.3.1)
       view=(unit sem:sem-lib)
+      ::  the run's `max-set-size` (tlc2 `-maxSetSize`); 0 = engine default.
+      ::  Carried here because `+env-of` is where the search's evaluation
+      ::  context is built (R2.4.1)
+      setmax=@ud
   ==
 ::
 ++  env-of
   ::  the node-eval evaluation context for a search
   |=  o=bfs-opts
   ^-  eenv:ne
-  (make-env:ne defs.o consts.o vars.o)
+  (with-setmax:ne (make-env:ne defs.o consts.o vars.o) setmax.o)
 ::  everything required to resume a search byte-identically
 +$  bfs-cursor
   $:  init-todo=(list state)  ::  initial states not yet registered
@@ -1726,7 +1730,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1769,7 +1773,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1807,7 +1811,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1825,7 +1829,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2042,7 +2046,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2234,7 +2238,7 @@
       ::  branch used to pass ONLY the property, silently dropping the config's
       =/  o=bfs-opts
         :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
-            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c
+            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0
         ==
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -2275,7 +2279,7 @@
     ::  running it. `+bfs-step` already checks `invs` and stops at the first
     ::  violation, so no new checking machinery was needed here, only the list
     =/  o=bfs-opts
-      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c]
+      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -2385,7 +2389,7 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0]
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  modn     (module-name-of tree.c)
@@ -2448,7 +2452,7 @@
   ::  on with the ordinary model check
   |=  c=sctx
   ^-  wain
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0]
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
@@ -2536,7 +2540,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -2549,11 +2553,11 @@
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
     =/  er  (explore is.c o)
     (explore-outcome out.er od.er)
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
   =/  er  (explore is.c o)
   (explore-outcome out.er od.er)
 ::
@@ -2580,7 +2584,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

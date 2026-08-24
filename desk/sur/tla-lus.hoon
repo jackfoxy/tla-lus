@@ -174,6 +174,11 @@
       max-depth=@ud
       max-time=@dr
       max-artifact=@ud  ::  stored artifact bytes
+      ::  the largest set a run may MATERIALIZE -- tlc2's `-maxSetSize`
+      ::  (`TLCGlobals.setBound`, default 1,000,000). Exceeding it FAILS the
+      ::  run in tlc2, so this is a parity bound and not only an ergonomic
+      ::  one; 0 means the engine default (R2.4.1)
+      max-set-size=@ud
   ==
 +$  request
   $:  =op

@@ -54,6 +54,10 @@
       ::  argument as an OpApplNode. Value/operator arguments still bind
       ::  through `vals`/`ops`; only bare state-variable arguments land here.
       psub=(map @t sem:sm)
+      ::  the run's `max-set-size` (tlc2 `-maxSetSize`); 0 = engine default.
+      ::  Carried on the env because the bound bites where a lazy set is
+      ::  MATERIALIZED, deep inside evaluation (R2.4.1)
+      setmax=@ud
       ::  the StandardModule override registry, built once per environment
       ::  (unit 6C.1); rebuilding the table inside an evaluation loop would
       ::  cost a map construction per operator application
@@ -318,7 +322,7 @@
   ^-  eres
   =/  s  (eval-domain n e)
   ?:  ?=(%| -.s)  s
-  (force:v p.s)
+  (force:v p.s setmax.e)
 ::
 ::  +|  Builtin Dispatch
 ::
@@ -358,7 +362,7 @@
     ::  yet solve (R1.4.2)
     =/  sx  (eval-domain n e)
     ?:  ?=(%| -.sx)  sx
-    (force:v p.sx)
+    (force:v p.sx setmax.e)
   ?:  =(nm 'DOMAIN')
     =/  a  (eval (snag 0 as) e)
     ?:  ?=(%| -.a)  a
@@ -847,7 +851,7 @@
     [%| 0 'function constructor over multiple binders is unsupported.']
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
-  =/  fr  (force:v p.sd)
+  =/  fr  (force:v p.sd setmax.e)
   ?:  ?=(%| -.fr)  fr
   =/  el  (elemsof-e:v p.fr)
   ?:  ?=(%| -.el)  el
@@ -972,7 +976,7 @@
     [%| (card-err (crip (render:v s.p.dom)))]
   ?:  (infinite:v p.dom)
     [%| (card-err (crip (sexp-name:v p.dom)))]
-  =/  f  (force:v p.dom)
+  =/  f  (force:v p.dom setmax.e)
   ?:  ?=(%| -.f)  f
   [%& [%int (sun:si (lent (set-elems:v p.f)))]]
 ::
@@ -1606,7 +1610,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ make-senv:so]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -1660,7 +1664,16 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars ~ make-senv:so]
+  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so]
+::
+++  with-setmax
+  ::  the run's `max-set-size` applied to a prebuilt env (R2.4.1). A separate
+  ::  arm rather than a `+make-env` parameter because `+make-env` has ~30 call
+  ::  sites across `check`/`job`/tests, and only the ones that HAVE a `limits`
+  ::  need to say anything
+  |=  [e=eenv lim=@ud]
+  ^-  eenv
+  e(setmax lim)
 ::
 ++  init-states
   ::  the complete initial-state stream for an Init BODY under a prebuilt env

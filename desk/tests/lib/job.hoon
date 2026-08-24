@@ -1307,4 +1307,45 @@
 ::
 ++  test-kernel-report-equals-console-inv-prop-box
   %+  same-report  ip-spec  ip-box-order
+::
+::  +|  Max Set Size (R2.4.1)
+::
+::  tlc2's `-maxSetSize` (`TLCGlobals.setBound`, default 1,000,000). R2.4.0
+::  measured which of its two guarded sites is actually reachable: NOT
+::  `StateVec.grow`/EC 2172 (`-maxSetSize 5` on a spec with 21 successors ran
+::  clean, 442 states) but `ValueVec.ensureCapacity`, whose message names the
+::  BOUND rather than the actual size. The port's `+force` is the same
+::  boundary -- where a lazy set must become a value.
+++  bigset-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, FiniteSets
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 3
+  Inv == Cardinality({i \in 0..30 : TRUE}) = 31
+  ====
+  '''
+::
+++  bigset-req
+  |=  n=@ud
+  ^-  request
+  =/  l  lim
+  =.  max-set-size.l  n
+  [[%check [| ~ [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~]
+::
+++  test-max-set-size-default-runs
+  ::  the matched half: the same spec under the default bound completes
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (bigset-req 0) t0) 256)
+  ?>  ?=(^ result.j)
+  (expect-eq !>(%ok) !>(-.u.result.j))
+::
+++  test-max-set-size-bound-bites
+  ::  one field different, and the run FAILS with tlc2's own wording -- the
+  ::  bound names itself, as `ValueVec` does
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (bigset-req 5) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'Attempted to construct a set with too many elements (>5).'])
+  !>(result.j)
 --

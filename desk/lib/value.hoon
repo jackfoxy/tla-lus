@@ -1075,15 +1075,20 @@
 ::
 ++  force
   ::  materialize a lazy set into a normalized eager %set (the boundary at
-  ::  which a lazy set must become a value); typed overflow if too large
-  |=  x=sexp
+  ::  which a lazy set must become a value); typed overflow if too large.
+  ::  `lim` is the run's `max-set-size` (0 = `max-card`, the engine default,
+  ::  which is tlc2's own 1,000,000). This is the port's `ValueVec
+  ::  .ensureCapacity` -- measured at the pin, that is the site `-maxSetSize`
+  ::  actually reaches, and it names the BOUND rather than the actual size
+  |=  [x=sexp lim=@ud]
   ^-  (each value eval-err)
+  =/  cap  ?:(=(0 lim) max-card lim)
   =/  rc  (enum x)
   ?:  ?=(%| -.rc)  rc
   =/  bnd  (cur-bound p.rc)
   ?:  ?=(%| -.bnd)  bnd
-  ?:  (gth p.bnd max-card)
-    [%| 0 'Set too large to enumerate.']
+  ?:  (gth p.bnd cap)
+    [%| 0 (crip "Attempted to construct a set with too many elements (>{<cap>}).")]
   =|  acc=(list value)
   =/  cur  p.rc
   |-  ^-  (each value eval-err)

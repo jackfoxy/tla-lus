@@ -194,6 +194,8 @@
       max-depth=1.000
       max-time=~m10
       max-artifact=1.000.000
+      ::  tlc2's own `-maxSetSize` default (R2.4.1)
+      max-set-size=1.000.000
   ==
 ::  work units one Gall event may spend; engine configuration,
 ::  deliberately separate from the request's user-facing limits
@@ -1385,7 +1387,7 @@
         :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-            vwb
+            vwb  max-set-size.lims
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
       (more j pre)
@@ -1416,7 +1418,7 @@
     ::  violation is the state search's own verdict and pre-empts the liveness
     ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
-      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb]
+      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb max-set-size.lims]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  p.osr  u.pp  modn  act  nl
@@ -1430,7 +1432,7 @@
   =/  o=bfs-opts:check
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-        vwb
+        vwb  max-set-size.lims
     ==
   =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
   (more j pre)
