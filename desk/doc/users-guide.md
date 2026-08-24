@@ -89,9 +89,15 @@ you set `allow-write=&` and use the write action.
 - **Exhaustive** (`[%exhaustive deadlock=?]`) — breadth-first exploration of
   the whole reachable state space, checking the invariant at each state and
   (optionally) deadlock.
-- **Simulate** (`[%simulate seed num depth]`) — bounded, **seeded** random
-  behaviors. The same seed and limits always produce the same result, so runs
-  are reproducible.
+- **Simulate** (`[%simulate seed num depth generate=?]`) — bounded, **seeded**
+  random behaviors. The same seed and limits always produce the same result, so
+  runs are reproducible. With `generate` set this is tlc2's `-generate`: the
+  successor pick becomes **probabilistic**, so each step generates one successor
+  rather than all of them. Same seed, same reproducibility, a different walk —
+  and different statistics, since fewer states are generated per step. It only
+  changes anything when the nondeterminism sits below a conjunction (a
+  top-level `\/` or `\E` is split into separate actions before the successor
+  search runs, and the two modes coincide there).
 
 ## Limits and cancellation
 

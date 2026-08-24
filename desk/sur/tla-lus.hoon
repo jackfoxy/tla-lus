@@ -126,7 +126,13 @@
 +$  analyze-flags  [syntax=? semantic=? level=? lint=?]
 +$  check-mode
   $%  [%exhaustive deadlock=?]
-      [%simulate seed=@ud num=@ud depth=@ud]
+      ::  `generate` is tlc2's `-generate` (R2.4.6): the same seeded run with
+      ::  PROBABILISTIC successor picking (`Tool.probabilistic`). It is a field
+      ::  on this variant rather than a variant of its own because tlc2 spells
+      ::  it that way too -- both flags set `RunMode.SIMULATE`, and every rule
+      ::  that keys on simulation (the stage plan, `-difftrace`, the ALIAS
+      ::  refusal) applies unchanged to both
+      [%simulate seed=@ud num=@ud depth=@ud generate=?]
   ==
 +$  check-opts
   $:  translate=?

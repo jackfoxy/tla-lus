@@ -54,7 +54,7 @@
 ++  sim-demo-req
   ::  a seeded simulation over cyc-spec (Inv holds, so it completes num behaviors)
   ^-  request
-  :*  [%check [| | | | ~ [%simulate 1 2 6]]]
+  :*  [%check [| | | | ~ [%simulate 1 2 6 |]]]
       :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==

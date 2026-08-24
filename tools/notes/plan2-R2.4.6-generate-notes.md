@@ -159,6 +159,56 @@ Revised size: **L / med**. Sequenced after the two defects above, which are
 `op-check-simulate` parity in their own right and which `-generate` would
 otherwise bake in.
 
+## 7. On the wire
+
+`check-mode` gained `generate=?` on the `%simulate` variant rather than a
+variant of its own. tlc2 spells it that way too — `-simulate` and `-generate`
+both set `RunMode.SIMULATE`, and the flag is a system property, not a mode — so
+every rule that keys on simulation (the stage plan, the `-difftrace` refusal, the
+ALIAS refusal) applies unchanged to both, which a separate variant would have
+made me restate three times.
+
+**The CASE refusal needed a channel before the mode could ship.** tlc2 aborts on
+a `CASE` in probabilistic position: exit 255, no model checking performed. An
+engine that merely dropped the offending action would have reported a completed
+simulation over whatever actions remain, where tlc2 produced no result at all.
+So `sim-result` grew `err=(unit @t)`, `step-res` an `%err` arm that ABORTS the
+run rather than retrying the next action, and `do-sim` checks it **before**
+`viol`, mapping it to `%failed`. The partial statistics are deliberately not
+reported as an `%ok`.
+
+Evidence is a **matched pair through the job kernel** — one bundle, one seed, one
+field different:
+
+| | states generated | verdict |
+|---|---|---|
+| `generate=\|` | 43 | `[%invariant 'Inv']` |
+| `generate=&` | 13 | `[%invariant 'Inv']` |
+
+both tlc2's exact numbers at `num=1 -workers 1 -seed 1 -depth 20`. Same verdict
+KIND, different arithmetic, so the field is proven to reach the engine rather
+than be read and ignored. A second pair pins the refusal: the CASE spec is
+`%failed` under `-generate` and reaches a `%violated` verdict under plain
+`-simulate`, which makes the refusal a property of the probabilistic engine and
+not of the spec.
+
+## 8. A shard that had not built since R2.4.1
+
+Running `/tests/mar` — which this unit touched because it carries a `check-mode`
+literal — found it **failing to build**, and not because of anything R2.4.6 did.
+Three literals in `desk/tests/mar/tla-lus.hoon` had gone stale as the wire grew
+and nothing had rebuilt the file since:
+
+- `limits` was missing `max-set-size` (R2.4.1)
+- `request.write` was still the boolean `allow-write` (R2.2)
+- `check-opts` was missing `view` / `difftrace` / `continue` (R2.4.2, R2.4.3)
+
+A `FAILED /tests/mar/tla-lus/hoon (build)` is a FILE failure, not an arm failure,
+so a shard-scoped run of any other path reports `ok=%.y` and says nothing about
+it. The increments that added those fields each ran only their touched shards —
+correct for their budget, and exactly the hole that lets a build break sit for
+five units. Fixed here; `/tests/mar` is green again.
+
 ## Evidence
 
 Ship shards, all `ok=%.y`: `sim-diff` (82, was 33), `generate-diff` (18, new),

@@ -798,6 +798,13 @@
       ::  simulation when deadlock checking is on (R1.7c). `name` is '' for a
       ::  deadlock, which has none.
       viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+      ::  a typed engine REFUSAL that ends the run with no verdict at all
+      ::  (R2.4.6). The deterministic walk has no such outcome -- a solver
+      ::  failure there drops the action -- but the `-generate` walk does: tlc2
+      ::  throws `UnsupportedOperationException` on a CASE in probabilistic
+      ::  position and ABORTS, exit 255, with no model checking performed. A
+      ::  run that ends this way has no `viol` and no statistics worth reading
+      err=(unit @t)
   ==
 ::  fixed parameters of one simulation run (built once from search-ctx). The
 ::  successor generation is the unit-7 semantic path (node-eval), and the RNG is
@@ -912,6 +919,10 @@
   $%  [%viol name=@t st=state]
       [%ok nx=(list state)]
       [%none ~]
+      ::  a typed engine refusal, reachable only on the `-generate` walk
+      ::  (R2.4.6): it ABORTS the run rather than dropping the action, because
+      ::  that is what tlc2 does with the shapes `Tool.probabilistic` refuses
+      [%err msg=@t]
   ==
 ::
 ++  sim-nexts-det
@@ -933,8 +944,12 @@
 ++  sim-nexts-prob
   ::  the `-generate` next-state functor for one action: the probabilistic walk
   ::  returns at most ONE successor -- the first the functor accepts -- so the
-  ::  successor-pick draw that follows always sees a one-element list. A solver
-  ::  failure drops the action, exactly as the deterministic path does
+  ::  successor-pick draw that follows always sees a one-element list.
+  ::
+  ::  Unlike the deterministic path, a failure here does NOT drop the action:
+  ::  the shapes `Tool.probabilistic` refuses -- a CASE in action position --
+  ::  abort tlc2 outright (exit 255, no model checking), so the refusal ends
+  ::  the whole run through `sim-result.err`
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
@@ -954,7 +969,7 @@
     %found  [[%ok ~[st.r]] p]
     %viol   [[%viol nm.r st.r] p]
     %none   [[%none ~] p]
-    %err    [[%none ~] p]
+    %err    [[%err msg.p.r] p]
   ==
 ::
 ++  welford-add
@@ -977,6 +992,7 @@
   ::  Var(X) and SD use TLC's `genTrace + 1` div-by-zero guard.
   |=  $:  gt=@ud  cur=sim-cursor
           viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+          err=(unit @t)
       ==
   ^-  sim-result
   =/  m2   (abs:si tm2.cur)
@@ -985,7 +1001,7 @@
   =/  sd
     =/  x  (div:rd (sun:rd m2) (sun:rd d))
     (abs:si (need (toi:rd (add:rd (sqt:rd x) .~0.5))))
-  [gt steps.cur gen.cur (abs:si tm.cur) var sd viol]
+  [gt steps.cur gen.cur (abs:si tm.cur) var sd viol err]
 ::
 ++  sim-live-viol
   ::  the completed behavior (chronological) if it breaks the temporal PROPERTY,
@@ -1007,14 +1023,14 @@
   ::  or deadlock) its trace is checked against the temporal PROPERTY (9.3a).
   |=  [o=sim-opts cur=sim-cursor budget=@ud]
   ^-  sim-slice
-  ?:  =(~ inits.cur)  [%done (mk-result 0 cur ~) cur]
+  ?:  =(~ inits.cur)  [%done (mk-result 0 cur ~ ~) cur]
   ::  build the node-eval env (with its override registry) once per event; the
   ::  kont stores defs/consts/vars, never the built env (see +$ sim-opts)
   =/  e  (make-env:ne defs.o consts.o vars.o)
   =/  spent  0
   |-  ^-  sim-slice
   ?:  (gte spent budget)  [%more cur]
-  ?:  =(num.o t.cur)  [%done (mk-result t.cur cur ~) cur]
+  ?:  =(num.o t.cur)  [%done (mk-result t.cur cur ~ ~) cur]
   =/  mw  walk.cur
   ?~  mw
     ::  a) start a behavior at a random initial state (TLC checks invariants
@@ -1028,14 +1044,14 @@
     ::  length into the Welford trace-length stats and start the next behavior
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv] ~) cur]
     =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
     $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   =/  alen  (lent actions.o)
   ?:  =(0 alen)
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv] ~) cur]
     =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
     $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   ::  b) pick an action and the retry stride prime, then walk actions from that
@@ -1061,6 +1077,9 @@
   =.  es.cur   es.fnd
   =.  s.cur    ls.fnd
   =.  gen.cur  (add gen.cur ngen.fnd)
+  ?:  ?=(%err -.found)
+    ::  a `-generate` refusal: the run ENDS with no verdict, as tlc2 aborts
+    [%done (mk-result t.cur cur ~ `msg.found) cur]
   ?:  ?=(%none -.found)
     ::  no action produced a SURVIVING successor. Anything it did generate was
     ::  still counted before the constraint dropped it.
@@ -1079,10 +1098,10 @@
     ::  established for the exhaustive checker. With it OFF, `break` just ends
     ::  this behavior and the next one starts -- the fold below.
     ?:  ddl.o
-      [%done (mk-result +(t.cur) cur `[%deadlock '' (flop path.w)]) cur]
+      [%done (mk-result +(t.cur) cur `[%deadlock '' (flop path.w)] ~) cur]
     =/  lv  (sim-live-viol o path.w e)
     ?^  lv
-      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv]) cur]
+      [%done (mk-result +(t.cur) cur `[%property pname.o u.lv] ~) cur]
     =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
     $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   ?:  ?=(%viol -.found)
@@ -1091,7 +1110,7 @@
     ::  `collectPreSuccessor` runs before `addElement` checks the invariant --
     ::  which the `gen.cur` fold above now does for every outcome
     :+  %done
-      (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])])
+      (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])] ~)
     cur
   ::  d) pick one successor and make it the current state; every successor the
   ::  chosen action generated counts toward states-generated (collectPre)
@@ -1145,7 +1164,7 @@
   |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud prob=?]
   ^-  sim-result
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  [0 0 0 0 0 0 ~]
+  ?:  ?=(%| -.sc)  [0 0 0 0 0 0 ~ ~]
   =*  c  p.sc
   =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
   =/  pname  ?~(pp.c '' u.pp.c)

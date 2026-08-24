@@ -29,7 +29,13 @@
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ [%simulate seed num depth]]] (bundle spec `cfg) lim ~]
+  [[%check [| | | | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~]
+::
+++  gen-req
+  ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
+  |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
+  ^-  request
+  [[%check [| | | | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
@@ -770,6 +776,76 @@
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
+::
+::  +|  -generate (R2.4.6)
+::
+::  A MATCHED PAIR: one bundle, one seed, one field different. The nondeterminism
+::  sits BELOW the action-decomposition boundary, which is the only place
+::  `Tool.probabilistic` is observable -- a top-level `\/` or `\E` is consumed by
+::  `Tool.getActions` and the two modes are byte-identical there.
+++  gen-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x, y
+  Init == x = 0 /\ y = 0
+  Next == /\ y' = y + 1
+          /\ \E n \in 1..5 : x' = (x + n) % 100
+  Inv == x < 30
+  ====
+  '''
+++  gen-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::  `tlc2.TLC -simulate num=1 -workers 1 -seed 1 -depth 20`: 43 states generated,
+::  because the exhaustive walk takes every successor of the chosen action
+++  test-gen-off-matches-tlc
+  =/  r  (run-all (init:job-lib (sim-req gen-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  [`[%invariant 'Inv'] `43]
+  !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
+      ?~(result.j ~ `generated.stats.j)
+::  the same run with `-generate`: 13, because the probabilistic walk returns at
+::  the FIRST successor the functor accepts instead of taking all five. Same
+::  verdict KIND, different arithmetic -- so the field reaches the engine rather
+::  than being read and ignored
+++  test-gen-on-matches-tlc
+  =/  r  (run-all (init:job-lib (gen-req gen-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  [`[%invariant 'Inv'] `13]
+  !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
+      ?~(result.j ~ `generated.stats.j)
+::  a CASE below the decomposition boundary. tlc2 ABORTS there -- exit 255, no
+::  model checking at all -- so the port fails the run rather than dropping the
+::  action and reporting a completed simulation over whatever actions remain
+++  gen-case-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x, y
+  Init == x = 0 /\ y = 0
+  Next == /\ y' = y + 1
+          /\ CASE x < 5 -> x' = x + 1
+               [] OTHER -> x' = 0
+  Inv == y < 8
+  ====
+  '''
+++  test-gen-case-refused
+  =/  r  (run-all (init:job-lib (gen-req gen-case-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  `%failed
+  !>  ?~(result.j ~ `-.u.result.j)
+::  the SAME spec under plain `-simulate` runs to a verdict, which is what makes
+::  the refusal a property of the probabilistic engine and not of the spec
+++  test-gen-case-runs-without-generate
+  =/  r  (run-all (init:job-lib (sim-req gen-case-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  `%violated
+  !>  ?~(result.j ~ `-.u.result.j)
 ::
 ++  test-pause-resume-every-boundary-simulate
   ::  the saved RNG sample must make slicing invisible

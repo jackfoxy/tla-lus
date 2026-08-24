@@ -31,7 +31,9 @@
 ::
 ++  clay-request
   ^-  request
-  :*  [%check [& `'MC.cfg' [%simulate 42 5 100]]]
+  ::  `check-opts` is [translate view difftrace continue cfg mode]; the middle
+  ::  three landed in R2.4.2/R2.4.3 and this literal never grew them
+  :*  [%check [& | | | `'MC.cfg' [%simulate 42 5 100 |]]]
       :*  %clay
           ~zod
           %specs
@@ -41,19 +43,25 @@
           ~[/lib]
       ==
       default-limits
-      &
+      ::  `write` (R2.2): a terminal run's Clay write TARGET, not a boolean --
+      ::  this literal was `&` when the field was `allow-write=?`
+      `[%specs /out/dump]
   ==
 ::
 ++  default-limits
   ^-  limits
-  [1.000.000 64 100.000 1.000 ~m10 1.000.000]
+  ::  the trailing field is `max-set-size` (tlc2's `-maxSetSize` default,
+  ::  R2.4.1). This literal went stale when that field landed and this shard
+  ::  has not built since; found by R2.4.6, which is the first increment to
+  ::  run `/tests/mar` again
+  [1.000.000 64 100.000 1.000 ~m10 1.000.000 1.000.000]
 ::
 ++  inline-request
   ^-  request
   :*  [%translate [%wf & &]]
       [%inline 'Demo' (malt ~[['Demo' '====']]) `'INIT Init']
       default-limits
-      |
+      ~
   ==
 ::
 ++  actions

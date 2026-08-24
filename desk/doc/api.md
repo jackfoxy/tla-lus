@@ -56,8 +56,8 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
       [%clay =ship =desk cas=case root=module-name cfg=(unit path) roots=(list path)]
   ==
 +$  limits  [max-source=@ud max-modules=@ud max-states=@ud max-depth=@ud max-time=@dr max-artifact=@ud]
-+$  check-opts  [translate=? cfg=(unit source-name) mode=check-mode]
-+$  check-mode  $%([%exhaustive deadlock=?] [%simulate seed=@ud num=@ud depth=@ud])]
++$  check-opts  [translate=? view=? difftrace=? continue=? cfg=(unit source-name) mode=check-mode]
++$  check-mode  $%([%exhaustive deadlock=?] [%simulate seed=@ud num=@ud depth=@ud generate=?])]
 +$  analyze-flags  [syntax=? semantic=? level=? lint=?]
 +$  pcal-opts  [=fairness termination=? gen-cfg=?]
 ```
@@ -214,9 +214,9 @@ wire and not listed here.
 | `fairness` | `?(%none %wf %sf %wf-next)` | `%wf` — PlusCal only |
 | `pcal-opts` | `[=fairness termination=? gen-cfg=?]` | `[%none | |]` — `%translate` is a typed rejection today |
 | `analyze-flags` | `[syntax=? semantic=? level=? lint=?]` | `[& & & &]` — `semantic`/`level`/`lint` each gate whether that stage runs and reports. **`syntax` must be `&`**: parsing is mandatory (every later stage consumes the tree), so `syntax=\|` is a typed rejection rather than a flag that does nothing |
-| `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth])` | `[%exhaustive &]` / `[%simulate 42 100 20]` |
-| `check-opts` | `[translate=? cfg=(unit source-name) mode=check-mode]` | `[| ~ [%exhaustive &]]` |
-| `op` | `$%(%translate %analyze %check)` | `[%check [| ~ [%exhaustive &]]]` |
+| `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth generate=?])` | `[%exhaustive &]` / `[%simulate 42 100 20 \|]`. `generate` is tlc2's `-generate`: the same seeded run with PROBABILISTIC successor picking (`Tool.probabilistic`) — one successor per step instead of all of them. It is a field on `%simulate` rather than a mode of its own because tlc2 spells it that way too (both flags set `RunMode.SIMULATE`). A `CASE` in probabilistic position is a typed `%failed`, as tlc2 aborts there |
+| `check-opts` | `[translate=? view=? difftrace=? continue=? cfg=(unit source-name) mode=check-mode]` | `[\| \| \| \| ~ [%exhaustive &]]` |
+| `op` | `$%(%translate %analyze %check)` | `[%check [\| \| \| \| ~ [%exhaustive &]]]` |
 | `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** |
 | `source-ref` | `[=ship =desk cas=case =path]` | `[~zod %tla-lus da+now /counter/tla]` — only `lib/source-path` builds one |
 | `read-request` | `[tag=@ud =source-ref]` | `[1 [~zod %tla-lus da+now /counter/tla]]` |

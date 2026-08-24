@@ -1377,13 +1377,9 @@
       ::  `deadlock && getCheckDeadlock()`), but `[%simulate ...]` carries no
       ::  such toggle on this wire -- only `[%exhaustive deadlock=?]` does --
       ::  so here the cfg's CHECK_DEADLOCK is the whole story.
-      ::  `prob` is `|`: the `-generate` successor engine is ported and
-      ::  differentially tested at `+generate-spec`, but no request field
-      ::  selects it yet -- R2.4.6 leaves the wire exposure owed rather than
-      ::  landing a mode the CASE refusal has no channel to report through
       :*  actions  invs  cons  acons  deadlock.rs
           p.osr  ?~(pp '' u.pp)
-          defs  consts  vars  order  num.mode  dep  |
+          defs  consts  vars  order  num.mode  dep  generate.mode
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
@@ -1691,6 +1687,13 @@
       (a-tape:check sd.res.r)
       ")."
     ==
+  ::  a `-generate` engine REFUSAL ends the run with no verdict, as tlc2 aborts
+  ::  on the shapes `Tool.probabilistic` does not implement (R2.4.6). It is a
+  ::  typed failure rather than an `%ok` with empty statistics: tlc2 performs no
+  ::  model checking at all in that case, and a caller must not read the partial
+  ::  counts as a completed run
+  ?^  err.res.r
+    (finish j [%failed u.err.res.r] pre)
   ?~  viol.res.r
     (finish-arts j [%ok st] head ~ pre)
   =/  vk     kind.u.viol.res.r
