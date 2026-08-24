@@ -529,6 +529,47 @@
   |=  k=@t
   [k (crip (render:ev (~(got by st) k)))]
 ::
+++  alias-state
+  ::  ALIAS rendering (R2.3.2), a faithful port of `Tool.evalAlias`.
+  ::
+  ::  tlc2 does NOT thread an alias through its printer: `evalAlias` evaluates
+  ::  the alias expression and calls `.toState()` on the resulting record, so
+  ::  the RECORD BECOMES THE STATE and the ordinary state printer renders it.
+  ::  The port does the same — which is why no renderer signature changes.
+  ::
+  ::  The alias is evaluated against BOTH the current state and its successor
+  ::  (`eval(getAliasSpec(), Context.Empty, current, successor, …)`), so a
+  ::  primed reference resolves against the successor. The last state of a
+  ::  trace has no successor and is paired with ITSELF, which is what makes
+  ::  `x' # x` print FALSE there and TRUE everywhere else — measured against
+  ::  the pin.
+  ::
+  ::  On an evaluation error tlc2 does not fail the run: it returns the
+  ::  original state plus an `_ALIASEvalError` field carrying the message.
+  ::  Reproduced, because a trace that cannot render is still a trace.
+  |=  [al=sem:sem-lib e=eenv:ne cur=state suc=state]
+  ^-  [order=(list @t) st=state]
+  =/  r  (eval:ne al e(s0 cur, s1 suc, primed |))
+  ?:  ?=(%| -.r)
+    :-  ~['_ALIASEvalError']
+    (~(put by cur) '_ALIASEvalError' [%str msg.p.r])
+  ?.  ?=(%rec -.p.r)
+    ::  not a record: tlc2's `toState()` yields null and the current state is
+    ::  rendered unchanged
+    [~ cur]
+  ::  the record's fields become the bindings. tlc2's `RecordValue.toState()`
+  ::  walks the record's `names` in CONSTRUCTOR order, but the port's `%rec`
+  ::  value normalizes its field list at construction, so the evaluated value
+  ::  cannot report source order. Recover it from the alias's OWN semantic
+  ::  node -- the `$RcdConstructor` field sequence -- and fall back to the
+  ::  normalized order when the node names no fields (an alias that is not a
+  ::  bare constructor: a record built by a conditional or an operator call)
+  =/  fs  p.p.r
+  =/  nrm  (turn fs |=(f=vfield:vl k.f))
+  =/  src  (turn (rcd-pairs:sem-lib al) |=(pr=[fname=@t *] fname.pr))
+  :-  ?:(=((sy src) (sy nrm)) src nrm)
+  (~(gas by *state) (turn fs |=(f=vfield:vl [k.f v.f])))
+::
 ++  render-state
   ::  a trace state's bindings, one per line. A SINGLE variable renders bare
   ::  (`x = v`); two or more render as a conjunct list (`/\ x = v`) — exactly
@@ -551,6 +592,7 @@
   |=  $:  trace=(list state)  next-label=@t
           actions=(list [name=@t body=sem:sem-lib])
           e=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   =/  i  1
@@ -562,10 +604,17 @@
     ?~  prev  '<Initial predicate>'
     ?~  actions  next-label
     (edge-action-label u.prev (@t (state-fp:fp order i.trace)) actions e order modn)
+  ::  ALIAS: the record BECOMES the state (R2.3.2). Its successor is the next
+  ::  trace state, and the LAST state is paired with itself -- which is what
+  ::  makes a primed reference print FALSE there, measured against the pin
+  =/  shown=[order=(list @t) st=state]
+    ?~  al  [order i.trace]
+    =/  suc  ?~(t.trace i.trace i.t.trace)
+    (alias-state u.al e i.trace suc)
   :_  $(trace t.trace, i +(i), prev `i.trace)
   ;:  weld
     ~[(crip "State {(a-tape i)}: {(trip label)}")]
-    (render-state order i.trace)
+    (render-state order.shown st.shown)
     ~['']
   ==
 ::
@@ -1003,6 +1052,9 @@
       view=(unit sem:sem-lib)                ::  VIEW body (R2.3.1): a state's
                                              ::  identity is this expression's
                                              ::  value, not its bindings
+      alias=(unit sem:sem-lib)               ::  ALIAS body (R2.3.2): a trace
+                                             ::  state renders as this record's
+                                             ::  fields, not its bindings
       aname=@t                               ::  ROOT action name: the NEXT
                                              ::  operator's name, or `Action`
                                              ::  under a SPECIFICATION (tlc2
@@ -1222,8 +1274,12 @@
       %^  cat  3
         'It might cause TLC to miss violations of the stated liveness properties. '
       'Please check liveness without symmetry defined.'
-  ::  ALIAS is still refused: it is validated but no renderer applies it, and
-  ::  a dropped alias prints the wrong trace (R1.8.6). VIEW is LIVE as of
+  ::  ALIAS is LIVE as of R2.3.2 -- resolved below and carried on `sctx`, and
+  ::  applied by `+render-trace`, by the EC 2107/2108 initial-state branches,
+  ::  and so by every safety path. Its own liveness refusal sits at the genuine
+  ::  temporal branch of `+check` rather than here, because a `[]P` box-state
+  ::  PROPERTY runs on the SAFETY path and does render the alias correctly --
+  ::  a `?=(^ pp)` guard here would over-refuse it. VIEW is LIVE as of
   ::  R2.3.1 -- resolved below and carried on `sctx` -- except alongside a
   ::  temporal PROPERTY, where the liveness module recomputes plain state
   ::  fingerprints (`+succ-fps`, `+trace-graph`) that would not match a
@@ -1231,8 +1287,6 @@
   ::  refused for; it is narrowed, not ignored
   ?:  &(?=(^ view.ca) ?=(^ pp))
     [%| 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
-  ?^  alias.ca
-    [%| 'unsupported: ALIAS (trace rendering through an alias; unit 7)']
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
@@ -1272,8 +1326,10 @@
   =/  aname=@t  ?~(nname.p.rt 'Action' u.nname.p.rt)
   ::  the VIEW body, resolved like any other config target (R2.3.1)
   =/  vwb=(unit sem:sem-lib)  ?~(view.ca ~ (sem-body defs u.view.ca))
+  ::  the ALIAS body, resolved like any other config target (R2.3.2)
+  =/  alb=(unit sem:sem-lib)  ?~(alias.ca ~ (sem-body defs u.alias.ca))
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
-      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  vwb  aname
+      invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
       p.or
   ==
@@ -1982,7 +2038,7 @@
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
-      (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
+      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
     ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
     ::  includes the fairness conjuncts `decompose-spec` extracted from the
     ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
@@ -2002,6 +2058,16 @@
     ::  state search and aborts the run, so the final liveness check never runs:
     ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
     ::  violation the port used to report over the same state count.
+    ::  ALIAS is LIVE on every SAFETY path (R2.3.2) -- including the implied
+    ::  init / implied action / box-state branches above, which all render
+    ::  through `+render-outcome`. It is REFUSED here, on the genuine temporal
+    ::  path: tlc2 aliases the lasso trace too (`LiveWorker.java:876-972`), but
+    ::  `+live-report` renders its prefix and cycle itself and takes no alias,
+    ::  so accepting one would print an UNALIASED trace -- exactly the silent
+    ::  wrong trace R1.8.6's blanket rejection existed to prevent. Narrowed,
+    ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
+    ?^  alias.c
+      ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
     =/  o=bfs-opts
       [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c]
     =/  bg    (build-graph-out is.c o)
@@ -2015,7 +2081,7 @@
     ?:  ?=(?(%deadlock %error) -.out.bg)
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c)
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn
+          (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c
       ==
     =/  r
       %-  live-report
@@ -2074,9 +2140,14 @@
     ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
     `i.sts
   ?~  bad  [warn (safety-run c)]
+  ::  EC 2108 is built from `evalAlias(curState, curState)` exactly as EC 2107
+  ::  is (`ModelChecker.java:1199`), so an ALIAS renders this state too
+  =/  shown=[order=(list @t) st=state]
+    ?~  alias.c  [order.c u.bad]
+    (alias-state u.alias.c env u.bad u.bad)
   :+  warn
     (crip "Error: Property {(trip pname)} is violated by the initial state:")
-  (render-state order.c u.bad)
+  (render-state order.shown st.shown)
 ::
 ++  implied-action-run
   ::  an IMPLIED ACTION: tlc2 checks `[][A]_v`'s A on every transition, so a
@@ -2098,11 +2169,11 @@
   =/  g  (build-graph is.c o)
   =/  viol  (first-bad-step g nsb.c env body)
   ?~  viol
-    (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
+    (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
   ;:  weld
     ~[(crip "Error: Action property {(trip pname)} is violated.")]
     ~['Error: The behavior up to this point is:']
-    (render-trace u.viol nl.c actions env order.c modn)
+    (render-trace u.viol nl.c actions env order.c modn alias.c)
     (counts-lines gen.g distinct.g 0 depth.g)
   ==
 ::
@@ -2139,7 +2210,7 @@
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
-  (render-outcome out:(explore is.c o) nl.c actions env order.c modn)
+  (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c)
 ::
 ++  render-outcome
   ::  TLC's terminal lines for a safety outcome. `actions`/`e`/`order`/`modn`
@@ -2148,6 +2219,7 @@
   |=  $:  res=outcome  nl=@t
           actions=(list [name=@t body=sem:sem-lib])
           e=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   ?-    -.res
@@ -2167,14 +2239,22 @@
     ::  (EC 2110) prints the numbered trace and the counts (matching TLC)
     ?:  initial.res
       ::  a single offending initial state, rendered inline (a wet `turn` over
-      ::  the recursive state mold fuse-loops the zuse-408 compiler)
+      ::  the recursive state mold fuse-loops the zuse-408 compiler). The ALIAS
+      ::  applies HERE too (R2.3.2): `ModelChecker.java:1187` builds the EC 2107
+      ::  message from `evalAlias(curState, curState)` -- the initial state is
+      ::  its own successor, so a primed reference sees no change, exactly as
+      ::  the last state of a printed trace does
       %+  weld
         ~[(crip "Error: Invariant {(trip name.res)} is violated by the initial state:")]
-      ?~(trace.res ~ (render-state order i.trace.res))
+      ?~  trace.res  ~
+      =/  shown=[order=(list @t) st=state]
+        ?~  al  [order i.trace.res]
+        (alias-state u.al e i.trace.res i.trace.res)
+      (render-state order.shown st.shown)
     ;:  weld
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl actions e order modn)
+      (render-trace trace.res nl actions e order modn al)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
@@ -2182,7 +2262,7 @@
     ;:  weld
       ~['Error: Deadlock reached.']
       ~['Error: The behavior up to this point is:']
-      (render-trace trace.res nl actions e order modn)
+      (render-trace trace.res nl actions e order modn al)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::

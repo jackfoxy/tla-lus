@@ -129,7 +129,16 @@
       ::  back to -- `Action` under a SPECIFICATION, the NEXT operator's name
       ::  otherwise. Carried since R1.8.3, when a SPECIFICATION first reached
       ::  this path at all
-      [%bfs nl=@t act=next-act aname=@t o=bfs-opts:check cur=bfs-cursor:check]
+      ::  `al` is the resolved ALIAS body (R2.3.2), what `+finish-bfs` renders
+      ::  the report and the typed wire trace through
+      $:  %bfs
+          nl=@t
+          act=next-act
+          aname=@t
+          o=bfs-opts:check
+          cur=bfs-cursor:check
+          al=(unit sem:semantic)
+      ==
       ::  liveness (unit 8.8/8.9): full graph build (%build) then the 8.2–8.6
       ::  tableau/product/SCC/lasso check (%check). Pure []P box-state is a state
       ::  invariant and runs on the safety %bfs path instead (do-config), so no
@@ -1193,13 +1202,15 @@
   ::  except alongside a temporal PROPERTY, where the liveness module
   ::  recomputes plain state fingerprints that a view-keyed graph would not
   ::  match. Narrowed, not ignored (see check.hoon's matching guard)
+  ::  ALIAS is live as of R2.3.2 — resolved below and carried on the `%bfs`
+  ::  kont, which is what `+finish-bfs` renders the report and the typed wire
+  ::  trace from. Refused on the two paths whose trace renderers take no alias
+  ::  (simulation and the genuine temporal lasso), each at its own branch below
+  ::  rather than here, because a `[]P` box-state PROPERTY runs on the SAFETY
+  ::  path and does render the alias — a `?=(^ pp)` guard here would over-refuse
   ?:  &(?=(^ view.rs) ?=(^ pp))
     %^  finish  j
       [%failed 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
-    pre
-  ?^  alias.rs
-    %^  finish  j
-      [%failed 'unsupported: ALIAS (trace rendering through an alias; unit 7)']
     pre
   =/  vars  (var-names:check tree)
   =/  order  (var-order:check tree)
@@ -1207,6 +1218,8 @@
   =/  defs    (defmap-of:ne mo)
   ::  the VIEW body, resolved like any other config target (R2.3.1)
   =/  vwb=(unit sem:semantic)  ?~(view.rs ~ (sem-body:check defs u.view.rs))
+  ::  the ALIAS body, resolved like any other config target (R2.3.2)
+  =/  alb=(unit sem:semantic)  ?~(alias.rs ~ (sem-body:check defs u.alias.rs))
   =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
   ?:  &(?=(^ iv) ?=(~ ivb))
     %^  finish  j
@@ -1274,6 +1287,13 @@
   ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior on its
   ::  stutter graph (unit 9.3a, LiveCheck.checkTrace via the 8.2–8.6 engine).
   ?:  ?=(%simulate -.mode)
+    ::  `+trace-states` renders the simulated behavior with no alias, and
+    ::  tlc2 does apply one there (`SimulationWorker.java:163`), so an ALIAS
+    ::  here would print a wrong trace. Refused, narrowly (R2.3.2)
+    ?^  alias.rs
+      %^  finish  j
+        [%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)']
+      pre
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
     =/  actions  (get-actions:check nsb aname defs)
@@ -1318,8 +1338,15 @@
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
             vwb
         ==
-      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
+      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
       (more j pre)
+    ::  the lasso trace is rendered by the %liveness stage, which takes no
+    ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
+    ::  narrowly, matching the console path's guard (R2.3.2)
+    ?^  alias.rs
+      %^  finish  j
+        [%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
+      pre
     ::  a genuine temporal property runs the 8.2–8.6 engine in the %liveness
     ::  stage; a %clay run could not know it needs that stage until its config
     ::  is read, so the plan grows here, honestly, with its total
@@ -1352,7 +1379,7 @@
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb
     ==
-  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is)])
+  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -1377,7 +1404,7 @@
       ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
-    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk pre)
+    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk al.kk pre)
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
@@ -1406,7 +1433,8 @@
 ++  finish-bfs
   ::  seal a safety search: wire result, stats, report + trace artifacts
   |=  $:  j=jobstate  out=outcome:check  od=out-degree  o=bfs-opts:check
-          nl=@t  act=next-act  aname=@t  pre=(list event)
+          nl=@t  act=next-act  aname=@t  al=(unit sem:semantic)
+          pre=(list event)
       ==
   ^-  step-out
   ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
@@ -1431,11 +1459,16 @@
   =/  acts  (get-actions:check next.o aname defs.o)
   =/  env   (make-env:ne defs.o consts.o vars.o)
   =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
-  =/  report  (wain-text (render-outcome:check out nl ~ *eenv:ne ~ ''))
+  ::  the ALIAS reaches BOTH artifacts (R2.3.2): the report through
+  ::  `+render-outcome` and the typed trace through `+trace-states`. `env` is
+  ::  passed where `*eenv:ne` used to be because evaluating the alias needs it;
+  ::  it changes nothing else, since `actions` stays `~` and the only other
+  ::  reader of `e` is the per-action label that `~` disables
+  =/  report  (wain-text (render-outcome:check out nl ~ env ~ '' al))
   =/  tr=(unit trace)
     ?+  -.out  ~
-      %inv       `[%safety (trace-states trace.out act acts env order.o modn) ~]
-      %deadlock  `[%safety (trace-states trace.out act acts env order.o modn) ~]
+      %inv       `[%safety (trace-states trace.out act acts env order.o modn al) ~]
+      %deadlock  `[%safety (trace-states trace.out act acts env order.o modn al) ~]
     ==
   (finish-arts j res report tr pre)
 ::
@@ -1504,7 +1537,7 @@
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
-  =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '') `loop.u.l]
+  =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '' ~) `loop.u.l]
   (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
 ::
 ::  +|  Stage: %simulate
@@ -1561,10 +1594,10 @@
     ;:  weld
       ~[headline]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '')
+      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '' ~)
       ~[head]
     ==
-  =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '') ~]
+  =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '' ~) ~]
   =/  vn
     ?-  vk
       %invariant  [%invariant vname]
@@ -1622,6 +1655,7 @@
   |=  $:  sts=(list state:check)  act=next-act
           acts=(list [name=@t body=sem:semantic])
           e=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:semantic)
       ==
   ^-  (list trace-state)
   =/  i  1
@@ -1637,8 +1671,14 @@
         u.prev  (@t (state-fp:fp order i.sts))  acts  e  order  modn
       ==
     ?~(hit act hit)
+  ::  ALIAS (R2.3.2): the record BECOMES the state, its successor is the next
+  ::  trace state, and the LAST state pairs with ITSELF -- the same pairing
+  ::  `+render-trace` uses, so report and wire trace never disagree
+  =/  shown=[order=(list @t) st=state:check]
+    ?~  al  [order i.sts]
+    (alias-state:check u.al e i.sts ?~(t.sts i.sts i.t.sts))
   :_  $(sts t.sts, i +(i), prev `i.sts)
-  [i a (state-pairs:check order i.sts)]
+  [i a (state-pairs:check order.shown st.shown)]
 ::
 ++  wain-text
   |=  w=wain

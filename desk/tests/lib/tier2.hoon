@@ -413,8 +413,7 @@
 ++  test-tlc-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'Github746 -> Error: unsupported: ALIAS (trace rendering through an alias; unit 7)'
-    ==
+    ~
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])

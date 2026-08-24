@@ -1,0 +1,4 @@
+Error: Invariant Inv is violated by the initial state:
+/\ i = 1
+/\ foo = "bar"
+/\ j = TRUE

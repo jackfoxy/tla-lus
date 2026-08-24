@@ -10,6 +10,48 @@
   ^-  wain
   (skip w |=(l=@t =('' l)))
 ::
+++  test-mc-alias
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ v = 0'
+        '/\\ doubled = 0'
+        '/\\ moved = TRUE'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        '/\\ v = 1'
+        '/\\ doubled = 2'
+        '/\\ moved = TRUE'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        '/\\ v = 2'
+        '/\\ doubled = 4'
+        '/\\ moved = FALSE'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aInv == x < 2\0aAlias == [ v |-> x, doubled |-> x * 2, moved |-> x\' # x ]\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
+::
+++  test-mc-alias-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        '/\\ i = 1'
+        '/\\ foo = "bar"'
+        '/\\ j = TRUE'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aVARIABLE i\0aInit == i = 1\0aNext == UNCHANGED i\0aSpec == Init /\\ [][Next]_i\0aInv == i = 2\0aAlias == [ i |-> i, foo |-> "bar", j |-> i = i\' ]\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANTS Inv\0aALIAS Alias\0a'
+::
 ++  test-mc-cyc
   %+  expect-eq
     !>  ^-  wain

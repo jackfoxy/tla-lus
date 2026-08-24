@@ -326,28 +326,24 @@ TLC_LIVENESS_BATCH = [
 # ENABLED assigns `a'` exactly as tlc2's Tool does (it pushes a LetInNode's
 # definitions into the context and recurses on the body in action position).
 # The TLC batch now agrees on every spec.
-# R1.8.6 REOPENED one: `Github746` declares `ALIAS Alias`, and the port now
-# type-rejects ALIAS instead of silently ignoring it.
-#
-# The silent ignore had been WRONG and this projection could not see it. TLC
-# renders the violating state THROUGH the alias -- for Github746 it prints
-# `/\ i = 1 /\ foo = "bar" /\ j = TRUE`, the alias record's fields, where the
-# port printed the raw binding `i = 1`. It went unnoticed because an
+# R1.8.6 REOPENED one: `Github746` declares `ALIAS Alias`, and the port
+# type-rejected ALIAS instead of silently ignoring it. The silent ignore had
+# been WRONG and this projection could not see it -- TLC renders the violating
+# state THROUGH the alias (`/\ i = 1 /\ foo = "bar" /\ j = TRUE`) where the
+# port printed the raw binding `i = 1`, and it went unnoticed because an
 # initial-state violation is announced by `Error: Invariant Inv is violated by
-# the initial state:`, which is neither trace marker `tlc_projection` keys on,
-# so those lines were never compared. The spec agreed on
-# [verdict, counts, depth] while disagreeing on every state line.
+# the initial state:`, which is neither trace marker `tlc_projection` keys on.
+# The spec agreed on [verdict, counts, depth] while disagreeing on every state
+# line: a pre-existing divergence made VISIBLE, which is what refusing an
+# unsupported option buys.
 #
-# So this entry is not a regression: it is a pre-existing divergence becoming
-# VISIBLE, which is what refusing an unsupported option buys. Closing it means
-# implementing alias trace rendering, not restoring the silent ignore.
-TLC_BATCH_DIVERGENCES = [
-    "Github746 -> Error: unsupported: ALIAS (trace rendering through an alias; unit 7)",
-]
+# R2.3.2 CLOSED it by porting alias rendering rather than restoring the ignore
+# (`+alias-state`, plus the EC 2107 initial-state branch of `+render-outcome`,
+# which `ModelChecker.java:1187` builds from `evalAlias(curState, curState)`).
+# The TLC safety batch agrees on every spec again.
+TLC_BATCH_DIVERGENCES = []
 # grouped cause, keyed by module
-TLC_BATCH_REASONS = {
-    "Github746": "ALIAS trace rendering is not ported; typed rejection (R1.8.6)",
-}
+TLC_BATCH_REASONS = {}
 
 # Liveness batch modules whose Hoon check disagrees with TLC, frozen from the
 # ship run in TLC_LIVENESS_BATCH order (the arm returns processing order via

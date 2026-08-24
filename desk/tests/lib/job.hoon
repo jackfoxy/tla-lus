@@ -1098,11 +1098,58 @@
     (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW V\0a') t0) 256)
   (expect-eq !>(`[%ok [3 2 0 2 [0 1 1 1]]]) !>(result.j))
 ::
-++  test-alias-refused-not-ignored
+++  alias-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 3 /\ x' = x + 1
+  Inv == x < 2
+  Alias == [ v |-> x, doubled |-> x * 2, moved |-> x' # x ]
+  Spec == Init /\ [][Next]_x
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+::
+++  test-alias-renders-wire-trace
+  ::  R2.3.2: ALIAS is live, and it reaches the TYPED WIRE TRACE, not only the
+  ::  console report. The record BECOMES the state, in the RECORD'S constructor
+  ::  order (`v, doubled, moved`, not alphabetical) -- and `moved` is `x' # x`,
+  ::  which reads TRUE on every state but the LAST, because the last state has
+  ::  no successor and is paired with ITSELF. That final FALSE is what proves
+  ::  the successor pairing rather than a coincidence of values
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
   =/  [evs=(list event) j=jb]
-    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS V\0a') t0) 256)
+    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
+  =/  art  (~(got by artifacts.j) %trace)
+  ?>  ?=(%trace -.art)
+  =/  sts  states.trace.art
+  ;:  weld
+    (expect-eq !>(3) !>((lent sts)))
+    (expect-eq !>(~[['v' '0'] ['doubled' '0'] ['moved' 'TRUE']]) !>(bindings:(snag 0 sts)))
+    (expect-eq !>(~[['v' '1'] ['doubled' '2'] ['moved' 'TRUE']]) !>(bindings:(snag 1 sts)))
+    (expect-eq !>(~[['v' '2'] ['doubled' '4'] ['moved' 'FALSE']]) !>(bindings:(snag 2 sts)))
+  ==
+::
+++  test-alias-refused-with-property
+  ::  the lasso trace is rendered by the %liveness stage, which takes no alias,
+  ::  and tlc2 does alias it. Narrowed refusal, not a silent wrong trace
+  =/  cfg  'SPECIFICATION Spec\0aPROPERTY Lead\0aALIAS Alias\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
   %+  expect-eq
-    !>(`[%failed 'unsupported: ALIAS (trace rendering through an alias; unit 7)'])
+    !>(`[%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)'])
+  !>(result.j)
+::
+++  test-alias-refused-in-simulation
+  ::  same shape one mode over: the simulated trace is not aliased either
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (sim-req alias-spec cfg 1 4 4) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)'])
   !>(result.j)
 ::
 ::  the same spec WITHOUT the VIEW line still runs: the refusal is keyed on the

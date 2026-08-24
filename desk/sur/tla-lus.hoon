@@ -97,7 +97,8 @@
 +$  trace-state
   $:  index=@ud
       action=(unit [name=@t at=(unit loc)])
-      ::  sorted by var, +sort-bindings:diagnostics
+      ::  in TLC's variable DECLARATION order (+state-pairs), or, under an
+      ::  ALIAS, in the alias record's own constructor order (R2.3.2)
       bindings=(list binding)
   ==
 +$  trace

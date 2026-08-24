@@ -259,7 +259,11 @@ the raw binding, and the comparator could not see the difference because
 `tlc_projection` captures trace lines only after the two counter-example markers
 — and an initial-state violation prints neither. The spec agreed on
 `[verdict, counts, depth]` and disagreed on every line beneath. Censused, not
-silenced: the safety batch now reads 13/14 agree, 1 listed.
+silenced: the safety batch read 13/14 agree, 1 listed. **R2.3.2 closed it** by
+porting alias rendering — including the EC 2107 initial-state branch, which
+`ModelChecker.java:1187` renders with `evalAlias(curState, curState)` and which
+`+render-trace` never touches — so the batch is back to 14/14 and the census
+entry is retired.
 
 The lesson generalizes past this one spec: **a projection that does not look at
 something cannot report it as agreeing.** The dropped generated-count is a
