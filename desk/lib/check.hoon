@@ -1062,6 +1062,10 @@
                                              ::  opDef, so `Action.getLocation`
                                              ::  prints its generic "Action")
       nl=@t                                  ::  whole-relation span label
+      swarn=(list @t)                        ::  SPECIFICATION-decomposition
+                                             ::  warnings, printed BEFORE the
+                                             ::  verdict (R2.3.5): today the
+                                             ::  EC 2145 subscript-coverage one
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -1140,20 +1144,32 @@
   ::  SPECIFICATION body into its init conjuncts, its next-state action, and
   ::  its fairness/temporal conjuncts. A worklist (never `turn`/`roll` over the
   ::  recursive `sem` mold) processes conjuncts depth-first in source order.
-  ::  Out of scope for the corpus and deferred: INSTANCE substitution, LazyValue
-  ::  parameter inlining, the subscript-variable-coverage warning.
-  |=  [body=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ::  R2.3.5 lands the subscript-variable-coverage warning and LazyValue
+  ::  parameter inlining. INSTANCE substitution stays deferred and is now
+  ::  deferred for a REASON that is written down: peeling `$SubstIn` here is
+  ::  easy (`+substin-parts` already exists), but the substituted body then has
+  ::  to be EVALUATED, and `node-eval` has no `$SubstIn` case -- an inner
+  ::  module's `v` must resolve through `v <- x` to the outer state's binding,
+  ::  which is a renaming frame in the evaluator, not a value binding. That is
+  ::  engine work in `lib/node-eval`, not decomposition.
+  ::
+  ::  `vars` is the declared state-variable set: the subscript of `[][A]_v` is
+  ::  checked against it and each variable the subscript does not cover raises
+  ::  EC 2145 (a WARNING; the run proceeds). `~` skips the check.
+  |=  [body=sem:sem-lib defs=(map @t sem-def:sem-lib) vars=(list @t)]
   ^-  $:  inits=(list sem:sem-lib)
           next=(unit sem:sem-lib)
           fair=(list sem:sem-lib)
           err=(unit @t)
+          warn=(list @t)
       ==
   =/  work=(list sem:sem-lib)  ~[body]
   =|  inits=(list sem:sem-lib)
   =|  fair=(list sem:sem-lib)
+  =|  warn=(list @t)
   =/  next=(unit sem:sem-lib)  ~
-  |-  ^-  [(list sem:sem-lib) (unit sem:sem-lib) (list sem:sem-lib) (unit @t)]
-  ?~  work  [(rev-sem inits) next (rev-sem fair) ~]
+  |-  ^-  [(list sem:sem-lib) (unit sem:sem-lib) (list sem:sem-lib) (unit @t) (list @t)]
+  ?~  work  [(rev-sem inits) next (rev-sem fair) ~ (flop warn)]
   =/  p     i.work
   =/  rest  t.work
   ?.  ?=(%apply -.p)
@@ -1164,13 +1180,56 @@
     =/  l  (sem-lvl p)
     ?:  (lte l 1)  $(work rest, inits [p inits])
     ?:  =(3 l)     $(work rest, fair [p fair])
-    [inits next fair `'cannot handle this conjunct in the SPECIFICATION']
+    [inits next fair `'cannot handle this conjunct in the SPECIFICATION' warn]
   =/  op  name.op.p
   ::  EC 2237: a conjunct that is constantly FALSE makes the whole spec
   ::  trivially false, and tlc2 names the conjunct AS WRITTEN — the operator
   ::  name for `Falsy == FALSE`, the literal for an inline `FALSE` (R1.8.1.3)
   ?:  &(?=(%builtin kind.op.p) =('FALSE' op))
-    [inits next fair `'The spec is trivially false because FALSE is false.']
+    [inits next fair `'The spec is trivially false because FALSE is false.' warn]
+  ::  INSTANCE substitution ($SubstIn / $APSubstIn) is REFUSED here, by name.
+  ::  R2.3.5 measured why it is not merely deferred: peeling the wrapper is
+  ::  trivial (`+substin-parts` already returns its parts), but the peeled body
+  ::  then has to be EVALUATED, and `lib/node-eval` has no `$SubstIn` case --
+  ::  an inner module's `v` must resolve through `v <- x` to the OUTER state's
+  ::  binding, which is a variable RENAMING frame on `eenv` (touching variable
+  ::  reads, primed reads, assignability and UNCHANGED), not a value binding.
+  ::  Until that exists, the honest answer is this message rather than
+  ::  `the SPECIFICATION has no next-state relation`, which is what fell out
+  ::  before and told the caller nothing true (R2.1 doctrine)
+  ?:  ?&  ?=(%builtin kind.op.p)
+          ?=(^ (anysubstin-mod:sem-lib op))
+      ==
+    :^  inits  next  fair
+    :-  `'unsupported: INSTANCE substitution in a SPECIFICATION (the substituted body is not evaluable; unit 6)'
+    warn
+  ::  LazyValue parameter inlining (R2.3.5), in the one shape the port can
+  ::  soundly do it: `Op(A)` where `Op(i) == i`. The body IS the formal, so the
+  ::  apply simply DENOTES `A` and decomposition continues on `A` -- no context
+  ::  has to survive into a leaf. That is Github1244's shape
+  ::  (`MyInit(myInit) == myInit`, `Spec == MyInit(Init) /\ [][Next]_vars`).
+  ::
+  ::  tlc2 inlines ANY parameterized body because its `Action` carries the
+  ::  `Context`, so a formal left inside an emitted leaf still resolves when the
+  ::  action is evaluated. The port's leaves carry no context, so a body
+  ::  decomposition does not fully reach would emit an UNBOUND formal.
+  ::  Measured, not predicted: inlining unconditionally regressed tier-2
+  ::  `AssignmentInitNeg` to `Error: undefined identifier: var` -- a spec that
+  ::  passes by falling through to the level check below and letting
+  ::  `node-eval`'s own operator application bind the formals properly. So
+  ::  every other parameterized operator is left to the evaluator, which
+  ::  already handles it
+  =/  ident-arg
+    ^-  (unit sem:sem-lib)
+    ?.  ?&(?=(%user-op kind.op.p) ?=([* ~] args.p))  ~
+    =/  d  (~(get by defs) op)
+    ?~  d  ~
+    ?~  body.u.d  ~
+    ?.  =(1 (lent params.u.d))  ~
+    =/  b  u.body.u.d
+    ?.  ?&(?=(%apply -.b) ?=(%formal-param kind.op.b) ?=(~ args.b))  ~
+    `i.args.p
+  ?^  ident-arg  $(work [u.ident-arg rest])
   ?:  &(?=(%user-op kind.op.p) =(~ args.p))
     ::  arity-0 user operator: expand its body (init if state-level, else recurse)
     =/  d  (~(get by defs) op)
@@ -1178,7 +1237,8 @@
     ?~  body.u.d  $(work rest)
     ?:  (is-false-body u.body.u.d)
       :^  inits  next  fair
-      `(crip "The spec is trivially false because {(trip op)} is false.")
+      :-  `(crip "The spec is trivially false because {(trip op)} is false.")
+      warn
     ?:  =(1 (sem-lvl u.body.u.d))
       $(work rest, inits [u.body.u.d inits])
     $(work [u.body.u.d rest])
@@ -1191,17 +1251,82 @@
     =/  arg  ?~(args.p p i.args.p)
     ?:  &(?=(%apply -.arg) =('$SquareAct' name.op.arg))
       ::  [][A]_v: the next-state relation is A (the first SquareAct argument)
-      ?^  next  [inits next fair `'the SPECIFICATION has more than one next-state relation']
-      ?~  args.arg  [inits next fair `'malformed [A]_v in the SPECIFICATION']
+      ?^  next  [inits next fair `'the SPECIFICATION has more than one next-state relation' warn]
+      ?~  args.arg  [inits next fair `'malformed [A]_v in the SPECIFICATION' warn]
+      ::  EC 2145 (R2.3.5): `[A]_v`'s SUBSCRIPT must mention every declared
+      ::  state variable, or TLC's analysis is unsound -- a variable outside it
+      ::  is never compared, so a step that changes it looks like stuttering.
+      ::  tlc2 WARNS per uncovered variable and proceeds
+      ::  (`SpecProcessor.java:1327-1339`), which is what makes this a warning
+      ::  worth having rather than a rejection: the run still produces a result,
+      ::  it is just a result about a smaller relation than the author wrote
+      =/  subv  ?~(t.args.arg ~ (subscript-vars i.t.args.arg defs))
+      ::  the message is TWO console lines, so it is two `wain` entries -- not
+      ::  one entry with an embedded newline. Built by an EXPLICIT loop: a wet
+      ::  `turn`/`skip` here fuses against this arm's own recursive product
+      ::  type and `fuse-loop`s the zuse-408 compiler, the same trap
+      ::  `+render-outcome` records for its initial-state branch
+      =.  warn  (subscript-warns vars subv warn)
       $(work rest, next `i.args.arg)
     ?:  (lte (sem-lvl arg) 1)
-      [inits next fair `'TLC cannot handle a [] of a state predicate in the SPECIFICATION']
+      [inits next fair `'TLC cannot handle a [] of a state predicate in the SPECIFICATION' warn]
     $(work rest, fair [p fair])
   ::  any other conjunct: route by level
   =/  l  (sem-lvl p)
   ?:  (lte l 1)  $(work rest, inits [p inits])
   ?:  =(3 l)     $(work rest, fair [p fair])
-  [inits next fair `'cannot handle this conjunct in the SPECIFICATION']
+  [inits next fair `'cannot handle this conjunct in the SPECIFICATION' warn]
+::
+++  subscript-warns
+  ::  EC 2145 lines for every declared variable the subscript does not cover.
+  ::  `acc` is carried REVERSED, as `+decompose-spec`'s `warn` is (it flops on
+  ::  return), so each two-line message is pushed second-line-first
+  |=  [vars=(list @t) subv=(list @t) acc=(list @t)]
+  ^-  (list @t)
+  ?~  vars  acc
+  =/  covered  (lien subv |=(w=@t =(w i.vars)))
+  =?  acc  !covered
+    :+  (crip "does not seem to contain the state variable {(trip i.vars)}")
+      'Warning: The subscript of the next-state relation specified by the specification'
+    acc
+  $(vars t.vars)
+::
+++  subscript-vars
+  ::  the state variables a `[A]_v` SUBSCRIPT covers — a port of
+  ::  `SpecProcessor.SubscriptCollector` (R2.3.5). A bare variable counts; a
+  ::  TUPLE recurses into its members; a 0-ary user operator expands to its
+  ::  body; EVERY OTHER built-in is IGNORED rather than descended into, which
+  ::  is the Java's own rule ("Variables that appear in other kinds of
+  ::  expressions are ignored") and is why `<<x, y>>` covers both while
+  ::  `x + y` covers neither
+  |=  [sub=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ^-  (list @t)
+  =/  work=(list sem:sem-lib)  ~[sub]
+  =|  out=(list @t)
+  =|  seen=(set @t)
+  |-  ^-  (list @t)
+  ?~  work  (flop out)
+  =/  p     i.work
+  =/  rest  t.work
+  ?.  ?=(%apply -.p)
+    ?:  ?=(%letin -.p)
+      ?~(body.p $(work rest) $(work [u.body.p rest]))
+    $(work rest)
+  ?:  ?=(%variable kind.op.p)
+    $(work rest, out [name.op.p out])
+  ?:  &(?=(%builtin kind.op.p) =('$Tuple' name.op.p))
+    $(work (weld-sem args.p rest))
+  ?:  &(?=(%builtin kind.op.p) =('$Nop' name.op.p))
+    ?~(args.p $(work rest) $(work [i.args.p rest]))
+  ::  every other built-in is ignored, exactly as the Java ignores it
+  ?:  ?=(%builtin kind.op.p)  $(work rest)
+  ?.  ?=(%user-op kind.op.p)  $(work rest)
+  ::  a user operator expands to its body once (a cycle would not terminate)
+  ?:  (~(has in seen) name.op.p)  $(work rest)
+  =/  d  (~(get by defs) name.op.p)
+  ?~  d  $(work rest)
+  ?~  body.u.d  $(work rest)
+  $(work [u.body.u.d rest], seen (~(put in seen) name.op.p))
 ::
 ++  resolve-targets
   ::  resolve the Init body, Next body, fairness conjuncts, and the Next
@@ -1209,18 +1334,25 @@
   ::  Takes the three NAMES rather than a whole `cfg-ast`, so the job kernel
   ::  can call it with a `run-mode` and the console path with its ast, and
   ::  both resolve a SPECIFICATION the same way (R1.8.3)
-  |=  [[in=(unit @t) nx=(unit @t) sp=(unit @t)] defs=(map @t sem-def:sem-lib)]
-  ^-  (each [init=sem:sem-lib next=sem:sem-lib fair=(list sem:sem-lib) nname=(unit @t)] @t)
+  ::  `vars` is the declared state-variable order, passed through so the
+  ::  decomposition can raise the EC 2145 subscript-coverage warning (R2.3.5)
+  |=  $:  [in=(unit @t) nx=(unit @t) sp=(unit @t)]
+          defs=(map @t sem-def:sem-lib)
+          vars=(list @t)
+      ==
+  ^-  (each [init=sem:sem-lib next=sem:sem-lib fair=(list sem:sem-lib) nname=(unit @t) warn=(list @t)] @t)
   ?:  &(?=(^ in) ?=(^ nx))
     =/  isb  (sem-body defs u.in)
     =/  nsb  (sem-body defs u.nx)
     ?~  isb  [%| 'no Init definition']
     ?~  nsb  [%| 'no Next definition']
-    [%& u.isb u.nsb ~ `u.nx]
+    ::  INIT/NEXT mode has no subscript to check -- the warning is a property
+    ::  of `[A]_v`, which only a SPECIFICATION carries
+    [%& u.isb u.nsb ~ `u.nx ~]
   ?~  sp  [%| 'no INIT/NEXT or SPECIFICATION in config']
   =/  sb  (sem-body defs u.sp)
   ?~  sb  [%| 'no specification definition']
-  =/  d  (decompose-spec u.sb defs)
+  =/  d  (decompose-spec u.sb defs vars)
   ?^  err.d  [%| u.err.d]
   ?~  next.d  [%| 'the SPECIFICATION has no next-state relation']
   =/  isb  (conjoin-inits inits.d (sem-span:config u.sb))
@@ -1232,7 +1364,7 @@
   =/  nname=(unit @t)
     =/  n  u.next.d
     ?:(&(?=(%apply -.n) ?=(%user-op kind.op.n)) `name.op.n ~)
-  [%& u.isb u.nsb fair.d nname]
+  [%& u.isb u.nsb fair.d nname warn.d]
 ::
 ++  search-ctx
   ::  parse, generate the WU3 graph, resolve config targets, solve the
@@ -1253,7 +1385,7 @@
   ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
   ::  resolve Init/Next (and fairness) from INIT/NEXT keys or a SPECIFICATION
-  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs)
+  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs (var-order tree))
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  isb   init.p.rt
   =/  nsb   next.p.rt
@@ -1331,6 +1463,7 @@
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  ddl  pp  fair  spec.ca  sloc  tree  vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
+      warn.p.rt
       p.or
   ==
 ::
@@ -1976,7 +2109,9 @@
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
   =/  defs  (defmap-of:ne u.mo)
-  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs)
+  ::  the raw oos path needs no subscript warning -- it renders the temporal
+  ::  decomposition, never a verdict
+  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs ~)
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  pbods=(list sem:sem-lib)
     =/  ps  properties.ca
@@ -2015,6 +2150,10 @@
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  ::  SPECIFICATION-decomposition warnings print BEFORE the verdict and do not
+  ::  change it — today the EC 2145 subscript-coverage one (R2.3.5). tlc2
+  ::  emits them while processing the config, ahead of every run line
+  %+  weld  swarn.c
   ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
   ::  through the safety terminal output; every other form runs the 8.2–8.6
   ::  engine and renders tlc2.TLC's temporal console diagnostic (unit 8.9)

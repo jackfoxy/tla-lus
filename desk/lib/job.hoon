@@ -43,6 +43,11 @@
       =progress
       stats=run-stats
       diags=(list diagnostic)
+      ::  SPECIFICATION-decomposition warnings (R2.3.5), prepended to whatever
+      ::  report the run ends up producing. On the jobstate rather than a kont
+      ::  because EVERY terminal path renders a report and they do not share a
+      ::  continuation shape -- `+finish-arts` is the one place they all meet
+      swarn=(list @t)
       artifacts=(map artifact-name artifact)
       result=(unit result)
       started=@da
@@ -508,7 +513,7 @@
   ^-  jobstate
   =/  stages  (plan req)
   :*  req  %starting  stages  [0 (lent stages)]
-      *run-stats  ~  ~  ~  now  ~
+      *run-stats  ~  ~  ~  ~  now  ~
   ==
 ::
 ++  kont-stage
@@ -1269,8 +1274,12 @@
       %init-next  [init.mode.rs next.mode.rs `(unit @t)`~]
       %spec       [`(unit @t)`~ `(unit @t)`~ `name.mode.rs]
     ==
-  =/  rt  (resolve-targets:check tg defs)
+  ::  `order` goes in so the SPECIFICATION decomposition can raise the EC 2145
+  ::  subscript-coverage warning here too (R2.3.5) -- the kernel's report is
+  ::  compared to the console's, so a warning on one path must appear on both
+  =/  rt  (resolve-targets:check tg defs order)
   ?:  ?=(%| -.rt)  (finish j [%failed p.rt] pre)
+  =.  swarn.j  warn.p.rt
   =/  isb=sem:semantic  init.p.rt
   =/  nsb=sem:semantic  next.p.rt
   =/  fair  fair.p.rt
@@ -1692,6 +1701,12 @@
   ::  growth, keeping the true statistics
   |=  [j=jobstate res=result report=@t tr=(unit trace) pre=(list event)]
   ^-  step-out
+  ::  R2.3.5: the decomposition's warnings lead the report, as they lead tlc2's
+  ::  console output -- they are emitted while the config is processed, before
+  ::  any run line. Counted against `max-artifact` like the rest of it
+  =/  report=@t
+    ?~  swarn.j  report
+    (rap 3 (join '\0a' (snoc swarn.j report)))
   ?:  (gth (met 3 report) max-artifact.limits.request.j)
     (finish j [%limited %artifact stats.j] pre)
   =.  artifacts.j  (~(put by artifacts.j) %report [%text report])

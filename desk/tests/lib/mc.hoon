@@ -410,6 +410,36 @@
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
 ::
+++  test-mc-spec-lazy
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 3\0aMyInit(i) == i\0aSpec == MyInit(Init) /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+++  test-mc-spec-sub
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The subscript of the next-state relation specified by the specification'
+        'does not seem to contain the state variable y'
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
 ++  test-mc-twobit
   %+  expect-eq
     !>  ^-  wain
