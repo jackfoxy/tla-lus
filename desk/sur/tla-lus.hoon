@@ -125,7 +125,11 @@
   ==
 +$  check-opts
   $:  translate=?
-      ::  cfg source override; ~ uses the bundle's cfg
+      ::  cfg source override (tlc2's `-config`): names one of an %inline
+      ::  bundle's own sources to use as the config, replacing the bundle's
+      ::  `cfg`. `~` uses the bundle's cfg. A %clay bundle selects its config
+      ::  by PATH (`src.cfg`) instead, because the file's Clay mark is part of
+      ::  the reference and a bare name cannot supply it
       cfg=(unit source-name)
       mode=check-mode
   ==

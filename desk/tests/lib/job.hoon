@@ -1158,4 +1158,74 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a') t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  +|  Cfg Source Override (R2.3.3)
+::
+::  `check-opts.cfg` is tlc2's `-config`: it names one of the bundle's own
+::  sources to use as the config INSTEAD of the bundle's `cfg` field. The pair
+::  below is matched -- one bundle, carrying BOTH configs, run twice with only
+::  that field different -- so a passing test proves the override SELECTS
+::  rather than that a number happens to match.
+++  twocfg-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Loose == x < 4
+  Strict == x < 2
+  ====
+  '''
+::
+++  loose-cfg   'INIT Init\0aNEXT Next\0aINVARIANT Loose\0a'
+++  strict-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Strict\0a'
+::
+++  ovr-bundle
+  ::  carries its own `cfg` (loose, holds) AND a named source `strict` the
+  ::  override can select (strict, is violated)
+  ^-  source-bundle
+  :*  %inline  'spec'
+      (malt ~[['spec' twocfg-spec] ['strict' strict-cfg]])
+      `loose-cfg
+  ==
+::
+++  ovr-req
+  |=  nm=(unit source-name)
+  ^-  request
+  [[%check [| nm [%exhaustive &]]] ovr-bundle lim ~]
+::
+++  test-cfg-override-absent-uses-bundle-cfg
+  ::  no override: the bundle's own cfg runs, Loose holds, the run completes
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ovr-req ~) t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+++  test-cfg-override-selects-named-source
+  ::  same bundle, override set: the NAMED source is the config, so Strict is
+  ::  the invariant and it is violated. A different verdict KIND, not just a
+  ::  different count -- the bundle's own cfg could not produce this
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ovr-req `'strict') t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Strict']) !>(violation.u.result.j))
+::
+++  test-cfg-override-unknown-source-rejected
+  ::  refused at SUBMIT, so nothing downstream can quietly fall back to the
+  ::  bundle's cfg and check a config the caller did not ask for
+  %+  expect-eq
+    !>(`'unknown cfg source: nope')
+  !>((validate:job-lib (ovr-req `'nope')))
+::
+++  test-cfg-override-clay-rejected
+  ::  a %clay bundle selects its config by PATH: the file's mark is part of
+  ::  the reference, so a bare name cannot supply it
+  =/  req=request
+    :*  [%check [| `'some-cfg' [%exhaustive &]]]
+        [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
+        lim  ~
+    ==
+  %+  expect-eq
+    !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
+  !>((validate:job-lib req))
 --

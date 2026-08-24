@@ -352,11 +352,25 @@
     (validate-src req)
   ?:  translate.opts.op.req
     `'unsupported: translate-before-check is not ported yet (unit 8)'
-  ?:  ?=(^ cfg.opts.op.req)
-    `'unsupported: cfg source override; put the config in the bundle'
+  ::  the cfg source override (R2.3.3) -- tlc2's `-config`, which replaces the
+  ::  default `<spec>.cfg` with a NAMED file. The port's analogue names one of
+  ::  the bundle's own sources to use as the config instead of the bundle's
+  ::  `cfg` field. An unknown name is refused HERE, at submit, so nothing
+  ::  downstream can silently fall back to the bundle's cfg and check a
+  ::  different config than the caller asked for
   ?:  ?=(%clay -.src.req)
+    ::  a %clay bundle selects its config by PATH, not by name: the desk has
+    ::  no `%cfg` mark, so the file's mark is part of the reference (hence
+    ::  `/spec-cfg/txt`) and a bare name cannot supply it. The capability is
+    ::  present on this bundle, spelled `src.cfg` -- refused, not missing
+    ?:  ?=(^ cfg.opts.op.req)
+      `'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)'
     ?~  cfg.src.req
       `'a %check request requires a config'
+    (validate-src req)
+  ?:  ?=(^ cfg.opts.op.req)
+    ?.  (~(has by modules.src.req) u.cfg.opts.op.req)
+      `(rap 3 ~['unknown cfg source: ' u.cfg.opts.op.req])
     (validate-src req)
   ?~  cfg.src.req
     `'a %check request requires a config'
@@ -456,14 +470,29 @@
     ==
   ==
 ::
+++  cfg-of
+  ::  the EFFECTIVE config text for a source set. `check-opts.cfg` names a
+  ::  source in the bundle to use INSTEAD of the bundle's own `cfg` -- tlc2's
+  ::  `-config`, which replaces the default `<spec>.cfg` with a named file
+  ::  (R2.3.3). `+validate` refuses an unknown name at submit, so a miss here
+  ::  cannot mean "silently use the bundle's cfg"; it means the name resolved
+  ::  to nothing, which the caller is told about rather than run around
+  |=  [req=request s=srcs]
+  ^-  (unit @t)
+  ?.  ?=(%check -.op.req)  cfg.s
+  ?~  cfg.opts.op.req  cfg.s
+  (~(get by modules.s) u.cfg.opts.op.req)
+::
 ++  has-property
   ::  does the config name a temporal PROPERTY? (structural cfg parse,
-  ::  no graph — the %config stage does full validation later)
+  ::  no graph — the %config stage does full validation later). Reads the
+  ::  EFFECTIVE config, so an overridden one plans the same stages it runs
   |=  req=request
   ^-  ?
   ?.  ?=(%inline -.src.req)  |
-  ?~  cfg.src.req  |
-  =/  pr  (parse-cfg:config u.cfg.src.req)
+  =/  ct  (cfg-of req [root.src.req modules.src.req cfg.src.req])
+  ?~  ct  |
+  =/  pr  (parse-cfg:config u.ct)
   ?&(?=(%& -.pr) ?=(^ properties.p.pr))
 ::
 ::  +|  Engine
@@ -880,13 +909,19 @@
 ++  inline-provs
   ::  an inline bundle records the same shape: the caller supplied the
   ::  bytes, so the id is the bundle's own name for each module
-  |=  s=srcs
+  |=  [req=request s=srcs]
   ^-  provs
   :+  root.s
     %+  turn  (sort ~(tap in ~(key by modules.s)) aor)
     |=  nm=module-name
     ^-  [module-name prov]
     [nm [%inline nm] (shax (~(gut by modules.s) nm ''))]
+  ::  under a cfg source override the config's bytes are the NAMED source's,
+  ::  so record THAT id -- provenance must name what was read as the config,
+  ::  not the bundle `cfg` the override displaced (R2.3.3)
+  =/  nm  ?:(?=(%check -.op.req) cfg.opts.op.req ~)
+  ?^  nm
+    `[[%inline u.nm] (shax (~(gut by modules.s) u.nm ''))]
   ?~  cfg.s  ~
   `[[%inline ''] (shax u.cfg.s)]
 ::
@@ -973,7 +1008,7 @@
   =/  po=[jobstate (list event)]
     ?:  |(?=(%clay -.src.request.j) (~(has by artifacts.j) %sources))
       [j ~]
-    (put-sources j (inline-provs src))
+    (put-sources j (inline-provs request.j src))
   =.  j    -.po
   =.  pre  (weld pre +.po)
   ?:  ?=(%check -.op.request.j)
@@ -1129,9 +1164,10 @@
   ?~  so
     (finish j [%failed 'internal: %config without loaded sources'] pre)
   =/  src   u.so
-  ?~  cfg.src
+  =/  cfo   (cfg-of request.j src)
+  ?~  cfo
     (finish j [%failed 'a %check request requires a config'] pre)
-  =/  cfg   u.cfg.src
+  =/  cfg   u.cfo
   =/  mode  mode.opts.op.request.j
   =/  lims  limits.request.j
   ::  real config pipeline (unit 5): parse -> validate against the WU3

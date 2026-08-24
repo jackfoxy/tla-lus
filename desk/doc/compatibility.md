@@ -1498,8 +1498,13 @@ been *written down*, which is part of why the row read open.
 
 ### Dispositioned elsewhere (3)
 
-`-config` is the cfg source override (typed rejection, `check-opt-cfg`); `-h` and
-`-help` are usage.
+`-config` is the cfg source override — **live as of R2.3.3** (`check-opt-cfg`):
+`check-opts.cfg` names one of an `%inline` bundle's own sources to use as the
+config, replacing the bundle's `cfg`, exactly as `-config` replaces the default
+`<spec>.cfg`. A `%clay` bundle selects its config by PATH (`src.cfg`) instead,
+because the file's Clay mark is part of the reference and a bare name cannot
+supply it — the capability is present on both bundle kinds, spelled to match
+how each one names sources. `-h` and `-help` are usage.
 
 ### Decided here (12)
 
@@ -1754,7 +1759,8 @@ ignored):
 |---|---|
 | `op` = `%translate` | `unsupported: PlusCal translation is not ported yet (unit 8)` |
 | `check-opts.translate` = `&` | `unsupported: translate-before-check is not ported yet (unit 8)` |
-| `check-opts.cfg` = `` `name `` | `unsupported: cfg source override; put the config in the bundle` |
+| `check-opts.cfg` naming a source the bundle does not have | `unknown cfg source: <name>` (at submit). **R2.3.3**: the override itself is live; an unresolvable name is refused rather than silently falling back to the bundle's cfg, which would check a config the caller did not ask for |
+| `check-opts.cfg` on a `%clay` bundle | `unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)` |
 | `%check` without a bundle cfg | `a %check request requires a config` |
 | `src` = `%clay …` with no search root | `a %clay bundle needs at least one module-search root` |
 | `src` = `%clay …` with an empty root name | `empty root module name` |
@@ -1763,6 +1769,6 @@ ignored):
 | a temporal property the normalizer cannot decompose | **the pin's own message**, `TLC cannot handle the temporal formula …` — R1.8.1's full normalizer removed the port-specific *temporal property form* rejection this table used to list. `<>P`, `[]<>P`, `[]P`, `~>`, `-+->`, `WF_`/`SF_` and `<>[]` all run |
 | `INVARIANT` and `PROPERTY` in one config | `unsupported: INVARIANT and PROPERTY in one config (unit 7)` (at `%config`) |
 | `VIEW` **with a temporal `PROPERTY`** | `unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)` (at `%config`). **R2.3.1**: VIEW itself is live; only the combination is refused, because the liveness module recomputes plain state fingerprints (`+succ-fps`, `+trace-graph`) that a view-keyed graph would not match — the same latent mismatch symmetry+liveness is refused for |
-| `ALIAS` in the config | `unsupported: ALIAS (trace rendering through an alias; unit 7)` (at `%config`). Not name-resolved — `getAliasSpec` runs only when a trace prints, so tlc2 accepts an undefined ALIAS at config time |
+| `ALIAS` **with a temporal `PROPERTY`**, or in **simulation** mode | `unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)` / `unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)`. **R2.3.2**: ALIAS is live on every SAFETY path — plain invariants, deadlock, implied init/action and `[]P` box-state — and refused only where the trace renderer takes no alias. Still not name-resolved at config time: `getAliasSpec` runs only when a trace prints, so tlc2 accepts an undefined ALIAS |
 | `write` = `` `[desk pax] `` overlapping a search root | `write target <pax> overlaps a module-search root; a run may not write over its own sources` (at submit). **R2.2**: writing is supported; writing over the run's own inputs is not |
 | `analyze-flags.syntax` = `\|` | `unsupported: syntactic analysis cannot be skipped; every later stage consumes the tree` (at submit). **R2.1**: it could never mean anything — parsing is mandatory, a parse error is fatal and so unsuppressible, and a *successful* parse emits no diagnostics (`parse-typed` returns `diags=~`) |
