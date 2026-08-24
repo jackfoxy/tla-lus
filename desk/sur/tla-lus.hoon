@@ -111,6 +111,11 @@
 +$  artifact
   $%  [%text text=@t]
       [%trace =trace]
+      ::  every counterexample of a `-continue` run (R2.4.2), in discovery
+      ::  order. A separate ARTIFACT rather than a change to `result` or
+      ::  `violation`: those two are R2.7.1's to reshape (the EC 2107/2110
+      ::  split), and that is the one unit meant to move `api-version`
+      [%violations viols=(list [=violation =trace])]
   ==
 ::
 ::  +|  Requests
@@ -125,6 +130,13 @@
   ==
 +$  check-opts
   $:  translate=?
+      ::  tlc2's `-continue` (R2.4.2): keep searching past a violation and
+      ::  report every one, instead of stopping at the first. The run then
+      ::  COMPLETES, so `result` is still `%ok`/`%limited` and the
+      ::  counterexamples arrive as a `%violations` artifact -- measured at the
+      ::  pin, tlc2 prints `Model checking completed. No error has been found.`
+      ::  after reporting them, because that line is about the search finishing
+      continue=?
       ::  cfg source override (tlc2's `-config`): names one of an %inline
       ::  bundle's own sources to use as the config, replacing the bundle's
       ::  `cfg`. `~` uses the bundle's cfg. A %clay bundle selects its config

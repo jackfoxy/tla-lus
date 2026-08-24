@@ -24,18 +24,18 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| ~ [%exhaustive &]]] (bundle spec `cfg) lim ~]
+  [[%check [| | ~ [%exhaustive &]]] (bundle spec `cfg) lim ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| ~ [%simulate seed num depth]]] (bundle spec `cfg) lim ~]
+  [[%check [| | ~ [%simulate seed num depth]]] (bundle spec `cfg) lim ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
   |=  [root=module-name cfg=(unit path) roots=(list path)]
   ^-  request
-  :*  [%check [| ~ [%exhaustive &]]]
+  :*  [%check [| | ~ [%exhaustive &]]]
       [%clay ~zod %spec ud+1 root cfg roots]
       lim  ~
   ==
@@ -295,7 +295,7 @@
   ::  `+write-ref` refuses overlap in EITHER direction, so a target under a
   ::  read root and a read root under the target are both refused.
   =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
+    :*  [%check [| | ~ [%exhaustive &]]]
         [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
         lim
         `[%base /spec]
@@ -307,7 +307,7 @@
 ++  test-validate-write-outside-roots-accepted
   ::  the same request with a target that shares no prefix with the roots
   =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
+    :*  [%check [| | ~ [%exhaustive &]]]
         [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
         lim
         `[%base /out]
@@ -318,12 +318,12 @@
   ::  an %inline bundle declares no search roots, so nothing of its own can
   ::  be written over
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out]]
+    [[%check [| | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out]]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-write-bad-desk-rejected
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out]]
+    [[%check [| | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out]]
   %+  expect-eq
     !>(`'invalid desk name \'Bad Desk\'')
   !>((validate:job-lib req))
@@ -357,26 +357,26 @@
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~]
+    [[%check [& | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] (bundle cyc-spec ~) lim ~]
+    [[%check [| | ~ [%exhaustive &]]] (bundle cyc-spec ~) lim ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~]
+    [[%check [| | ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
+    :*  [%check [| | ~ [%exhaustive &]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
         lim  ~
     ==
@@ -389,7 +389,7 @@
 ::
 ++  test-validate-too-many-modules
   =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
+    :*  [%check [| | ~ [%exhaustive &]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
         lim  ~
     ==
@@ -558,7 +558,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~]
+    [[%check [| | ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -575,7 +575,7 @@
 ::  runs end to end to a safety verdict matching tlc2.TLC
 ++  test-multi-module-check
   =/  req=request
-    :*  [%check [| ~ [%exhaustive &]]]
+    :*  [%check [| | ~ [%exhaustive &]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
         lim  ~
     ==
@@ -1194,7 +1194,7 @@
 ++  ovr-req
   |=  nm=(unit source-name)
   ^-  request
-  [[%check [| nm [%exhaustive &]]] ovr-bundle lim ~]
+  [[%check [| | nm [%exhaustive &]]] ovr-bundle lim ~]
 ::
 ++  test-cfg-override-absent-uses-bundle-cfg
   ::  no override: the bundle's own cfg runs, Loose holds, the run completes
@@ -1221,7 +1221,7 @@
   ::  a %clay bundle selects its config by PATH: the file's mark is part of
   ::  the reference, so a bare name cannot supply it
   =/  req=request
-    :*  [%check [| `'some-cfg' [%exhaustive &]]]
+    :*  [%check [| | `'some-cfg' [%exhaustive &]]]
         [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
         lim  ~
     ==
@@ -1333,7 +1333,7 @@
   ^-  request
   =/  l  lim
   =.  max-set-size.l  n
-  [[%check [| ~ [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~]
+  [[%check [| | ~ [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~]
 ::
 ++  test-max-set-size-default-runs
   ::  the matched half: the same spec under the default bound completes
@@ -1348,4 +1348,56 @@
   %+  expect-eq
     !>(`[%failed 'Attempted to construct a set with too many elements (>5).'])
   !>(result.j)
+::
+::  +|  Continue Past The First Violation (R2.4.2)
+::
+::  tlc2's `-continue`. R2.4.0 measured what the row could not decide: the run
+::  COMPLETES -- two EC 2110 blocks and then `Model checking completed. No
+::  error has been found.` with the WHOLE graph's counts. So `result` stays one
+::  (`%ok`), and the counterexamples become a list in their own artifact;
+::  `result`/`violation` are left alone for R2.7.1, the unit that owns the
+::  api-version bump.
+++  cont-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLES x, y
+  Init == x = 0 /\ y = 0
+  Next == x' = (x + 1) % 4 /\ y' = y
+  Inv == x < 2
+  ====
+  '''
+::
+++  cont-req
+  |=  c=?
+  ^-  request
+  [[%check [| c ~ [%exhaustive &]]] (bundle cont-spec `mc-cfg) lim ~]
+::
+++  test-continue-off-stops-at-first
+  ::  the matched half: without the flag the run STOPS at the first violation
+  ::  and reports the prefix's counts -- 3 states, depth 3
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (cont-req |) t0) 256)
+  %+  expect-eq
+    !>(`[%violated [%invariant 'Inv'] [3 3 0 3 [1 1 1 1]]])
+  !>(result.j)
+::
+++  test-continue-completes-with-all-violations
+  ::  one field different: the search runs to completion, so the VERDICT is
+  ::  `%ok` and the counts are the WHOLE graph's (5 generated / 4 distinct /
+  ::  depth 4, against 3/3/3 above). Both violations are on the wire
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (cont-req &) t0) 256)
+  =/  a  (~(get by artifacts.j) %violations)
+  ?>  ?=(^ a)
+  ?>  ?=(%violations -.u.a)
+  ;:  weld
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+    (expect-eq !>(2) !>((lent viols.u.a)))
+    (expect-eq !>(`violation`[%invariant 'Inv']) !>(violation:(snag 0 viols.u.a)))
+    ::  discovery order: the depth-3 violator first, then the depth-4 one that
+    ::  is only reachable THROUGH it -- which is what proves the violating
+    ::  state is still enqueued
+    (expect-eq !>(3) !>((lent states.trace:(snag 0 viols.u.a))))
+    (expect-eq !>(4) !>((lent states.trace:(snag 1 viols.u.a))))
+  ==
 --

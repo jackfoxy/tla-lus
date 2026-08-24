@@ -195,7 +195,12 @@
 ::
 +$  visit  [depth=@ud pred=@t st=state]
 +$  outcome
-  $%  [%ok gen=@ud distinct=@ud queued=@ud depth=@ud]
+  ::  `viols` is non-empty only under `-continue` (R2.4.2): the search ran to
+  ::  completion and reports EVERY violation it passed, in discovery order.
+  ::  The verdict is still `%ok` -- measured at the pin, tlc2 prints
+  ::  `Model checking completed. No error has been found.` even after
+  ::  reporting violations, because that line is about the SEARCH completing
+  $%  [%ok gen=@ud distinct=@ud queued=@ud depth=@ud viols=(list [name=@t trace=(list state)])]
       [%inv gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t initial=?]
       [%deadlock gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state)]
       [%limited what=?(%states %depth) gen=@ud distinct=@ud queued=@ud depth=@ud]
@@ -228,6 +233,11 @@
       ::  Carried here because `+env-of` is where the search's evaluation
       ::  context is built (R2.4.1)
       setmax=@ud
+      ::  tlc2's `-continue` (R2.4.2): keep searching past a violation instead
+      ::  of stopping at the first. Measured at the pin, the violating state is
+      ::  still ENQUEUED -- the same spec reports a violation at depth 3 AND at
+      ::  depth 4, and depth 4 is only reachable THROUGH the depth-3 violator
+      cont=?
   ==
 ::
 ++  env-of
@@ -250,6 +260,11 @@
       ::  what tlc2's BucketStatistics keeps, so min/mean/95th/max all derive
       ::  from it rather than only the max (R1.5.12b)
       outdeg=(map @ud @ud)
+      ::  violations passed so far under `-continue` (R2.4.2), as
+      ::  [invariant-name, violating state's fingerprint] in discovery order.
+      ::  Fingerprints rather than traces: the cursor is PERSISTED and bounded
+      ::  by `max-noun-bytes`, and every trace is rebuildable from `seen`
+      viols=(list [name=@t fp=@t])
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -262,7 +277,7 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 ~]
+  [is ~ ~ ~ (lent is) 0 0 ~ ~]
 ::
 ++  con-hold
   ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
@@ -400,6 +415,15 @@
   =/  iv  (first-violated invs.o cst e)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+    ::  `-continue` (R2.4.2): record the violation and carry on. The state is
+    ::  still ENQUEUED below -- measured at the pin, a violator's successors are
+    ::  explored and can violate in turn, which is how the same spec reports at
+    ::  depth 3 and again at depth 4
+    ?:  cont.o
+      =.  viols.cur  (snoc viols.cur [p.u.iv fp])
+      =.  queue.cur  (snoc queue.cur fp)
+      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      [~ cur]
     :_  cur
     :-  ~
     :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
@@ -408,6 +432,16 @@
   =.  queue.cur  (snoc queue.cur fp)
   =?  inits.cur  =('' pred)  (snoc inits.cur fp)
   [~ cur]
+::
+++  viols-of
+  ::  the recorded `-continue` violations with their traces rebuilt from
+  ::  `seen` (R2.4.2). Done at the DONE boundary rather than as they are found,
+  ::  so the persisted cursor never carries a trace
+  |=  cur=bfs-cursor
+  ^-  (list [name=@t trace=(list state)])
+  %+  turn  viols.cur
+  |=  [name=@t fp=@t]
+  [name (trace-to seen.cur fp)]
 ::
 ++  register-all
   |=  [o=bfs-opts cur=bfs-cursor sts=(list state) d=@ud pred=@t prev=(unit state)]
@@ -439,7 +473,7 @@
     [%done [%limited %states gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
   =/  q  queue.cur
   ?~  q
-    [%done [%ok gen.cur distinct.cur 0 depth.cur] cur]
+    [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
   =/  fp   i.q
   =/  vis  (~(got by seen.cur) fp)
   =/  nr  (next-states:ne st.vis next.o (env-of o))
@@ -1730,7 +1764,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1773,7 +1807,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1811,7 +1845,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -1829,7 +1863,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2046,7 +2080,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2238,7 +2272,7 @@
       ::  branch used to pass ONLY the property, silently dropping the config's
       =/  o=bfs-opts
         :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
-            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0
+            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
         ==
       =/  actions  (get-actions nsb.c aname.c defs.c)
       =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -2279,7 +2313,7 @@
     ::  running it. `+bfs-step` already checks `invs` and stops at the first
     ::  violation, so no new checking machinery was needed here, only the list
     =/  o=bfs-opts
-      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0]
+      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 |]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -2389,7 +2423,7 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 |]
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  modn     (module-name-of tree.c)
@@ -2452,7 +2486,7 @@
   ::  on with the ordinary model check
   |=  c=sctx
   ^-  wain
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 |]
   =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  modn     (module-name-of tree.c)
@@ -2470,6 +2504,28 @@
   ^-  wain
   ?-    -.res
       %ok
+    ::  `-continue` (R2.4.2): every violation the completed search passed is
+    ::  reported FIRST, in discovery order, each as the ordinary EC 2110 block.
+    ::  Then the completion line -- which tlc2 prints even here, because it is
+    ::  about the SEARCH completing and not about the verdict. Measured at the
+    ::  pin: two violations followed by `No error has been found.` and the
+    ::  FULL counts, which are the whole graph's rather than the prefix's
+    ::  EXPLICIT loop: a wet `turn` over the recursive `state` mold fuse-loops
+    ::  the zuse-408 compiler here, the same trap `+render-outcome`'s
+    ::  initial-state branch and `+subscript-warns` already record
+    =/  vlines=wain
+      =/  vs  viols.res
+      =|  acc=(list wain)
+      |-  ^-  wain
+      ?~  vs  (zing (flop acc))
+      =/  blk=wain
+        ;:  weld
+          ~[(crip "Error: Invariant {(trip name.i.vs)} is violated.")]
+          ~['Error: The behavior up to this point is:']
+          (render-trace trace.i.vs nl actions e order modn al)
+        ==
+      $(vs t.vs, acc [blk acc])
+    %+  weld  vlines
     :-  'Model checking completed. No error has been found.'
     (counts-lines gen.res distinct.res queued.res depth.res)
   ::
@@ -2540,7 +2596,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 |]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -2553,11 +2609,11 @@
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 |]
     =/  er  (explore is.c o)
     (explore-outcome out.er od.er)
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 |]
   =/  er  (explore is.c o)
   (explore-outcome out.er od.er)
 ::
@@ -2584,7 +2640,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 |]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

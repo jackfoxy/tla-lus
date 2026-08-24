@@ -1387,7 +1387,7 @@
         :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-            vwb  max-set-size.lims
+            vwb  max-set-size.lims  continue.opts.op.request.j
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
       (more j pre)
@@ -1418,7 +1418,7 @@
     ::  violation is the state search's own verdict and pre-empts the liveness
     ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
-      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb max-set-size.lims]
+      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb max-set-size.lims |]
     =.  cont.j
       %-  save-kont
       :*  %live  %build  p.osr  u.pp  modn  act  nl
@@ -1432,7 +1432,7 @@
   =/  o=bfs-opts:check
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-        vwb  max-set-size.lims
+        vwb  max-set-size.lims  continue.opts.op.request.j
     ==
   =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb])
   (more j pre)
@@ -1535,6 +1535,28 @@
       %inv       `[%safety (trace-states trace.out act acts env order.o modn al) ~]
       %deadlock  `[%safety (trace-states trace.out act acts env order.o modn al) ~]
     ==
+  ::  `-continue` (R2.4.2): a completed run that passed violations carries them
+  ::  all. They go to their OWN artifact rather than into `result` -- `result`
+  ::  and `violation` are R2.7.1's to reshape, and that is the unit meant to
+  ::  move `api-version`
+  =.  j
+    ?.  ?&(?=(%ok -.out) ?=(^ viols.out))  j
+    ::  EXPLICIT loop, and the element face is NOT called `trace`: a wet `turn`
+    ::  over the recursive `state` mold fuse-loops zuse-408, and a face named
+    ::  `trace` shadows the MOLD of that name, which `-find.$`s the cast
+    =/  vs=(list [=violation =trace])
+      ::  WIDENED: the `?=(^ viols.out)` guard above narrows the list, which
+      ::  makes this loop's `?~` branch `mint-vain` (the zuse-408 narrowing
+      ::  trap the dev notes record for wet gates)
+      =/  ws=(list [name=@t trace=(list state:check)])  viols.out
+      =|  acc=(list [=violation =trace])
+      |-  ^-  (list [=violation =trace])
+      ?~  ws  (flop acc)
+      =/  one=[=violation =trace]
+        :-  [%invariant name.i.ws]
+        [%safety (trace-states trace.i.ws act acts env order.o modn al) ~]
+      $(ws t.ws, acc [one acc])
+    j(artifacts (~(put by artifacts.j) %violations [%violations vs]))
   (finish-arts j res report tr pre)
 ::
 ::  +|  Stage: %liveness

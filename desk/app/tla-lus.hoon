@@ -162,8 +162,11 @@
     ?-  -.art
       %text   [%txt !>(`wain`(to-wain:format text.art))]
       %trace  [%noun !>(`trace`trace.art)]
+      ::  a `-continue` run's counterexample list (R2.4.2): a noun, like a
+      ::  single trace
+      %violations  [%noun !>(`(list [=violation =trace])`viols.art)]
     ==
-  =/  ext  ?-(-.art %text %txt, %trace %noun)
+  =/  ext  ?-(-.art %text %txt, %trace %noun, %violations %noun)
   =/  pax  `path`(weld pax.u.w ~[nom ext])
   :_  $(as t.as)
   [%pass [%job %write nom ~] %arvo %c %info desk.u.w %& ~[[pax %ins cage]]]
