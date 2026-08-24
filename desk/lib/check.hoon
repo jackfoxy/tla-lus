@@ -2234,6 +2234,336 @@
     ==
   report.r
 ::
+::
+::  +|  DFID — Depth-First Iterative Deepening (R2.5)
+::
+::  A port of `tlc2.tool.DFIDModelChecker` + `DFIDWorker` + the
+::  `FPIntSet`/`MemFPIntSet` visited set. It is a SECOND search engine rather
+::  than a mode of `+bfs-step`, for the reason R2.5.0 measured: the visited set
+::  is not a set. Each fingerprint carries a STATUS WORD — a DONE bit, a
+::  LEVELED bit compared against a global parity that alternates 2, 0, 2, 0 on
+::  every level, and the level in the high bits — so one sweep invalidates the
+::  previous sweep's marks in O(1) instead of clearing the set. The BFS `seen`
+::  map cannot express that.
+::
+::  ONE APPROVED DIFFERENCE, and it is forced by the oracle rather than by the
+::  port: `DFIDWorker.getInit`/`getNext` descend into a RANDOM eligible
+::  successor, drawn from a generator seeded off the clock
+::  (`new RandomGenerator()` takes `java.util.Random()`'s no-arg seed, then
+::  reseeds from `nextLong()`); `-seed` does not reach it. Measured at the pin,
+::  six runs of the same TLC on one unchanged spec reported THREE different
+::  counterexamples while every count was byte-identical. So the DFS ORDER — and
+::  with it the counterexample trace — is not a function of the specification
+::  and cannot be a parity target. This port descends in generation order. Every
+::  COUNT is order-independent and is matched exactly.
+::
++$  dfid-opts
+  $:  next=sem:sem-lib
+      invs=(list [name=@t body=sem:sem-lib])
+      cons=(list sem:sem-lib)                  ::  CONSTRAINT
+      acons=(list sem:sem-lib)                 ::  ACTION_CONSTRAINT
+      vars=(set @t)
+      order=(list @t)
+      defs=(map @t sem-def:sem-lib)
+      consts=(map @t value)
+      deadlock=?
+      setmax=@ud
+      ::  tlc2's `-dfid num`: the deepest level a sweep may reach. `runTLC`
+      ::  returns immediately for a depth below 2, so 0 and 1 explore the
+      ::  initial states and nothing else
+      maxd=@ud
+  ==
+::  one frame of the explicit DFS stack: the state, its fingerprint, and the
+::  successors still eligible to descend into (tlc2's succStateStack/succFPStack)
++$  dfid-frame  [st=state fp=@t sucs=(list [st=state fp=@t])]
+::  the resumable DFID cursor. `lvl`/`leveled` are `FPIntSet.Level`/`Leveled`;
+::  `stack` is innermost-FIRST; `more` is the worker's `moreLevel`, which tlc2
+::  resets per sweep because `runTLC` builds a NEW worker for every level
++$  dfid-cursor
+  $:  inits=(list [st=state fp=@t])
+      fps=(map @t @ud)          ::  fingerprint -> status word
+      lvl=@ud
+      leveled=@ud
+      todo=(list [st=state fp=@t])   ::  initial states left in THIS sweep
+      stack=(list dfid-frame)
+      gen=@ud
+      more=?
+      term=?
+      ::  the per-level progress lines, in order (EC 2205)
+      levels=(list [lvl=@ud gen=@ud distinct=@ud])
+  ==
+::  a DFID run's terminal outcome. `%ok` is reached only when a sweep found no
+::  more levels to explore INSIDE the bound; a run that stops because it hit
+::  `maxd` is `%limited %depth`, because tlc2 prints no completion line there
++$  dfid-out
+  $%  [%ok gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud])]
+      [%limited gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud])]
+      [%inv gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud]) trace=(list state) name=@t]
+      [%deadlock gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud]) trace=(list state)]
+      [%error msg=@t]
+  ==
++$  dfid-slice
+  $%  [%more cur=dfid-cursor]
+      [%done out=dfid-out cur=dfid-cursor]
+  ==
+::
+::  +|  DFID status words (FPIntSet)
+::
+++  st-new   0
+++  st-done  1
+++  is-done      |=(s=@ud =(1 (dis s 1)))
+++  is-completed
+  |=  [s=@ud leveled=@ud]
+  ^-  ?
+  |(=(leveled (dis s 2)) =(1 (dis s 1)))
+++  st-level     |=(s=@ud (rsh [0 2] s))
+++  is-leaf-st
+  |=  [s=@ud lvl=@ud]
+  ^-  ?
+  |(=(0 s) =(lvl (rsh [0 2] s)))
+::
+++  set-status
+  ::  MemFPIntSet.setStatus: OR `s` into an existing entry and return the
+  ::  PREVIOUS status; insert a fresh entry as `(Level << 2) | Leveled | s`
+  ::  and return NEW. The returned value is the one every caller tests
+  |=  [m=(map @t @ud) fp=@t s=@ud lvl=@ud leveled=@ud]
+  ^-  [old=@ud m=(map @t @ud)]
+  =/  e  (~(get by m) fp)
+  ?^  e  [u.e (~(put by m) fp (con u.e s))]
+  [st-new (~(put by m) fp (con (con (lsh [0 2] lvl) leveled) s))]
+::
+++  set-leveled
+  ::  MemFPIntSet.setLeveled: replace the LEVELED bit with the current parity
+  |=  [m=(map @t @ud) fp=@t leveled=@ud]
+  ^-  (map @t @ud)
+  =/  e  (~(get by m) fp)
+  ?~  e  m
+  (~(put by m) fp (con (dis u.e (not 0 32 2)) leveled))
+::
+++  dfid-env
+  |=  o=dfid-opts
+  ^-  eenv:ne
+  =/  e  (make-env:ne defs.o consts.o vars.o)
+  ?:(=(0 setmax.o) e (with-setmax:ne e setmax.o))
+::
+++  dfid-fp
+  |=  [o=dfid-opts st=state]
+  ^-  @t
+  (@t (state-fp:fp order.o st))
+::
+++  dfid-trace
+  ::  the behavior the DFS stack currently holds, oldest first, extended by
+  ::  `tail`. tlc2's DFID trace is the STACK, not a shortest path -- which is
+  ::  the other half of why it is not reproducible
+  |=  [stack=(list dfid-frame) tail=(list state)]
+  ^-  (list state)
+  =|  out=(list state)
+  |-  ^-  (list state)
+  ?~  stack  (weld out tail)
+  $(stack t.stack, out [st.i.stack out])
+::
+++  dfid-next
+  ::  DFIDModelChecker.doNext for ONE state. Returns the successors still
+  ::  eligible to descend into, whether every successor was a non-leaf
+  ::  (`allSuccNonLeaf`, which drives `moreLevel`), and the updated set.
+  ::
+  ::  Order, exactly as tlc2 has it: every successor is COUNTED first
+  ::  (`numOfGenStates += sz`, before any filtering); a state pruned by a
+  ::  CONSTRAINT or ACTION_CONSTRAINT is not entered into the set but its
+  ::  status stays NEW, so it is still invariant-checked — the same rule
+  ::  `+register` applies in the BFS
+  |=  $:  o=dfid-opts  cur=dfid-cursor  fr=dfid-frame  leaf=?
+          e=eenv:ne
+      ==
+  ^-  $:  out=(unit dfid-out)
+          sucs=(list [st=state fp=@t])
+          noleaf=?
+          cur=dfid-cursor
+      ==
+  =/  nr  (next-states:ne st.fr next.o e)
+  ?:  ?=(%| -.nr)  [`[%error msg.p.nr] ~ & cur]
+  =/  nx  p.nr
+  ::  tlc2 adds the WHOLE successor vector to `numOfGenStates` up front
+  ::  (`this.numOfGenStates.getAndAdd(sz)`), before it looks at any of them --
+  ::  so a violation part-way through still counts the successors after it.
+  ::  Counting one at a time inside the loop under-reports a terminating run,
+  ::  the same shape as the R2.4.6 simulation defect
+  =.  gen.cur  (add gen.cur (lent nx))
+  =|  keep=(list [st=state fp=@t])
+  =/  all-done  &
+  =/  all-nonleaf  &
+  =/  dead  ?=(~ nx)
+  |-
+  ^-  $:  out=(unit dfid-out)
+          sucs=(list [st=state fp=@t])
+          noleaf=?
+          cur=dfid-cursor
+      ==
+  ?~  nx
+    ::  deadlock, then the DONE rule: a state is DONE when all its children are
+    ::  DONE, or it is a leaf and none of its children is a leaf
+    ?:  &(dead deadlock.o)
+      :^  :-  ~
+          :*  %deadlock  gen.cur  ~(wyt by fps.cur)  (flop levels.cur)
+              (dfid-trace stack.cur ~[st.fr])
+          ==
+        ~  &  cur
+    =?  fps.cur  |(all-done &(leaf all-nonleaf))
+      +:(set-status fps.cur fp.fr st-done lvl.cur leveled.cur)
+    [~ (flop keep) all-nonleaf cur]
+  =/  ch  (con-hold cons.o i.nx e)
+  ?:  ?=(%| -.ch)  [`[%error p.ch] ~ & cur]
+  =/  ah  (acon-hold acons.o st.fr i.nx e)
+  ?:  ?=(%| -.ah)  [`[%error p.ah] ~ & cur]
+  =/  in-model  &(p.ch p.ah)
+  =/  sfp  (dfid-fp o i.nx)
+  =^  status  fps.cur
+    ?.  in-model  [st-new fps.cur]
+    (set-status fps.cur sfp st-new lvl.cur leveled.cur)
+  =?  all-done     in-model  &(all-done (is-done status))
+  =?  all-nonleaf  in-model  &(all-nonleaf !(is-leaf-st status lvl.cur))
+  =?  keep  &(in-model !(is-completed status leveled.cur))
+    [[i.nx sfp] keep]
+  ::  tlc2 checks the invariants only for a status of NEW — which covers both a
+  ::  first-seen in-model state and every out-of-model one
+  ?.  =(st-new status)
+    $(nx t.nx)
+  =/  iv  (first-violated invs.o i.nx e)
+  ?~  iv  $(nx t.nx)
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] ~ & cur]
+  :^  :-  ~
+      :*  %inv  gen.cur  ~(wyt by fps.cur)  (flop levels.cur)
+          (dfid-trace stack.cur ~[st.fr i.nx])  p.u.iv
+      ==
+    ~  &  cur
+::
+++  dfid-eligible
+  ::  DFIDWorker.getNext: the successors still worth descending into — not
+  ::  completed at this level, and recorded DEEPER than where we now stand, so a
+  ::  state already reachable in fewer steps is not re-expanded
+  |=  [sucs=(list [st=state fp=@t]) m=(map @t @ud) leveled=@ud curl=@ud]
+  ^-  (list [st=state fp=@t])
+  ?~  sucs  ~
+  =/  s  (~(gut by m) fp.i.sucs 0)
+  ?:  ?&(!(is-completed s leveled) (lth curl (st-level s)))
+    [i.sucs $(sucs t.sucs)]
+  $(sucs t.sucs)
+::
+++  dfid-step
+  ::  spend up to `budget` work units (one per state expanded), then return the
+  ::  cursor. Every count is independent of how the run is sliced
+  |=  [o=dfid-opts cur=dfid-cursor budget=@ud]
+  ^-  dfid-slice
+  =/  e  (dfid-env o)
+  =/  spent  0
+  |-  ^-  dfid-slice
+  ?:  (gte spent budget)  [%more cur]
+  ?:  term.cur
+    [%done [%ok gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
+  ::  inside a sweep?
+  =/  stk  stack.cur
+  ?^  stk
+    =/  fr  i.stk
+    =/  curl  (lent stk)
+    =/  elig  (dfid-eligible sucs.fr fps.cur leveled.cur curl)
+    ?~  elig
+      ::  nothing left below this state: mark it leveled and backtrack
+      =.  fps.cur  (set-leveled fps.cur fp.fr leveled.cur)
+      $(cur cur(stack t.stk), spent +(spent))
+    ::  descend into the first eligible successor. tlc2 picks a RANDOM one and
+    ::  does NOT remove it from the frame -- re-visiting is prevented by the
+    ::  status word, not by consuming the list -- so `sucs.fr` is left intact
+    =/  ch  i.elig
+    ::  isLeaf = curLevel >= toLevel - 1, where toLevel is the level of THIS
+    ::  sweep (`lvl.cur`), not the run's bound
+    =/  leaf  (gte curl (dec (max 1 lvl.cur)))
+    =/  nfr=dfid-frame  [st.ch fp.ch ~]
+    =/  dn  (dfid-next o cur nfr leaf e)
+    ?^  out.dn  [%done u.out.dn cur.dn]
+    =.  cur  cur.dn
+    =.  more.cur  |(more.cur !noleaf.dn)
+    ::  `isLeaf` is tlc2's LOOP CONDITION, not a "do not push" flag:
+    ::  `while (!isLeaf) { ... }` in DFIDWorker.run, so the first descent that
+    ::  reaches the sweep's depth ends the WHOLE walk from this initial state
+    ::  and the worker goes back to `getInit()`. It does not carry on with the
+    ::  parent's other successors. Treating it as a push guard explores a
+    ::  different state set -- which is what made a violating branching run
+    ::  report 15/7 against the pin's 18/9 while every level line still agreed
+    =.  stack.cur  ?:(leaf ~ [nfr(sucs sucs.dn) stk])
+    $(spent +(spent))
+  ::  start the next initial state of this sweep
+  =/  td  todo.cur
+  ?^  td
+    =/  s  (~(gut by fps.cur) fp.i.td 0)
+    ?:  (is-completed s leveled.cur)
+      $(cur cur(todo t.td), spent +(spent))
+    ::  isLeaf = toLevel < 2 for an initial state
+    =/  leaf  (lth lvl.cur 2)
+    =/  fr=dfid-frame  [st.i.td fp.i.td ~]
+    =/  dn  (dfid-next o cur fr leaf e)
+    ?^  out.dn  [%done u.out.dn cur.dn]
+    =.  cur  cur.dn
+    =.  more.cur  |(more.cur !noleaf.dn)
+    =?  stack.cur  !leaf  ~[fr(sucs sucs.dn)]
+    $(cur cur(todo t.td), spent +(spent))
+  ::  the sweep is over. `terminated = !moreLevel`; otherwise open the next
+  ::  level, unless the bound is reached — in which case tlc2 prints no
+  ::  completion line, so the run is %limited rather than %ok
+  ?.  more.cur
+    [%done [%ok gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
+  ?:  (gte lvl.cur maxd.o)
+    [%done [%limited gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
+  =/  nl  +(lvl.cur)
+  %=  $
+    levels.cur   [[nl gen.cur ~(wyt by fps.cur)] levels.cur]
+    lvl.cur      nl
+    leveled.cur  (sub 2 leveled.cur)
+    todo.cur     inits.cur
+    stack.cur    ~
+    more.cur     |
+    spent        +(spent)
+  ==
+::
+++  dfid-cursor-init
+  ::  the cursor before the first sweep: Level 1, Leveled 0, every initial state
+  ::  counted and entered in the set (tlc2's doInit)
+  |=  [o=dfid-opts is=(list state)]
+  ^-  dfid-cursor
+  =|  m=(map @t @ud)
+  =|  ins=(list [st=state fp=@t])
+  =/  todo  is
+  =.  m
+    |-  ^-  (map @t @ud)
+    ?~  todo  m
+    =/  f  (dfid-fp o i.todo)
+    $(todo t.todo, m (~(put by m) f (con (lsh [0 2] 1) 0)))
+  =.  ins
+    =/  td  is
+    |-  ^-  (list [st=state fp=@t])
+    ?~  td  ~
+    [[i.td (dfid-fp o i.td)] $(td t.td)]
+  ::  Level 1 / Leveled 0, and `more` TRUE so the first step OPENS level 2 --
+  ::  tlc2's loop is `for (level = 2; level <= DFIDMax; level++)`, so no sweep
+  ::  ever runs at level 1
+  [ins m 1 0 ~ ~ (lent is) & | ~]
+::
+++  dfid-spec
+  ::  run a DFID search from spec + config source, returning its outcome
+  |=  [spec=@t cfg=@t maxd=@ud]
+  ^-  dfid-out
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  [%error p.sc]
+  =*  c  p.sc
+  =/  o=dfid-opts
+    :*  nsb.c  invs.c  cons.c  acons.c  vars.c  order.c
+        defs.c  consts.c  ddl.c  0  maxd
+    ==
+  =/  cur  (dfid-cursor-init o is.c)
+  |-  ^-  dfid-out
+  =/  r  (dfid-step o cur 1.024)
+  ?:  ?=(%done -.r)  out.r
+  $(cur cur.r)
+::
 ++  get-actions
   ::  Tool.getActions: decompose a next-state relation into named leaf actions.
   ::  A user-op reference recurses into its body (renaming the action), a
