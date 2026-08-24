@@ -24,18 +24,18 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| | | | ~ [%exhaustive &]]] (bundle spec `cfg) lim ~]
+  [[%check [| | | | ~ [%exhaustive &]]] (bundle spec `cfg) lim ~ ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~]
+  [[%check [| | | | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~]
 ::
 ++  gen-req
   ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~]
+  [[%check [| | | | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
@@ -43,21 +43,21 @@
   ^-  request
   :*  [%check [| | | | ~ [%exhaustive &]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  ~
+      lim  ~  ~
   ==
 ::
 ++  analyze-req
   |=  mods=(list [module-name @t])
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~]
+  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~]
 ::
 ++  analyze-req-f
   ::  an %analyze request with explicit flags [syntax semantic level lint]
   |=  [mods=(list [module-name @t]) flags=analyze-flags]
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze flags] [%inline root (malt mods) ~] lim ~]
+  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~]
 ::
 ++  cyc-spec
   ^~
@@ -305,6 +305,7 @@
         [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
         lim
         `[%base /spec]
+        ~
     ==
   %+  expect-eq
     !>  `'write target /spec overlaps a module-search root; a run may not write over its own sources'
@@ -317,6 +318,7 @@
         [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
         lim
         `[%base /out]
+        ~
     ==
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
@@ -324,12 +326,12 @@
   ::  an %inline bundle declares no search roots, so nothing of its own can
   ::  be written over
   =/  req=request
-    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out]]
+    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-write-bad-desk-rejected
   =/  req=request
-    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out]]
+    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
   %+  expect-eq
     !>(`'invalid desk name \'Bad Desk\'')
   !>((validate:job-lib req))
@@ -349,7 +351,7 @@
 ::
 ++  test-validate-translate-rejected
   =/  req=request
-    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~]
+    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~]
   %+  expect-eq
     !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
   !>((validate:job-lib req))
@@ -358,33 +360,33 @@
   ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
   ::  bundle validates
   =/  req=request
-    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~]
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~]
+    [[%check [& | | | ~ [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec ~) lim ~]
+    [[%check [| | | | ~ [%exhaustive &]]] (bundle cyc-spec ~) lim ~ ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| | | | ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~]
+    [[%check [| | | | ~ [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
     :*  [%check [| | | | ~ [%exhaustive &]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
-        lim  ~
+        lim  ~  ~
     ==
   (expect-eq !>(`'root module not in bundle') !>((validate:job-lib req)))
 ::
@@ -397,7 +399,7 @@
   =/  req=request
     :*  [%check [| | | | ~ [%exhaustive &]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
-        lim  ~
+        lim  ~  ~
     ==
   =.  max-modules.limits.req  1
   (expect-eq !>(`'too many modules') !>((validate:job-lib req)))
@@ -492,6 +494,64 @@
     (expect-eq !>(%lint) !>(stage.i.ws))
   ==
 ::
+::  +|  -messagesAsErrors (R2.4.5)
+::
+::  A MATCHED PAIR on the lint warning above: one request, one field different.
+::  tlc2 promotes at the moment `MP.printWarning` runs (`Assert.fail` BEFORE
+::  `recorder.record`), so the promoted diagnostic never lands as a warning and
+::  the run stops there.
+++  promote-req
+  ::  the lint-warning analyze request, with `codes` promoted to errors
+  |=  codes=(set diag-code)
+  ^-  request
+  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes]
+::
+++  test-promote-warning-fails-the-run
+  =/  req  (promote-req (silt ~[`diag-code`[%sany 4.802]]))
+  =/  r  (run-all (init:job-lib req t0) 256)
+  =/  j  +.r
+  =/  as-warn
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%warning severity.d))))
+  =/  as-err
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%error severity.d))))
+  ;:  weld
+    ::  the verdict is %failed, carrying the warning's own message
+    (expect-eq !>(`%failed) !>(?~(result.j ~ `-.u.result.j)))
+    ::  and 4802 is recorded as an ERROR, never as a warning: in tlc2 the
+    ::  promoted code never reaches `recorder.record` as a warning at all
+    (expect-eq !>([| &]) !>([as-warn as-err]))
+  ==
+::
+++  test-promote-off-keeps-the-warning
+  ::  the matched half: the same request with an empty set completes, and the
+  ::  4802 diagnostic is still a WARNING
+  =/  r  (run-all (init:job-lib (promote-req ~) t0) 256)
+  =/  j  +.r
+  =/  as-warn
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%warning severity.d))))
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>(&) !>(as-warn))
+  ==
+::
+++  test-promote-unrelated-code-is-inert
+  ::  a code the run never emits changes nothing, exactly as tlc2 does with
+  ::  `-messagesAsErrors 2143` on a spec that never triggers 2143
+  =/  r  (run-all (init:job-lib (promote-req (silt ~[`diag-code`[%tlc 2.143]])) t0) 256)
+  =/  j  +.r
+  (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+::
+++  test-promote-error-code-is-inert
+  ::  promoting a code that is emitted as an ERROR is inert too, and that is
+  ::  tlc2's rule and not a port choice: `isTlcMessageAsError` is consulted in
+  ::  `MP.printWarning` and nowhere else. Measured, `-messagesAsErrors 2110`
+  ::  (an error) leaves a run byte-identical
+  =/  base  (check-req invfail-spec mc-cfg)
+  =/  req  base(promote (silt ~[`diag-code`[%tlc 2.110]]))
+  =/  r  (run-all (init:job-lib req t0) 256)
+  =/  j  +.r
+  (expect-eq !>(`%violated) !>(?~(result.j ~ `-.u.result.j)))
+::
 ++  test-analyze-lint-flag-off
   ::  with the lint flag off, no 4802 warning is emitted
   =/  r  (analyze-run (analyze-req-f ~[['spec' lint-spec]] [& & & |]))
@@ -564,7 +624,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| | | | ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~]
+    [[%check [| | | | ~ [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -583,7 +643,7 @@
   =/  req=request
     :*  [%check [| | | | ~ [%exhaustive &]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
-        lim  ~
+        lim  ~  ~
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
@@ -1270,7 +1330,7 @@
 ++  ovr-req
   |=  nm=(unit source-name)
   ^-  request
-  [[%check [| | | | nm [%exhaustive &]]] ovr-bundle lim ~]
+  [[%check [| | | | nm [%exhaustive &]]] ovr-bundle lim ~ ~]
 ::
 ++  test-cfg-override-absent-uses-bundle-cfg
   ::  no override: the bundle's own cfg runs, Loose holds, the run completes
@@ -1299,7 +1359,7 @@
   =/  req=request
     :*  [%check [| | | | `'some-cfg' [%exhaustive &]]]
         [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
-        lim  ~
+        lim  ~  ~
     ==
   %+  expect-eq
     !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
@@ -1409,7 +1469,7 @@
   ^-  request
   =/  l  lim
   =.  max-set-size.l  n
-  [[%check [| | | | ~ [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~]
+  [[%check [| | | | ~ [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~ ~]
 ::
 ++  test-max-set-size-default-runs
   ::  the matched half: the same spec under the default bound completes
@@ -1448,7 +1508,7 @@
 ++  cont-req
   |=  c=?
   ^-  request
-  [[%check [| | | c ~ [%exhaustive &]]] (bundle cont-spec `mc-cfg) lim ~]
+  [[%check [| | | c ~ [%exhaustive &]]] (bundle cont-spec `mc-cfg) lim ~ ~]
 ::
 ++  test-continue-off-stops-at-first
   ::  the matched half: without the flag the run STOPS at the first violation
@@ -1501,7 +1561,7 @@
 ++  vw-req
   |=  v=?
   ^-  request
-  [[%check [| v | | ~ [%exhaustive &]]] (bundle vw-spec `vw-cfg) lim ~]
+  [[%check [| v | | ~ [%exhaustive &]]] (bundle vw-spec `vw-cfg) lim ~ ~]
 ::
 ++  test-view-render-off-shows-bindings
   ::  the matched half: without the flag the trace prints the BINDINGS
@@ -1526,7 +1586,7 @@
 ++  test-view-render-without-view-refused
   ::  the flag with no VIEW in the config has nothing to render
   =/  req=request
-    [[%check [| & | | ~ [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~]
+    [[%check [| & | | ~ [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   %+  expect-eq
     !>(`[%failed 'unsupported: -view without a VIEW in the config (nothing to render)'])
@@ -1536,7 +1596,7 @@
   ::  measured: an exhaustive run is byte-identical with and without the flag,
   ::  so accepting it there would be accepting an option that does nothing
   =/  req=request
-    [[%check [| | & | ~ [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~]
+    [[%check [| | & | ~ [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~ ~]
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>((validate:job-lib req))

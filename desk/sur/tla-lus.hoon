@@ -216,6 +216,22 @@
       ::  R2.2. A boolean could not express this: "may write" says nothing
       ::  about WHERE, and an %inline bundle has no desk to infer one from
       write=(unit write-target)
+      ::  tlc2's `-messagesAsErrors` (R2.4.5): diagnostic codes to PROMOTE to
+      ::  errors. This is not a display concern -- measured at the pin,
+      ::  promotion calls `Assert.fail` at the moment the diagnostic is
+      ::  emitted (`MP.printWarning`), so the run ABORTS THERE and reports the
+      ::  statistics it had reached, rather than restyling a message at the
+      ::  end. A caller filtering severities off a completed run cannot
+      ::  reproduce that: they would hold a finished run's result where tlc2
+      ::  produced a partial one.
+      ::
+      ::  It lives on `request` rather than `check-opts` because it applies to
+      ::  `%analyze` and `%check` alike. Only WARNINGS are promotable, which is
+      ::  tlc2's rule too: `isTlcMessageAsError` is consulted in `printWarning`
+      ::  and nowhere else, so promoting an error code or an info code is inert
+      ::  in both. Measured: `-messagesAsErrors 2110` (an error) leaves the run
+      ::  byte-identical
+      promote=(set diag-code)
   ==
 ::  a write destination: the desk and the directory under it. The ship is
 ::  always our own — Clay cannot write to another ship's desk — and the

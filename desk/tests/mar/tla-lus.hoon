@@ -46,6 +46,7 @@
       ::  `write` (R2.2): a terminal run's Clay write TARGET, not a boolean --
       ::  this literal was `&` when the field was `allow-write=?`
       `[%specs /out/dump]
+      ~
   ==
 ::
 ++  default-limits
@@ -61,7 +62,7 @@
   :*  [%translate [%wf & &]]
       [%inline 'Demo' (malt ~[['Demo' '====']]) `'INIT Init']
       default-limits
-      ~
+      ~  ~
   ==
 ::
 ++  actions

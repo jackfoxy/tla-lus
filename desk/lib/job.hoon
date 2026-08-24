@@ -78,6 +78,10 @@
 ::  what a run consumed: where each source came from, and its content
 ::  hash. The id is the frozen wire typing, so inline and Clay sources
 ::  are recorded the same way
+::  what an emission chokepoint returns: the updated job, the events to fan
+::  out, and -- if a diagnostic was PROMOTED to an error -- the message the
+::  caller must seal the run %failed with (R2.4.5)
++$  demit  [j=jobstate evs=(list event) halt=(unit @t)]
 +$  prov   [id=source-id hash=@]
 +$  provs
   $:  root=module-name
@@ -315,6 +319,9 @@
         ~  ~
     ==
   =/  jr  j.i.cands
+  ::  NOT routed through `+add-diags`: this is agent-side retention reclaim on
+  ::  an already-TERMINAL job, not an emission during a run, so there is
+  ::  nothing left to abort and tlc2 has no analogue to promote (R2.4.5)
   =.  jr  jr(artifacts ~, diags (snoc diags.jr dg))
   $(js (~(put by js) id.i.cands jr), cands t.cands)
 ::
@@ -666,6 +673,45 @@
   ?.  ?=(%load -.p.lr)  |
   (~(has by pend.cur.p.lr) tag)
 ::
+++  add-diags
+  ::  the single emission chokepoint for a run's diagnostics (R2.4.5).
+  ::
+  ::  Promotion (`request.promote`, tlc2's `-messagesAsErrors`) has to happen
+  ::  HERE and not at the terminal verdict. `MP.printWarning` calls
+  ::  `Assert.fail` BEFORE `recorder.record`, so a promoted warning aborts the
+  ::  run at the moment it is emitted and never lands as a warning at all --
+  ::  it BECOMES the error. Measured mid-run at the pin (EC 2143 promoted):
+  ::  2 states generated / 2 distinct / 1 left on queue, against 5/5/0
+  ::  unpromoted. Promoting at the end instead would let the run continue past
+  ::  the point tlc2 stops and report a completed search where tlc2 reported a
+  ::  partial one -- which is exactly the difference a caller filtering
+  ::  severities off a finished result cannot reproduce.
+  ::
+  ::  `halt` is the promoted diagnostic's message; the caller seals %failed.
+  ::  Nothing after a promoted diagnostic is emitted, because in tlc2 nothing
+  ::  after it runs.
+  |=  [j=jobstate ds=(list diagnostic)]
+  ^-  demit
+  ?~  ds  [j ~ ~]
+  ?.  (promoted j i.ds)
+    =.  diags.j  (snoc diags.j i.ds)
+    =/  r  $(ds t.ds)
+    [j.r [[%diagnostic i.ds] evs.r] halt.r]
+  =/  dg  i.ds(severity %error)
+  =.  diags.j  (snoc diags.j dg)
+  [j ~[[%diagnostic dg]] `message.dg]
+::
+++  promoted
+  ::  is this diagnostic promoted to an error by the request's set? Only a
+  ::  WARNING can be, and that is tlc2's rule rather than a port choice:
+  ::  `isTlcMessageAsError` is consulted in `MP.printWarning` and nowhere
+  ::  else, so an error or an info code in the set is inert there too --
+  ::  measured, `-messagesAsErrors 2110` (an error) leaves a run byte-identical
+  |=  [j=jobstate dg=diagnostic]
+  ^-  ?
+  ?.  =(%warning severity.dg)  |
+  (~(has in promote.request.j) code.dg)
+::
 ++  finish
   ::  seal the job; a sealed job is never resumed
   |=  [j=jobstate res=result pre=(list event)]
@@ -902,7 +948,7 @@
   ::  max-artifact it is dropped with a warning rather than failing an
   ::  otherwise sound run — but never dropped silently
   |=  [j=jobstate ps=provs]
-  ^-  [jobstate (list event)]
+  ^-  demit
   =/  txt  (render-sources ps)
   ?:  (gth (met 3 txt) max-artifact.limits.request.j)
     =/  dg=diagnostic
@@ -910,8 +956,8 @@
           'source provenance omitted: it exceeds max-artifact'
           ~  ~
       ==
-    [j(diags (snoc diags.j dg)) ~[[%diagnostic dg]]]
-  [j(artifacts (~(put by artifacts.j) %sources [%text txt])) ~]
+    (add-diags j ~[dg])
+  [j(artifacts (~(put by artifacts.j) %sources [%text txt])) ~ ~]
 ::
 ++  clay-provs
   ::  what the load cursor read, by module name
@@ -953,9 +999,10 @@
   |=  [j=jobstate ps=provs s=srcs pre=(list event)]
   ^-  step-out
   =/  po  (put-sources j ps)
-  =/  jp  -.po
+  ?^  halt.po  (finish j.po [%failed u.halt.po] (weld pre evs.po))
+  =/  jp  j.po
   =.  cont.jp  (save-kont [%src s])
-  (more jp (weld pre +.po))
+  (more jp (weld pre evs.po))
 ::
 ++  load-fail
   ::  a resolution failure is a typed diagnostic at the %modules stage,
@@ -963,8 +1010,8 @@
   |=  [j=jobstate msg=@t pre=(list event)]
   ^-  step-out
   =/  dg=diagnostic  [[%lus 401] %error %modules msg ~ ~]
-  =.  diags.j  (snoc diags.j dg)
-  (finish j [%failed msg] (snoc pre [%diagnostic dg]))
+  =/  r  (add-diags j ~[dg])
+  (finish j.r [%failed msg] (weld pre evs.r))
 ::
 ++  do-load
   ::  close the module graph over asynchronous reads. No stage may touch
@@ -1027,12 +1074,13 @@
   =/  cry  (carry j so)
   ::  an inline bundle's provenance is recorded here, where a Clay run
   ::  recorded its own at the close of the load
-  =/  po=[jobstate (list event)]
+  =/  po=demit
     ?:  |(?=(%clay -.src.request.j) (~(has by artifacts.j) %sources))
-      [j ~]
+      [j ~ ~]
     (put-sources j (inline-provs request.j src))
-  =.  j    -.po
-  =.  pre  (weld pre +.po)
+  ?^  halt.po  (finish j.po [%failed u.halt.po] (weld pre evs.po))
+  =.  j    j.po
+  =.  pre  (weld pre evs.po)
   ?:  ?=(%check -.op.request.j)
     =/  text  (~(get by modules.src) root.src)
     ?~  text
@@ -1043,11 +1091,12 @@
     =/  pt  p.pr
     ?:  |(fatal.pt ?=(~ tree.pt))
       ::  SANY's exact parse-error text travels as the diagnostics
-      =.  diags.j  (weld diags.j diags.pt)
-      =/  evs  (turn diags.pt |=(d=diagnostic `event`[%diagnostic d]))
-      %^  finish  j
-        [%failed ?~(diags.pt 'parse error' message.i.diags.pt)]
-      (weld pre evs)
+      =/  r  (add-diags j diags.pt)
+      %^  finish  j.r
+        :-  %failed
+        ?^  halt.r  u.halt.r
+        ?~(diags.pt 'parse error' message.i.diags.pt)
+      (weld pre evs.r)
     =.  cont.j  (save-kont [%tree u.tree.pt cry])
     (more j pre)
   ::  %analyze
@@ -1073,11 +1122,17 @@
     diags.p.pr
   ?~  ds
     $(todo.kk t.todo.kk, spent +(spent))
-  =.  diags.j  (weld diags.j ds)
+  =/  r  (add-diags j ds)
+  ?^  halt.r  (finish j.r [%failed u.halt.r] (weld evs evs.r))
+  ::  copy the DIAGS leg rather than the whole jobstate: `op.request.j` is
+  ::  narrowed by the `?=(%check ...)` guard above, so a `%=` on `j` itself
+  ::  nest-fails against the unnarrowed one `+add-diags` returns. `+add-diags`
+  ::  touches no other leg, so this is the same assignment
+  =.  diags.j  diags.j.r
   %=  $
     todo.kk  t.todo.kk
     spent    +(spent)
-    evs      (weld evs (turn ds |=(d=diagnostic `event`[%diagnostic d])))
+    evs      (weld evs evs.r)
   ==
 ::
 ::  +|  Stage: %semantic (level and lint)
@@ -1127,8 +1182,8 @@
       (more j pre)
     =/  d=diagnostic
       [[%lus 401] %error %modules 'module resolution failed' ~ ~]
-    =.  diags.j  (snoc diags.j d)
-    (more j (snoc pre [%diagnostic d]))
+    =/  r  (add-diags j ~[d])
+    (more j.r (weld pre evs.r))
   =/  as-diags
     |=  [ds=(list sdiag:semantic) stg=stage]
     ^-  (list diagnostic)
@@ -1146,9 +1201,11 @@
       ?:(level.flags (as-diags lvl.u.ag %level) ~)
       lint-ds
     ==
-  =.  diags.j  (weld diags.j ds)
-  =/  evs  (weld pre (turn ds |=(d=diagnostic `event`[%diagnostic d])))
-  (more j evs)
+  ::  the lint and level stages are where WARNINGS actually appear, so this is
+  ::  the site a promotion set is most likely to fire at (R2.4.5)
+  =/  r  (add-diags j ds)
+  ?^  halt.r  (finish j.r [%failed u.halt.r] (weld pre evs.r))
+  (more j.r (weld pre evs.r))
 ::
 ::  +|  Stage: %config
 ::
@@ -1160,8 +1217,8 @@
   |=  [j=jobstate d=cfg-vdiag:config pre=(list event)]
   ^-  step-out
   =/  dg=diagnostic  [[%tlc code.d] %error %config msg.d ~ ~]
-  =.  diags.j  (snoc diags.j dg)
-  (finish j [%failed msg.d] (snoc pre [%diagnostic dg]))
+  =/  r  (add-diags j ~[dg])
+  (finish j.r [%failed msg.d] (weld pre evs.r))
 ::
 ++  assume-fail
   ::  a false (EC 2104) or non-boolean (EC 2105) ASSUME is a typed TLC failure
@@ -1169,8 +1226,8 @@
   |=  [j=jobstate ec=@ud msg=@t pre=(list event)]
   ^-  step-out
   =/  dg=diagnostic  [[%tlc ec] %error %explore msg ~ ~]
-  =.  diags.j  (snoc diags.j dg)
-  (finish j [%failed msg] (snoc pre [%diagnostic dg]))
+  =/  r  (add-diags j ~[dg])
+  (finish j.r [%failed msg] (weld pre evs.r))
 ::
 ++  do-config
   ::  consume the parsed root tree and build the engine continuation.

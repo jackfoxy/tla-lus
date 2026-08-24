@@ -44,7 +44,7 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 ### `request`
 
 ```hoon
-+$  request  [=op src=source-bundle =limits write=(unit write-target)]
++$  request  [=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]
 +$  write-target  [=desk pax=path]
 +$  op
   $%  [%translate opts=pcal-opts]      ::  PlusCal → TLA+
@@ -55,7 +55,7 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
   $%  [%inline root=module-name modules=(map module-name @t) cfg=(unit @t)]
       [%clay =ship =desk cas=case root=module-name cfg=(unit path) roots=(list path)]
   ==
-+$  limits  [max-source=@ud max-modules=@ud max-states=@ud max-depth=@ud max-time=@dr max-artifact=@ud]
++$  limits  [max-source=@ud max-modules=@ud max-states=@ud max-depth=@ud max-time=@dr max-artifact=@ud max-set-size=@ud]
 +$  check-opts  [translate=? view=? difftrace=? continue=? cfg=(unit source-name) mode=check-mode]
 +$  check-mode  $%([%exhaustive deadlock=?] [%simulate seed=@ud num=@ud depth=@ud generate=?])]
 +$  analyze-flags  [syntax=? semantic=? level=? lint=?]
@@ -223,7 +223,7 @@ wire and not listed here.
 | `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
 | `limits` | six bounds | `default-limits:job-lib` = `[1.000.000 64 100.000 1.000 ~m10 1.000.000]` |
 | `write-target` | `[=desk pax=path]` | `[%base /tlaout]` — no `case`: a write lands at the head. `%report` lands at `<pax>/report/txt`, a `%trace` at `<pax>/trace/noun` |
-| `request` | `[=op src=source-bundle =limits write=(unit write-target)]` | see the Dojo example |
+| `request` | `[=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]` | see the Dojo example. `promote` is tlc2's `-messagesAsErrors`: diagnostic codes to raise to errors. It is on `request` rather than `check-opts` because it applies to `%analyze` and `%check` alike, and it is **not** a display concern — promotion aborts the run at the moment the diagnostic is emitted and reports the statistics reached so far, which a caller filtering severities off a finished result cannot reproduce. Only WARNINGS are promotable, which is tlc2's rule too |
 
 ### Result and job
 
