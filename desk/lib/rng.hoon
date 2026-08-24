@@ -97,6 +97,83 @@
   =^  d  s  (next-double s)
   $(cnt (dec cnt))
 ::
+::  +|  %bounded draws (R2.4.6)
+::
+++  next-int-bound
+  ::  java.util.Random.nextInt(bound): a uniform index in [0,bound). A
+  ::  power-of-two bound takes the high-bits fast path; otherwise the draw is
+  ::  rejected and retaken while `u - r + (bound-1)` would overflow a Java int,
+  ::  which is what keeps the distribution uniform
+  |=  [s=@ bound=@ud]
+  ^-  [@ud @]
+  ?:  =(0 bound)  [0 s]
+  =/  m  (dec bound)
+  ?:  =(0 (dis bound m))
+    =^  r  s  (nx s 31)
+    [(rsh [0 31] (mul bound r)) s]
+  |-  ^-  [@ud @]
+  =^  u  s  (nx s 31)
+  =/  r  (mod u bound)
+  ?:  (lte (add (sub u r) m) (dec (bex 31)))  [r s]
+  $(s s)
+::
+++  prime-factors
+  ::  the prime factors of `n` WITH multiplicity, ascending (Apache Commons
+  ::  Math `Primes.primeFactors`, which +optimal-m-a is the only caller of).
+  ::  Trial division: the arguments are set cardinalities, so they are small
+  |=  n=@ud
+  ^-  (list @ud)
+  ?:  (lth n 2)  ~
+  =|  out=(list @ud)
+  =/  m  n
+  =/  d  2
+  |-  ^-  (list @ud)
+  ?:  (lth m 2)  (flop out)
+  ?:  (gth (mul d d) m)  (flop [m out])
+  ?:  =(0 (mod m d))  $(m (div m d), out [d out])
+  $(d +(d))
+::
+++  optimal-m-a
+  ::  EnumerableValue.computeOptimalMandA(n): the LCG modulus and multiplier a
+  ::  randomized enumeration of an n-element set walks. Raise n to at least 9,
+  ::  then to the first value that is NOT divisible by 4 and NOT squarefree (a
+  ::  repeated prime factor is what gives the generator full period); the
+  ::  multiplier is the product of the distinct prime factors, plus one
+  |=  n=@ud
+  ^-  [m=@ud a=@ud]
+  =/  x  ?:((lth n 9) 9 n)
+  |-  ^-  [m=@ud a=@ud]
+  =/  pf  (prime-factors x)
+  =/  ds  ~(wyt in (silt pf))
+  ?:  ?|(=(0 (mod x 4)) =((lent pf) ds))  $(x +(x))
+  :-  x
+  %+  add  1
+  (roll ~(tap in (silt pf)) |=([p=@ud acc=_1] (mul acc p)))
+::
+++  subset-indices
+  ::  EnumerableValue.SubsetEnumerator(k, n): the k indices in [0,n) it yields,
+  ::  in order. The seed index is `nextInt(n)` and the increment is a
+  ::  `nextPrime` draw, both from the ENUMERATION generator (a separate
+  ::  java.util.Random seeded with -seed, not the simulation worker's); each
+  ::  step walks `index = (a*index + c) % m`, rejecting any index >= n.
+  ::  `Ordering.RANDOMIZED` is this with k = n
+  |=  [s=@ k=@ud n=@ud]
+  ^-  [(list @ud) @]
+  ?:  |(=(0 n) =(0 k))  [~ s]
+  =/  ma  (optimal-m-a n)
+  =^  idx  s  (next-int-bound s n)
+  =^  c    s  (next-prime s)
+  =|  out=(list @ud)
+  =/  i  0
+  |-  ^-  [(list @ud) @]
+  ?:  =(i k)  [(flop out) s]
+  =/  nix=@ud
+    |-  ^-  @ud
+    =/  v  (mod (add (mul a.ma idx) c) m.ma)
+    ?:  (lth v n)  v
+    $(idx v)
+  $(i +(i), idx nix, out [nix out])
+::
 ::  +|  %primes
 ::
 ++  primes

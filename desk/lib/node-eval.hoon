@@ -2,6 +2,7 @@
 /=  v   /lib/value
 /=  sm  /lib/semantic
 /=  so  /lib/stdops
+/=  rg  /lib/rng
 ::  Semantic-node expression evaluator (PORT-COMPLETION-PLAN-2 unit 6.5).
 ::
 ::  A dispatcher over the Work Unit 3 typed semantic graph (`sem` nodes) that
@@ -1695,6 +1696,261 @@
   ?.  (levy p.r |=(st=state (complete st vars.e)))
     [%| 0 'incomplete next state: a variable is unassigned.']
   [%& p.r]
+::
+::
+::  +|  Probabilistic Successors (tlc2 `-generate`, R2.4.6)
+::
+::  `-generate` sets `Tool.probabilistic`, which takes a DIFFERENT path through
+::  `getNextStates`: the disjuncts, the bounded existential, `\in` and
+::  `\subseteq` are visited in RANDOMIZED order and the walk RETURNS as soon as
+::  the next-state functor has accepted one successor, so a step generates one
+::  successor instead of every successor.
+::
+::  That early return is a property of tlc2's CPS shape -- `getNextStates`
+::  threads an `ActionItemList` continuation through every opcode -- and cannot
+::  be bolted onto `+solve`, which returns a LIST per node and threads a list of
+::  partial states through a conjunction. `/\ x' \in S /\ y' \in T` has to stop
+::  at the first accepted PAIR, and only a continuation can say that. So this is
+::  a second solver family rather than a flag on the first, which is what the
+::  R2.4.6 row meant by "a different successor-pick engine, not a flag".
+::
+::  Initial states are NOT affected: `getInitStates` has no probabilistic
+::  branch, so `%init` never reaches here.
+::
+::  one deferred conjunct: the node still to be solved and the environment it
+::  was pushed with (tlc2's ActionItemList carries a Context per item)
++$  pitem  [n=sem:sm e=eenv]
+::  the walk's threaded state: the ENUMERATION generator (tlc2's
+::  `RandomEnumerableValues` -- a java.util.Random seeded with `-seed`), the
+::  SIMULATION generator (the worker's `localRng`, which is what
+::  `TLCGlobals.simulator.getRNG()` hands back on a worker thread, measured --
+::  NOT the Simulator's own), and the running count of successors GENERATED
++$  pst  [es=@ ls=@ ngen=@ud]
+::  the next-state functor's verdict on one complete successor, i.e. what
+::  `SimulationWorker.addElement` does after counting: check the invariants (a
+::  violation throws), then CONSTRAINT / ACTION_CONSTRAINT (a failure drops it)
++$  fres  $@(?(%keep %drop) [%viol nm=@t])
++$  pres
+  $%  [%found st=state]
+      [%viol nm=@t st=state]
+      [%none ~]
+      [%err p=eval-err:v]
+  ==
+::
+++  pitems
+  ::  the deferred conjuncts of a conjunction, each carrying the current env
+  |=  [as=(list sem:sm) e=eenv]
+  ^-  (list pitem)
+  ?~  as  ~
+  [[i.as e] $(as t.as)]
+::
+++  pgroup-items
+  ::  a bounded universal's remaining elements as deferred conjuncts, each with
+  ::  its own binding (tlc2 conses them onto the ActionItemList and solves the
+  ::  FIRST element now, so the pushed ones end up in reverse)
+  |=  [body=sem:sm g=bgroup xs=(list value:v) e=eenv]
+  ^-  (list pitem)
+  ?~  xs  ~
+  [[body (bind-group e g i.xs)] $(xs t.xs)]
+::
+++  next-states-prob
+  ::  ONE successor of `cur` under a Next BODY, on the `-generate` path: the
+  ::  walk returns as soon as `fil` accepts a successor. `p` carries both
+  ::  generators and the states-generated count, threaded in and out
+  |=  [cur=state body=sem:sm e=eenv p=pst fil=$-(state fres)]
+  ^-  [pres pst]
+  =^  res  p  (psolve body cur ~ e(s0 cur) ~ p fil)
+  ?.  ?=(%found -.res)  [res p]
+  ?.  (complete st.res vars.e)
+    [[%err 0 'incomplete next state: a variable is unassigned.'] p]
+  [res p]
+::
+++  pnext
+  ::  continue with the deferred conjuncts; an empty continuation means the
+  ::  successor is COMPLETE. tlc2 counts it there (`collectPreSuccessor`, before
+  ::  any filtering) and only then runs the functor
+  |=  $:  cur=state  part=state  acts=(list pitem)
+          p=pst  fil=$-(state fres)
+      ==
+  ^-  [pres pst]
+  ?^  acts
+    (psolve n.i.acts cur part e.i.acts t.acts p fil)
+  =.  ngen.p  +(ngen.p)
+  =/  f  (fil part)
+  ?@  f
+    ?:(?=(%keep f) [[%found part] p] [[%none ~] p])
+  [[%viol nm.f part] p]
+::
+++  pfilter
+  ::  a boolean conjunct: it prunes, it never assigns
+  |=  $:  n=sem:sm  cur=state  part=state  e=eenv
+          acts=(list pitem)  p=pst  fil=$-(state fres)
+      ==
+  ^-  [pres pst]
+  =/  b  (eval-bool n (senv %next cur part e))
+  ?:  ?=(%| -.b)  [[%err p.b] p]
+  ?.  p.b  [[%none ~] p]
+  (pnext cur part acts p fil)
+::
+++  pbind-elems
+  ::  bind `vn` to each element and continue, in RANDOMIZED order, stopping at
+  ::  the first successor the functor accepts.
+  ::
+  ::  The deterministic pass afterwards is tlc2's, not a slip: the probabilistic
+  ::  branches of OPCODE_in and OPCODE_se have NO early return after their loop
+  ::  (unlike OPCODE_dl and OPCODE_be), so when the randomized pass accepts
+  ::  nothing the ordinary enumeration runs AGAIN over the same elements -- and
+  ::  `collectPreSuccessor` counts them a second time. Measured at the pin: a
+  ::  run whose CONSTRAINT drops every successor of its last state reports 8
+  ::  states generated where the arithmetic without the fall-through gives 6
+  |=  $:  vn=@t  xs=(list value:v)  cur=state  part=state
+          acts=(list pitem)  p=pst  fil=$-(state fres)
+      ==
+  ^-  [pres pst]
+  =/  nn  (lent xs)
+  ?:  =(0 nn)  [[%none ~] p]
+  =^  ixs  es.p  (subset-indices:rg es.p nn nn)
+  =/  rr
+    |-  ^-  [pres pst]
+    ?~  ixs  [[%none ~] p]
+    =^  res  p  (pnext cur (~(put by part) vn (snag i.ixs xs)) acts p fil)
+    ?.  ?=(%none -.res)  [res p]
+    $(ixs t.ixs)
+  =/  r1  -.rr
+  =.  p   +.rr
+  ?.  ?=(%none -.r1)  [r1 p]
+  =/  ys  xs
+  |-  ^-  [pres pst]
+  ?~  ys  [[%none ~] p]
+  =^  res  p  (pnext cur (~(put by part) vn i.ys) acts p fil)
+  ?.  ?=(%none -.res)  [res p]
+  $(ys t.ys)
+::
+++  psolve
+  ::  the probabilistic sibling of +solve. Mode is always %next
+  |=  $:  n=sem:sm  cur=state  part=state  e=eenv
+          acts=(list pitem)  p=pst  fil=$-(state fres)
+      ==
+  ^-  [pres pst]
+  ?.  ?=(%apply -.n)
+    ?.  ?=(%letin -.n)  (pfilter n cur part e acts p fil)
+    ?~  body.n  [[%err 0 'LET with no body in an action.'] p]
+    =/  e2=eenv
+      =/  os  ops.e
+      =/  ls  lets.n
+      |-  ^-  eenv
+      ?~  ls  e(ops os)
+      $(ls t.ls, os (~(put by os) name.i.ls i.ls))
+    (psolve u.body.n cur part e2 acts p fil)
+  =/  nm  name.op.n
+  ?:  |(=(nm '$ConjList') =(nm '\\land'))
+    ?~  args.n  (pnext cur part acts p fil)
+    (psolve i.args.n cur part e (weld (pitems t.args.n e) acts) p fil)
+  ?:  |(=(nm '$DisjList') =(nm '\\lor'))
+    =/  alen  (lent args.n)
+    ?:  =(0 alen)  [[%none ~] p]
+    =^  ix  ls.p  (floor-scaled:rg ls.p alen)
+    =^  pr  ls.p  (next-prime:rg ls.p)
+    =/  i  0
+    =/  idx  ix
+    |-  ^-  [pres pst]
+    ?:  =(i alen)  [[%none ~] p]
+    =^  res  p  (psolve (snag idx args.n) cur part e acts p fil)
+    ?.  ?=(%none -.res)  [res p]
+    $(i +(i), idx (mod (add idx pr) alen))
+  ?:  =(nm '$IfThenElse')
+    =/  b  (eval-bool (snag 0 args.n) (senv %next cur part e))
+    ?:  ?=(%| -.b)  [[%err p.b] p]
+    (psolve ?:(p.b (snag 1 args.n) (snag 2 args.n)) cur part e acts p fil)
+  ::  tlc2 REFUSES here rather than picking a branch: `Probabilistic evaluation
+  ::  of next-state relation not implemented for CASE yet.` (Tool.java:1323),
+  ::  which aborts the run with no model checking at all
+  ?:  =(nm '$Case')
+    :_  p
+    :-  %err
+    :-  0
+    'unsupported: probabilistic evaluation of the next-state relation is not implemented for CASE (tlc2 -generate refuses the same way).'
+  ?:  =(nm '$BoundedExists')
+    =/  bs  (flatten-bound bound.n)
+    ?.  ?=([* ~] bs)
+      [[%err 0 'an action existential over multiple binders is unsupported.'] p]
+    =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
+    ?:  ?=(%| -.sd)  [[%err p.sd] p]
+    =/  el  (drain-sexp p.sd)
+    ?:  ?=(%| -.el)  [[%err p.el] p]
+    =/  xs=(list value:v)  p.el
+    =/  nn  (lent xs)
+    ?:  =(0 nn)  [[%none ~] p]
+    =^  ixs  es.p  (subset-indices:rg es.p nn nn)
+    =/  body  (snag 0 args.n)
+    |-  ^-  [pres pst]
+    ?~  ixs  [[%none ~] p]
+    =/  e2  (bind-group e i.bs (snag i.ixs xs))
+    =^  res  p  (psolve body cur part e2 acts p fil)
+    ?.  ?=(%none -.res)  [res p]
+    $(ixs t.ixs)
+  ::  a bounded universal is NOT randomized by tlc2: it solves the first
+  ::  element now and defers the rest onto the continuation
+  ?:  =(nm '$BoundedForall')
+    =/  bs  (flatten-bound bound.n)
+    ?.  ?=([* ~] bs)
+      [[%err 0 'an action universal over multiple binders is unsupported.'] p]
+    =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
+    ?:  ?=(%| -.sd)  [[%err p.sd] p]
+    =/  el  (drain-sexp p.sd)
+    ?:  ?=(%| -.el)  [[%err p.el] p]
+    =/  xs=(list value:v)  p.el
+    ?~  xs  (pnext cur part acts p fil)
+    =/  body  (snag 0 args.n)
+    =/  rest  (flop (pgroup-items body i.bs t.xs e))
+    (psolve body cur part (bind-group e i.bs i.xs) (weld rest acts) p fil)
+  ?:  =(nm 'UNCHANGED')
+    =/  names  (unchanged-vars (snag 0 args.n) psub.e)
+    =/  out=state  part
+    =.  out
+      |-  ^-  state
+      ?~  names  out
+      =/  cv  (~(get by cur) i.names)
+      ?~  cv  $(names t.names)
+      $(names t.names, out (~(put by out) i.names u.cv))
+    (pnext cur out acts p fil)
+  ?:  =(nm '=')
+    =/  as  (assignable-sem (snag 0 args.n) %next vars.e part psub.e)
+    ?~  as  (pfilter n cur part e acts p fil)
+    =/  rv  (eval (snag 1 args.n) (senv %next cur part e))
+    ?:  ?=(%| -.rv)  [[%err p.rv] p]
+    (pnext cur (~(put by part) u.as p.rv) acts p fil)
+  ?:  =(nm '\\in')
+    =/  as  (assignable-sem (snag 0 args.n) %next vars.e part psub.e)
+    ?~  as  (pfilter n cur part e acts p fil)
+    =/  sd  (eval-domain (snag 1 args.n) (senv %next cur part e))
+    ?:  ?=(%| -.sd)  [[%err p.sd] p]
+    =/  el  (drain-sexp p.sd)
+    ?:  ?=(%| -.el)  [[%err p.el] p]
+    (pbind-elems u.as p.el cur part acts p fil)
+  ?:  =(nm '\\subseteq')
+    =/  as  (assignable-sem (snag 0 args.n) %next vars.e part psub.e)
+    ?~  as  (pfilter n cur part e acts p fil)
+    =/  rv  (eval (snag 1 args.n) (senv %next cur part e))
+    ?:  ?=(%| -.rv)  [[%err p.rv] p]
+    =/  el  (drain-sexp [%subset p.rv])
+    ?:  ?=(%| -.el)  [[%err p.el] p]
+    (pbind-elems u.as p.el cur part acts p fil)
+  ?:  ?=(^ (anysubstin-mod:sm nm))
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  (pfilter n cur part e acts p fil)
+    =/  e2  (bind-substs (senv %next cur part e) names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e2)  [[%err p.e2] p]
+    (psolve inner.u.sp cur part p.e2 acts p fil)
+  ?:  ?=(%user-op kind.op.n)
+    =/  d  (~(get by ops.e) nm)
+    ?:  ?|(?=(~ d) ?=(~ body.u.d))  (pfilter n cur part e acts p fil)
+    ?.  =((lent params.u.d) (lent args.n))  (pfilter n cur part e acts p fil)
+    ?:  =(0 fuel.e)  [[%err 0 'evaluation recursion/resource limit exceeded.'] p]
+    =/  e2  (bind-psub e(fuel (dec fuel.e)) params.u.d args.n)
+    ?:  ?=(%| -.e2)  [[%err p.e2] p]
+    (psolve u.body.u.d cur part p.e2 acts p fil)
+  (pfilter n cur part e acts p fil)
 ::
 ++  pred-bool
   ::  a state/action predicate BODY as a boolean under given states

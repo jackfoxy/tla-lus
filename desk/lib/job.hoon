@@ -1362,7 +1362,7 @@
       pre
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
-    =/  actions  (get-actions:check nsb aname defs)
+    =/  actions  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
     ::  normalize the PROPERTY (if any) into the OrderOfSolution form; an
     ::  unsupported property is a typed rejection, never a silent %ok
     =/  osr=(each (list oos:tp) aerr:tp)
@@ -1377,9 +1377,13 @@
       ::  `deadlock && getCheckDeadlock()`), but `[%simulate ...]` carries no
       ::  such toggle on this wire -- only `[%exhaustive deadlock=?]` does --
       ::  so here the cfg's CHECK_DEADLOCK is the whole story.
+      ::  `prob` is `|`: the `-generate` successor engine is ported and
+      ::  differentially tested at `+generate-spec`, but no request field
+      ::  selects it yet -- R2.4.6 leaves the wire exposure owed rather than
+      ::  landing a mode the CASE refusal has no channel to report through
       :*  actions  invs  cons  acons  deadlock.rs
           p.osr  ?~(pp '' u.pp)
-          defs  consts  vars  order  num.mode  dep
+          defs  consts  vars  order  num.mode  dep  |
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
@@ -1543,8 +1547,8 @@
   ::  per-action attribution for the wire trace: the getActions leaves plus the
   ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
   ::  keeps the whole-Next label it has always rendered.
-  =/  acts  (get-actions:check next.o aname defs.o)
   =/  env   (make-env:ne defs.o consts.o vars.o)
+  =/  acts  (get-actions:check next.o aname defs.o env)
   =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
   ::  the ALIAS reaches BOTH artifacts (R2.3.2): the report through
   ::  `+render-outcome` and the typed trace through `+trace-states`. `env` is
@@ -1768,7 +1772,7 @@
   ::  whole-Next label) is the fallback when no leaf matches or no action
   ::  context is available.
   |=  $:  sts=(list state:check)  act=next-act
-          acts=(list [name=@t body=sem:semantic])
+          acts=(list act:check)
           e=eenv:ne  order=(list @t)  modn=@t
           al=(unit sem:semantic)
       ==

@@ -127,5 +127,6 @@
   =/  defs  (defmap-of:ne u.mo)
   =/  nsb  (sem-body:check defs 'Next')
   ?~  nsb  ~['NO-NEXT']
-  (turn (get-actions:check u.nsb 'Next' defs) |=([n=@t *] n))
+  =/  e  (base-env:ne u.mo ~ ~)
+  (turn (get-actions:check u.nsb 'Next' defs e) |=([n=@t *] n))
 --

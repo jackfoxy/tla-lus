@@ -62,6 +62,7 @@ GENERATORS = [
     ("gen-sim-tests.py",     "pass",        "Seeded simulation traces (tlc2.tool.SimulationWorker)", "desk/tests/lib/sim-diff.hoon (unit 9.2): lib/check simulate reproduces `tlc2.TLC -simulate -workers 1 -seed S` behavior byte-for-byte over a supported-fragment corpus"),
     ("gen-sim-live-tests.py", "pass",       "Temporal property in simulation (LiveCheck.checkTrace)", "desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`"),
     ("gen-sim-stats-tests.py", "pass",      "Simulation statistics (SimulationWorkerStatistics)", "desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`"),
+    ("gen-generate-tests.py", "pass",       "Probabilistic simulation (Tool.probabilistic / -generate)", "desk/tests/lib/generate-diff.hoon (R2.4.6): lib/check generate-spec reproduces `tlc2.TLC -generate -workers 1 -seed S` behavior AND states-generated over the three probabilistic opcodes (bounded exists, `x\' \\in S`, disjunction), each placed BELOW the action-decomposition boundary because that is the only place the flag is observable"),
 ]
 EVIDENCE = "desk/doc/evidence-counts.md"
 # paths whose contents are oracle-derived and must reproduce byte-identically

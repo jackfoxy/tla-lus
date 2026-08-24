@@ -207,6 +207,12 @@
       ::  a typed evaluation failure during the search (WU6.9)
       [%error msg=@t]
   ==
+::  one `Tool.getActions` leaf action: its name, its next-state body, and the
+::  bound-variable CONTEXT the decomposition bound into it. Non-empty only for
+::  an action split out of a constant-level `\E` (R2.4.6): tlc2 enumerates such
+::  a bound at spec-processing time and emits one action per element, carrying
+::  the binding in that action's `Context`
++$  act  [name=@t body=sem:sem-lib ctx=(map @t value)]
 ::  fixed parameters of one search
 +$  bfs-opts
   ::  WU6.9: the search runs on Work Unit 3 SEMANTIC nodes via node-eval, not
@@ -650,7 +656,7 @@
   ::  action context (`actions` ~) it falls back to the whole-Next label — the
   ::  single-action case renders identically either way.
   |=  $:  trace=(list state)  next-label=@t
-          actions=(list [name=@t body=sem:sem-lib])
+          actions=(list act)
           e=eenv:ne  order=(list @t)  modn=@t
           al=(unit sem:sem-lib)
           ::  `-view` (R2.4.3): the VIEW body when the flag is set, so every
@@ -801,7 +807,7 @@
 ::  cannot survive `;;`). Like bfs-opts, carry defs/consts/vars and rebuild the
 ::  env per event (sim-step), so the registry is always freshly constructed.
 +$  sim-opts
-  $:  actions=(list [name=@t body=sem:sem-lib])  ::  getActions, source order
+  $:  actions=(list act)   ::  getActions leaves, source order
       invs=(list [name=@t body=sem:sem-lib])     ::  invariants, decl order
       cons=(list sem:sem-lib)                    ::  CONSTRAINT (R1.7)
       acons=(list sem:sem-lib)                   ::  ACTION_CONSTRAINT (R1.7)
@@ -814,6 +820,11 @@
       order=(list @t)            ::  vars in declaration order (fingerprints)
       num=@ud     ::  behaviors to simulate
       depth=@ud   ::  transitions per behavior
+      ::  tlc2's `-generate` (R2.4.6): pick successors PROBABILISTICALLY --
+      ::  `Tool.probabilistic`, which walks the nondeterministic constructs in
+      ::  randomized order and stops at the first successor the functor accepts,
+      ::  so a step generates one successor instead of all of them
+      prob=?
   ==
 ::  everything required to resume a run byte-identically: the RNG is the raw
 ::  48-bit java.util.Random state (lib/rng), advanced only at step boundaries,
@@ -828,6 +839,10 @@
       tm=@s                  ::  Welford running mean of completed trace lengths
       tm2=@s                 ::  Welford running M2
       walk=(unit [cur=state n=@ud path=(list state)])
+      ::  the ENUMERATION generator's state (tlc2 `RandomEnumerableValues`, a
+      ::  java.util.Random seeded with the run's seed). Only `-generate` draws
+      ::  from it, but it rides the cursor so a resumed run is byte-identical
+      es=@
   ==
 +$  sim-slice
   $%  [%more cur=sim-cursor]
@@ -843,9 +858,9 @@
 ::
 ++  nth-action
   ::  index into an action list (dry, same recursive-mold reason as +nth-state)
-  |=  [i=@ud l=(list [name=@t body=sem:sem-lib])]
-  ^-  sem:sem-lib
-  body:(snag i l)
+  |=  [i=@ud l=(list act)]
+  ^-  act
+  (snag i l)
 ::
 ++  sim-nexts
   ::  SimulationWorker's next-state functor for one action, in generation order.
@@ -866,25 +881,81 @@
   ::  raising: the simulation path has no typed error channel (the `%|` arm
   ::  below makes the same choice for a solver failure). Named, not silent --
   ::  tlc2 would report TLC_INVARIANT_EVALUATION_FAILED's action analogue.
-  |=  $:  cur=state  body=sem:sem-lib
+  ::
+  ::  R2.4.6: the `%viol` arm carries `ngen` too. `collectPreSuccessor` runs
+  ::  BEFORE the invariant check, so every successor generated up to AND
+  ::  INCLUDING the violating one is counted; the old shape dropped the whole
+  ::  violating invocation from the run's states-generated total.
+  |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne
       ==
-  ^-  $%([%viol name=@t st=state] [%ok nx=(list state) ngen=@ud])
-  =/  nr  (next-states:ne cur body e)
+  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
+  =/  nr  (next-states:ne cur body.a (act-env e ctx.a))
   ?:  ?=(%| -.nr)  [%ok ~ 0]
   =/  gen  p.nr
   =|  keep=(list state)
   =|  n=@ud
-  |-  ^-  $%([%viol name=@t st=state] [%ok nx=(list state) ngen=@ud])
+  |-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
   ?~  gen  [%ok (flop keep) n]
   =/  fv  (first-violated invs i.gen e)
-  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen]
+  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n)]
   =/  ch  (con-hold cons i.gen e)
   =/  ah  (acon-hold acons cur i.gen e)
   =/  in=?  &(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah)
   $(gen t.gen, n +(n), keep ?:(in [i.gen keep] keep))
+::
+::  what one action invocation yielded during a simulation step: a violating
+::  successor, a non-empty surviving successor set, or nothing
++$  step-res
+  $%  [%viol name=@t st=state]
+      [%ok nx=(list state)]
+      [%none ~]
+  ==
+::
+++  sim-nexts-det
+  ::  +sim-nexts in `+$ step-res` shape, with the generated count folded into
+  ::  the threaded `pst` instead of returned alongside
+  |=  $:  cur=state  a=act
+          invs=(list [name=@t body=sem:sem-lib])
+          cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
+          e=eenv:ne  p=pst:ne
+      ==
+  ^-  [step-res pst:ne]
+  =/  r  (sim-nexts cur a invs cons acons e)
+  ?:  ?=(%viol -.r)
+    [[%viol name.r st.r] p(ngen (add ngen.p ngen.r))]
+  =.  ngen.p  (add ngen.p ngen.r)
+  ?~  nx.r  [[%none ~] p]
+  [[%ok nx.r] p]
+::
+++  sim-nexts-prob
+  ::  the `-generate` next-state functor for one action: the probabilistic walk
+  ::  returns at most ONE successor -- the first the functor accepts -- so the
+  ::  successor-pick draw that follows always sees a one-element list. A solver
+  ::  failure drops the action, exactly as the deterministic path does
+  |=  $:  cur=state  a=act
+          invs=(list [name=@t body=sem:sem-lib])
+          cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
+          e=eenv:ne  p=pst:ne
+      ==
+  ^-  [step-res pst:ne]
+  =/  fil
+    |=  st=state
+    ^-  fres:ne
+    =/  fv  (first-violated invs st e)
+    ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv)]
+    =/  ch  (con-hold cons st e)
+    =/  ah  (acon-hold acons cur st e)
+    ?:(&(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah) %keep %drop)
+  =^  r  p  (next-states-prob:ne cur body.a (act-env e ctx.a) p fil)
+  ?-  -.r
+    %found  [[%ok ~[st.r]] p]
+    %viol   [[%viol nm.r st.r] p]
+    %none   [[%none ~] p]
+    %err    [[%none ~] p]
+  ==
 ::
 ++  welford-add
   ::  fold one completed behavior of length `tl` into the running mean/m2 with
@@ -971,25 +1042,28 @@
   ::  index until one yields successors ((index + p) % alen per retry)
   =^  index  s.cur  (floor-scaled:rng s.cur alen)
   =^  p      s.cur  (next-prime:rng s.cur)
-  =/  found
-    ::  `acc` carries the successors generated by actions whose states were all
-    ::  constrained out: they were counted (collectPreSuccessor) even though the
-    ::  action contributed nothing, so the retry must not lose them
+  ::  the retry loop threads BOTH generators and the generated count through
+  ::  `pst`: an action whose successors were all constrained out still counted
+  ::  them (collectPreSuccessor) and, under `-generate`, still spent enumeration
+  ::  draws, so neither may be lost across a retry
+  =/  fnd
     =/  tries  0
-    =/  acc=@ud  0
-    |-  ^-  $%  [%viol name=@t st=state]
-                [%ok nx=(list state) ngen=@ud]
-                [%none ngen=@ud]
-            ==
-    ?:  =(tries alen)  [%none acc]
-    =/  r  (sim-nexts cur.w (nth-action index actions.o) invs.o cons.o acons.o e)
-    ?:  ?=(%viol -.r)  r
-    ?^  nx.r  r(ngen (add acc ngen.r))
-    $(tries +(tries), index (mod (add index p) alen), acc (add acc ngen.r))
+    =/  pp=pst:ne  [es.cur s.cur 0]
+    |-  ^-  [step-res pst:ne]
+    ?:  =(tries alen)  [[%none ~] pp]
+    =/  a  (nth-action index actions.o)
+    =^  r  pp
+      ?:  prob.o  (sim-nexts-prob cur.w a invs.o cons.o acons.o e pp)
+      (sim-nexts-det cur.w a invs.o cons.o acons.o e pp)
+    ?.  ?=(%none -.r)  [r pp]
+    $(tries +(tries), index (mod (add index p) alen))
+  =/  found  -.fnd
+  =.  es.cur   es.fnd
+  =.  s.cur    ls.fnd
+  =.  gen.cur  (add gen.cur ngen.fnd)
   ?:  ?=(%none -.found)
     ::  no action produced a SURVIVING successor. Anything it did generate was
     ::  still counted before the constraint dropped it.
-    =.  gen.cur  (add gen.cur ngen.found)
     ::  tlc2 SimulationWorker.java:692-698 --
     ::
     ::      if (nextStates.empty()) {
@@ -1012,7 +1086,10 @@
     =/  wf  (welford-add tm.cur tm2.cur (min depth.o (lent path.w)) +(t.cur))
     $(walk.cur ~, t.cur +(t.cur), tm.cur -.wf, tm2.cur +.wf, spent +(spent))
   ?:  ?=(%viol -.found)
-    ::  an invariant violation ends the run with the offending behavior
+    ::  an invariant violation ends the run with the offending behavior. The
+    ::  successors this action generated are still COUNTED (R2.4.6): tlc2's
+    ::  `collectPreSuccessor` runs before `addElement` checks the invariant --
+    ::  which the `gen.cur` fold above now does for every outcome
     :+  %done
       (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])])
     cur
@@ -1022,7 +1099,6 @@
   =/  s1  (nth-state j nx.found)
   %=  $
     spent      +(spent)
-    gen.cur    (add gen.cur ngen.found)
     walk.cur   `[s1 +(n.w) [s1 path.w]]
     steps.cur  +(steps.cur)
     maxn.cur   (max maxn.cur +(n.w))
@@ -1035,8 +1111,10 @@
   |=  [inits=(list state) seed=@]
   ^-  sim-cursor
   =/  wseed  -:(next-long:rng (scramble:rng seed))
-  ::  states generated counts the initial states first (tlc2 getInitStates)
-  [(scramble:rng wseed) inits 0 0 0 (lent inits) --0 --0 ~]
+  ::  states generated counts the initial states first (tlc2 getInitStates).
+  ::  The enumeration generator is seeded with the RUN's seed directly
+  ::  (`RandomEnumerableValues.setSeed(seed)`, TLC.java:1400), not the worker's
+  [(scramble:rng wseed) inits 0 0 0 (lent inits) --0 --0 ~ (scramble:rng seed)]
 ::
 ++  simulate
   ::  bounded seeded simulation: up to `num` random behaviors, each up to
@@ -1054,14 +1132,26 @@
   ::  structured summary (traces / steps / whether a violation was found)
   |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud]
   ^-  sim-result
+  (sim-spec-mode spec cfg seed traces depth |)
+::
+++  generate-spec
+  ::  the same run under tlc2's `-generate` (R2.4.6): probabilistic successor
+  ::  picking. Same seed, same statistics shape, a different walk
+  |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud]
+  ^-  sim-result
+  (sim-spec-mode spec cfg seed traces depth &)
+::
+++  sim-spec-mode
+  |=  [spec=@t cfg=@t seed=@ traces=@ud depth=@ud prob=?]
+  ^-  sim-result
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [0 0 0 0 0 0 ~]
   =*  c  p.sc
-  =/  actions  (get-actions nsb.c aname.c defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
   =/  pname  ?~(pp.c '' u.pp.c)
   =/  o=sim-opts
     :*  actions  invs.c  cons.c  acons.c  ddl.c  oss.c  pname
-        defs.c  consts.c  vars.c  order.c  traces  depth
+        defs.c  consts.c  vars.c  order.c  traces  depth  prob
     ==
   (simulate o is.c seed)
 ::
@@ -1902,7 +1992,7 @@
   =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
   ?~  l  ~['(no lasso)']
   =/  modn     (module-name-of tree.c)
-  =/  actions  (get-actions nsb.c aname.c defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c env)
   =/  np    (lent prefix.u.l)
   =/  stut  =(%stuttering class.u.l)
   =/  marker-num    ?:(stut +(np) loop.u.l)
@@ -2001,7 +2091,7 @@
   =/  footer  (counts-lines gen distinct 0 depth)
   ?~  l
     ['Model checking completed. No error has been found.' footer]
-  =/  actions  (get-actions nsb aname defs)
+  =/  actions  (get-actions nsb aname defs env)
   =/  np       (lent prefix.u.l)
   =/  stut     =(%stuttering class.u.l)
   ::  the numbered prefix states: state 1 is the initial predicate, each later
@@ -2128,39 +2218,98 @@
 ++  get-actions
   ::  Tool.getActions: decompose a next-state relation into named leaf actions.
   ::  A user-op reference recurses into its body (renaming the action), a
-  ::  disjunction recurses each disjunct, anything else is a leaf action.
-  |=  [n=sem:sem-lib nm=@t defs=(map @t sem-def:sem-lib)]
-  ^-  (list [name=@t body=sem:sem-lib])
-  ?:  ?=(%letin -.n)  ?~(body.n ~[[nm n]] $(n u.body.n))
-  ?.  ?=(%apply -.n)  ~[[nm n]]
+  ::  disjunction recurses each disjunct, a constant-level `\E` enumerates,
+  ::  anything else is a leaf action. `e` is the constant-only environment the
+  ::  `\E` bound is evaluated in (tlc2 evaluates it against `TLCState.Empty`)
+  |=  [n=sem:sem-lib nm=@t defs=(map @t sem-def:sem-lib) e=eenv:ne]
+  ^-  (list act)
+  (get-actions-in n nm defs e ~)
+::
+++  get-actions-in
+  ::  +get-actions carrying the bound-variable context accumulated so far
+  |=  $:  n=sem:sem-lib  nm=@t  defs=(map @t sem-def:sem-lib)
+          e=eenv:ne  ctx=(map @t value)
+      ==
+  ^-  (list act)
+  ?:  ?=(%letin -.n)  ?~(body.n ~[[nm n ctx]] $(n u.body.n))
+  ?.  ?=(%apply -.n)  ~[[nm n ctx]]
   =/  op  name.op.n
   ?:  ?&(?=(%user-op kind.op.n) ?=(~ args.n))
     =/  d  (~(get by defs) op)
-    ?:  ?|(?=(~ d) ?=(~ body.u.d))  ~[[nm n]]
+    ?:  ?|(?=(~ d) ?=(~ body.u.d))  ~[[nm n ctx]]
     $(n u.body.u.d, nm op)
   ?:  |(=(op '$DisjList') =(op '\\lor'))
-    (get-actions-list args.n nm defs)
-  ::  `\E i \in S : body` — tlc2's getActions ENUMERATES S and recurses into
-  ::  args[0] once per element, carrying the binding in the element's Context
-  ::  (Tool.getActionsAppl OPCODE_be), so every resulting action carries the
-  ::  BODY's span, not the whole quantifier's. We keep ONE action whose BODY is
-  ::  still the whole quantifier (so it stays solvable -- the bound variable has
-  ::  no binding outside it) but whose SPAN is the body's, which is what the
-  ::  label renders. One-vs-N is unobservable here: every per-element action
-  ::  carries this same label, the successor stream is already enumerated in
-  ::  element order by +solve-exists, and the coverage counts are a documented
-  ::  approved difference. R1.5.12
+    (get-actions-list args.n nm defs e ctx)
+  ::  `\E i \in S : body` -- tlc2's getActions ENUMERATES S against
+  ::  `TLCState.Empty` and recurses into args[0] once per element, carrying the
+  ::  binding in the element's Context (Tool.getActionsAppl OPCODE_be), so each
+  ::  resulting action carries the BODY's span, not the whole quantifier's.
+  ::
+  ::  R1.5.12 kept ONE action here and recorded that one-vs-N "no port surface
+  ::  can distinguish". R2.4.6 MEASURED otherwise: in SIMULATION the action
+  ::  COUNT is the divisor of the action-index draw and the successor count is
+  ::  the divisor of the successor-pick draw, so N actions of one successor and
+  ::  one action of N successors spend the same draws to different ends --
+  ::  `\E n \in 1..3 : x' = x + n` diverged from `tlc2 -simulate` on every seed
+  ::  tried, and reported 25 states generated where tlc2 reported 14.
+  ::
+  ::  The FALLBACK is tlc2's own: `getActionsAppl` wraps the enumeration in a
+  ::  `try`, and an empty domain (`Enum.isDone()`) or any throw (a bound that
+  ::  needs a state, a non-enumerable bound) leaves exactly the single
+  ::  whole-quantifier action this arm used to return unconditionally
   ?:  =(op '$BoundedExists')
-    ?~  args.n  ~[[nm n]]
-    ?.  ?=(%apply -.i.args.n)  ~[[nm n]]
-    ~[[nm n(at at.i.args.n)]]
-  ~[[nm n]]
+    ?~  args.n  ~[[nm n ctx]]
+    =/  fb=(list act)
+      ?.  ?=(%apply -.i.args.n)  ~[[nm n ctx]]
+      ~[[nm n(at at.i.args.n) ctx]]
+    =/  bs  (flatten-bound:ne bound.n)
+    ?.  ?=([* ~] bs)  fb
+    =/  sd  (eval-domain:ne rng.i.bs e(s0 ~, s1 ~, primed |))
+    ?:  ?=(%| -.sd)  fb
+    =/  els  (drain-sexp:ne p.sd)
+    ?:  ?=(%| -.els)  fb
+    ?~  p.els  fb
+    ::  EXPLICIT loop: a wet `turn` over the recursive `value`/`sem` molds
+    ::  fuse-loops the zuse-408 compiler here (the R2.4.2 trap)
+    =/  xs=(list value)  p.els
+    =|  out=(list act)
+    |-  ^-  (list act)
+    ?~  xs  out
+    =/  e2  (bind-group:ne e i.bs i.xs)
+    =/  c2  (ctx-bind ctx i.bs i.xs)
+    $(xs t.xs, out (weld out (get-actions-in i.args.n nm defs e2 c2)))
+  ~[[nm n ctx]]
+::
+++  ctx-bind
+  ::  +bind-group on a bare context map: bind ONE binder group to ONE domain
+  ::  element, destructuring a tuple group across its names
+  |=  [ctx=(map @t value) g=bgroup:ne w=value]
+  ^-  (map @t value)
+  ?.  tup.g
+    ?~(nms.g ctx (~(put by ctx) i.nms.g w))
+  ?.  ?=(%seq -.w)  ctx
+  =/  ns  nms.g
+  =/  vs  p.w
+  |-  ^-  (map @t value)
+  ?~  ns  ctx
+  ?~  vs  ctx
+  $(ns t.ns, vs t.vs, ctx (~(put by ctx) i.ns i.vs))
+::
+++  act-env
+  ::  an action's evaluation environment: the run's env plus the bindings the
+  ::  getActions decomposition bound into that action (R2.4.6)
+  |=  [e=eenv:ne ctx=(map @t value)]
+  ^-  eenv:ne
+  ?:  =(~ ctx)  e
+  e(vals (~(uni by vals.e) ctx))
 ::
 ++  get-actions-list
-  |=  [l=(list sem:sem-lib) nm=@t defs=(map @t sem-def:sem-lib)]
-  ^-  (list [name=@t body=sem:sem-lib])
+  |=  $:  l=(list sem:sem-lib)  nm=@t  defs=(map @t sem-def:sem-lib)
+          e=eenv:ne  ctx=(map @t value)
+      ==
+  ^-  (list act)
   ?~  l  ~
-  (weld (get-actions i.l nm defs) $(l t.l))
+  (weld (get-actions-in i.l nm defs e ctx) $(l t.l))
 ::
 ++  action-label
   ::  `<name line BL, col BC to line EL, col EC of module M>`
@@ -2179,12 +2328,12 @@
   ::  the label of the action that generates state `s1fp` from `s0`: the first
   ::  getActions leaf whose next-state relation reaches that fingerprint
   |=  $:  s0=state  s1fp=@t
-          actions=(list [name=@t body=sem:sem-lib])
+          actions=(list act)
           e=eenv:ne  order=(list @t)  modn=@t
       ==
   ^-  @t
   ?~  actions  '<unknown action>'
-  =/  r  (next-states:ne s0 body.i.actions e)
+  =/  r  (next-states:ne s0 body.i.actions (act-env e ctx.i.actions))
   ?:  ?=(%| -.r)  $(actions t.actions)
   ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
     (action-label name.i.actions (sem-span:config body.i.actions) modn)
@@ -2196,12 +2345,12 @@
   ::  field (the rendered text form is what the report artifact prints).
   ::  ~ when no action matches. R1.5.12b
   |=  $:  s0=state  s1fp=@t
-          actions=(list [name=@t body=sem:sem-lib])
+          actions=(list act)
           e=eenv:ne  order=(list @t)  modn=@t
       ==
   ^-  (unit [name=@t at=(unit loc)])
   ?~  actions  ~
-  =/  r  (next-states:ne s0 body.i.actions e)
+  =/  r  (next-states:ne s0 body.i.actions (act-env e ctx.i.actions))
   ?:  ?=(%| -.r)  $(actions t.actions)
   ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
     =/  sp  (sem-span:config body.i.actions)
@@ -2306,7 +2455,7 @@
         :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
             vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
         ==
-      =/  actions  (get-actions nsb.c aname.c defs.c)
+      =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
       (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c |)
@@ -2359,7 +2508,7 @@
     ::  the safety trace and counts, and NO temporal verdict (R2.3.4)
     ?:  ?=(?(%inv %deadlock %error) -.out.bg)
       %-  render-outcome
-      :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c)
+      :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
       ==
     =/  r
@@ -2457,7 +2606,7 @@
   =/  o=bfs-opts
     [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 |]
   =/  env      (make-env:ne defs.c consts.c vars.c)
-  =/  actions  (get-actions nsb.c aname.c defs.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c env)
   =/  modn     (module-name-of tree.c)
   ::  build the whole reachability graph, then scan every transition for the
   ::  first state whose successor breaks A. The trace is the behavior reaching
@@ -2519,8 +2668,8 @@
   |=  c=sctx
   ^-  wain
   =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 |]
-  =/  actions  (get-actions nsb.c aname.c defs.c)
   =/  env      (make-env:ne defs.c consts.c vars.c)
+  =/  actions  (get-actions nsb.c aname.c defs.c env)
   =/  modn     (module-name-of tree.c)
   (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c |)
 ::
@@ -2529,7 +2678,7 @@
   ::  give the getActions per-action trace labels (R1.5.4); pass ~ actions to
   ::  fall back to the single whole-Next label.
   |=  $:  res=outcome  nl=@t
-          actions=(list [name=@t body=sem:sem-lib])
+          actions=(list act)
           e=eenv:ne  order=(list @t)  modn=@t
           al=(unit sem:sem-lib)
           ::  `-view` (R2.4.3): the VIEW body when the flag is set, so every
