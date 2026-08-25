@@ -3547,7 +3547,7 @@
         :*  p.osr  (states-of seen.g.bg)  inits.g.bg  nsb.c
             (make-env:ne defs.c consts.c vars.c)  order.c
         ==
-      ?~(l [[%ok st] st] [[%violated [%property u.pp.c] st] st])
+      ?~(l [[%ok st] st] [[%violated [%property u.pp.c %.n] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
       [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 |]
@@ -3566,7 +3566,7 @@
   ?-    -.res
       %ok        =/  st  [gen.res distinct.res queued.res depth.res od]  [[%ok st] st]
       %limited   =/  st  [gen.res distinct.res queued.res depth.res od]  [[%limited what.res st] st]
-      %inv       =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%invariant name.res] st] st]
+      %inv       =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%invariant name.res initial.res] st] st]
       %deadlock  =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%deadlock ~] st] st]
       %error     [[%failed msg.res] *run-stats]
   ==

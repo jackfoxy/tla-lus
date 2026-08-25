@@ -603,7 +603,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 256)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'Inv' %.n] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
     (expect !>((~(has by artifacts.j) %report)))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
@@ -798,7 +798,7 @@
   =/  art  (~(got by artifacts.j) %trace)
   ?>  ?=(%trace -.art)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'PBad'] [3 3 0 3 [1 1 1 1]]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'PBad' %.n] [3 3 0 3 [1 1 1 1]]]) !>(result.j))
     (expect-eq !>(%safety) !>(kind.trace.art))
   ==
 ::
@@ -810,7 +810,7 @@
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req live-spec lead-cfg) t0) 256)
   %+  expect-eq
-    !>(`[%violated [%property 'Lead'] [5 4 0 4 [0 1 1 1]]])
+    !>(`[%violated [%property 'Lead' %.n] [5 4 0 4 [0 1 1 1]]])
   !>(result.j)
 ::
 ++  test-pause-resume-every-boundary-liveness
@@ -838,7 +838,7 @@
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   ;:  weld
     %+  expect-eq
-      !>(`[%invariant 'Inv'])
+      !>(`[%invariant 'Inv' %.n])
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
@@ -849,6 +849,42 @@
 ::  COUNTS are compared, not the trace: the DFS order is drawn from a
 ::  clock-seeded generator `-seed` does not reach, so two runs of the same jar
 ::  can report different counterexamples while agreeing on every number.
+::
+::  +|  EC 2107 / 2110 On The Wire (R2.7.1)
+::
+::  The two used to arrive as the same `[%invariant name]`. These arms are the
+::  point of the split: same operator, same name, different `initial`.
+::
+++  test-invariant-violated-by-behavior
+  ::  EC 2110: found by a behavior, so the result carries a counterexample and
+  ::  the full state-graph statistics
+  =/  r  (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`violation`[%invariant 'Inv' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) violation.u.result.j *violation))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+++  test-invariant-violated-by-initial-state
+  ::  EC 2107: `Inv == x > 0` is false at `x = 0`, so tlc2 reports it while
+  ::  COMPUTING the initial states — no behavior, and no statistics
+  =/  spec
+    '''
+    ---- MODULE spec ----
+    EXTENDS Naturals
+    VARIABLE x
+    Init == x = 0
+    Next == x' = x + 1
+    Inv == x > 0
+    ====
+    '''
+  =/  r  (run-all (init:job-lib (check-req spec mc-cfg) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>(`violation`[%invariant 'Inv' %.y])
+  !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) violation.u.result.j *violation))
 ::
 ++  test-dfid-plan
   %+  expect-eq
@@ -885,7 +921,7 @@
   =/  j  +.r
   ;:  weld
     %+  expect-eq
-      !>(`[%invariant 'Inv'])
+      !>(`[%invariant 'Inv' %.n])
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect-eq !>([7 4]) !>([generated.stats.j distinct.stats.j]))
     (expect !>((~(has by artifacts.j) %trace)))
@@ -918,7 +954,7 @@
   =/  j  +.r
   ;:  weld
     %+  expect-eq
-      !>(`[%invariant 'PBad'])
+      !>(`[%invariant 'PBad' %.n])
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect-eq !>([4 3]) !>([generated.stats.j distinct.stats.j]))
   ==
@@ -1006,7 +1042,7 @@
   =/  r  (run-all (init:job-lib (sim-req gen-spec gen-cfg 1 1 20) t0) 1.024)
   =/  j  +.r
   %+  expect-eq
-    !>  [`[%invariant 'Inv'] `43]
+    !>  [`[%invariant 'Inv' %.n] `43]
   !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
       ?~(result.j ~ `generated.stats.j)
 ::  the same run with `-generate`: 13, because the probabilistic walk returns at
@@ -1017,7 +1053,7 @@
   =/  r  (run-all (init:job-lib (gen-req gen-spec gen-cfg 1 1 20) t0) 1.024)
   =/  j  +.r
   %+  expect-eq
-    !>  [`[%invariant 'Inv'] `13]
+    !>  [`[%invariant 'Inv' %.n] `13]
   !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
       ?~(result.j ~ `generated.stats.j)
 ::  a CASE below the decomposition boundary. tlc2 ABORTS there -- exit 255, no
@@ -1076,7 +1112,7 @@
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   ;:  weld
     %+  expect-eq
-      !>(`[%property 'Live'])
+      !>(`[%property 'Live' %.n])
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
@@ -1488,7 +1524,7 @@
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ovr-req `'strict') t0) 256)
   ?>  ?=(^ result.j)
   ?>  ?=(%violated -.u.result.j)
-  (expect-eq !>(`violation`[%invariant 'Strict']) !>(violation.u.result.j))
+  (expect-eq !>(`violation`[%invariant 'Strict' %.n]) !>(violation.u.result.j))
 ::
 ++  test-cfg-override-unknown-source-rejected
   ::  refused at SUBMIT, so nothing downstream can quietly fall back to the
@@ -1551,7 +1587,7 @@
     (run-all (init:job-lib (check-req ip-spec ip-inv-wins) t0) 256)
   ?>  ?=(^ result.j)
   ?>  ?=(%violated -.u.result.j)
-  (expect-eq !>(`violation`[%invariant 'Tight']) !>(violation.u.result.j))
+  (expect-eq !>(`violation`[%invariant 'Tight' %.n]) !>(violation.u.result.j))
 ::
 ++  test-inv-prop-liveness-runs-when-invariant-holds
   ::  the matched half: same spec, an invariant that HOLDS, so the run reaches
@@ -1561,7 +1597,7 @@
     (run-all (init:job-lib (check-req ip-spec ip-prop-runs) t0) 256)
   ?>  ?=(^ result.j)
   ?>  ?=(%violated -.u.result.j)
-  (expect-eq !>(`violation`[%property 'Live']) !>(violation.u.result.j))
+  (expect-eq !>(`violation`[%property 'Live' %.n]) !>(violation.u.result.j))
 ::
 ++  test-inv-prop-box-state-invariant-order
   ::  a `[]P` box-state PROPERTY is checked as an INVARIANT, and the config's
@@ -1572,7 +1608,7 @@
     (run-all (init:job-lib (check-req ip-spec ip-box-order) t0) 256)
   ?>  ?=(^ result.j)
   ?>  ?=(%violated -.u.result.j)
-  (expect-eq !>(`violation`[%invariant 'Tight']) !>(violation.u.result.j))
+  (expect-eq !>(`violation`[%invariant 'Tight' %.n]) !>(violation.u.result.j))
 ::
 ++  test-inv-prop-both-hold
   ::  both hold: the run completes
@@ -1659,7 +1695,7 @@
   ::  and reports the prefix's counts -- 3 states, depth 3
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib (cont-req |) t0) 256)
   %+  expect-eq
-    !>(`[%violated [%invariant 'Inv'] [3 3 0 3 [1 1 1 1]]])
+    !>(`[%violated [%invariant 'Inv' %.n] [3 3 0 3 [1 1 1 1]]])
   !>(result.j)
 ::
 ++  test-continue-completes-with-all-violations
@@ -1673,7 +1709,7 @@
   ;:  weld
     (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
     (expect-eq !>(2) !>((lent viols.u.a)))
-    (expect-eq !>(`violation`[%invariant 'Inv']) !>(violation:(snag 0 viols.u.a)))
+    (expect-eq !>(`violation`[%invariant 'Inv' %.n]) !>(violation:(snag 0 viols.u.a)))
     ::  discovery order: the depth-3 violator first, then the depth-4 one that
     ::  is only reachable THROUGH it -- which is what proves the violating
     ::  state is still enqueued

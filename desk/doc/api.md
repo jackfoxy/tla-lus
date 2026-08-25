@@ -97,7 +97,7 @@ sources it is checking.
 ::  state-graph out-degree: one sample per dequeued state (its newly-distinct
 ::  successor count), summarized as TLC reports it
 +$  out-degree  [min=@ud mean=@ud p95=@ud max=@ud]
-+$  violation  $%([%invariant name=@t] [%deadlock ~] [%property name=@t] [%liveness name=@t] [%assumption name=@t])
++$  violation  $%([%invariant name=@t initial=?] [%deadlock ~] [%property name=@t initial=?] [%liveness name=@t] [%assumption name=@t])
 ```
 
 Events arrive **in order**; `%result` fires exactly once and is terminal.
@@ -229,7 +229,7 @@ wire and not listed here.
 
 | Mold | Shape | Example |
 |---|---|---|
-| `violation` | `$%(%invariant %deadlock %property %liveness %assumption)` | `[%invariant 'Inv']`, `[%deadlock ~]`, `[%property 'Lead']` |
+| `violation` | `$%(%invariant %deadlock %property %liveness %assumption)` | `[%invariant 'Inv' \|]`, `[%deadlock ~]`, `[%property 'Lead' \|]`. **`initial` splits what tlc2 reports as two error codes** (R2.7.1): `&` is a violation found while COMPUTING THE INITIAL STATES (EC 2107 for an invariant, EC 2108 for a property), `\|` one found by a behavior (EC 2110). It is not cosmetic — an initial-state violation has no behavior and tlc2 prints no state-graph statistics for it, so without the flag a caller cannot tell whether the `trace` it holds is a counterexample or a single offending state. `%deadlock`, `%liveness` and `%assumption` take no flag: the first two are properties of a behavior by construction and an ASSUME is checked before any state exists |
 | `limit-kind` | `?(%source %modules %states %depth %time %artifact %noun)` | `%artifact` |
 | `out-degree` | `[min mean p95 max]` | `[0 1 1 1]` — one sample per **dequeued** state, so a sink pulls `min` to 0 |
 | `run-stats` | `[generated distinct queued depth outdeg]` | `[5 4 0 4 [0 1 1 1]]` |
@@ -242,6 +242,11 @@ wire and not listed here.
 
 Three reading notes that save a round trip:
 
+- **`api-version` stays 1 through this change, deliberately.**
+  `compatibility.md` §10.6 records the rule: pre-release reshapes are not
+  versions, because no ship held that state and no caller saw that wire.
+  R2's own preamble says the same. Bumping it here would re-create exactly the
+  pre-release version history §10.6 removed on purpose. It moves at release.
 - **`%violated` is never collapsed into `%failed`.** A counterexample is a
   successful run that found something; `%failed` means the engine could not
   answer.

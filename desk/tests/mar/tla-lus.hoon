@@ -82,7 +82,7 @@
       [%job ~.j1 [%progress 3 13]]
       [%job ~.j1 [%diagnostic full-diag]]
       [%job ~.j1 [%result [%ok [100 80 0 12 [0 1 2 3]]]]]
-      [%job ~.j1 [%result [%violated [%invariant 'Inv'] [10 8 0 4 [0 1 1 2]]]]]
+      [%job ~.j1 [%result [%violated [%invariant 'Inv' %.n] [10 8 0 4 [0 1 1 2]]]]]
       [%job ~.j1 [%result [%limited %states [75 60 0 9 [0 1 1 1]]]]]
       [%job ~.j1 [%result [%cancelled ~]]]
       [%job ~.j1 [%result [%failed 'evaluation error']]]

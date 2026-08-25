@@ -710,7 +710,7 @@
   =/  tr  (~(got by artifacts.j) %trace)
   ?>  ?=(%trace -.tr)
   ;:  weld
-    (expect-eq !>(`[%violated [%invariant 'Inv'] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
+    (expect-eq !>(`[%violated [%invariant 'Inv' %.n] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
     (expect-eq !>(%safety) !>(kind.trace.tr))
     ::  x = 0, 1, 2, 3 — the shortest path to the violation
     (expect-eq !>(4) !>((lent states.trace.tr)))

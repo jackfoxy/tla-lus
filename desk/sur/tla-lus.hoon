@@ -18,6 +18,12 @@
 ::  Bumped when a caller-visible noun changes AFTER a release. Nothing has
 ::  been released, so this is 1: the wire as it ships, with no pre-release
 ::  revision history to carry.
+::  STAYS 1 through R2.7.1's wire change, and that is the desk's own rule
+::  rather than an oversight: `compatibility.md` §10.6 records that pre-release
+::  reshapes are NOT versions -- "no ship ever held that state and no caller
+::  ever saw that wire" -- and R2's own preamble says nothing has shipped and
+::  the wire may be reshaped freely. Bumping here would re-create exactly the
+::  pre-release version history §10.6 deliberately removed. It moves at release
 ++  api-version  1
 ::
 ::  +|  Identifiers
@@ -114,8 +120,11 @@
       [%trace =trace]
       ::  every counterexample of a `-continue` run (R2.4.2), in discovery
       ::  order. A separate ARTIFACT rather than a change to `result` or
-      ::  `violation`: those two are R2.7.1's to reshape (the EC 2107/2110
-      ::  split), and that is the one unit meant to move `api-version`
+      ::  `violation`: those two were R2.7.1's to reshape (the EC 2107/2110
+      ::  split, since done). Keeping the counterexample list OUT of `result`
+      ::  still holds on its own terms -- a completed `-continue` run has one
+      ::  verdict and many counterexamples, which is an artifact's shape, not a
+      ::  result's
       [%violations viols=(list [=violation =trace])]
   ==
 ::
@@ -258,10 +267,27 @@
 ::
 ::  +|  Results
 ::
+::  R2.7.1 splits what tlc2 reports as two distinct error codes and this wire
+::  used to collapse into one. `initial` is TRUE for a violation found while
+::  COMPUTING THE INITIAL STATES and FALSE for one found by a behavior:
+::
+::    invariant  EC 2107 `Invariant %1% is violated by the initial state:`
+::               EC 2110 `Invariant %1% is violated.`
+::    property   EC 2108 `Property %1% is violated by the initial state:`
+::
+::  The difference is not cosmetic. An initial-state violation has no behavior
+::  and tlc2 prints no state-graph statistics for it, so a caller that cannot
+::  tell them apart cannot know whether the `trace` it holds is a
+::  counterexample or a single offending state -- the console report has always
+::  distinguished them, and only the typed result did not.
+::
+::  `%deadlock`, `%liveness` and `%assumption` take no flag: a deadlock and a
+::  liveness violation are properties of a behavior by construction, and an
+::  ASSUME is checked before any state exists.
 +$  violation
-  $%  [%invariant name=@t]
+  $%  [%invariant name=@t initial=?]
       [%deadlock ~]
-      [%property name=@t]
+      [%property name=@t initial=?]
       [%liveness name=@t]
       [%assumption name=@t]
   ==

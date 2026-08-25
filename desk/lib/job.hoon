@@ -1652,7 +1652,7 @@
     ?-  -.out
       %ok        [%ok st]
       %limited   [%limited what.out st]
-      %inv       [%violated [%invariant name.out] st]
+      %inv       [%violated [%invariant name.out initial.out] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
   ::  per-action attribution for the wire trace: the getActions leaves plus the
@@ -1675,7 +1675,8 @@
   ::  `-continue` (R2.4.2): a completed run that passed violations carries them
   ::  all. They go to their OWN artifact rather than into `result` -- `result`
   ::  and `violation` are R2.7.1's to reshape, and that is the unit meant to
-  ::  move `api-version`
+  ::  reshape `violation` (R2.7.1 has since done so, splitting EC 2107/2110
+  ::  with an `initial` flag; `api-version` stayed 1 -- see sur/tla-lus)
   =.  j
     ?.  ?&(?=(%ok -.out) ?=(^ viols.out))  j
     ::  EXPLICIT loop, and the element face is NOT called `trace`: a wet `turn`
@@ -1690,7 +1691,9 @@
       |-  ^-  (list [=violation =trace])
       ?~  ws  (flop acc)
       =/  one=[=violation =trace]
-        :-  [%invariant name.i.ws]
+        ::  `-continue` records only BEHAVIOR violations: an initial-state
+        ::  one returns from `doInit` before the search starts (R2.7.1)
+        :-  [%invariant name.i.ws %.n]
         [%safety (trace-states trace.i.ws act acts env order.o modn al) ~]
       $(ws t.ws, acc [one acc])
     j(artifacts (~(put by artifacts.j) %violations [%violations vs]))
@@ -1762,7 +1765,7 @@
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
   =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '' ~) `loop.u.l]
-  (finish-arts j [%violated [%property pname.kk] st] report `typed pre)
+  (finish-arts j [%violated [%property pname.kk %.n] st] report `typed pre)
 ::
 ::  +|  Stage: %simulate
 ::
@@ -1831,8 +1834,10 @@
   =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '' ~) ~]
   =/  vn
     ?-  vk
-      %invariant  [%invariant vname]
-      %property   [%property vname]
+      ::  simulation reports what a BEHAVIOR violated; it has no
+      ::  initial-predicate phase of its own (R2.7.1)
+      %invariant  [%invariant vname %.n]
+      %property   [%property vname %.n]
       %deadlock   [%deadlock ~]
     ==
   (finish-arts j [%violated vn st] report `typed pre)
@@ -1879,9 +1884,14 @@
       ::  the bound was reached and tlc2 printed no completion line, so this is
       ::  NOT %ok: the search did not finish
       %limited   [%limited %depth st]
-      %inv       [%violated [%invariant name.out] st]
-      %prop      [%violated [%property name.out] st]
-      %action    [%violated [%property name.out] st]
+      %inv       [%violated [%invariant name.out initial.out] st]
+      ::  an implied INIT can only fail on an initial state, by construction
+      %prop      [%violated [%property name.out %.y] st]
+      ::  RESIDUE, named rather than hidden: an implied ACTION violation is
+      ::  tlc2's EC 2112, a THIRD code this wire still folds into `%property`.
+      ::  R2.7.1's scope is the 2107/2110 invariant split; the action-property
+      ::  code wants its own row rather than a silent third meaning here
+      %action    [%violated [%property name.out %.n] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
   =/  env  (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
