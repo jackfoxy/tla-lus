@@ -135,10 +135,17 @@ R2_MODULE_DEFAULT = {
     "_TLCTESpec": "out:internal trace-expression spec surface",
     "_TLCTrace":  "out:internal trace-expression spec surface",
     "_TLCTracePlain": "out:internal trace-expression spec surface",
-    "Randomization": "R2.6.2",
+    # R2.6.0 assigned these to R2.6.2. R2.6.2's own measurement then showed
+    # the draw ADVANCES the RNG within a single evaluation (the pin designs for
+    # `x' = RandomElement(..) /\ y' = RandomElement(..)` giving two values), so
+    # a faithful port must carry RNG state across draws -- the same
+    # return-carrying change R2.7.4 needs. Folded there too (2026-08-25); the
+    # machinery underneath (`+subset-indices`, `lib/rng`, FP64) is already
+    # ported, so the surgery is the whole remaining cost.
+    "Randomization": "R2.7.4",
 }
 R2_CLASSIFY = {
-    ("TLC", "RandomElement"): "R2.6.2",
+    ("TLC", "RandomElement"): "R2.7.4",
     ("TLC", "JavaTime"):      "out:wall-clock nondeterminism",
     ("TLC", "Any"):           "out:universal UserValue; no canonical representation",
     # --- TLCExt, per operator. The module-level `excluded` default called all
