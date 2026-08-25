@@ -1069,7 +1069,11 @@
   ::  the evaluator must never use them, so generating them is wasted work
   ::  and, across a corpus, wasted memory
   ^-  (set @t)
-  (silt ~['Bags'])
+  ::  R2.6.3 adds TLCExt, for `AssertEq` — the pin gives it no Java override,
+  ::  so its vendored body IS the behavior. Without the module here the
+  ::  definition is generated body-less and every use fails
+  ::  `operator has no evaluable body`, which is how this was found
+  (silt ~['Bags' 'TLCExt'])
 ::
 ++  ctx-defs
   ::  the definitions a module exports, synthesized from its export context:

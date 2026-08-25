@@ -102,6 +102,14 @@ CLASSIFY = {
     ("Bags", "SubBag"):      ("body", "not overridden by Java; evaluates its TLA+ definition"),
     ("Bags", "Sum"):         ("body", "LOCAL helper of Bags.tla"),
     ("Sequences", "Seq"):    ("required", "non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)"),
+    # TLCExt's non-debugger operators (R2.6.3). The module-level default calls
+    # every TLCExt surface `excluded`; these five are not, and `class` has to
+    # say so or it contradicts what lib/stdops actually does.
+    ("TLCExt", "AssertEq"):    ("body", "no Java override; evaluates its TLA+ definition (PrintT/Assert, both implemented)"),
+    ("TLCExt", "AssertError"): ("required", "catches the argument's evaluation failure and compares the message (R2.6.3)"),
+    ("TLCExt", "TLCCache"):    ("required", "memoization of a pure expression is the identity; the pin returns exactly the expression's value (R2.6.3)"),
+    ("TLCExt", "TLCDefer"):    ("required", "TRUE without evaluating: `execCallable` is run by the Simulation/Exploration workers, NOT by ModelChecker, so under BFS the deferred expression never runs (R2.6.3)"),
+    ("TLCExt", "TLCNoOp"):     ("required", "the identity function (`return val`) (R2.6.3)"),
 }
 
 # ---------------------------------------------------------------------------

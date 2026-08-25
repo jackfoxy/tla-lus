@@ -2000,7 +2000,7 @@
       ::  action and every wire trace state loses its attribution
       %:  edge-action:check
         u.prev  (@t (state-fp:fp order i.sts))  acts
-        (with-run:ne e [(dec i) ~])  order  modn
+        (with-run:ne e [| (dec i) ~])  order  modn
       ==
     ?~(hit act hit)
   ::  ALIAS (R2.3.2): the record BECOMES the state, its successor is the next

@@ -261,7 +261,7 @@
   ::  expansion's successors
   |=  [cur=bfs-cursor lvl=@ud]
   ^-  tlc-run:so:ne
-  [lvl `[depth.cur distinct.cur (lent queue.cur) gen.cur]]
+  [| lvl `[depth.cur distinct.cur (lent queue.cur) gen.cur]]
 ::
 ++  env-at
   ::  `+env-of` carrying those statistics
@@ -396,7 +396,7 @@
   =/  e  (env-of o)
   =/  ch  (con-hold cons.o st e)
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
-  ?.  p.ch  (check-pruned o cur st pred e)
+  ?.  p.ch  (check-pruned o cur st pred e d)
   ?^  prev
     =/  ah  (acon-hold acons.o u.prev st e)
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
@@ -408,9 +408,12 @@
   ::  a CONSTRAINT-pruned state: check its invariants (declaration order) but do
   ::  not dedup, count, or enqueue it. A violation ends the run; the trace is the
   ::  predecessor's behavior extended by this state (it is absent from `seen`).
-  |=  [o=bfs-opts cur=bfs-cursor st=state pred=@t e=eenv:ne]
+  |=  [o=bfs-opts cur=bfs-cursor st=state pred=@t e=eenv:ne d=@ud]
   ^-  [out=(unit outcome) cur=bfs-cursor]
-  =/  iv  (first-violated invs.o st e)
+  ::  a CONSTRAINT-pruned state is not counted or entered, so the statistics it
+  ::  sees are the ones standing before it (R2.6.1)
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
+  =/  iv  (first-violated invs.o st ie)
   ?~  iv  [~ cur]
   ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
   :_  cur
@@ -448,7 +451,14 @@
   ::  the invariant is checked on the orbit representative (sound for the
   ::  symmetry-invariant predicates TLC requires; identical to `st` when there
   ::  is no symmetry group)
-  =/  iv  (first-violated invs.o cst e)
+  ::  R2.6.1/R2.6.3: the INVARIANT is evaluated here, so it needs the run
+  ::  statistics too -- `TLCGet("distinct")` in an invariant is as legal as in a
+  ::  next-state relation. tlc2 checks the invariant right after the state is
+  ::  entered in the set, so `distinct` INCLUDES this state, which is why the
+  ::  counters are read after the increments above. `level` is the state's own
+  ::  depth: `isValid(inv, succState)` passes it as s0
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
+  =/  iv  (first-violated invs.o cst ie)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is
@@ -711,7 +721,7 @@
     ::  reconstructible; the counters are not, and stay `~`
     %:  edge-action-label
       u.prev  (@t (state-fp:fp order i.trace))  actions
-      (with-run:ne e [(dec i) ~])  order  modn
+      (with-run:ne e [| (dec i) ~])  order  modn
     ==
   ::  ALIAS: the record BECOMES the state (R2.3.2). Its successor is the next
   ::  trace state, and the LAST state is paired with itself -- which is what
@@ -1064,7 +1074,10 @@
   ?:  =(~ inits.cur)  [%done (mk-result 0 cur ~ ~) cur]
   ::  build the node-eval env (with its override registry) once per event; the
   ::  kont stores defs/consts/vars, never the built env (see +$ sim-opts)
-  =/  e  (make-env:ne defs.o consts.o vars.o)
+  ::  R2.6.3: marked `%sim` so `TLCExt!TLCDefer`, whose deferred expression the
+  ::  Simulation worker DOES execute (and the BFS one does not), can refuse here
+  ::  by name instead of silently dropping the effect
+  =/  e  (with-run:ne (make-env:ne defs.o consts.o vars.o) [& 0 ~])
   =/  spent  0
   |-  ^-  sim-slice
   ?:  (gte spent budget)  [%more cur]

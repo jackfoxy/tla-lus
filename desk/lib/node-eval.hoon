@@ -941,6 +941,9 @@
   ?:  ?=(%sort-seq tag)       (eval-sort-seq n e)
   ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e)
   ?:  ?=(%tlc-get tag)        (eval-tlc-get n e)
+  ?:  ?=(%assert-error tag)   (eval-assert-error n e)
+  ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e)
+  ?:  ?=(%tlc-defer tag)      (eval-tlc-defer n e)
   ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
   ?.  ?=([* * ~] args.n)
     [%| 0 'SelectSeq expects two arguments.']
@@ -1064,6 +1067,79 @@
   ^-  eres
   ?.  ?=([* ~] args.n)  [%| 0 'TLCEval expects one argument.']
   (eval i.args.n e)
+::
+++  eval-assert-error
+  ::  TLCExt!AssertError(err, exp) — evaluate `exp`; if it FAILS, compare the
+  ::  failure's message to `err` and answer TRUE on a match, FALSE otherwise.
+  ::  An expression that evaluates cleanly is FALSE, since no error occurred.
+  ::
+  ::  This is the one TLCExt operator that reads more naturally here than in
+  ::  the pin: there it is a `try/catch` around `EvalException`, and this
+  ::  evaluator already returns a failure as a VALUE (`eres`'s `%|` arm), so
+  ::  "catching" is just branching on it.
+  ::
+  ::  The `err` argument is checked SYNTACTICALLY, as `assertError` does with
+  ::  `Assert.check(args[0] instanceof StringNode, ...)` — a computed string
+  ::  is rejected even though it would evaluate to one
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* * ~] args.n)  [%| 0 'AssertError expects two arguments.']
+  =/  ea  i.args.n
+  ?.  ?=(%lit -.ea)
+    :-  %|
+    :-  0
+    %^  rap  3  'In computing AssertError, a non-string expression was used '
+    ~['as the err of an AssertError(err, exp).']
+  =/  ev  (eval ea e)
+  ?:  ?=(%| -.ev)  ev
+  ?.  ?=(%str -.p.ev)
+    :-  %|
+    :-  0
+    %^  rap  3  'In computing AssertError, a non-string expression was used '
+    ~['as the err of an AssertError(err, exp).']
+  =/  r  (eval i.t.args.n e)
+  ?:  ?=(%& -.r)  [%& %bool |]
+  [%& %bool =(p.p.ev msg.p.r)]
+::
+++  eval-tlc-cache
+  ::  TLCExt!TLCCache(expression, closure) — MEMOIZATION, and memoization of a
+  ::  pure expression is observationally the identity. The pin keys a cache on
+  ::  `closure`'s value and stores it on the expression node (constant level) or
+  ::  on `s0` (variable level); either way the answer it returns is exactly
+  ::  `expression`'s value, so evaluating it is at parity by construction.
+  ::
+  ::  `closure` is still evaluated, because the pin evaluates it to build the
+  ::  key before it decides anything — so a `closure` that FAILS fails the
+  ::  operator here too, rather than being skipped on a cache hit this engine
+  ::  does not have
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* * ~] args.n)  [%| 0 'TLCCache expects two arguments.']
+  =/  k  (eval i.t.args.n e)
+  ?:  ?=(%| -.k)  k
+  (eval i.args.n e)
+::
+++  eval-tlc-defer
+  ::  TLCExt!TLCDefer(exp) — returns TRUE and arranges for `exp` to be
+  ::  evaluated LATER, by `TLCState.setCallable`. Measured at the pin, who runs
+  ::  that callable decides the whole behavior: `execCallable` is invoked by
+  ::  `SimulationWorker` and `ExplorationWorker` and NOT by `ModelChecker`, so
+  ::  under BFS the deferred expression is never evaluated at all — a spec with
+  ::  `TLCDefer(PrintT(...))` prints nothing and runs otherwise unchanged.
+  ::
+  ::  So TRUE-without-evaluating is not an approximation under BFS; it is what
+  ::  tlc2 does. Under SIMULATION the callable does run, and this engine has no
+  ::  post-step hook to run it in, so that case is refused BY NAME rather than
+  ::  silently dropping an effect the pin performs
+  |=  [n=sem-apply:sm e=eenv]
+  ^-  eres
+  ?.  ?=([* ~] args.n)  [%| 0 'TLCDefer expects one argument.']
+  ?:  ?&(?=(^ run.e) sim.u.run.e)
+    :-  %|
+    :-  0
+    %^  rap  3  'unsupported StandardModule operator: TLCExt!TLCDefer in '
+    ~['simulation; the deferred expression needs a post-step hook this engine has not built']
+  [%& %bool &]
 ::
 ++  eval-tlc-get
   ::  TLC!TLCGet — also an `@Evaluation` override in the pin, so it receives

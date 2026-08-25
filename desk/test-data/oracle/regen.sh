@@ -38,6 +38,11 @@ normalize() {
     -e 's/ and [0-9]+ cores/ and <N> cores/' \
     -e 's/with [0-9]+MB heap and [0-9]+MB offheap/with <N>MB heap and <N>MB offheap/' \
     -e 's/\[pid: [0-9]+\]/[pid: <N>]/' \
+    `# the JVM's own version, printed in TLC's banner. It has nothing to do`  \
+    `# with the pinned oracle: a host JDK patch bump (11.0.31 -> 11.0.32)`     \
+    `# turned 8 of the 14 baseline goldens red with tlaplus unchanged, so it`  \
+    `# is normalized rather than pinned`                                       \
+    -e 's/, [A-Za-z]+ [0-9][0-9._]+ 64bit/, <JVM> 64bit/' \
     -e 's/seed -?[0-9]{6,}/seed <SEED>/' \
     -e 's/_TTrace_[0-9]+/_TTrace_<T>/g' \
     -e 's#states/[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9.\-]+#<METADIR>#g' \

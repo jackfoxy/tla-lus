@@ -160,6 +160,8 @@
   ::  (C1.1 seeded 18, C1.3 added SubSeq, C1.4 added 11 Bags rows plus the
   ::  two TLC function constructors and moved Cardinality to a node-op,
   ::  C1.5 added the TLC value-shaped rows, C1.6 moved TLCGet to the
-  ::  node-op table because the pin evaluates it lazily)
-  (expect-eq !>(37) !>(~(wyt by registry:so)))
+  ::  node-op table because the pin evaluates it lazily, R2.6.3 added
+  ::  TLCExt!TLCNoOp -- its three siblings are node-ops, being `@Evaluation`
+  ::  overrides, and AssertEq is a `body`)
+  (expect-eq !>(38) !>(~(wyt by registry:so)))
 --

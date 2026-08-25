@@ -59,7 +59,11 @@
   ::  StandardModule operators the pin does NOT override, so their vendored
   ::  TLA+ definition is the behavior (inventory.txt class `body`)
   ^-  (set [@t @t])
-  (silt ~[['Bags' 'SubBag'] ['Bags' 'Sum']])
+  ::  R2.6.3: `TLCExt!AssertEq` joins them. It has NO Java override in the pin
+  ::  -- its vendored body is `IF a # b THEN PrintT(..) /\ a = b ELSE a = b`,
+  ::  over `PrintT` and `Assert`, both already implemented -- so evaluating the
+  ::  definition IS the behavior, and a native arm would be a second copy of it
+  (silt ~[['Bags' 'SubBag'] ['Bags' 'Sum'] ['TLCExt' 'AssertEq']])
 ::
 ++  lookup
   |=  [s=senv k=op-key]
@@ -147,6 +151,9 @@
     [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
     [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
     [['TLC' 'TLCSet' 2] [| 0 |=(a=(list value:v) (tlc-set a))]]
+    ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
+    ::  nothing else (R2.6.3)
+    [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
   ==
 ::
 ::  FiniteSets!Cardinality and !IsFiniteSet are `node-op`s, not rows: their
@@ -334,6 +341,13 @@
   ::  so TLC never constant-folds it); the datum is carried and checked even
   ::  though this engine has no constant-folding pass
   ?:  =(k ['TLC' 'TLCGet' 1])              `[%tlc-get & 1]
+  ::  TLCExt's non-debugger `@Evaluation` overrides (R2.6.3). All three receive
+  ::  the unevaluated node, which is the whole point of each: `AssertError` has
+  ::  to CATCH the argument's evaluation failure, `TLCCache` decides whether to
+  ::  evaluate at all, and `TLCDefer` deliberately does not evaluate
+  ?:  =(k ['TLCExt' 'AssertError' 2])      `[%assert-error & 0]
+  ?:  =(k ['TLCExt' 'TLCCache' 2])         `[%tlc-cache & 0]
+  ?:  =(k ['TLCExt' 'TLCDefer' 1])         `[%tlc-defer & 0]
   ~
 ::
 ++  op-meta
@@ -851,7 +865,13 @@
 ::  (0 in a constant or initial-predicate context) and NOT monotone, where
 ::  `diameter` (`TLCTrace.getLevelForReporting()`) is
 +$  tlc-run
-  $:  level=@ud
+  $:  ::  which engine is running. `TLCExt!TLCDefer` is the one operator whose
+      ::  BEHAVIOR differs between them at the pin -- measured, its deferred
+      ::  expression is never executed under BFS (`execCallable` is called by
+      ::  the Simulation and Exploration workers, not by `ModelChecker`) and IS
+      ::  executed under `-simulate` (R2.6.3)
+      sim=?
+      level=@ud
       ::  the four counters, `~` where they are not reconstructible. The
       ::  trace-label re-solve is the case that needs this: it knows each trace
       ::  state's LEVEL (its position) but not the search counts at the moment
@@ -918,6 +938,15 @@
       %generated  generated.u.cs
     ==
   [%& %int (sun:si n)]
+::
+++  tlc-no-op
+  ::  TLCExt!TLCNoOp(v) == v. `tlcNoOp` is `return val;` -- the pin uses it to
+  ::  defeat constant folding, which this evaluator does not do, so the identity
+  ::  is the whole behavior
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'TLCNoOp expects one argument.']
+  [%& i.as]
 ::
 ++  tlc-set
   ::  TLCSet(k, v) WRITES, and that is what still makes it a typed rejection.
