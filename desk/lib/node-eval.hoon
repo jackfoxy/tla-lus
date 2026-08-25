@@ -342,7 +342,7 @@
   ::  arity-0 constants
   ?:  =(nm 'TRUE')     [%& [%bool &]]
   ?:  =(nm 'FALSE')    [%& [%bool |]]
-  ?:  =(nm 'BOOLEAN')  [%& [%set ~[[%bool |] [%bool &]]]]
+  ?:  =(nm 'BOOLEAN')  [%& [%set %set-enum ~[[%bool |] [%bool &]]]]
   ::  equality and logic
   ?:  =(nm '=')        (bi-eq as e |)
   ?:  =(nm '/=')       (bi-eq as e &)
@@ -587,7 +587,7 @@
   |=  [as=(list sem:sm) e=eenv]
   ^-  eres
   =/  vs  (eval-args as e)
-  ?:(?=(%| -.vs) vs [%& (normalize:v [%set p.vs])])
+  ?:(?=(%| -.vs) vs [%& (normalize:v [%set %set-enum p.vs])])
 ::
 ++  eval-tuple
   |=  [as=(list sem:sm) e=eenv]
@@ -797,7 +797,7 @@
       %^  ctx-map:v  (ctx-doms bs e)  ~
       |=(pre=(list value:v) (eval body (bind-vals e bs pre)))
     ?:  ?=(%| -.r)  r
-    [%& (normalize:v [%set p.r])]
+    [%& (normalize:v [%set %set-enum p.r])]
   =/  sd  (eval-domain rng.i.bs e)
   ?:  ?=(%| -.sd)  sd
   %+  map-over:v  p.sd

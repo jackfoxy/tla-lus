@@ -99,7 +99,7 @@
     %intv   v
     %str    v
     %model  [%model (~(gut by pm) p.v p.v)]
-    %set    [%set (permute-list pm p.v)]
+    %set    [%set %set-enum (permute-list pm p.v)]
     %seq    [%seq (permute-list pm p.v)]
     %rec    [%rec (permute-fields pm p.v)]
     %fcn    [%fcn (permute-pairs pm p.v)]

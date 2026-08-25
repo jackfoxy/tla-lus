@@ -172,7 +172,7 @@
   ::  set enumeration: pull the token after '{'
   =/  p  (pull t.toks buf line.cur)
   ?:  ?&(?=(^ tok.p) =(img.u.tok.p '}'))
-    [%& [%set ~] rest.p buf.p ln.p]
+    [%& [%set %set-enum ~] rest.p buf.p ln.p]
   ::  non-empty: parse elements until a non-comma, then require '}'
   =|  acc=(list cfg-value)
   =/  el-toks=(list ctok)  ?~(tok.p ~ [u.tok.p rest.p])
@@ -186,7 +186,7 @@
   ?:  ?|(?=(~ tok.q) !=(img.u.tok.q ','))
     ?.  ?&(?=(^ tok.q) =(img.u.tok.q '}'))
       [%| (ed 5.006 ln.q '}')]
-    [%& [%set (flop [ev acc])] rest.q buf.q ln.q]
+    [%& [%set %set-enum (flop [ev acc])] rest.q buf.q ln.q]
   ::  comma: pull the next element's first token and continue
   =/  n  (pull rest.q buf.q ln.q)
   %=  $

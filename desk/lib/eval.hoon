@@ -50,7 +50,13 @@
 +$  vint    $+(vint $:(%int p=@sd))
 +$  vstr    $+(vstr $:(%str p=@t))
 +$  vmodel  $+(vmodel $:(%model p=@t))
-+$  vset    $+(vset $:(%set p=(list value)))
+::  R2.7.2: `cls` is the tlc2 VALUE CLASS this set was built as -- `%set-enum`
+::  for an ordinary one, `%subset`/`%prod`/`%fcns`/`%rcds`/... for a lazy
+::  construction. It rides the EXISTING arm rather than a new one because a
+::  tenth arm carrying `value` overflows the zuse-408 mold compiler
+::  (`recover: dig: over`), while widening an arm adds no cycle member and
+::  compiles -- measured by isolation probe before any of this was written
++$  vset    $+(vset $:(%set cls=@tas p=(list value)))
 +$  vseq    $+(vseq $:(%seq p=(list value)))
 +$  vrec    $+(vrec $:(%rec p=(list vfield)))
 +$  vfcn    $+(vfcn $:(%fcn p=(list vpair)))
@@ -388,7 +394,7 @@
   =/  nm  (genid-name n)
   ?:  =('TRUE' nm)   [%bool &]
   ?:  =('FALSE' nm)  [%bool |]
-  ?:  =('BOOLEAN' nm)  [%set ~[[%bool |] [%bool &]]]
+  ?:  =('BOOLEAN' nm)  [%set %set-enum ~[[%bool |] [%bool &]]]
   =/  hit  (~(get by e) nm)
   ?~  hit  ~|([%unbound nm] !!)
   u.hit
@@ -443,19 +449,19 @@
 ++  set-union
   |=  [a=value b=value]
   ^-  value
-  [%set (norm-set (weld (as-set a) (as-set b)))]
+  [%set %set-enum (norm-set (weld (as-set a) (as-set b)))]
 ::
 ++  set-inter
   |=  [a=value b=value]
   ^-  value
   =/  bs  (as-set b)
-  [%set (norm-set (skim (as-set a) |=(x=value (lien bs |=(y=value (val-equal x y))))))]
+  [%set %set-enum (norm-set (skim (as-set a) |=(x=value (lien bs |=(y=value (val-equal x y))))))]
 ::
 ++  set-diff
   |=  [a=value b=value]
   ^-  value
   =/  bs  (as-set b)
-  [%set (norm-set (skip (as-set a) |=(x=value (lien bs |=(y=value (val-equal x y))))))]
+  [%set %set-enum (norm-set (skip (as-set a) |=(x=value (lien bs |=(y=value (val-equal x y))))))]
 ::
 ++  eval-prefix
   |=  [n=node e=env]
@@ -483,20 +489,20 @@
     =/  x  i.es
     =.  subs  (weld subs (turn subs |=(sub=(list value) (snoc sub x))))
     $(es t.es)
-  [%set (norm-set (turn subs |=(sub=(list value) `value`[%set (norm-set sub)])))]
+  [%set %set-enum (norm-set (turn subs |=(sub=(list value) `value`[%set %set-enum (norm-set sub)])))]
 ::
 ++  big-union
   |=  s=value
   ^-  value
   =/  inner  (as-set s)
-  [%set (norm-set (zing (turn inner as-set)))]
+  [%set %set-enum (norm-set (zing (turn inner as-set)))]
 ::
 ++  domain-of
   |=  v=value
   ^-  value
   ?-    -.v
-      %rec   [%set (norm-set (turn p.v |=([k=@t *] `value`[%str k])))]
-      %fcn   [%set (norm-set (turn p.v |=([d=value *] d)))]
+      %rec   [%set %set-enum (norm-set (turn p.v |=([k=@t *] `value`[%str k])))]
+      %fcn   [%set %set-enum (norm-set (turn p.v |=([d=value *] d)))]
       %seq   [%intv (sun:si 1) (sun:si (lent p.v))]
       *      ~|(%domain !!)
   ==
@@ -558,7 +564,7 @@
   =/  dom  (as-set (eval range.parts e))
   =/  body  (expr-after-colon kids)
   =/  vn  ?~(vars.parts '' i.vars.parts)
-  :-  %set
+  :+  %set  %set-enum
   %-  norm-set
   %+  skim  dom
   |=  x=value
@@ -574,7 +580,7 @@
   =/  parts  (qbound-parts ?~(qb ~ (kids-of i.qb)))
   =/  dom  (as-set (eval range.parts e))
   =/  vn  ?~(vars.parts '' i.vars.parts)
-  :-  %set
+  :+  %set  %set-enum
   %-  norm-set
   %+  turn  dom
   |=  x=value
@@ -650,7 +656,7 @@
       %n-generalid  (eval-genid n e)
       %n-infixexpr  (eval-infix n e)
       %n-prefixexpr  (eval-prefix n e)
-      %n-setenumerate  [%set (norm-set (turn (elems n) |=(k=node (eval k e))))]
+      %n-setenumerate  [%set %set-enum (norm-set (turn (elems n) |=(k=node (eval k e))))]
       %n-tuple  [%seq (turn (elems n) |=(k=node (eval k e)))]
       %n-rcdconstructor  (eval-record n e)
       %n-recordcomponent  (eval-rcd-select n e)

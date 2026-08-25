@@ -712,7 +712,7 @@
   =/  ps  (bag-of i.as)
   ?~  ps
     [%| (wrong-value-error 'BagToSet' 'a function with a finite domain' i.as)]
-  [%& (normalize:v [%set (turn u.ps |=(pr=vpair:v d.pr))])]
+  [%& (normalize:v [%set %set-enum (turn u.ps |=(pr=vpair:v d.pr))])]
 ::
 ++  set-to-bag
   ::  the pin's message really does say BagToSet here (a copy-paste in
@@ -793,7 +793,7 @@
   =/  ps  (orderings es)
   =|  fs=(list value:v)
   |-  ^-  eres
-  ?~  ps  [%& (normalize:v [%set fs])]
+  ?~  ps  [%& (normalize:v [%set %set-enum fs])]
   $(ps t.ps, fs [[%fcn (zip-pairs es i.ps)] fs])
 ::
 ++  zip-pairs

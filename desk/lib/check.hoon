@@ -1820,7 +1820,16 @@
     %str    "StringValue"
     %model  "ModelValue"
     %intv   "IntervalValue"
-    %set    "SetEnumValue"
+    ::  R2.7.2: the class a set was BUILT as, which the port used to lose when
+    ::  a lazy construction was forced. `%set-enum` is an ordinary set literal
+    %set
+      ::  only the three classes the pin was measured to emit; every other
+      ::  construction forces to a plain SetEnumValue there
+      ?+  cls.x  "SetEnumValue"
+        %subset    "SubsetValue"
+        %prod      "SetOfTuplesValue"
+        %set-pred  "SetPredValue"
+      ==
     %seq    "TupleValue"
     %rec    "RecordValue"
     %fcn    "FcnRcdValue"

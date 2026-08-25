@@ -55,12 +55,6 @@ _LAZYSET = ("tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, "
             "domain. R1.3.8")
 
 SKIPS = {
-    ("ev-sets", "Sub"): _LAZYSET,
-    ("ev-prod", "P"): _LAZYSET,
-    ("ev-prod", "R"): _LAZYSET,
-    ("ev-prodfilt", "Card"): _LAZYSET,
-    ("ev-tupbind", "S"): _LAZYSET,
-    ("ev-tupbind", "FiltT"): _LAZYSET,
     ("ev-tupbind", "FcnT"): _LAZYSET,
 }
 

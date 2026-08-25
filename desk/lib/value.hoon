@@ -248,7 +248,10 @@
     %+  sort  (turn p.v |=(pr=vpair [(normalize d.pr) (normalize r.pr)]))
     |=([x=vpair y=vpair] (vlth d.x d.y))
       %set
-    [%set (norm-set (turn p.v normalize))]
+    ::  R2.7.2: `cls` survives normalization. Normalizing reorders and dedups
+    ::  ELEMENTS; it does not change what the set was BUILT as, and resetting
+    ::  it here would erase every class before it could be observed
+    [%set cls.v (norm-set (turn p.v normalize))]
   ==
 ::
 ++  norm-set
@@ -440,7 +443,7 @@
 ++  vs    |=(s=@t `value`[%str s])
 ++  vm    |=(m=@t `value`[%model m])
 ++  vintv-c  |=([lo=@sd hi=@sd] `value`[%intv lo hi])
-++  vset-c   |=(l=(list value) `value`[%set l])
+++  vset-c   |=(l=(list value) `value`[%set %set-enum l])
 ++  vseq-c   |=(l=(list value) `value`[%seq l])
 ++  vrec-c   |=(l=(list vfield) `value`[%rec l])
 ++  vfcn-c   |=(l=(list vpair) `value`[%fcn l])
@@ -560,9 +563,9 @@
   |=  f=value
   ^-  vres
   ?-  -.f
-    %fcn   [%& (normalize [%set (turn p.f |=(pr=vpair d.pr))])]
+    %fcn   [%& (normalize [%set %set-enum (turn p.f |=(pr=vpair d.pr))])]
     %seq   [%& [%intv --1 (sun:si (lent p.f))]]
-    %rec   [%& (normalize [%set (turn p.f |=(fd=vfield `value`[%str k.fd]))])]
+    %rec   [%& (normalize [%set %set-enum (turn p.f |=(fd=vfield `value`[%str k.fd]))])]
     %bool  [%| 0 'DOMAIN of a boolean']
     %int   [%| 0 'DOMAIN of an integer']
     %str   [%| 0 'DOMAIN of a string']
@@ -1039,7 +1042,7 @@
   ::
       %subset
     ?:  done.cur  [[%done ~] cur]
-    =/  item  (normalize [%set (turn comb.cur |=(j=@ud (snag j es.cur)))])
+    =/  item  (normalize [%set %set-enum (turn comb.cur |=(j=@ud (snag j es.cur)))])
     =/  adv   (subset-advance (lent es.cur) k.cur comb.cur)
     [[%item item] cur(k k.adv, comb comb.adv, done done.adv)]
   ==
@@ -1073,6 +1076,45 @@
     [%& (bex (lent es.c))]
   ==
 ::
+++  sexp-class
+  ::  the tlc2 VALUE CLASS a lazy construction denotes (R2.7.2). This is the
+  ::  class `EvalDump` prints and the one the port used to lose at `+force`.
+  ::
+  ::  `%set` PROPAGATES its operand's class rather than flattening it, which is
+  ::  the rule the R1.3.8 residue recorded and a naive port gets wrong: the
+  ::  class is not a property of the operator. `{x \in 1..6 : P}` is a
+  ::  SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue --
+  ::  same filter, different base
+  ::  MEASURED, not assumed. Across every `eval-core` golden the pin emits
+  ::  exactly three non-enum set classes -- SubsetValue (1), SetOfTuplesValue
+  ::  (3) and SetPredValue (2) -- and nothing else. `\cup`, `\cap`, `\` and
+  ::  UNION all print SetEnumValue there, so tlc2 FORCES them and mapping them
+  ::  to a lazy class would over-report. The first attempt did exactly that and
+  ::  the corpus caught it: `EvSet SetCupValue` against the pin's SetEnumValue.
+  |=  x=sexp
+  ^-  @tas
+  ?-  -.x
+    %set     ?:(?=(%set -.s.x) cls.s.x %set-enum)
+    %subset  %subset
+    %prod    %prod
+    ::  measured eager at the pin -- these force to a plain SetEnumValue
+    %cup     %set-enum
+    %cap     %set-enum
+    %diff    %set-enum
+    %union   %set-enum
+    ::  UNMEASURED: no golden covers `[D -> R]` or `[a: S, ...]`, so they keep
+    ::  the status quo rather than a guessed class. tlc2 has SetOfFcnsValue /
+    ::  SetOfRcdsValue; whether they survive to a printed class is not known
+    ::  here, and inventing it would be the same error the `%cup` attempt made
+    %fcns    %set-enum
+    %rcds    %set-enum
+    ::  the infinite UserValues never reach `+force` (enumeration refuses
+    ::  first), so these are unreachable rather than meaningful
+    %nats    %set-enum
+    %ints    %set-enum
+    %seqs    %set-enum
+  ==
+::
 ++  force
   ::  materialize a lazy set into a normalized eager %set (the boundary at
   ::  which a lazy set must become a value); typed overflow if too large.
@@ -1095,7 +1137,10 @@
   =/  st  (enum-next cur)
   =/  es  -.st
   ?-  -.es
-    %done  [%& (normalize [%set acc])]
+    ::  R2.7.2: the forced set remembers WHAT IT WAS. This is the boundary the
+    ::  class used to be lost at -- the enumeration was always lazy, the
+    ::  representation was not
+    %done  [%& (normalize [%set (sexp-class x) acc])]
     %item  $(acc [v.es acc], cur +.st)
   ==
 ::
@@ -1161,7 +1206,7 @@
       %fcns
     ?.  (fcn-like e)  [%& |]
     =/  ps  (fcn-pairs e)
-    =/  dom-e  (normalize [%set (turn ps |=(pr=vpair d.pr))])
+    =/  dom-e  (normalize [%set %set-enum (turn ps |=(pr=vpair d.pr))])
     ?.  (equal dom-e dom.x)  [%& |]
     [%& (levy ps |=(pr=vpair (memb r.pr rng.x)))]
   ::
@@ -1350,7 +1395,14 @@
     ?:  ?=(%| -.b)  b
     ?:(p.b [%& `v] [%& ~])
   ?:  ?=(%| -.r)  r
-  [%& (normalize [%set p.r])]
+  ::  R2.7.2: a filter over a LAZY base is tlc2's SetPredValue; a filter over
+  ::  an eager one is a plain SetEnumValue. Measured -- `{x \in ((1..2) \X
+  ::  (1..2)) : TRUE}` is SetPredValue at the pin while `{x \in 1..6 : P}` is
+  ::  SetEnumValue, which is why the class cannot be read off the OPERATOR and
+  ::  has to be read off the base set
+  =/  base  (sexp-class x)
+  =/  cls  ?:(=(%set-enum base) %set-enum %set-pred)
+  [%& (normalize [%set cls p.r])]
 ::
 ++  map-over
   ::  {e(x) : x \in S}  — streamed image, normalized (deduped) result set
@@ -1363,7 +1415,7 @@
     =/  w  (f v)
     ?:(?=(%| -.w) w [%& `p.w])
   ?:  ?=(%| -.r)  r
-  [%& (normalize [%set p.r])]
+  [%& (normalize [%set %set-enum p.r])]
 ::
 ++  fcn-over
   ::  [x \in S |-> e(x)]  — a function pairing each domain element with e
@@ -1653,9 +1705,13 @@
     %int    v
     %str    v
     %model  v
-    %intv   (canonicalize [%set (set-elems v)])
+    ::  canonicalize is the IDENTITY form (fingerprinting, equality). A set's
+    ::  class is NOT part of its identity at the pin -- `SUBSET {1,2}` and the
+    ::  same elements written out are the same value -- so `cls` is flattened
+    ::  to `%set-enum` here on purpose, and only here
+    %intv   (canonicalize [%set %set-enum (set-elems v)])
     %seq    [%seq (turn p.v canonicalize)]
-    %set    [%set (norm-set (turn p.v canonicalize))]
+    %set    [%set %set-enum (norm-set (turn p.v canonicalize))]
       %rec
     [%rec (turn p.v |=(f=vfield [k.f (canonicalize v.f)]))]
       %fcn
