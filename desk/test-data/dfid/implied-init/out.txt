@@ -1,0 +1,3 @@
+Warning: The formula Positive is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula Positive holds in all states of every behavior, use INVARIANT Positive instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula Positive changes it into a temporal formula, asserting that Positive holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.
+Error: Property Positive is violated by the initial state:
+x = 0

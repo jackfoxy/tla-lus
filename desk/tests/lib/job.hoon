@@ -31,6 +31,12 @@
   ^-  request
   [[%check [| | | | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~]
 ::
+++  dfid-req
+  ::  `tlc2.TLC -workers 1 -dfid <depth>` (R2.5)
+  |=  [spec=@t cfg=@t depth=@ud]
+  ^-  request
+  [[%check [| | | | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~]
+::
 ++  gen-req
   ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
@@ -836,6 +842,144 @@
     !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
     (expect !>((~(has by artifacts.j) %trace)))
   ==
+::
+::  +|  DFID Through The Kernel (R2.5)
+::
+::  Every expectation here is `tlc2.TLC -workers 1 -dfid N` at the pin. The
+::  COUNTS are compared, not the trace: the DFS order is drawn from a
+::  clock-seeded generator `-seed` does not reach, so two runs of the same jar
+::  can report different counterexamples while agreeing on every number.
+::
+++  test-dfid-plan
+  %+  expect-eq
+    !>(`(list stage)`~[%parse %config %dfid])
+  !>((plan:job-lib (dfid-req cyc-spec bare-cfg 10)))
+::
+++  test-dfid-ok
+  ::  `-dfid 10` on the 4-cycle: the graph is exhausted inside the bound, so
+  ::  the completion line prints and the run is %ok at 11/4
+  =/  r  (run-all (init:job-lib (dfid-req cyc-spec bare-cfg 10) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>([11 4]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-bound-is-limited-not-ok
+  ::  `-dfid 2` stops AT the bound. tlc2 prints no completion line there, so
+  ::  reporting %ok would claim a search it did not perform
+  =/  r  (run-all (init:job-lib (dfid-req cyc-spec bare-cfg 2) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%limited %depth])
+    !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `[%limited kind.u.result.j] ~))
+    (expect-eq !>([2 2]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-finds-violation
+  ::  7 generated / 4 distinct, and the counts are the run's FINAL ones: the
+  ::  worker keeps walking after `setErrState` because its DFS loop never tests
+  ::  `stopCode`, so stopping at the violation would report fewer
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%invariant 'Inv'])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect-eq !>([7 4]) !>([generated.stats.j distinct.stats.j]))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+++  test-dfid-trace-has-no-action-labels
+  ::  DFID's printers carry no action attribution -- `printInvariantTrace`
+  ::  prints the ordinal and nothing else -- so no trace state names one
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  =/  ta  (~(get by artifacts.j) %trace)
+  %+  expect-eq  !>(&)
+  !>  ^-  ?
+  ?.  ?&(?=(^ ta) ?=(%trace -.u.ta))  |
+  ?.  ?=(%safety -.trace.u.ta)  |
+  (levy states.trace.u.ta |=(ts=trace-state ?=(~ action.ts)))
+::
+++  test-dfid-deadlock
+  =/  r  (run-all (init:job-lib (dfid-req dead-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>(`[%deadlock ~])
+  !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+::
+++  test-dfid-box-state-property-runs
+  ::  `[]P` over a state-level P is appended to the config's INVARIANT vector
+  ::  by `processConfigProps`, so DFID checks it like any invariant and does
+  ::  NOT refuse -- measured at the pin, PBad reports at 4/3
+  =/  r  (run-all (init:job-lib (dfid-req live-spec live-bad-cfg 6) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%invariant 'PBad'])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect-eq !>([4 3]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-box-state-property-holds
+  =/  r  (run-all (init:job-lib (dfid-req live-spec live-good-cfg 6) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>([11 4]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-refuses-genuine-liveness
+  ::  `DFIDModelChecker.java:67`, verbatim including the DOUBLE space before
+  ::  `Please`. It keys on a genuine temporal property, which is why the two
+  ::  box-state cases above run instead of hitting this
+  =/  r  (run-all (init:job-lib (dfid-req live-spec lead-cfg 6) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  :-  ~
+    :-  %failed
+    %^  cat  3
+      'Depth-First Iterative Deepening mode does not support checking liveness '
+    %^  cat  3
+      'properties (https://github.com/tlaplus/tlaplus/issues/548).  Please check '
+    'liveness properties in Breadth-First-Search mode.'
+  !>(result.j)
+::
+++  test-dfid-refuses-continue
+  ::  `-continue` under DFID is a tlc2 capability this engine has not built,
+  ::  so it is refused BY NAME rather than accepted and ignored (R2.1)
+  %+  expect-eq
+    !>  `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
+  !>  %-  validate:job-lib
+  [[%check [| | | & ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+::
+++  test-dfid-refuses-difftrace
+  ::  measured at the pin, `-difftrace` changes nothing outside `-simulate`
+  %+  expect-eq
+    !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
+  !>  %-  validate:job-lib
+  [[%check [| | & | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+::
+++  test-dfid-kernel-report-matches-console
+  ::  the kernel's `%report` artifact is the CONSOLE renderer's output, so the
+  ::  22-case `tests/lib/dfid` differential covers this path too. Both go
+  ::  through `+render-dfid-outcome`; this arm is what keeps them from drifting
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  =/  ra  (~(get by artifacts.j) %report)
+  %+  expect-eq
+    !>  ^-  @t
+    %+  rap  3
+    %+  join  '\0a'
+    (dfid-check:check invfail-spec mc-cfg 10)
+  !>(?:(?&(?=(^ ra) ?=(%text -.u.ra)) text.u.ra ''))
+::
+++  test-pause-resume-every-boundary-dfid
+  ::  the DFID cursor is resumable like every other: interrupting after any
+  ::  slice changes neither the event stream nor the final job noun
+  (every-boundary (dfid-req cyc-spec bare-cfg 6) 1)
 ::
 ::  +|  -generate (R2.4.6)
 ::

@@ -1,0 +1,9 @@
+Finished computing initial states: 1 states generated, with 1 of them distinct.
+Starting level 2: 1 states generated, 1 distinct states found.
+Starting level 3: 3 states generated, 3 distinct states found.
+Starting level 4: 9 states generated, 6 distinct states found.
+Starting level 5: 19 states generated, 8 distinct states found.
+Starting level 6: 31 states generated, 9 distinct states found.
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+43 states generated, 9 distinct states found.

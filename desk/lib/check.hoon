@@ -11,6 +11,7 @@
 /=  lv       /lib/liveness
 /=  vl       /lib/value
 /=  rng      /lib/rng
+/=  diag     /lib/diagnostics
 |%
   ::  TLC Safety Model Checking (deterministic single-worker BFS)
   ::
@@ -352,6 +353,19 @@
   ?:  ?=(%| -.r)  `[%| msg.p.r]
   ?.  p.r  `[%& name.i.ivs]
   $(ivs t.ivs)
+::
+++  first-bad-action
+  ::  the first IMPLIED ACTION (declaration order) broken by the transition
+  ::  cur -> nxt; ~ = all hold, [%& name] = violated, [%| msg] = an evaluation
+  ::  error. The shape `+first-violated` has, over a transition rather than a
+  ::  state -- `Tool.isValid(impliedAction, curState, succState)`
+  |=  [ias=(list [name=@t body=sem:sem-lib]) cur=state nxt=state e=eenv:ne]
+  ^-  (unit (each @t @t))
+  ?~  ias  ~
+  =/  r  (pred-bool:ne body.i.ias cur nxt e)
+  ?:  ?=(%| -.r)  `[%| msg.p.r]
+  ?.  p.r  `[%& name.i.ias]
+  $(ias t.ias)
 ::
 ++  register
   ::  admit one generated state at depth `d`. TLC order: a state pruned by a
@@ -2258,8 +2272,23 @@
 ::  COUNT is order-independent and is matched exactly.
 ::
 +$  dfid-opts
-  $:  next=sem:sem-lib
+  $:  ::  the getActions decomposition, NOT the whole next-state relation.
+      ::  `DFIDModelChecker.doNext` loops over `tool.getActions()` and does
+      ::  `numOfGenStates.getAndAdd(sz)` per ACTION, so a doNext that stops at a
+      ::  violating successor has counted that action's whole vector and none of
+      ::  the later actions'. Counting the merged relation instead over-reports
+      ::  every terminating run by the successors tlc2 never generated
+      acts=(list act)
+      ::  INVARIANTs, plus a `[]P` box-state PROPERTY: `processConfigProps`
+      ::  appends that to the SAME `invVec` the config's INVARIANTs fill, so it
+      ::  is not a separate check and DFID does not refuse it
       invs=(list [name=@t body=sem:sem-lib])
+      ::  IMPLIED ACTIONS (`[][A]_v`): checked per TRANSITION inside `doNext`,
+      ::  right after the invariants. The BFS path scans a finished graph
+      ::  instead, which DFID never has -- so this one is done tlc2's own way
+      iacts=(list [name=@t body=sem:sem-lib])
+      ::  an IMPLIED INIT (a level-1 PROPERTY): checked per initial state
+      iinits=(list [name=@t body=sem:sem-lib])
       cons=(list sem:sem-lib)                  ::  CONSTRAINT
       acons=(list sem:sem-lib)                 ::  ACTION_CONSTRAINT
       vars=(set @t)
@@ -2276,6 +2305,15 @@
 ::  one frame of the explicit DFS stack: the state, its fingerprint, and the
 ::  successors still eligible to descend into (tlc2's succStateStack/succFPStack)
 +$  dfid-frame  [st=state fp=@t sucs=(list [st=state fp=@t])]
+::  the first violation a run found, held until the run ENDS. tlc2 reports all
+::  four the same way -- `setErrState` + `printTrace` -- and all four leave the
+::  worker walking, which is what makes one shape enough
++$  dfid-hit
+  $:  kind=?(%inv %action %prop %deadlock)
+      name=@t
+      trace=(list state)
+      initial=?
+  ==
 ::  the resumable DFID cursor. `lvl`/`leveled` are `FPIntSet.Level`/`Leveled`;
 ::  `stack` is innermost-FIRST; `more` is the worker's `moreLevel`, which tlc2
 ::  resets per sweep because `runTLC` builds a NEW worker for every level
@@ -2288,7 +2326,10 @@
       stack=(list dfid-frame)
       gen=@ud
       more=?
-      term=?
+      ::  `stopCode`: set the moment a violation is found. It ends the run at
+      ::  the next `getInit`, NOT at the violation -- see `+dfid-step`
+      stop=?
+      hit=(unit dfid-hit)
       ::  the per-level progress lines, in order (EC 2205)
       levels=(list [lvl=@ud gen=@ud distinct=@ud])
   ==
@@ -2298,8 +2339,26 @@
 +$  dfid-out
   $%  [%ok gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud])]
       [%limited gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud])]
-      [%inv gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud]) trace=(list state) name=@t]
-      [%deadlock gen=@ud distinct=@ud levels=(list [lvl=@ud gen=@ud distinct=@ud]) trace=(list state)]
+      $:  %inv
+          gen=@ud  distinct=@ud
+          levels=(list [lvl=@ud gen=@ud distinct=@ud])
+          trace=(list state)  name=@t  initial=?
+      ==
+      $:  %action
+          gen=@ud  distinct=@ud
+          levels=(list [lvl=@ud gen=@ud distinct=@ud])
+          trace=(list state)  name=@t
+      ==
+      $:  %prop
+          gen=@ud  distinct=@ud
+          levels=(list [lvl=@ud gen=@ud distinct=@ud])
+          trace=(list state)  name=@t
+      ==
+      $:  %deadlock
+          gen=@ud  distinct=@ud
+          levels=(list [lvl=@ud gen=@ud distinct=@ud])
+          trace=(list state)
+      ==
       [%error msg=@t]
   ==
 +$  dfid-slice
@@ -2362,83 +2421,133 @@
   ?~  stack  (weld out tail)
   $(stack t.stack, out [st.i.stack out])
 ::
-++  dfid-next
-  ::  DFIDModelChecker.doNext for ONE state. Returns the successors still
-  ::  eligible to descend into, whether every successor was a non-leaf
-  ::  (`allSuccNonLeaf`, which drives `moreLevel`), and the updated set.
-  ::
-  ::  Order, exactly as tlc2 has it: every successor is COUNTED first
-  ::  (`numOfGenStates += sz`, before any filtering); a state pruned by a
-  ::  CONSTRAINT or ACTION_CONSTRAINT is not entered into the set but its
-  ::  status stays NEW, so it is still invariant-checked — the same rule
-  ::  `+register` applies in the BFS
-  |=  $:  o=dfid-opts  cur=dfid-cursor  fr=dfid-frame  leaf=?
-          e=eenv:ne
+++  dfid-verdict
+  ::  the terminal outcome. The counts are the run's FINAL ones, never the ones
+  ::  standing when a violation was found: `setErrState` only sets `stopCode`,
+  ::  and the worker's DFS loop does not test it, so the walk from the current
+  ::  initial state runs to its end and keeps counting. Measured at the pin --
+  ::  the branching spec at `-dfid 8` reports 18/9, where stopping at the
+  ::  violation gives 14/7
+  |=  [cur=dfid-cursor fin=?(%ok %limited)]
+  ^-  dfid-out
+  =/  ls   (flop levels.cur)
+  =/  dis  ~(wyt by fps.cur)
+  ?^  hit.cur
+    =*  h  u.hit.cur
+    ?-  kind.h
+      %deadlock  [%deadlock gen.cur dis ls trace.h]
+      %inv       [%inv gen.cur dis ls trace.h name.h initial.h]
+      %action    [%action gen.cur dis ls trace.h name.h]
+      %prop      [%prop gen.cur dis ls trace.h name.h]
+    ==
+  ?-  fin
+    %ok       [%ok gen.cur dis ls]
+    %limited  [%limited gen.cur dis ls]
+  ==
+::
+++  dfid-succs
+  ::  `DFIDModelChecker.doNext`'s inner loop, over ONE action's successor
+  ::  vector. `halt` is tlc2's early `return allSuccNonLeaf`: the vector is
+  ::  abandoned at the violator and no later action runs, but the DFS walk goes
+  ::  on regardless -- only `stopCode` was set
+  |=  $:  o=dfid-opts  cur=dfid-cursor  fr=dfid-frame
+          nx=(list state)  keep=(list [st=state fp=@t])
+          done=?  noleaf=?  e=eenv:ne
       ==
-  ^-  $:  out=(unit dfid-out)
-          sucs=(list [st=state fp=@t])
-          noleaf=?
-          cur=dfid-cursor
+  ^-  $:  err=(unit @t)  halt=?
+          keep=(list [st=state fp=@t])
+          done=?  noleaf=?  cur=dfid-cursor
       ==
-  =/  nr  (next-states:ne st.fr next.o e)
-  ?:  ?=(%| -.nr)  [`[%error msg.p.nr] ~ & cur]
-  =/  nx  p.nr
-  ::  tlc2 adds the WHOLE successor vector to `numOfGenStates` up front
-  ::  (`this.numOfGenStates.getAndAdd(sz)`), before it looks at any of them --
-  ::  so a violation part-way through still counts the successors after it.
-  ::  Counting one at a time inside the loop under-reports a terminating run,
-  ::  the same shape as the R2.4.6 simulation defect
-  =.  gen.cur  (add gen.cur (lent nx))
-  =|  keep=(list [st=state fp=@t])
-  =/  all-done  &
-  =/  all-nonleaf  &
-  =/  dead  ?=(~ nx)
   |-
-  ^-  $:  out=(unit dfid-out)
-          sucs=(list [st=state fp=@t])
-          noleaf=?
-          cur=dfid-cursor
+  ^-  $:  err=(unit @t)  halt=?
+          keep=(list [st=state fp=@t])
+          done=?  noleaf=?  cur=dfid-cursor
       ==
-  ?~  nx
-    ::  deadlock, then the DONE rule: a state is DONE when all its children are
-    ::  DONE, or it is a leaf and none of its children is a leaf
-    ?:  &(dead deadlock.o)
-      :^  :-  ~
-          :*  %deadlock  gen.cur  ~(wyt by fps.cur)  (flop levels.cur)
-              (dfid-trace stack.cur ~[st.fr])
-          ==
-        ~  &  cur
-    =?  fps.cur  |(all-done &(leaf all-nonleaf))
-      +:(set-status fps.cur fp.fr st-done lvl.cur leveled.cur)
-    [~ (flop keep) all-nonleaf cur]
+  ?~  nx  [~ | keep done noleaf cur]
   =/  ch  (con-hold cons.o i.nx e)
-  ?:  ?=(%| -.ch)  [`[%error p.ch] ~ & cur]
+  ?:  ?=(%| -.ch)  [`p.ch & keep done noleaf cur]
   =/  ah  (acon-hold acons.o st.fr i.nx e)
-  ?:  ?=(%| -.ah)  [`[%error p.ah] ~ & cur]
+  ?:  ?=(%| -.ah)  [`p.ah & keep done noleaf cur]
+  ::  `isInModel(succ) && isInActions(cur, succ)`: a pruned state is not entered
+  ::  in the set and its status stays NEW, so it is still invariant-checked
   =/  in-model  &(p.ch p.ah)
   =/  sfp  (dfid-fp o i.nx)
   =^  status  fps.cur
     ?.  in-model  [st-new fps.cur]
     (set-status fps.cur sfp st-new lvl.cur leveled.cur)
-  =?  all-done     in-model  &(all-done (is-done status))
-  =?  all-nonleaf  in-model  &(all-nonleaf !(is-leaf-st status lvl.cur))
+  =?  done    in-model  &(done (is-done status))
+  =?  noleaf  in-model  &(noleaf !(is-leaf-st status lvl.cur))
+  ::  addElement happens BEFORE the invariant check, so a violating successor is
+  ::  still on its parent's frame when the walk backtracks through it
   =?  keep  &(in-model !(is-completed status leveled.cur))
     [[i.nx sfp] keep]
-  ::  tlc2 checks the invariants only for a status of NEW — which covers both a
-  ::  first-seen in-model state and every out-of-model one
-  ?.  =(st-new status)
-    $(nx t.nx)
-  =/  iv  (first-violated invs.o i.nx e)
-  ?~  iv  $(nx t.nx)
-  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] ~ & cur]
-  :^  :-  ~
-      :*  %inv  gen.cur  ~(wyt by fps.cur)  (flop levels.cur)
-          (dfid-trace stack.cur ~[st.fr i.nx])  p.u.iv
+  ::  ORDER MATTERS, and it is tlc2's: the INVARIANTS first and only for a
+  ::  status of NEW (which covers both a first-seen in-model state and every
+  ::  out-of-model one), then the IMPLIED ACTIONS on EVERY transition, new
+  ::  successor or not -- tlc2 says so in as many words, "We need to do it even
+  ::  if succState is not new". A transition breaking both names the invariant
+  =/  iv  ?.(=(st-new status) ~ (first-violated invs.o i.nx e))
+  ?^  iv
+    ?:  ?=(%| -.u.iv)  [`p.u.iv & keep done noleaf cur]
+    ::  `setErrState` reports only the FIRST violation (it returns false once
+    ::  `errState` is set, so `printTrace` never runs again); every later one
+    ::  is silent but still truncates its own doNext
+    =?  hit.cur  ?=(~ hit.cur)
+      `[%inv p.u.iv (dfid-trace stack.cur ~[st.fr i.nx]) |]
+    [~ & keep done noleaf cur(stop &)]
+  =/  ia  (first-bad-action iacts.o st.fr i.nx e)
+  ?~  ia  $(nx t.nx)
+  ?:  ?=(%| -.u.ia)  [`p.u.ia & keep done noleaf cur]
+  =?  hit.cur  ?=(~ hit.cur)
+    `[%action p.u.ia (dfid-trace stack.cur ~[st.fr i.nx]) |]
+  [~ & keep done noleaf cur(stop &)]
+::
+++  dfid-next
+  ::  `DFIDModelChecker.doNext` for ONE state: the successors still eligible to
+  ::  descend into, whether every successor was a non-leaf (`allSuccNonLeaf`,
+  ::  which drives `moreLevel`), and the updated set
+  |=  [o=dfid-opts cur=dfid-cursor fr=dfid-frame leaf=? e=eenv:ne]
+  ^-  $:  err=(unit @t)
+          sucs=(list [st=state fp=@t])
+          noleaf=?
+          cur=dfid-cursor
       ==
-    ~  &  cur
+  =|  keep=(list [st=state fp=@t])
+  =/  done    &
+  =/  noleaf  &
+  =/  dead    &
+  =/  acts  acts.o
+  |-
+  ^-  $:  err=(unit @t)
+          sucs=(list [st=state fp=@t])
+          noleaf=?
+          cur=dfid-cursor
+      ==
+  ?^  acts
+    =/  nr  (next-states:ne st.fr body.i.acts (act-env e ctx.i.acts))
+    ?:  ?=(%| -.nr)  [`msg.p.nr ~ & cur]
+    =/  nx  p.nr
+    ::  `numOfGenStates.getAndAdd(sz)` runs before tlc2 looks at any successor
+    ::  of this action, so an abandoned vector still counts in full
+    =.  gen.cur  (add gen.cur (lent nx))
+    =.  dead     &(dead ?=(~ nx))
+    =/  r  (dfid-succs o cur fr nx keep done noleaf e)
+    ?^  err.r  [err.r ~ & cur.r]
+    ?:  halt.r  [~ (flop keep.r) noleaf.r cur.r]
+    $(acts t.acts, cur cur.r, keep keep.r, done done.r, noleaf noleaf.r)
+  ::  deadlock is reported exactly like an invariant violation -- and, exactly
+  ::  like one, it does not stop the walk
+  ?:  &(dead deadlock.o)
+    =?  hit.cur  ?=(~ hit.cur)
+      `[%deadlock '' (dfid-trace stack.cur ~[st.fr]) |]
+    [~ (flop keep) noleaf cur(stop &)]
+  ::  DONE when all children are DONE, or this is a leaf and no child is one
+  =?  fps.cur  |(done &(leaf noleaf))
+    +:(set-status fps.cur fp.fr st-done lvl.cur leveled.cur)
+  [~ (flop keep) noleaf cur]
 ::
 ++  dfid-eligible
-  ::  DFIDWorker.getNext: the successors still worth descending into — not
+  ::  DFIDWorker.getNext: the successors still worth descending into -- not
   ::  completed at this level, and recorded DEEPER than where we now stand, so a
   ::  state already reachable in fewer steps is not re-expanded
   |=  [sucs=(list [st=state fp=@t]) m=(map @t @ud) leveled=@ud curl=@ud]
@@ -2458,16 +2567,18 @@
   =/  spent  0
   |-  ^-  dfid-slice
   ?:  (gte spent budget)  [%more cur]
-  ?:  term.cur
-    [%done [%ok gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
-  ::  inside a sweep?
+  ::  inside a walk? `DFIDWorker.run`'s inner `while (!isLeaf)` loop does NOT
+  ::  test `stopCode`, so a walk that has already found a violation runs to its
+  ::  end -- backtracking, expanding the frontier and counting all the way
   =/  stk  stack.cur
   ?^  stk
-    =/  fr  i.stk
+    =/  fr    i.stk
     =/  curl  (lent stk)
     =/  elig  (dfid-eligible sucs.fr fps.cur leveled.cur curl)
     ?~  elig
-      ::  nothing left below this state: mark it leveled and backtrack
+      ::  nothing left below this state: mark it leveled and backtrack. At
+      ::  `curLevel == 1` tlc2 breaks out of the walk, which is the same thing
+      ::  as this stack becoming empty
       =.  fps.cur  (set-leveled fps.cur fp.fr leveled.cur)
       $(cur cur(stack t.stk), spent +(spent))
     ::  descend into the first eligible successor. tlc2 picks a RANDOM one and
@@ -2479,40 +2590,41 @@
     =/  leaf  (gte curl (dec (max 1 lvl.cur)))
     =/  nfr=dfid-frame  [st.ch fp.ch ~]
     =/  dn  (dfid-next o cur nfr leaf e)
-    ?^  out.dn  [%done u.out.dn cur.dn]
+    ?^  err.dn  [%done [%error u.err.dn] cur.dn]
     =.  cur  cur.dn
     =.  more.cur  |(more.cur !noleaf.dn)
     ::  `isLeaf` is tlc2's LOOP CONDITION, not a "do not push" flag:
     ::  `while (!isLeaf) { ... }` in DFIDWorker.run, so the first descent that
     ::  reaches the sweep's depth ends the WHOLE walk from this initial state
     ::  and the worker goes back to `getInit()`. It does not carry on with the
-    ::  parent's other successors. Treating it as a push guard explores a
-    ::  different state set -- which is what made a violating branching run
-    ::  report 15/7 against the pin's 18/9 while every level line still agreed
+    ::  parent's other successors, and it does NOT level anything on the way out
     =.  stack.cur  ?:(leaf ~ [nfr(sucs sucs.dn) stk])
     $(spent +(spent))
-  ::  start the next initial state of this sweep
+  ::  the walk is over, so we are back at `while (this.stopCode == 0)`
+  ?:  stop.cur  [%done (dfid-verdict cur %ok) cur]
+  ::  getInit: the first initial state not yet completed at this level. It is
+  ::  NOT consumed -- a walk that ended on a leaf left it uncompleted, and tlc2
+  ::  picks it again and descends afresh
   =/  td  todo.cur
   ?^  td
     =/  s  (~(gut by fps.cur) fp.i.td 0)
     ?:  (is-completed s leveled.cur)
       $(cur cur(todo t.td), spent +(spent))
-    ::  isLeaf = toLevel < 2 for an initial state
+    ::  isLeaf = toLevel < 2 for an initial state; no sweep runs below level 2,
+    ::  so this is always false, and tlc2's `runTLC` is why
     =/  leaf  (lth lvl.cur 2)
     =/  fr=dfid-frame  [st.i.td fp.i.td ~]
     =/  dn  (dfid-next o cur fr leaf e)
-    ?^  out.dn  [%done u.out.dn cur.dn]
+    ?^  err.dn  [%done [%error u.err.dn] cur.dn]
     =.  cur  cur.dn
     =.  more.cur  |(more.cur !noleaf.dn)
-    =?  stack.cur  !leaf  ~[fr(sucs sucs.dn)]
-    $(cur cur(todo t.td), spent +(spent))
+    =.  stack.cur  ?:(leaf ~ ~[fr(sucs sucs.dn)])
+    $(spent +(spent))
   ::  the sweep is over. `terminated = !moreLevel`; otherwise open the next
-  ::  level, unless the bound is reached — in which case tlc2 prints no
+  ::  level, unless the bound is reached -- in which case tlc2 prints no
   ::  completion line, so the run is %limited rather than %ok
-  ?.  more.cur
-    [%done [%ok gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
-  ?:  (gte lvl.cur maxd.o)
-    [%done [%limited gen.cur ~(wyt by fps.cur) (flop levels.cur)] cur]
+  ?.  more.cur       [%done (dfid-verdict cur %ok) cur]
+  ?:  (gte lvl.cur maxd.o)  [%done (dfid-verdict cur %limited) cur]
   =/  nl  +(lvl.cur)
   %=  $
     levels.cur   [[nl gen.cur ~(wyt by fps.cur)] levels.cur]
@@ -2525,27 +2637,86 @@
   ==
 ::
 ++  dfid-cursor-init
-  ::  the cursor before the first sweep: Level 1, Leveled 0, every initial state
-  ::  counted and entered in the set (tlc2's doInit)
-  |=  [o=dfid-opts is=(list state)]
-  ^-  dfid-cursor
-  =|  m=(map @t @ud)
-  =|  ins=(list [st=state fp=@t])
-  =/  todo  is
-  =.  m
-    |-  ^-  (map @t @ud)
-    ?~  todo  m
-    =/  f  (dfid-fp o i.todo)
-    $(todo t.todo, m (~(put by m) f (con (lsh [0 2] 1) 0)))
-  =.  ins
-    =/  td  is
-    |-  ^-  (list [st=state fp=@t])
-    ?~  td  ~
-    [[i.td (dfid-fp o i.td)] $(td t.td)]
+  ::  `doInit`: every initial state is counted, entered in the set at Level 1 /
+  ::  Leveled 0, and invariant-checked in declaration order. A violation there
+  ::  is EC 2107 and returns before any level runs, so the cursor comes back
+  ::  already stopped, holding the states inserted SO FAR and no others
+  |=  [o=dfid-opts is=(list state) e=eenv:ne]
+  ^-  [err=(unit @t) cur=dfid-cursor]
   ::  Level 1 / Leveled 0, and `more` TRUE so the first step OPENS level 2 --
   ::  tlc2's loop is `for (level = 2; level <= DFIDMax; level++)`, so no sweep
   ::  ever runs at level 1
-  [ins m 1 0 ~ ~ (lent is) & | ~]
+  ::  `*?` is TRUE, so both flags are set explicitly rather than bunted
+  =|  cur=dfid-cursor
+  =.  lvl.cur      1
+  =.  leveled.cur  0
+  =.  more.cur     &
+  =.  stop.cur     |
+  =.  gen.cur      (lent is)
+  =/  todo  is
+  |-  ^-  [err=(unit @t) cur=dfid-cursor]
+  ?~  todo  [~ cur(inits (flop inits.cur))]
+  =/  f  (dfid-fp o i.todo)
+  =^  status  fps.cur  (set-status fps.cur f st-new 1 0)
+  =?  inits.cur  =(st-new status)  [[i.todo f] inits.cur]
+  ?.  =(st-new status)  $(todo t.todo)
+  ::  `doInit` is STATE-MAJOR: for each initial state every INVARIANT first
+  ::  (EC 2107) and only then every implied init (EC 2108), so an invariant
+  ::  false on the same state wins
+  =/  iv  (first-violated invs.o i.todo e)
+  ?^  iv
+    ?:  ?=(%| -.u.iv)  [`p.u.iv cur(inits (flop inits.cur))]
+    :-  ~
+    cur(inits (flop inits.cur), stop &, hit `[%inv p.u.iv ~[i.todo] &])
+  =/  ip  (first-violated iinits.o i.todo e)
+  ?~  ip  $(todo t.todo)
+  ?:  ?=(%| -.u.ip)  [`p.u.ip cur(inits (flop inits.cur))]
+  :-  ~
+  cur(inits (flop inits.cur), stop &, hit `[%prop p.u.ip ~[i.todo] &])
+::
+++  dfid-opts-of
+  ::  the DFID options a resolved config implies, with its PROPERTY routed
+  ::  exactly as `+check` routes it -- which is what decides whether DFID runs
+  ::  at all. `checkLiveness`, and so `DFIDModelChecker`'s refusal, is set only
+  ::  by the branch that reaches the liveness engine; the other three are
+  ::  ordinary checks DFID performs like any other. `warn` carries the EC 2255
+  ::  state-level warning the implied-init branch owes
+  |=  $:  acts=(list act)
+          invs=(list [name=@t body=sem:sem-lib])
+          cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
+          vars=(set @t)  order=(list @t)
+          defs=(map @t sem-def:sem-lib)  consts=(map @t value)
+          pp=(unit @t)  psb=(unit sem:sem-lib)
+          deadlock=?  setmax=@ud  maxd=@ud
+      ==
+  ^-  (each [o=dfid-opts warn=wain] @t)
+  =/  base=dfid-opts
+    :*  acts  invs  ~  ~  cons  acons  vars  order
+        defs  consts  deadlock  setmax  maxd
+    ==
+  ?~  pp   [%& base ~]
+  ?~  psb  [%& base ~]
+  ::  `[]P` over a state-level P is appended to the config's own INVARIANT
+  ::  vector by `processConfigProps`, so it is checked alongside them
+  =/  binner  (box-state-inner:tp u.psb)
+  ?^  binner  [%& base(invs (weld invs ~[[u.pp u.binner]])) ~]
+  ?:  (lte (sem-lvl:sem-lib u.psb) 1)
+    [%& base(iinits ~[[u.pp u.psb]]) ~[(state-level-warn u.pp)]]
+  =/  iact  (implied-action-inner u.psb)
+  ?^  iact  [%& base(iacts ~[[u.pp u.iact]]) ~]
+  [%| dfid-refusal]
+::
+++  dfid-setup
+  ::  `+dfid-opts-of` over a resolved `sctx`, for the console path
+  |=  [c=sctx maxd=@ud setmax=@ud]
+  ^-  (each [o=dfid-opts warn=wain] @t)
+  =/  e  (make-env:ne defs.c consts.c vars.c)
+  %-  dfid-opts-of
+  :*  (get-actions nsb.c aname.c defs.c e)
+      invs.c  cons.c  acons.c  vars.c  order.c  defs.c  consts.c
+      pp.c  ?~(pp.c ~ (sem-body defs.c u.pp.c))
+      ddl.c  setmax  maxd
+  ==
 ::
 ++  dfid-spec
   ::  run a DFID search from spec + config source, returning its outcome
@@ -2554,15 +2725,206 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [%error p.sc]
   =*  c  p.sc
-  =/  o=dfid-opts
-    :*  nsb.c  invs.c  cons.c  acons.c  vars.c  order.c
-        defs.c  consts.c  ddl.c  0  maxd
-    ==
-  =/  cur  (dfid-cursor-init o is.c)
+  =/  su  (dfid-setup c maxd 0)
+  ?:  ?=(%| -.su)  [%error p.su]
+  =/  o   o.p.su
+  =/  ci  (dfid-cursor-init o is.c (dfid-env o))
+  ?^  err.ci  [%error u.err.ci]
+  =/  cur  cur.ci
+  ?:  stop.cur  (dfid-verdict cur %ok)
   |-  ^-  dfid-out
   =/  r  (dfid-step o cur 1.024)
   ?:  ?=(%done -.r)  out.r
   $(cur cur.r)
+::
+::  +|  DFID reporting
+::
+::  DFID has its OWN reporter, not a parameterization of the BFS one. Measured
+::  line by line at the pin (R2.5.0): the init line is EC 2208 and carries no
+::  timestamp, progress is EC 2205 per LEVEL rather than `Progress(N)`, and the
+::  final counts are EC 2204 -- with NO `states left on queue` term, no
+::  `The depth of the complete state graph search is N.` line and no average
+::  outdegree line. A run that stops at the bound prints no completion line at
+::  all, which is why `%limited` renders only counts
+::
+++  dfid-init-line
+  |=  [gen=@ud distinct=@ud]
+  ^-  @t
+  (ec-body:diag 2.208 ~[(a-co gen) (a-co distinct)])
+::
+++  dfid-levels-of
+  ::  the per-level lines an outcome carries. Every arm but %error has them,
+  ::  but at different axes, so a bare `levels.res` over the union forks
+  |=  res=dfid-out
+  ^-  (list [lvl=@ud gen=@ud distinct=@ud])
+  ?-  -.res
+    %error     ~
+    %ok        levels.res
+    %limited   levels.res
+    %inv       levels.res
+    %action    levels.res
+    %prop      levels.res
+    %deadlock  levels.res
+  ==
+::
+++  dfid-level-lines
+  |=  ls=(list [lvl=@ud gen=@ud distinct=@ud])
+  ^-  wain
+  %+  turn  ls
+  |=  [lvl=@ud gen=@ud distinct=@ud]
+  (ec-body:diag 2.205 ~[(a-co lvl) (a-co gen) (a-co distinct)])
+::
+++  dfid-counts-line
+  |=  [gen=@ud distinct=@ud]
+  ^-  @t
+  (ec-body:diag 2.204 ~[(a-co gen) (a-co distinct)])
+::
+++  render-dfid-trace
+  ::  DFID's trace has NO action labels: `printInvariantTrace` and
+  ::  `printErrorTrace` both print the ordinal and nothing else, where the BFS
+  ::  trace names the getActions leaf. The two printers also differ in
+  ::  WHITESPACE, and a renderer has to reproduce it. `printTrace` routes ONLY
+  ::  EC 2110 to `printInvariantTrace`, so an invariant violation prints
+  ::  `State N: ` with a trailing space (TLC_STATE_PRINT2, template `%1%: %2%`
+  ::  with an empty info) and everything else -- deadlock, action property,
+  ::  runtime error -- goes to `printErrorTrace` and its `State N:` with none
+  ::  (TLC_STATE_PRINT1, template `%1%:`)
+  |=  $:  trace=(list state)  order=(list @t)
+          e=eenv:ne  vw=(unit sem:sem-lib)  spaced=?
+      ==
+  ^-  wain
+  =/  i  1
+  %-  zing
+  |-  ^-  (list wain)
+  ?~  trace  ~
+  :_  $(trace t.trace, i +(i))
+  ;:  weld
+    ~[(crip "State {(a-tape i)}:{?:(spaced " " "")}")]
+    (render-state order i.trace vw e ~)
+    ~['']
+  ==
+::
+++  render-dfid-outcome
+  ::  TLC's terminal lines for a DFID outcome, init line first. `ngen`/`ndis`
+  ::  are `doInit`'s own two numbers: every initial state generated, and the
+  ::  distinct in-model ones actually kept
+  |=  $:  res=dfid-out  order=(list @t)
+          e=eenv:ne  al=(unit sem:sem-lib)  vw=(unit sem:sem-lib)
+          ngen=@ud  ndis=@ud
+      ==
+  ^-  wain
+  ?:  ?=(%error -.res)  ~[(crip "Error: {(trip msg.res)}")]
+  ::  an INITIAL-state violation returns from `doInit`, so `modelCheckImpl`
+  ::  never reaches the EC 2208 line or the level loop -- measured at the pin,
+  ::  such a run prints its error block and nothing else
+  =/  initial=?  ?|(?=(%prop -.res) ?&(?=(%inv -.res) initial.res))
+  =/  head=wain
+    ?:  initial  ~
+    :-  (dfid-init-line ngen ndis)
+    (dfid-level-lines (dfid-levels-of res))
+  ::  the offending initial state, rendered inline. An ALIAS applies here too
+  ::  (R2.3.2): tlc2 builds both EC 2107 and EC 2108 from
+  ::  `evalAlias(curState, curState)`, the initial state being its own successor
+  =/  init-state
+    |=  trace=(list state)
+    ^-  wain
+    ?~  trace  ~
+    =/  shown=[order=(list @t) st=state]
+      ?~  al  [order i.trace]
+      (alias-state u.al e i.trace i.trace)
+    (render-state order.shown st.shown vw e ~)
+  %+  weld  head
+  ?-    -.res
+      %ok
+    :~  'Model checking completed. No error has been found.'
+        (dfid-counts-line gen.res distinct.res)
+    ==
+  ::
+      %limited
+    ::  the bound was reached: tlc2's level loop simply ends, `reportSuccess`
+    ::  never runs, and the summary prints alone. Measured -- `-dfid 2` on a
+    ::  deeper graph prints counts and NO verdict line
+    ~[(dfid-counts-line gen.res distinct.res)]
+  ::
+      %inv
+    ?:  initial.res
+      %+  weld
+        ~[(crip "Error: Invariant {(trip name.res)} is violated by the initial state:")]
+      (init-state trace.res)
+    ;:  weld
+      ~[(cat 3 'Error: ' (ec-body:diag 2.110 ~[name.res]))]
+      ~['Error: The behavior up to this point is:']
+      (render-dfid-trace trace.res order e vw &)
+      ~[(dfid-counts-line gen.res distinct.res)]
+    ==
+  ::
+      %prop
+    ::  an implied init can only fail on an INITIAL state, so like EC 2107 it
+    ::  prints its state inline and no statistics follow
+    %+  weld
+      ~[(crip "Error: Property {(trip name.res)} is violated by the initial state:")]
+    (init-state trace.res)
+  ::
+      %action
+    ;:  weld
+      ~[(crip "Error: Action property {(trip name.res)} is violated.")]
+      ~['Error: The behavior up to this point is:']
+      ::  UNSPACED: `printTrace` routes only EC 2110 to `printInvariantTrace`;
+      ::  everything else -- this and the deadlock -- goes to `printErrorTrace`
+      ::  and its `State N:` with no trailing space. Measured at the pin
+      (render-dfid-trace trace.res order e vw |)
+      ~[(dfid-counts-line gen.res distinct.res)]
+    ==
+  ::
+      %deadlock
+    ;:  weld
+      ~['Error: Deadlock reached.']
+      ~['Error: The behavior up to this point is:']
+      (render-dfid-trace trace.res order e vw |)
+      ~[(dfid-counts-line gen.res distinct.res)]
+    ==
+  ==
+::
+++  dfid-refusal
+  ::  `DFIDModelChecker.java:67`. It keys on `checkLiveness`, i.e. on a GENUINE
+  ::  temporal property -- a `[]P` box-state one routes to the invariant path
+  ::  and runs, so this cannot key on `PROPERTY` being present. Note the DOUBLE
+  ::  space before `Please`, which is in the Java string literal
+  %^  cat  3
+    'Depth-First Iterative Deepening mode does not support checking liveness '
+  %^  cat  3
+    'properties (https://github.com/tlaplus/tlaplus/issues/548).  Please check '
+  'liveness properties in Breadth-First-Search mode.'
+::
+++  dfid-check
+  ::  the DFID counterpart of `+check`: TLC's terminal output for
+  ::  `tlc2.TLC -dfid <maxd>` on this spec + config
+  |=  [spec=@t cfg=@t maxd=@ud]
+  ^-  wain
+  =/  sc  (search-ctx spec cfg)
+  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  =*  c  p.sc
+  =/  su  (dfid-setup c maxd 0)
+  ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  =/  o   o.p.su
+  =/  e   (dfid-env o)
+  =/  ci  (dfid-cursor-init o is.c e)
+  ?^  err.ci  ~[(crip "Error: {(trip u.err.ci)}")]
+  =/  ndis  ~(wyt by fps.cur.ci)
+  =/  out
+    ?:  stop.cur.ci  (dfid-verdict cur.ci %ok)
+    =/  cur  cur.ci
+    |-  ^-  dfid-out
+    =/  r  (dfid-step o cur 1.024)
+    ?:  ?=(%done -.r)  out.r
+    $(cur cur.r)
+  ;:  weld
+    swarn.c
+    warn.p.su
+    (render-dfid-outcome out order.c e alias.c vrend.c (lent is.c) ndis)
+  ==
 ::
 ++  get-actions
   ::  Tool.getActions: decompose a next-state relation into named leaf actions.
@@ -2884,6 +3246,26 @@
   ?.  =('$SquareAct' name.op.a)  ~
   ?~(args.a ~ `i.args.a)
 ::
+++  state-level-warn
+  ::  EC 2255 TLC_LIVE_FORMULA_STATE_LEVEL: tlc2 always warns that a state-level
+  ::  PROPERTY is only checked in the initial state -- before the verdict, and
+  ::  whether or not the property holds
+  |=  pname=@t
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "Warning: The formula {(trip pname)} is a state-level formula, but it "
+    "was used as a PROPERTY (or PROPERTIES), where a temporal formula is "
+    "typically expected. State-level formulas used as PROPERTY or PROPERTIES "
+    "are only checked in the initial state. To verify that the formula "
+    "{(trip pname)} holds in all states of every behavior, use INVARIANT "
+    "{(trip pname)} instead. Alternatively, applying the \"always\" temporal "
+    "operator ([]) to the state-level formula {(trip pname)} changes it into "
+    "a temporal formula, asserting that {(trip pname)} holds in all states "
+    "of every behavior. See https://explain.tlapl.us/invariants-and-properties "
+    "for additional details."
+  ==
+::
 ++  implied-init-run
   ::  an IMPLIED INIT: tlc2 checks a level-1 PROPERTY against each initial state
   ::  while computing them, so a violation aborts there — the diagnostic names
@@ -2895,20 +3277,7 @@
   ::  tlc2 always warns that a state-level PROPERTY is only checked in the
   ::  initial state (EC 2255 TLC_LIVE_FORMULA_STATE_LEVEL) — before the verdict,
   ::  and whether or not the property holds
-  =/  warn=@t
-    %-  crip
-    ;:  weld
-      "Warning: The formula {(trip pname)} is a state-level formula, but it "
-      "was used as a PROPERTY (or PROPERTIES), where a temporal formula is "
-      "typically expected. State-level formulas used as PROPERTY or PROPERTIES "
-      "are only checked in the initial state. To verify that the formula "
-      "{(trip pname)} holds in all states of every behavior, use INVARIANT "
-      "{(trip pname)} instead. Alternatively, applying the \"always\" temporal "
-      "operator ([]) to the state-level formula {(trip pname)} changes it into "
-      "a temporal formula, asserting that {(trip pname)} holds in all states "
-      "of every behavior. See https://explain.tlapl.us/invariants-and-properties "
-      "for additional details."
-    ==
+  =/  warn  (state-level-warn pname)
   ::  R2.3.4: `ModelChecker.doInit` is STATE-MAJOR -- for each initial state it
   ::  checks every INVARIANT (EC 2107, `:1187`) and only then every implied
   ::  init (EC 2108, `:1199`). So an INVARIANT false on the same initial state

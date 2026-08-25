@@ -130,6 +130,19 @@
       %2.105  (mp-subst 'Evaluating assumption %1% failed.\0a%2%' params)
       %2.107  (mp-subst 'Invariant %1% is violated by the initial state:\0a%2%' params)
       %2.110  (mp-subst 'Invariant %1% is violated.' params)
+      ::  the DFID reporter (R2.5). DFID does NOT reuse the BFS lines: its
+      ::  final counts carry no queue term, its progress line is per LEVEL
+      ::  rather than per Progress(N), and its init line is the only one of
+      ::  the four TLC_INIT_GENERATED variants with no timestamp in it
+      %2.204  (mp-subst '%1% states generated, %2% distinct states found.' params)
+      %2.205
+    %+  mp-subst
+      'Starting level %1%: %2% states generated, %3% distinct states found.'
+    params
+      %2.208
+    %+  mp-subst
+      'Finished computing initial states: %1% states generated, with %2% of them distinct.'
+    params
       %2.116
     ?:  =(n 1)  (mp-subst 'Temporal property %1% was violated.\0a' params)
     ?:  =(n 0)  'Temporal properties were violated.\0a'

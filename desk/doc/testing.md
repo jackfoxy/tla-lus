@@ -35,6 +35,19 @@ Two halves, both required to be green:
    real-pipeline integration), `bnf` (grammar-manifest drift), `diagnostics`,
    `migrate`, and the `app` agent tests.
 
+**One generator MEASURES its own comparability rather than assuming it**
+(R2.5). `tools/gen-dfid-tests.py` runs the pinned jar **8 times per case** and
+compares the runs to each other before it writes a golden: DFID descends into a
+RANDOM eligible successor from a clock-seeded generator that `-seed` does not
+reach, so the same jar on the same spec can report different counterexamples.
+Where the trace varied it is dropped from the golden and the case is marked
+`nondeterministic` in its `trace.txt` — a **sticky** marker, so a rare
+disagreement cannot un-mark itself later and make the generator irreproducible.
+2 of 22 cases are marked; the other 20 compare their trace byte-for-byte, and
+every case compares the verdict, the level lines and the counts. This is the
+pattern to copy wherever the oracle is not a function of its input: prove which
+part is comparable, do not assert it.
+
 Oracle dumpers, by stage: `TokenDump` (lexer), `AstDump` (parser CST),
 `SemDump` (semantic graph + levels), `CrcVec` (PlusCal checksums), and the
 REPL/TLC/SANY invocations driven directly by the generators.

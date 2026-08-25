@@ -191,6 +191,20 @@
           ::  rides on this kont and nowhere else
           df=?
       ==
+      ::  depth-first iterative deepening (R2.5). Its own kont because its
+      ::  visited set is not the BFS one: each fingerprint carries a status
+      ::  word, not a `[depth pred]`. `ngen`/`ndis` are `doInit`'s two numbers,
+      ::  which the EC 2208 line needs and the cursor stops being able to
+      ::  supply the moment the first sweep runs
+      $:  %dfid
+          act=next-act
+          o=dfid-opts:check
+          cur=dfid-cursor:check
+          al=(unit sem:semantic)
+          vr=(unit sem:semantic)
+          ngen=@ud
+          ndis=@ud
+      ==
   ==
 ::
 ::  +|  Constants
@@ -385,8 +399,14 @@
   ::  pin, an exhaustive run's output is byte-identical with and without it.
   ::  Accepting it on an exhaustive request would be accepting an option that
   ::  does nothing, which R2.1 forbids (R2.4.3)
-  ?:  ?&(difftrace.opts.op.req ?=(%exhaustive -.mode.opts.op.req))
+  ?:  ?&(difftrace.opts.op.req !?=(%simulate -.mode.opts.op.req))
     `'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)'
+  ::  `-continue` under DFID is a real tlc2 capability (`TLCGlobals.continuation`
+  ::  is read in `DFIDModelChecker.doNext` too) that this port has not built:
+  ::  the DFID engine stops at its first violation and carries ONE hit.
+  ::  Refused by name rather than accepted and ignored (R2.1)
+  ?:  ?&(continue.opts.op.req ?=(%dfid -.mode.opts.op.req))
+    `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
   ?:  ?=(%clay -.src.req)
     ::  a %clay bundle selects its config by PATH, not by name: the desk has
     ::  no `%cfg` mark, so the file's mark is part of the reference (hence
@@ -492,6 +512,7 @@
     %+  weld  `(list stage)`~[%parse %config]
     ?-    -.mode.opts.op.req
         %simulate  `(list stage)`~[%simulate]
+        %dfid      `(list stage)`~[%dfid]
         %exhaustive
       ?:  (has-property req)
         `(list stage)`~[%explore %liveness]
@@ -549,6 +570,7 @@
     %bfs    `%explore
     %live   ?:(=(%build phase.k) `%explore `%liveness)
     %sim    `%simulate
+    %dfid   `%dfid
   ==
 ::
 ++  k-srcs
@@ -629,6 +651,7 @@
     %explore   (do-explore j k budget pre)
     %liveness  (do-scan j k budget pre)
     %simulate  (do-sim j k budget pre)
+    %dfid      (do-dfid j k budget pre)
     %terminal  (do-terminal j pre)
   ==
 ::
@@ -1409,6 +1432,41 @@
   ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
   ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior on its
   ::  stutter graph (unit 9.3a, LiveCheck.checkTrace via the 8.2–8.6 engine).
+  ::  DFID (R2.5): a SECOND search engine, not a mode of the BFS. Its PROPERTY
+  ::  routing is `+dfid-setup`'s -- box-state onto the invariant vector, a
+  ::  level-1 predicate as an implied init, `[][A]_v` as an implied action, and
+  ::  a genuine temporal one REFUSED, which is `DFIDModelChecker`'s own rule
+  ?:  ?=(%dfid -.mode)
+    =/  psb  ?~(pp ~ (sem-body:check defs u.pp))
+    ?:  ?&(?=(^ pp) ?=(~ psb))
+      (finish j [%failed (rap 3 ~['no definition for PROPERTY ' u.pp])] pre)
+    =/  su
+      %-  dfid-opts-of:check
+      :*  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
+          invs  cons  acons  vars  order  defs  consts
+          pp  psb  ?&(deadlock.mode deadlock.rs)
+          max-set-size.lims  depth.mode
+      ==
+    ?:  ?=(%| -.su)  (finish j [%failed p.su] pre)
+    ::  the planned %liveness stage never runs under DFID: either the property
+    ::  routed to a safety check above, or `+dfid-opts-of` refused
+    =?  j  (lien pending.j |=(s=stage =(%liveness s)))
+      %=  j
+        pending   (skip pending.j |=(s=stage =(%liveness s)))
+        progress  [done.progress.j (dec total.progress.j)]
+      ==
+    =/  o   o.p.su
+    =/  ci  (dfid-cursor-init:check o is (dfid-env:check o))
+    ?^  err.ci  (finish j [%failed u.err.ci] pre)
+    ::  the EC 2255 state-level warning prints BEFORE the verdict, which is
+    ::  what `swarn` is for (R2.3.5's EC 2145 uses the same channel)
+    =.  swarn.j  (weld swarn.j warn.p.su)
+    =.  cont.j
+      %-  save-kont
+      :*  %dfid  act  o  cur.ci  alb  vrb
+          (lent is)  ~(wyt by fps.cur.ci)
+      ==
+    (more j pre)
   ?:  ?=(%simulate -.mode)
     ::  `+trace-states` renders the simulated behavior with no alias, and
     ::  tlc2 does apply one there (`SimulationWorker.java:163`), so an ALIAS
@@ -1778,6 +1836,96 @@
       %deadlock   [%deadlock ~]
     ==
   (finish-arts j [%violated vn st] report `typed pre)
+::
+::  +|  Stage: %dfid
+::
+::
+++  do-dfid
+  ::  depth-first iterative deepening (R2.5). Sliced like every other engine;
+  ::  every count is independent of how the run is sliced
+  |=  [j=jobstate k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-out
+  ?.  ?&(?=(^ k) ?=(%dfid -.u.k))
+    (finish j [%failed 'internal: %dfid without a continuation'] pre)
+  =/  kk  u.k
+  ::  an initial-state violation is found by `+dfid-cursor-init`, before any
+  ::  sweep: the cursor arrives already stopped and there is nothing to step
+  ?:  stop.cur.kk
+    (finish-dfid j (dfid-verdict:check cur.kk %ok) kk pre)
+  =/  r  (dfid-step:check o.kk cur.kk budget)
+  ?:  ?=(%more -.r)
+    ::  live statistics at the slice boundary. DFID reports no queue, no graph
+    ::  depth and no out-degree -- its summary line carries two numbers -- so
+    ::  those slots stay zero rather than holding something tlc2 never produced
+    =.  stats.j  [gen.cur.r ~(wyt by fps.cur.r) 0 0 [0 0 0 0]]
+    =.  cont.j   (save-kont kk(cur cur.r))
+    ?:  (noun-over cont.j max-noun-bytes)
+      (finish j [%limited %noun stats.j] pre)
+    (more j pre)
+  (finish-dfid j out.r kk pre)
+::
+++  finish-dfid
+  ::  seal a DFID search: wire result, stats, report + trace artifacts
+  |=  [j=jobstate out=dfid-out:check kk=kont pre=(list event)]
+  ^-  step-out
+  ?>  ?=(%dfid -.kk)
+  ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
+  =/  gd  (dfid-gen-dis out)
+  =/  st=run-stats  [gen.gd dis.gd 0 0 [0 0 0 0]]
+  =.  stats.j  st
+  =/  res=result
+    ?-  -.out
+      %ok        [%ok st]
+      ::  the bound was reached and tlc2 printed no completion line, so this is
+      ::  NOT %ok: the search did not finish
+      %limited   [%limited %depth st]
+      %inv       [%violated [%invariant name.out] st]
+      %prop      [%violated [%property name.out] st]
+      %action    [%violated [%property name.out] st]
+      %deadlock  [%violated [%deadlock ~] st]
+    ==
+  =/  env  (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+  =/  report
+    %-  wain-text
+    %:  render-dfid-outcome:check
+      out  order.o.kk  env  al.kk  vr.kk  ngen.kk  ndis.kk
+    ==
+  ::  the wire trace carries NO action attribution, because the DFID printers
+  ::  carry none: `printInvariantTrace` prints the ordinal and nothing else
+  ::  where the BFS trace names the getActions leaf. Passing `~` for both the
+  ::  leaves and the fallback label is what makes every state's `action` ~
+  =/  tr=(unit trace)
+    ?+  -.out  ~
+        ?(%inv %action %deadlock)
+      `[%safety (trace-states (dfid-trace-of out) ~ ~ env order.o.kk '' al.kk) ~]
+    ==
+  (finish-arts j res report tr pre)
+::
+++  dfid-gen-dis
+  ::  an outcome's two counts. Every arm but %error has them, at differing
+  ::  axes, so a bare `gen.out` over the union forks
+  |=  out=dfid-out:check
+  ^-  [gen=@ud dis=@ud]
+  ?-  -.out
+    %error     [0 0]
+    %ok        [gen.out distinct.out]
+    %limited   [gen.out distinct.out]
+    %inv       [gen.out distinct.out]
+    %prop      [gen.out distinct.out]
+    %action    [gen.out distinct.out]
+    %deadlock  [gen.out distinct.out]
+  ==
+::
+++  dfid-trace-of
+  ::  the counterexample an outcome carries, ~ when it carries none
+  |=  out=dfid-out:check
+  ^-  (list state:check)
+  ?+  -.out  ~
+    %inv       trace.out
+    %prop      trace.out
+    %action    trace.out
+    %deadlock  trace.out
+  ==
 ::
 ::  +|  Stage: %terminal
 ::

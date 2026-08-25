@@ -78,6 +78,7 @@
       %checkpoint ::  checkpointing
       %liveness   ::  liveness checking
       %simulate   ::  simulation
+      %dfid       ::  depth-first iterative deepening (R2.5)
       %terminal   ::  finished (any result)
   ==
 +$  diagnostic
@@ -133,6 +134,20 @@
       ::  that keys on simulation (the stage plan, `-difftrace`, the ALIAS
       ::  refusal) applies unchanged to both
       [%simulate seed=@ud num=@ud depth=@ud generate=?]
+      ::  tlc2's `-dfid num` (R2.5): depth-first iterative deepening, a real
+      ::  run mode rather than a flag on one -- `TLCGlobals.DFIDMax` plus
+      ::  `RunMode.DFID`, which selects `DFIDModelChecker` over `ModelChecker`.
+      ::  `depth` is the deepest LEVEL a sweep may reach; below 2 no sweep runs
+      ::  at all, so 0 and 1 explore the initial states and stop. A run that
+      ::  ends at the bound is `%limited %depth`, never `%ok` -- tlc2 prints no
+      ::  completion line there, and reporting one would claim a search it did
+      ::  not finish.
+      ::
+      ::  DFID does NOT support liveness and says so
+      ::  (`DFIDModelChecker.java:67`, upstream issue 548); the refusal keys on
+      ::  a GENUINE temporal property, so a `[]P` box-state one still runs, as
+      ::  it does in tlc2
+      [%dfid depth=@ud deadlock=?]
   ==
 +$  check-opts
   $:  translate=?

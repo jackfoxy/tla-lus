@@ -57,7 +57,7 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
   ==
 +$  limits  [max-source=@ud max-modules=@ud max-states=@ud max-depth=@ud max-time=@dr max-artifact=@ud max-set-size=@ud]
 +$  check-opts  [translate=? view=? difftrace=? continue=? cfg=(unit source-name) mode=check-mode]
-+$  check-mode  $%([%exhaustive deadlock=?] [%simulate seed=@ud num=@ud depth=@ud generate=?])]
++$  check-mode  $%([%exhaustive deadlock=?] [%simulate seed=@ud num=@ud depth=@ud generate=?] [%dfid depth=@ud deadlock=?])]
 +$  analyze-flags  [syntax=? semantic=? level=? lint=?]
 +$  pcal-opts  [=fairness termination=? gen-cfg=?]
 ```
@@ -194,7 +194,7 @@ wire and not listed here.
 | `severity` | `?(%error %warning %info)` | `%error` |
 | `code-family` | `?(%sany %pcal %tlc %lus)` | `%tlc` — `%lus` is engine-specific, everything else is the pin's |
 | `diag-code` | `[family=code-family num=@ud]` | `[%tlc 2.103]`, `[%sany 4.802]`, `[%lus 402]` |
-| `stage` | 14 tags | `%parse`, `%config`, `%explore`, `%liveness`, `%terminal` |
+| `stage` | 15 tags | `%parse`, `%config`, `%explore`, `%liveness`, `%dfid`, `%terminal` |
 | `diagnostic` | `[code severity stage message at related]` | `[[%sany 4.200] %error %parse 'Encountered "==" …' `['Counter' [[4 6] [4 7]]] ~]` |
 
 ### Traces and artifacts
@@ -214,7 +214,7 @@ wire and not listed here.
 | `fairness` | `?(%none %wf %sf %wf-next)` | `%wf` — PlusCal only |
 | `pcal-opts` | `[=fairness termination=? gen-cfg=?]` | `[%none | |]` — `%translate` is a typed rejection today |
 | `analyze-flags` | `[syntax=? semantic=? level=? lint=?]` | `[& & & &]` — `semantic`/`level`/`lint` each gate whether that stage runs and reports. **`syntax` must be `&`**: parsing is mandatory (every later stage consumes the tree), so `syntax=\|` is a typed rejection rather than a flag that does nothing |
-| `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth generate=?])` | `[%exhaustive &]` / `[%simulate 42 100 20 \|]`. `generate` is tlc2's `-generate`: the same seeded run with PROBABILISTIC successor picking (`Tool.probabilistic`) — one successor per step instead of all of them. It is a field on `%simulate` rather than a mode of its own because tlc2 spells it that way too (both flags set `RunMode.SIMULATE`). A `CASE` in probabilistic position is a typed `%failed`, as tlc2 aborts there |
+| `check-mode` | `$%([%exhaustive deadlock=?] [%simulate seed num depth generate=?] [%dfid depth deadlock=?])` | `[%exhaustive &]` / `[%simulate 42 100 20 \|]`. `generate` is tlc2's `-generate`: the same seeded run with PROBABILISTIC successor picking (`Tool.probabilistic`) — one successor per step instead of all of them. It is a field on `%simulate` rather than a mode of its own because tlc2 spells it that way too (both flags set `RunMode.SIMULATE`). A `CASE` in probabilistic position is a typed `%failed`, as tlc2 aborts there. `%dfid` is tlc2's `-dfid num`: depth-first iterative deepening, a run mode rather than a flag (`RunMode.DFID` selects `DFIDModelChecker` over `ModelChecker`). `depth` is the deepest LEVEL a sweep may reach; below 2 no sweep runs, so 0 and 1 explore the initial states and stop. A run that ends AT the bound is `[%limited %depth …]` and never `%ok` — tlc2 prints no completion line there. DFID does not support liveness and refuses a genuine temporal PROPERTY verbatim (upstream issue 548); a `[]P` box-state one runs, because it is an invariant. `-continue` with `%dfid` is a typed rejection |
 | `check-opts` | `[translate=? view=? difftrace=? continue=? cfg=(unit source-name) mode=check-mode]` | `[\| \| \| \| ~ [%exhaustive &]]` |
 | `op` | `$%(%translate %analyze %check)` | `[%check [\| \| \| \| ~ [%exhaustive &]]]` |
 | `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** |
@@ -247,7 +247,12 @@ Three reading notes that save a round trip:
   answer.
 - **`run-stats` means different things per mode.** In `%simulate`, `generated`
   is transitions taken and `depth` the deepest transition index; `distinct` and
-  `queued` stay 0, because simulation keeps no frontier.
+  `queued` stay 0, because simulation keeps no frontier. In `%dfid`,
+  `generated` and `distinct` are tlc2's own two numbers and `queued`, `depth`
+  and `outdeg` stay 0 — DFID's summary line carries no queue term, no
+  `The depth of the complete state graph search is N.` line and no average
+  outdegree, so the port reports nothing there rather than a number the oracle
+  never produced. The per-level progress lines are in the `%report` artifact.
 - **`binding.val` is already rendered text**, matching what TLC prints — the
   wire does not ship a structured value.
 

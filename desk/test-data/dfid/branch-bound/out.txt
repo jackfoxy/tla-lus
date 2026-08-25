@@ -1,0 +1,4 @@
+Finished computing initial states: 1 states generated, with 1 of them distinct.
+Starting level 2: 1 states generated, 1 distinct states found.
+Starting level 3: 3 states generated, 3 distinct states found.
+9 states generated, 6 distinct states found.
