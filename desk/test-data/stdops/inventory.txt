@@ -2,135 +2,143 @@
 # (tlc2/module reflection + SANY-declared StandardModule operators).
 # Do not edit. One row per reachable operator surface.
 #
-# module|operator|arity|visibility|java|params|annotation|ec|class|rationale
-AnySet|ANY|0|undeclared|AnySet.ANY|-|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Bags|BagCardinality|1|public|Bags.BagCardinality|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)
-Bags|BagIn|2|public|Bags.BagIn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)
-Bags|BagOfAll|2|public|Bags.BagOfAll|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_ARGUMENT_ERROR_AN|required|bag core (C1.4)
-Bags|BagToSet|1|public|Bags.BagToSet|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)
-Bags|BagUnion|1|public|Bags.BagUnion|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE,TLC_MODULE_BAG_UNION1|required|bag core (C1.4)
-Bags|CopiesIn|2|public|Bags.CopiesIn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)
-Bags|EmptyBag|0|public|Bags.EmptyBag|-|-|-|required|bag core (C1.4)
-Bags|IsABag|1|public|Bags.IsABag|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)
-Bags|SetToBag|1|public|Bags.SetToBag|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)
-Bags|SubBag|1|public|-|-|-|-|body|not overridden by Java; evaluates its TLA+ definition
-Bags|Sum|1|local|-|-|-|-|body|LOCAL helper of Bags.tla
-Bags|\ominus|2|public|Bags.BagDiff|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)
-Bags|\oplus|2|public|Bags.BagCup|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)
-Bags|\sqsubseteq|2|public|Bags.SqSubseteq|Value,Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)
-FiniteSets|Cardinality|1|public|FiniteSets.Cardinality|Value|-|TLC_MODULE_COMPUTING_CARDINALITY|required|finite-set core (C1.4)
-FiniteSets|IsFiniteSet|1|public|FiniteSets.IsFiniteSet|Value|-|-|required|finite-set core (C1.4)
-IOUtils|Serialize|7|undeclared|Json.textSerialize|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(IOUtils!Serialize,minLevel=0,warn=false)|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|%|2|undeclared|Integers.Mod|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method
-Integers|*|2|undeclared|Integers.Times|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|+|2|undeclared|Integers.Plus|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|-|2|undeclared|Integers.Minus|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|-.|1|public|Integers.Neg|IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)
-Integers|..|2|undeclared|Integers.DotDot|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|<|2|undeclared|Integers.LT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method
-Integers|>|2|undeclared|Integers.GT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method
-Integers|Int|0|public|Integers.Int|-|-|-|required|arithmetic core (C1.2)
-Integers|Nat|0|undeclared|Integers.Nat|-|-|-|excluded|unreachable: no TLA+ declaration binds this method
-Integers|\div|2|undeclared|Integers.Divide|IntValue,IntValue|-|TLC_MODULE_DIVISION_BY_ZERO,TLC_MODULE_OVERFLOW|excluded|unreachable: no TLA+ declaration binds this method
-Integers|\geq|2|undeclared|Integers.GEQ|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method
-Integers|\leq|2|undeclared|Integers.LE|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method
-Integers|^|2|undeclared|Integers.Expt|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_NULL_POWER_NULL,TLC_MODULE_OVERFLOW|excluded|unreachable: no TLA+ declaration binds this method
-Json|IsSequence|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|JsonDeserialize|1|public|Json.deserialize|StringValue|TLAPlusOperator(Json!JsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|JsonSerialize|2|public|Json.serialize|StringValue,Value|TLAPlusOperator(Json!JsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJson|1|public|Json.toJson|IValue|TLAPlusOperator(Json!ToJson,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonArray|1|public|Json.toJsonArray|IValue|TLAPlusOperator(Json!ToJsonArray,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonArrayString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonKeyValue|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonObject|1|public|Json.toJsonObject|IValue|TLAPlusOperator(Json!ToJsonObject,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonObjectString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ndJsonDeserialize|1|public|Json.ndDeserialize|StringValue|TLAPlusOperator(Json!ndJsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Json|ndJsonSerialize|2|public|Json.ndSerialize|StringValue,Value|TLAPlusOperator(Json!ndJsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic
-Naturals|%|2|public|Naturals.Mod|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR|required|arithmetic core (C1.2)
-Naturals|*|2|public|Naturals.Times|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)
-Naturals|+|2|public|Naturals.Plus|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)
-Naturals|-|2|public|Naturals.Minus|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)
-Naturals|..|2|public|Naturals.DotDot|IntValue,IntValue|-|-|required|arithmetic core (C1.2)
-Naturals|<|2|public|Naturals.LT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)
-Naturals|>|2|public|Naturals.GT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)
-Naturals|Nat|0|public|Naturals.Nat|-|-|-|required|arithmetic core (C1.2)
-Naturals|\div|2|public|Naturals.Divide|IntValue,IntValue|-|TLC_MODULE_DIVISION_BY_ZERO|required|arithmetic core (C1.2)
-Naturals|\geq|2|public|Naturals.GEQ|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)
-Naturals|\leq|2|public|Naturals.LE|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)
-Naturals|^|2|public|Naturals.Expt|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_NULL_POWER_NULL,TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)
-Randomization|RandomSetOfSubsets|3|public|Randomization.RandomSetOfSubsets|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|deferred|TLC RandomGenerator parity is unit 9
-Randomization|RandomSubset|2|public|Randomization.RandomSubset|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|deferred|TLC RandomGenerator parity is unit 9
-Randomization|RandomSubsetSet|3|undeclared|Randomization.RandomSubsetSet|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method
-Randomization|TestRandomSetOfSubsets|3|public|-|-|-|-|deferred|TLC RandomGenerator parity is unit 9
-RealTime|RTBound|4|public|-|-|-|-|excluded|real-time semantics out of scope
-RealTime|RTnow|1|public|-|-|-|-|excluded|real-time semantics out of scope
-Reals|/|2|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported
-Reals|Infinity|0|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported
-Reals|Real|0|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported
-Sequences|Append|2|public|Sequences.Append|Value,Value|-|TLC_MODULE_EVALUATING|required|sequence core (C1.3)
-Sequences|Cons|2|undeclared|Sequences.Cons|Value,Value|-|TLC_MODULE_EVALUATING|excluded|unreachable: no TLA+ declaration binds this method
-Sequences|Head|1|public|Sequences.Head|Value|-|TLC_MODULE_APPLY_EMPTY_SEQ,TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)
-Sequences|Insert|3|undeclared|Sequences.Insert|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method
-Sequences|Len|1|public|Sequences.Len|Value|-|TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)
-Sequences|SelectInSeq|2|undeclared|Sequences.SelectInSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method
-Sequences|SelectSeq|2|public|Sequences.SelectSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|sequence core (C1.3)
-Sequences|Seq|1|public|Sequences.Seq|Value|-|-|required|non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)
-Sequences|SubSeq|3|public|Sequences.SubSeq|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_ARGUMENT_NOT_IN_DOMAIN|required|sequence core (C1.3)
-Sequences|Tail|1|public|Sequences.Tail|Value|-|TLC_MODULE_APPLY_EMPTY_SEQ,TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)
-Sequences|\o|2|public|Sequences.Concat|Value,Value|-|TLC_MODULE_EVALUATING|required|sequence core (C1.3)
-Strings|STRING|0|undeclared|Strings.STRING|-|-|-|excluded|unreachable: no TLA+ declaration binds this method
-TLC|:>|2|public|TLC.MakeFcn|Value,Value|-|-|required|function constructor override (C1.5)
-TLC|@@|2|public|TLC.CombineFcn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|function combination override (C1.5)
-TLC|Any|0|public|TLC.Any|-|-|-|excluded|universal UserValue; no canonical representation
-TLC|Assert|2|public|TLC.Assert|Value,Value|-|TLC_VALUE_ASSERT_FAILED|required|assertion failure is a typed EC (C1.5)
-TLC|JavaTime|0|public|TLC.JavaTime|-|-|-|excluded|wall-clock nondeterminism
-TLC|Permutations|1|public|TLC.Permutations|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|SYMMETRY consumes it; replaces check.hoon's ad hoc reader (C1.5)
-TLC|Print|2|public|TLC.Print|Value,Value|-|GENERAL|required|typed engine output channel, never a silent no-op (C1.5)
-TLC|PrintT|1|public|TLC.PrintT|Value|-|GENERAL|required|typed engine output channel, never a silent no-op (C1.5)
-TLC|RandomElement|1|public|TLC.RandomElement|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|deferred|TLC RandomGenerator parity is unit 9
-TLC|SortSeq|2|public|TLC.SortSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|order-sensitive; pinned after the family-5 decision (C1.5/C1.7)
-TLC|TLCEval|1|public|TLCEval.tlcEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCEval,minLevel=0,warn=false)|-|required|the pin's one plain Evaluation override; C1.6 implements the lazy argument contract with it
-TLC|TLCGet|1|public|TLCGetSet.TLCGetEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCGet,minLevel=1,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR,TLC_MODULE_TLCGET_UNDEFINED|required|C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an engine-state read is a typed rejection naming the key
-TLC|TLCSet|2|public|TLCGetSet.TLCSet|Value,Value|TLAPlusOperator(TLC!TLCSet,minLevel=0,warn=false)|GENERAL,TLC_MODULE_ARGUMENT_ERROR|required|C1.5 implements the rejection; it mutates engine state the evaluator does not own
-TLC|ToString|1|public|TLC.ToString|Value|-|-|required|canonical rendering already owned by value.hoon (C1.5)
-TLCExt|AssertEq|2|public|-|-|-|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|AssertError|2|public|TLCExt.assertError|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!AssertError,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|CounterExample|0|public|TLCExt.error|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!CounterExample,minLevel=1,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|PickSuccessor|1|public|TLCExt.pickSuccessor|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!PickSuccessor,minLevel=2,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCCache|2|public|TLCExt.tlcEval2|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCCache,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCDefer|1|public|TLCExt.tlcDefer|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCDefer,minLevel=0,warn=false)|TLC_MODULE_VALUE_JAVA_METHOD_OVERRIDE|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCEvalDefinition|1|public|TLCExt.tlcDefByName|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCEvalDefinition,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCFP|1|public|TLCExt.tlcFingerprint|Value|TLAPlusOperator(TLCExt!TLCFP,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCGetAndSet|4|public|-|-|-|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCGetOrDefault|2|public|TLCExt.tlcGetOrDefault|Value,Value|TLAPlusOperator(TLCExt!TLCGetOrDefault,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCModelValue|1|public|TLCExt.tlcModelValue|Value|TLAPlusOperator(TLCExt!TLCModelValue,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|TLCNoOp|1|public|TLCExt.tlcNoOp|Value|TLAPlusOperator(TLCExt!TLCNoOp,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|ToTrace|1|public|TLCExt.lassoOrdinal|Value|TLAPlusOperator(TLCExt!ToTrace,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-TLCExt|Trace|0|public|TLCExt.getTrace|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!Trace,minLevel=1,warn=false)|GENERAL,TLC_STATE_NOT_COMPLETELY_SPECIFIED_INITIAL|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)
-Toolbox|_TEPosition|0|public|-|-|-|-|excluded|IDE trace-explorer surface
-Toolbox|_TETrace|0|public|-|-|-|-|excluded|IDE trace-explorer surface
-Toolbox|_TETraceLength|0|local|-|-|-|-|excluded|IDE trace-explorer surface
-TransitiveClosure|Warshall|1|undeclared|TransitiveClosure.Warshall|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE,TLC_MODULE_TRANSITIVE_CLOSURE|excluded|unreachable: no TLA+ declaration binds this method
-_JsonTrace|_JsonTrace|0|public|-|-|-|-|excluded|internal trace-expression spec surface
-_JsonTrace|_JsonTraceConstraint|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_JsonTrace|_JsonTraceDump|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_JsonTrace|_JsonTraceLassoTarget|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_JsonTrace|_JsonTraceView|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_JsonTrace|_TLCState|1|local|_JsonTrace.tlcState|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(_JsonTrace!_TLCState,minLevel=1,warn=false)|-|excluded|internal trace-expression spec surface
-_Possible|_CheckName|1|public|-|-|-|-|excluded|internal trace-expression spec surface
-_Possible|_Counts|0|public|_Possible.counts|-|TLAPlusOperator(_Possible!_Counts,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface
-_Possible|_Merge|2|local|-|-|-|-|excluded|internal trace-expression spec surface
-_Possible|_PrintCounts|0|public|-|-|-|-|excluded|internal trace-expression spec surface
-_Possible|_Track|2|public|-|-|-|-|excluded|internal trace-expression spec surface
-_Possible|_Update|2|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCState|1|local|_TLCTrace.tlcState|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(_TLCTrace!_TLCState,minLevel=1,warn=false)|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTrace|0|public|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTrace0|1|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceConstraint|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceDeserialize|1|local|_TLCTrace.ioDeserialize|StringValue|TLAPlusOperator(_TLCTrace!_TLCTraceDeserialize,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceFileDeserialized|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceLassoTarget|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceSerialize|2|local|_TLCTrace.ioSerialize|IValue,StringValue|TLAPlusOperator(_TLCTrace!_TLCTraceSerialize,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceSilent|0|local|-|-|-|-|excluded|internal trace-expression spec surface
-_TLCTrace|_TLCTraceView|0|local|-|-|-|-|excluded|internal trace-expression spec surface
+# module|operator|arity|visibility|java|params|annotation|ec|class|rationale|r2-scope
+#
+# `class` is what the port does TODAY. `r2-scope` (R2.6.0) is the
+# orthogonal question: which surfaces R2 brings in and who owns them.
+#   in:...      already ported (class required/body)
+#   n/a:...     no TLA+ declaration binds the method; not a decision
+#   R2.6.N      in scope, owned by that subunit
+#   later:...   in scope for the port, owned after R2
+#   out:...     stays out, with the reason
+AnySet|ANY|0|undeclared|AnySet.ANY|-|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Bags|BagCardinality|1|public|Bags.BagCardinality|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)|in:already ported
+Bags|BagIn|2|public|Bags.BagIn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)|in:already ported
+Bags|BagOfAll|2|public|Bags.BagOfAll|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_ARGUMENT_ERROR_AN|required|bag core (C1.4)|in:already ported
+Bags|BagToSet|1|public|Bags.BagToSet|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)|in:already ported
+Bags|BagUnion|1|public|Bags.BagUnion|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE,TLC_MODULE_BAG_UNION1|required|bag core (C1.4)|in:already ported
+Bags|CopiesIn|2|public|Bags.CopiesIn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)|in:already ported
+Bags|EmptyBag|0|public|Bags.EmptyBag|-|-|-|required|bag core (C1.4)|in:already ported
+Bags|IsABag|1|public|Bags.IsABag|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)|in:already ported
+Bags|SetToBag|1|public|Bags.SetToBag|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)|in:already ported
+Bags|SubBag|1|public|-|-|-|-|body|not overridden by Java; evaluates its TLA+ definition|in:already ported
+Bags|Sum|1|local|-|-|-|-|body|LOCAL helper of Bags.tla|in:already ported
+Bags|\ominus|2|public|Bags.BagDiff|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)|in:already ported
+Bags|\oplus|2|public|Bags.BagCup|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|bag core (C1.4)|in:already ported
+Bags|\sqsubseteq|2|public|Bags.SqSubseteq|Value,Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|bag core (C1.4)|in:already ported
+FiniteSets|Cardinality|1|public|FiniteSets.Cardinality|Value|-|TLC_MODULE_COMPUTING_CARDINALITY|required|finite-set core (C1.4)|in:already ported
+FiniteSets|IsFiniteSet|1|public|FiniteSets.IsFiniteSet|Value|-|-|required|finite-set core (C1.4)|in:already ported
+IOUtils|Serialize|7|undeclared|Json.textSerialize|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(IOUtils!Serialize,minLevel=0,warn=false)|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|%|2|undeclared|Integers.Mod|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|*|2|undeclared|Integers.Times|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|+|2|undeclared|Integers.Plus|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|-|2|undeclared|Integers.Minus|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|-.|1|public|Integers.Neg|IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
+Integers|..|2|undeclared|Integers.DotDot|IntValue,IntValue|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|<|2|undeclared|Integers.LT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|>|2|undeclared|Integers.GT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|Int|0|public|Integers.Int|-|-|-|required|arithmetic core (C1.2)|in:already ported
+Integers|Nat|0|undeclared|Integers.Nat|-|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|\div|2|undeclared|Integers.Divide|IntValue,IntValue|-|TLC_MODULE_DIVISION_BY_ZERO,TLC_MODULE_OVERFLOW|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|\geq|2|undeclared|Integers.GEQ|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|\leq|2|undeclared|Integers.LE|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Integers|^|2|undeclared|Integers.Expt|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_NULL_POWER_NULL,TLC_MODULE_OVERFLOW|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Json|IsSequence|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|JsonDeserialize|1|public|Json.deserialize|StringValue|TLAPlusOperator(Json!JsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|JsonSerialize|2|public|Json.serialize|StringValue,Value|TLAPlusOperator(Json!JsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJson|1|public|Json.toJson|IValue|TLAPlusOperator(Json!ToJson,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonArray|1|public|Json.toJsonArray|IValue|TLAPlusOperator(Json!ToJsonArray,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonArrayString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonKeyValue|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonObject|1|public|Json.toJsonObject|IValue|TLAPlusOperator(Json!ToJsonObject,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonObjectString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ndJsonDeserialize|1|public|Json.ndDeserialize|StringValue|TLAPlusOperator(Json!ndJsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ndJsonSerialize|2|public|Json.ndSerialize|StringValue,Value|TLAPlusOperator(Json!ndJsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Naturals|%|2|public|Naturals.Mod|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR|required|arithmetic core (C1.2)|in:already ported
+Naturals|*|2|public|Naturals.Times|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
+Naturals|+|2|public|Naturals.Plus|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
+Naturals|-|2|public|Naturals.Minus|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
+Naturals|..|2|public|Naturals.DotDot|IntValue,IntValue|-|-|required|arithmetic core (C1.2)|in:already ported
+Naturals|<|2|public|Naturals.LT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)|in:already ported
+Naturals|>|2|public|Naturals.GT|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)|in:already ported
+Naturals|Nat|0|public|Naturals.Nat|-|-|-|required|arithmetic core (C1.2)|in:already ported
+Naturals|\div|2|public|Naturals.Divide|IntValue,IntValue|-|TLC_MODULE_DIVISION_BY_ZERO|required|arithmetic core (C1.2)|in:already ported
+Naturals|\geq|2|public|Naturals.GEQ|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)|in:already ported
+Naturals|\leq|2|public|Naturals.LE|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|required|arithmetic core (C1.2)|in:already ported
+Naturals|^|2|public|Naturals.Expt|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_NULL_POWER_NULL,TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
+Randomization|RandomSetOfSubsets|3|public|Randomization.RandomSetOfSubsets|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|deferred|TLC RandomGenerator parity is unit 9|R2.6.2
+Randomization|RandomSubset|2|public|Randomization.RandomSubset|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|deferred|TLC RandomGenerator parity is unit 9|R2.6.2
+Randomization|RandomSubsetSet|3|undeclared|Randomization.RandomSubsetSet|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Randomization|TestRandomSetOfSubsets|3|public|-|-|-|-|deferred|TLC RandomGenerator parity is unit 9|R2.6.2
+RealTime|RTBound|4|public|-|-|-|-|excluded|real-time semantics out of scope|out:real-time semantics out of scope
+RealTime|RTnow|1|public|-|-|-|-|excluded|real-time semantics out of scope|out:real-time semantics out of scope
+Reals|/|2|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported|out:no Real value kind; decimal literals unsupported
+Reals|Infinity|0|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported|out:no Real value kind; decimal literals unsupported
+Reals|Real|0|public|-|-|-|-|excluded|no Real value kind; decimal literals unsupported|out:no Real value kind; decimal literals unsupported
+Sequences|Append|2|public|Sequences.Append|Value,Value|-|TLC_MODULE_EVALUATING|required|sequence core (C1.3)|in:already ported
+Sequences|Cons|2|undeclared|Sequences.Cons|Value,Value|-|TLC_MODULE_EVALUATING|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Sequences|Head|1|public|Sequences.Head|Value|-|TLC_MODULE_APPLY_EMPTY_SEQ,TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)|in:already ported
+Sequences|Insert|3|undeclared|Sequences.Insert|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Sequences|Len|1|public|Sequences.Len|Value|-|TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)|in:already ported
+Sequences|SelectInSeq|2|undeclared|Sequences.SelectInSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+Sequences|SelectSeq|2|public|Sequences.SelectSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|sequence core (C1.3)|in:already ported
+Sequences|Seq|1|public|Sequences.Seq|Value|-|-|required|non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)|in:already ported
+Sequences|SubSeq|3|public|Sequences.SubSeq|Value,Value,Value|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_ARGUMENT_NOT_IN_DOMAIN|required|sequence core (C1.3)|in:already ported
+Sequences|Tail|1|public|Sequences.Tail|Value|-|TLC_MODULE_APPLY_EMPTY_SEQ,TLC_MODULE_ONE_ARGUMENT_ERROR|required|sequence core (C1.3)|in:already ported
+Sequences|\o|2|public|Sequences.Concat|Value,Value|-|TLC_MODULE_EVALUATING|required|sequence core (C1.3)|in:already ported
+Strings|STRING|0|undeclared|Strings.STRING|-|-|-|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+TLC|:>|2|public|TLC.MakeFcn|Value,Value|-|-|required|function constructor override (C1.5)|in:already ported
+TLC|@@|2|public|TLC.CombineFcn|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|function combination override (C1.5)|in:already ported
+TLC|Any|0|public|TLC.Any|-|-|-|excluded|universal UserValue; no canonical representation|out:universal UserValue; no canonical representation
+TLC|Assert|2|public|TLC.Assert|Value,Value|-|TLC_VALUE_ASSERT_FAILED|required|assertion failure is a typed EC (C1.5)|in:already ported
+TLC|JavaTime|0|public|TLC.JavaTime|-|-|-|excluded|wall-clock nondeterminism|out:wall-clock nondeterminism
+TLC|Permutations|1|public|TLC.Permutations|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|required|SYMMETRY consumes it; replaces check.hoon's ad hoc reader (C1.5)|in:already ported
+TLC|Print|2|public|TLC.Print|Value,Value|-|GENERAL|required|typed engine output channel, never a silent no-op (C1.5)|in:already ported
+TLC|PrintT|1|public|TLC.PrintT|Value|-|GENERAL|required|typed engine output channel, never a silent no-op (C1.5)|in:already ported
+TLC|RandomElement|1|public|TLC.RandomElement|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE|deferred|TLC RandomGenerator parity is unit 9|R2.6.2
+TLC|SortSeq|2|public|TLC.SortSeq|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR|required|order-sensitive; pinned after the family-5 decision (C1.5/C1.7)|in:already ported
+TLC|TLCEval|1|public|TLCEval.tlcEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCEval,minLevel=0,warn=false)|-|required|the pin's one plain Evaluation override; C1.6 implements the lazy argument contract with it|in:already ported
+TLC|TLCGet|1|public|TLCGetSet.TLCGetEval|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLC!TLCGet,minLevel=1,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR,TLC_MODULE_TLCGET_UNDEFINED|required|C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an engine-state read is a typed rejection naming the key|in:already ported
+TLC|TLCSet|2|public|TLCGetSet.TLCSet|Value,Value|TLAPlusOperator(TLC!TLCSet,minLevel=0,warn=false)|GENERAL,TLC_MODULE_ARGUMENT_ERROR|required|C1.5 implements the rejection; it mutates engine state the evaluator does not own|in:already ported
+TLC|ToString|1|public|TLC.ToString|Value|-|-|required|canonical rendering already owned by value.hoon (C1.5)|in:already ported
+TLCExt|AssertEq|2|public|-|-|-|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.3
+TLCExt|AssertError|2|public|TLCExt.assertError|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!AssertError,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.3
+TLCExt|CounterExample|0|public|TLCExt.error|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!CounterExample,minLevel=1,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|out:trace-explorer surface (needs a counterexample the evaluator does not hold)
+TLCExt|PickSuccessor|1|public|TLCExt.pickSuccessor|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!PickSuccessor,minLevel=2,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|out:debugger surface; interactive successor choice
+TLCExt|TLCCache|2|public|TLCExt.tlcEval2|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCCache,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.3
+TLCExt|TLCDefer|1|public|TLCExt.tlcDefer|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCDefer,minLevel=0,warn=false)|TLC_MODULE_VALUE_JAVA_METHOD_OVERRIDE|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.3
+TLCExt|TLCEvalDefinition|1|public|TLCExt.tlcDefByName|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!TLCEvalDefinition,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|later:evaluates a definition BY NAME in the current scope; needs no engine state the port lacks, but no R2 subunit owns it
+TLCExt|TLCFP|1|public|TLCExt.tlcFingerprint|Value|TLAPlusOperator(TLCExt!TLCFP,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|later:state fingerprint read; lib/fingerprint already computes it, but no R2 subunit owns it
+TLCExt|TLCGetAndSet|4|public|-|-|-|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.1
+TLCExt|TLCGetOrDefault|2|public|TLCExt.tlcGetOrDefault|Value,Value|TLAPlusOperator(TLCExt!TLCGetOrDefault,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.1
+TLCExt|TLCModelValue|1|public|TLCExt.tlcModelValue|Value|TLAPlusOperator(TLCExt!TLCModelValue,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|later:interns a model value; the port has model values, but no R2 subunit owns it
+TLCExt|TLCNoOp|1|public|TLCExt.tlcNoOp|Value|TLAPlusOperator(TLCExt!TLCNoOp,minLevel=0,warn=false)|-|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|R2.6.3
+TLCExt|ToTrace|1|public|TLCExt.lassoOrdinal|Value|TLAPlusOperator(TLCExt!ToTrace,minLevel=0,warn=false)|TLC_MODULE_ONE_ARGUMENT_ERROR|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|out:trace-explorer surface (lasso ordinal of a liveness counterexample)
+TLCExt|Trace|0|public|TLCExt.getTrace|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(TLCExt!Trace,minLevel=1,warn=false)|GENERAL,TLC_STATE_NOT_COMPLETELY_SPECIFIED_INITIAL|excluded|debugger/trace-explorer surface (plan-2 C1 scope boundary)|out:trace-explorer surface (needs the current behavior prefix)
+Toolbox|_TEPosition|0|public|-|-|-|-|excluded|IDE trace-explorer surface|out:IDE trace-explorer surface
+Toolbox|_TETrace|0|public|-|-|-|-|excluded|IDE trace-explorer surface|out:IDE trace-explorer surface
+Toolbox|_TETraceLength|0|local|-|-|-|-|excluded|IDE trace-explorer surface|out:IDE trace-explorer surface
+TransitiveClosure|Warshall|1|undeclared|TransitiveClosure.Warshall|Value|-|TLC_MODULE_APPLYING_TO_WRONG_VALUE,TLC_MODULE_TRANSITIVE_CLOSURE|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
+_JsonTrace|_JsonTrace|0|public|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_JsonTrace|_JsonTraceConstraint|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_JsonTrace|_JsonTraceDump|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_JsonTrace|_JsonTraceLassoTarget|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_JsonTrace|_JsonTraceView|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_JsonTrace|_TLCState|1|local|_JsonTrace.tlcState|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(_JsonTrace!_TLCState,minLevel=1,warn=false)|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_CheckName|1|public|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_Counts|0|public|_Possible.counts|-|TLAPlusOperator(_Possible!_Counts,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_Merge|2|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_PrintCounts|0|public|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_Track|2|public|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_Possible|_Update|2|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCState|1|local|_TLCTrace.tlcState|Tool,ExprOrOpArgNode[],Context,TLCState,TLCState,int,CostModel|Evaluation(_TLCTrace!_TLCState,minLevel=1,warn=false)|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTrace|0|public|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTrace0|1|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceConstraint|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceDeserialize|1|local|_TLCTrace.ioDeserialize|StringValue|TLAPlusOperator(_TLCTrace!_TLCTraceDeserialize,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceFileDeserialized|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceLassoTarget|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceSerialize|2|local|_TLCTrace.ioSerialize|IValue,StringValue|TLAPlusOperator(_TLCTrace!_TLCTraceSerialize,minLevel=0,warn=false)|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceSilent|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface
+_TLCTrace|_TLCTraceView|0|local|-|-|-|-|excluded|internal trace-expression spec surface|out:internal trace-expression spec surface

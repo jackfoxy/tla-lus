@@ -104,6 +104,67 @@ CLASSIFY = {
     ("Sequences", "Seq"):    ("required", "non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)"),
 }
 
+# ---------------------------------------------------------------------------
+# R2 SCOPE (subunit R2.6.0). `class` above is what the port does TODAY; this is
+# the orthogonal question R2.6 has to answer: of the surfaces that are not
+# already `required`/`body`, which ones does R2 bring in, and who owns them?
+#
+# Derived here rather than by hand because the R2 plan's hand-written split was
+# wrong three ways, all of them visible in the data:
+#   * it grounded R2.6.1 (TLCGet/TLCSet) on the excluded set, but both are
+#     already `required` -- they are not among the 78 at all;
+#   * it grounded R2.6.2 (Randomization) there too, but those are `deferred`,
+#     and deferred on "TLC RandomGenerator parity is unit 9", which unit 9 has
+#     since DISCHARGED (`tlc-util-rng` is parity);
+#   * it split TLCExt by hand into five "non-debugger" operators, which both
+#     over- and under-counts (see the per-operator entries below).
+#
+#   R2.6.1 / R2.6.2 / R2.6.3  in scope, owned by that subunit
+#   later                     in scope for the port but owned after R2
+#   out:<reason>              stays out; the reason is the record
+R2_MODULE_DEFAULT = {
+    "Reals":      "out:no Real value kind; decimal literals unsupported",
+    "RealTime":   "out:real-time semantics out of scope",
+    "Json":       "out:filesystem/JSON IO surface, not a checking semantic",
+    "Toolbox":    "out:IDE trace-explorer surface",
+    "_DotTrace":  "out:internal trace-expression spec surface",
+    "_JsonTrace": "out:internal trace-expression spec surface",
+    "_Possible":  "out:internal trace-expression spec surface",
+    "_TLAPlusCounterExample": "out:internal trace-expression spec surface",
+    "_TLCActionTrace": "out:internal trace-expression spec surface",
+    "_TLCTESpec": "out:internal trace-expression spec surface",
+    "_TLCTrace":  "out:internal trace-expression spec surface",
+    "_TLCTracePlain": "out:internal trace-expression spec surface",
+    "Randomization": "R2.6.2",
+}
+R2_CLASSIFY = {
+    ("TLC", "RandomElement"): "R2.6.2",
+    ("TLC", "JavaTime"):      "out:wall-clock nondeterminism",
+    ("TLC", "Any"):           "out:universal UserValue; no canonical representation",
+    # --- TLCExt, per operator. The module-level `excluded` default called all
+    # fourteen "debugger/trace-explorer", which is what produced the plan's
+    # wrong five-name split; measured against TLCExt.java and TLCExt.tla:
+    ("TLCExt", "AssertEq"):    "R2.6.3",
+    ("TLCExt", "AssertError"): "R2.6.3",
+    ("TLCExt", "TLCDefer"):    "R2.6.3",
+    ("TLCExt", "TLCCache"):    "R2.6.3",
+    ("TLCExt", "TLCNoOp"):     "R2.6.3",
+    # TLCGet-family, NOT debugger: tlcGetOrDefault reads the same per-run
+    # register store as TLCGet ("Partially Copy&Pasted from TLCGetSet.java"),
+    # and TLCGetAndSet is TLA+ over TLCGetOrDefault + TLCSet. They land with
+    # the slot R2.6.1 builds, not with the trace-explorer half.
+    ("TLCExt", "TLCGetOrDefault"): "R2.6.1",
+    ("TLCExt", "TLCGetAndSet"):    "R2.6.1",
+    # the trace-explorer / debugger half, which stays out
+    ("TLCExt", "CounterExample"): "out:trace-explorer surface (needs a counterexample the evaluator does not hold)",
+    ("TLCExt", "PickSuccessor"):  "out:debugger surface; interactive successor choice",
+    ("TLCExt", "Trace"):          "out:trace-explorer surface (needs the current behavior prefix)",
+    ("TLCExt", "ToTrace"):        "out:trace-explorer surface (lasso ordinal of a liveness counterexample)",
+    ("TLCExt", "TLCEvalDefinition"): "later:evaluates a definition BY NAME in the current scope; needs no engine state the port lacks, but no R2 subunit owns it",
+    ("TLCExt", "TLCFP"):             "later:state fingerprint read; lib/fingerprint already computes it, but no R2 subunit owns it",
+    ("TLCExt", "TLCModelValue"):     "later:interns a model value; the port has model values, but no R2 subunit owns it",
+}
+
 
 def sh(args, **kw):
     return subprocess.run(args, capture_output=True, text=True, **kw)
@@ -281,6 +342,25 @@ def classify(module: str, name: str) -> tuple:
     return ("", "")
 
 
+def r2_scope(module: str, name: str, cls: str, why: str) -> str:
+    """R2 scope verdict for one surface (subunit R2.6.0).
+
+    `required` and `body` surfaces are already in and need no verdict. An
+    UNREACHABLE surface is not a scope decision at all -- no TLA+ declaration
+    binds the method, so no spec can invoke it and there is nothing to bring
+    in; saying `out:` there would misrepresent 20 of the 78 as choices.
+    """
+    if cls in ("required", "body"):
+        return "in:already ported"
+    if why.startswith("unreachable"):
+        return "n/a:unreachable, not a scope decision"
+    if (module, name) in R2_CLASSIFY:
+        return R2_CLASSIFY[(module, name)]
+    if module in R2_MODULE_DEFAULT:
+        return R2_MODULE_DEFAULT[module]
+    return ""
+
+
 def build_inventory() -> tuple:
     """Merge the Java override table with the declared-operator table."""
     java = inventory_rows()
@@ -306,7 +386,8 @@ def build_inventory() -> tuple:
             cl, why = "excluded", "unreachable: no TLA+ declaration binds this method"
         rows[(mod, name, arity)] = [
             mod, name, str(arity), vis or "undeclared",
-            f"{cls}.{jname}", params, ann, method_ecs(cls, jname), cl, why]
+            f"{cls}.{jname}", params, ann, method_ecs(cls, jname), cl, why,
+            r2_scope(mod, name, cl, why)]
     for (mod, name, arity), vis in declared.items():
         if (mod, name, arity) in rows:
             continue
@@ -316,9 +397,12 @@ def build_inventory() -> tuple:
             # behavior, so the port evaluates the vendored body
             cl, why = "body", "no Java override; evaluates its TLA+ definition"
         rows[(mod, name, arity)] = [
-            mod, name, str(arity), vis, "-", "-", "-", "-", cl, why]
+            mod, name, str(arity), vis, "-", "-", "-", "-", cl, why,
+            r2_scope(mod, name, cl, why)]
     ordered = [rows[k] for k in sorted(rows)]
-    unclassified = [r for r in ordered if not r[8]]
+    # a surface with no `class` OR no R2 scope verdict fails the generator --
+    # the same discipline for both columns, so neither can drift into silence
+    unclassified = [r for r in ordered if not r[8] or not r[10]]
     return ordered, unclassified
 
 
@@ -328,7 +412,16 @@ def write_inventory(rows: list) -> None:
         "# (tlc2/module reflection + SANY-declared StandardModule operators).",
         "# Do not edit. One row per reachable operator surface.",
         "#",
-        "# module|operator|arity|visibility|java|params|annotation|ec|class|rationale",
+        "# module|operator|arity|visibility|java|params|annotation|ec|class|"
+        "rationale|r2-scope",
+        "#",
+        "# `class` is what the port does TODAY. `r2-scope` (R2.6.0) is the",
+        "# orthogonal question: which surfaces R2 brings in and who owns them.",
+        "#   in:...      already ported (class required/body)",
+        "#   n/a:...     no TLA+ declaration binds the method; not a decision",
+        "#   R2.6.N      in scope, owned by that subunit",
+        "#   later:...   in scope for the port, owned after R2",
+        "#   out:...     stays out, with the reason",
     ]
     body = ["|".join(r) for r in rows]
     INVENTORY.write_text("\n".join(head + body) + "\n")
@@ -527,10 +620,18 @@ def main() -> int:
         counts[r[8]] = counts.get(r[8], 0) + 1
     print(f"{len(rows)} operator rows ("
           + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) + ")")
+    # R2 scope histogram (R2.6.0), bucketed by verdict prefix
+    r2 = {}
+    for r in rows:
+        k = r[10].split(":")[0]
+        r2[k] = r2.get(k, 0) + 1
+    print("R2 scope (R2.6.0): "
+          + ", ".join(f"{k} {v}" for k, v in sorted(r2.items())))
     print(f"{n} stdops cases, {compared} compared definitions")
     if unclassified:
         for r in unclassified:
-            print(f"UNCLASSIFIED {r[0]}!{r[1]}/{r[2]}", file=sys.stderr)
+            miss = "class" if not r[8] else "r2-scope"
+            print(f"UNCLASSIFIED[{miss}] {r[0]}!{r[1]}/{r[2]}", file=sys.stderr)
         return 1
     problems = check_registry(rows) + check_contracts(rows)
     reg, _bodies = hoon_registry()
