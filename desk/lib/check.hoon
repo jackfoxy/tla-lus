@@ -252,6 +252,22 @@
   |=  o=bfs-opts
   ^-  eenv:ne
   (with-setmax:ne (make-env:ne defs.o consts.o vars.o) setmax.o)
+::
+++  run-stats-at
+  ::  the live `TLC!TLCGet` statistics for the state about to be expanded
+  ::  (R2.6.1). Read BEFORE its successors are registered, which is where the
+  ::  pin reads them: `TLCGetStringValue` runs while the next-state relation is
+  ::  being evaluated, and `numOfGenStates`/`theFPSet` have not yet taken this
+  ::  expansion's successors
+  |=  [cur=bfs-cursor lvl=@ud]
+  ^-  tlc-run:so:ne
+  [lvl `[depth.cur distinct.cur (lent queue.cur) gen.cur]]
+::
+++  env-at
+  ::  `+env-of` carrying those statistics
+  |=  [o=bfs-opts cur=bfs-cursor lvl=@ud]
+  ^-  eenv:ne
+  (with-run:ne (env-of o) (run-stats-at cur lvl))
 ::  everything required to resume a search byte-identically
 +$  bfs-cursor
   $:  init-todo=(list state)  ::  initial states not yet registered
@@ -496,7 +512,7 @@
     [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
   =/  fp   i.q
   =/  vis  (~(got by seen.cur) fp)
-  =/  nr  (next-states:ne st.vis next.o (env-of o))
+  =/  nr  (next-states:ne st.vis next.o (env-at o cur depth.vis))
   ?:  ?=(%| -.nr)  [%done [%error msg.p.nr] cur]
   =/  nexts  p.nr
   ?~  nexts
@@ -688,7 +704,15 @@
   =/  label=@t
     ?~  prev  '<Initial predicate>'
     ?~  actions  next-label
-    (edge-action-label u.prev (@t (state-fp:fp order i.trace)) actions e order modn)
+    ::  R2.6.1: the re-solve evaluates the next-state relation again, so a
+    ::  spec whose Next reads `TLCGet("level")` needs the PREDECESSOR's level
+    ::  or no action matches and every state falls back to `<unknown action>`.
+    ::  A trace position IS its level (state i is at level i), so this one is
+    ::  reconstructible; the counters are not, and stay `~`
+    %:  edge-action-label
+      u.prev  (@t (state-fp:fp order i.trace))  actions
+      (with-run:ne e [(dec i) ~])  order  modn
+    ==
   ::  ALIAS: the record BECOMES the state (R2.3.2). Its successor is the next
   ::  trace state, and the LAST state is paired with itself -- which is what
   ::  makes a primed reference print FALSE there, measured against the pin

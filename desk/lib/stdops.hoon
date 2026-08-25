@@ -844,32 +844,102 @@
       'exit'  'pause'
   ==
 ::
+::  what tlc2's statistic keys read, at the moment of evaluation (R2.6.1).
+::  Every field is something the port's own search cursor already holds; none
+::  of it is new engine state -- which is the correction this unit made to its
+::  own row. `level` is `s0.getLevel()`, the height of the state being expanded
+::  (0 in a constant or initial-predicate context) and NOT monotone, where
+::  `diameter` (`TLCTrace.getLevelForReporting()`) is
++$  tlc-run
+  $:  level=@ud
+      ::  the four counters, `~` where they are not reconstructible. The
+      ::  trace-label re-solve is the case that needs this: it knows each trace
+      ::  state's LEVEL (its position) but not the search counts at the moment
+      ::  that state was generated, and inventing zeros there would answer
+      ::  `TLCGet("generated")` with a plausible wrong number. Absent, those
+      ::  keys raise EC 2145 -- which is exactly what the pin does when no
+      ::  checker is running
+      counts=(unit [diameter=@ud distinct=@ud queued=@ud generated=@ud])
+  ==
+::
+++  tlc-stat-keys
+  ::  the keys R2.6.1 ANSWERS: each reads a number the port's own search cursor
+  ::  already holds, so none of them needs engine state the evaluator lacks --
+  ::  which is the correction R2.6.1's measurement made to its own row
+  ^-  (set @t)
+  (silt ~['level' 'diameter' 'distinct' 'queue' 'generated'])
+::
 ++  tlc-get
-  ::  TLCGet(k): a key the pin does not define is EC 2145, exactly as there;
-  ::  a defined key would report engine state the evaluator cannot reach, so
-  ::  it is a typed rejection naming the key rather than a plausible number
-  |=  as=(list value:v)
+  ::  TLCGet(k). `run` is the live statistics, `~` outside a checking run.
+  ::
+  ::  Three answers, and the split is tlc2's own:
+  ::    * a key the pin does not define at all      -> EC 2145
+  ::    * a statistic key, inside a run             -> the number
+  ::    * a statistic key with no checker running   -> EC 2145, because that is
+  ::      where `TLCGlobals.mainChecker` is null and the pin throws
+  ::      TLC_MODULE_TLCGET_UNDEFINED
+  ::  Everything else keeps its typed rejection naming what is missing.
+  ::
+  ::  `level` is the exception that needs no checker: `TLCGetStringValue` tests
+  ::  `EvalControl.isConst/isInit` FIRST and returns `INIT_LEVEL - 1` = 0 before
+  ::  it ever touches `mainChecker`
+  |=  [as=(list value:v) run=(unit tlc-run)]
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'TLCGet expects one argument.']
   ?:  ?=(%int -.i.as)
+    ::  an integer key reads the per-worker register store `TLCSet` writes.
+    ::  Unset, the pin raises EC 2145 for that index -- and since this engine
+    ::  has no writer yet (see `+tlc-set`), every index is unset
     [%| 2.145 (rap 3 ~['TLCGet(' (crip (render:v i.as)) ') was undefined.'])]
   ?.  ?=(%str -.i.as)
     [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
   ?.  (~(has in tlc-get-keys) p.i.as)
     [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
-  :-  %|
-  :-  0
-  %^  rap  3  'unsupported StandardModule operator: TLC!TLCGet; the key '
-  ~[p.i.as ' reports engine state the evaluator cannot reach']
+  ::  level is answered with or without a checker
+  ?:  =('level' p.i.as)
+    [%& %int (sun:si ?~(run 0 level.u.run))]
+  ?.  (~(has in tlc-stat-keys) p.i.as)
+    :-  %|
+    :-  0
+    %^  rap  3  'unsupported StandardModule operator: TLC!TLCGet; the key '
+    ?:  =('duration' p.i.as)
+      ~[p.i.as ' reads the wall clock, which no reproducible run may observe']
+    ~[p.i.as ' reports engine state the evaluator cannot reach']
+  ?~  run
+    [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
+  =/  cs  counts.u.run
+  ?~  cs
+    [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
+  =/  n=@ud
+    ?+  p.i.as  0
+      %diameter   diameter.u.cs
+      %distinct   distinct.u.cs
+      %queue      queued.u.cs
+      %generated  generated.u.cs
+    ==
+  [%& %int (sun:si n)]
 ::
 ++  tlc-set
-  ::  TLCSet(k, v) mutates engine state: a typed rejection, never a silent
-  ::  TRUE
+  ::  TLCSet(k, v) WRITES, and that is what still makes it a typed rejection.
+  ::
+  ::  R2.6.1 measured what the write actually is: a run-scoped mutable register
+  ::  store (`IdThread.setLocalValue`), read back by `TLCGet(int)`. Measured at
+  ::  the pin, `TLCSet(0, TLCGet(0) + 1)` in a next-state relation accumulates
+  ::  ACROSS state expansions -- 100, 101, 102, 103 -- and the write is visible
+  ::  to a later conjunct of the SAME evaluation. So the store cannot live on
+  ::  `eenv`, which is read-only by construction: every eval's RETURN would
+  ::  have to carry it.
+  ::
+  ::  That is the identical cross-cutting change `tlc-coverage` (R2.7.4) was
+  ::  re-sized L/high for, for the identical reason -- Hoon has no mutable
+  ::  counter, so an upward-accumulating quantity has to ride the result. Doing
+  ::  the two separately means the same surgery twice, so this half is left
+  ::  refused BY NAME rather than half-built
   |=  as=(list value:v)
   ^-  eres
   ?.  ?=([* * ~] as)  [%| 0 'TLCSet expects two arguments.']
   :-  %|
   :-  0
   %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet; '
-  ~['it mutates engine state, which this evaluator does not own']
+  ~['it writes a run-scoped register the evaluator cannot carry out of an evaluation']
 --

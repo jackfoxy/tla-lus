@@ -468,6 +468,50 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
+++  test-mc-tlcget-level
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 41 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 41 of module spec>'
+        'x = 3'
+        'State 4: <Next line 5, col 9 to line 5, col 41 of module spec>'
+        'x = 6'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x < 6 /\\ x\' = x + TLCGet("level")\0aInv == x < 5\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-tlcget-stats
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x < 4 /\\ x\' = x + 1\0aInv == TLCGet("distinct") < 3 /\\ TLCGet("generated") < 4 /\\ TLCGet("queue") < 2 /\\ TLCGet("diameter") < 4\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-mc-twobit
   %+  expect-eq
     !>  ^-  wain

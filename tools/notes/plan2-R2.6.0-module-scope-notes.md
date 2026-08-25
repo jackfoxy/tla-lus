@@ -95,7 +95,11 @@ the `deferred` set, not from the 78 at all.
 ## What this changes downstream
 
 - R2.6.1's grounding drops `tlc-module-excluded` and gains two `TLCExt`
-  surfaces.
+  surfaces. **Superseded 2026-08-25**: R2.6.1 measured that the register store
+  those two share with `TLCSet` needs R2.7.4's return-carrying change, so its
+  write half — and both surfaces — were folded into R2.7.4 and their `r2-scope`
+  verdicts moved there. That the column had to be edited rather than argued
+  with is the point of having it.
 - R2.6.2's list grows from 2 named surfaces to 4, and its premise changes from
   "excluded, bring it in" to "deferred on a condition unit 9 discharged".
 - R2.6.3 loses `AssertEq` as *work* (it is a `body`) and keeps four.

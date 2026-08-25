@@ -63,6 +63,13 @@
       ::  (unit 6C.1); rebuilding the table inside an evaluation loop would
       ::  cost a map construction per operator application
       ov=senv:so
+      ::  the live run statistics `TLC!TLCGet` reads (R2.6.1). `~` means no
+      ::  checker is running -- a constant expression or the REPL -- which is
+      ::  where the pin's `TLCGlobals.mainChecker` is null and every statistic
+      ::  key raises EC 2145. These CHANGE during the search, so a caller
+      ::  rebuilds them per expansion rather than once per run
+      ::  (the mold lives in lib/stdops, which cannot import this file)
+      run=(unit tlc-run:so)
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -1068,7 +1075,7 @@
   ?.  ?=([* ~] args.n)  [%| 0 'TLCGet expects one argument.']
   =/  k  (eval i.args.n e)
   ?:  ?=(%| -.k)  k
-  (tlc-get:so ~[p.k])
+  (tlc-get:so ~[p.k] run.e)
 ::
 ++  eval-sort-seq
   ::  TLC!SortSeq(s, cmp): tlc2's insertion sort, with the comparator applied
@@ -1611,7 +1618,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -1665,7 +1672,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so]
+  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~]
 ::
 ++  with-setmax
   ::  the run's `max-set-size` applied to a prebuilt env (R2.4.1). A separate
@@ -1675,6 +1682,14 @@
   |=  [e=eenv lim=@ud]
   ^-  eenv
   e(setmax lim)
+::
+++  with-run
+  ::  the live run statistics applied to a prebuilt env (R2.6.1), the same
+  ::  shape `+with-setmax` uses and for the same reason. Unlike `setmax` these
+  ::  change as the search runs, so the search sets them per expansion
+  |=  [e=eenv r=tlc-run:so]
+  ^-  eenv
+  e(run `r)
 ::
 ++  init-states
   ::  the complete initial-state stream for an Init BODY under a prebuilt env

@@ -151,10 +151,17 @@ R2_CLASSIFY = {
     ("TLCExt", "TLCNoOp"):     "R2.6.3",
     # TLCGet-family, NOT debugger: tlcGetOrDefault reads the same per-run
     # register store as TLCGet ("Partially Copy&Pasted from TLCGetSet.java"),
-    # and TLCGetAndSet is TLA+ over TLCGetOrDefault + TLCSet. They land with
-    # the slot R2.6.1 builds, not with the trace-explorer half.
-    ("TLCExt", "TLCGetOrDefault"): "R2.6.1",
-    ("TLCExt", "TLCGetAndSet"):    "R2.6.1",
+    # and TLCGetAndSet is TLA+ over TLCGetOrDefault + TLCSet.
+    #
+    # R2.6.0 assigned these to R2.6.1. R2.6.1 then MEASURED that store: it
+    # accumulates across state expansions, so it cannot ride the read-only
+    # `eenv` -- every eval's RETURN type has to carry it, which is the same
+    # cross-cutting change R2.7.4 (tlc-coverage) needs. Rather than perform
+    # that surgery twice on the same evaluator, the WRITE half of R2.6.1 was
+    # folded into R2.7.4, and these two moved with it. R2.6.1 kept and shipped
+    # the READ half (TLCGet's statistic keys), which needed no such change.
+    ("TLCExt", "TLCGetOrDefault"): "R2.7.4",
+    ("TLCExt", "TLCGetAndSet"):    "R2.7.4",
     # the trace-explorer / debugger half, which stays out
     ("TLCExt", "CounterExample"): "out:trace-explorer surface (needs a counterexample the evaluator does not hold)",
     ("TLCExt", "PickSuccessor"):  "out:debugger surface; interactive successor choice",

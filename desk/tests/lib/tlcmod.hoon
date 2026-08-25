@@ -98,20 +98,48 @@
   %+  tlc  'PrintT("hello")'
   "ERR: unsupported StandardModule operator: TLC!PrintT; it writes to the TLC console and this engine has no output channel"
 ::
-++  test-tlc-get-known-key
-  %+  tlc  'TLCGet("level")'
-  "ERR: unsupported StandardModule operator: TLC!TLCGet; the key level reports engine state the evaluator cannot reach"
+++  test-tlc-get-level-outside-a-run
+  ::  R2.6.1: `level` is answered with or WITHOUT a checker. `TLCGetStringValue`
+  ::  tests `EvalControl.isConst/isInit` first and returns `INIT_LEVEL - 1` = 0
+  ::  before it ever touches `mainChecker`, so a constant context is 0, not an
+  ::  error. Inside a search it is the level of the state being expanded --
+  ::  covered by `tests/lib/mc` `tlcget-level`, whose state graph is BUILT from
+  ::  it and matches the pin byte-for-byte
+  (tlc 'TLCGet("level")' "0")
+::
+++  test-tlc-get-stat-outside-a-run
+  ::  a statistic key with no checker running is EC 2145, which is what the pin
+  ::  does when `TLCGlobals.mainChecker` is null
+  (tlc 'TLCGet("distinct")' "ERR: TLCGet(distinct) was undefined.")
+::
+++  test-tlc-get-duration-refused
+  ::  a key the pin DEFINES and this engine will not answer: the wall clock is
+  ::  not something a reproducible run may observe. Refused by name, never a
+  ::  plausible number (R2.1)
+  %+  tlc  'TLCGet("duration")'
+  "ERR: unsupported StandardModule operator: TLC!TLCGet; the key duration reads the wall clock, which no reproducible run may observe"
+::
+++  test-tlc-get-unreachable-key-refused
+  ::  a key the pin defines and this engine cannot reach, distinct from the
+  ::  wall-clock case above and from an undefined key below
+  %+  tlc  'TLCGet("worker")'
+  "ERR: unsupported StandardModule operator: TLC!TLCGet; the key worker reports engine state the evaluator cannot reach"
 ::
 ++  test-tlc-get-unknown-key
   ::  the pin's own EC 2145 for a key it does not define
   (tlc 'TLCGet("zork")' "ERR: TLCGet(zork) was undefined.")
 ::
 ++  test-tlc-get-register
+  ::  an integer key reads the register store `TLCSet` writes. Nothing writes
+  ::  it yet, so every index is unset -- the pin's EC 2145 for that index
   (tlc 'TLCGet(3)' "ERR: TLCGet(3) was undefined.")
 ::
 ++  test-tlc-set
+  ::  R2.6.1 measured what the write IS -- a run-scoped register that
+  ::  accumulates across state expansions -- and the reason it stays refused
+  ::  is now that measurement rather than a generality
   %+  tlc  'TLCSet("exit", TRUE)'
-  "ERR: unsupported StandardModule operator: TLC!TLCSet; it mutates engine state, which this evaluator does not own"
+  "ERR: unsupported StandardModule operator: TLC!TLCSet; it writes a run-scoped register the evaluator cannot carry out of an evaluation"
 ::
 ::  +|  Excluded operators stay typed rejections
 ::

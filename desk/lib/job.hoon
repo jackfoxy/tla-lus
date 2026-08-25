@@ -1994,8 +1994,13 @@
     ?~  prev  act
     ?:  ?=(~ acts)  act
     =/  hit
+      ::  R2.6.1: the same re-solve as `+render-trace`, and it needs the same
+      ::  thing -- a trace position IS its level, so the predecessor's level is
+      ::  `i - 1`; without it a spec reading `TLCGet("level")` matches no
+      ::  action and every wire trace state loses its attribution
       %:  edge-action:check
-        u.prev  (@t (state-fp:fp order i.sts))  acts  e  order  modn
+        u.prev  (@t (state-fp:fp order i.sts))  acts
+        (with-run:ne e [(dec i) ~])  order  modn
       ==
     ?~(hit act hit)
   ::  ALIAS (R2.3.2): the record BECOMES the state, its successor is the next
