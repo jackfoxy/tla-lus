@@ -196,6 +196,121 @@
   =/  r  (solve-next:ne 'A' src 'Next' (snag 0 p.ir))
   ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
 ::
+++  test-stream-coverage-constraint-init
+  %+  expect-eq
+    !>  'S 0 x = 0'
+  !>
+  =/  r  (solve-init:ne 'A' (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 5 /\\ x\' = x + 1\0aDec == x > 0 /\\ x\' = x - 1\0aNext == Inc \\/ Dec\0aInv == x >= 0\0aACons == x\' # x\0aCons == x < 3\0a====\0a']]) 'Init')
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-outdeg-coverage-constraint
+  %+  expect-eq
+    !>  ^-  [@ud @ud @ud @ud]
+    [0 1 1 1]
+  !>
+  =/  r  (run-stats-full:check '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 5 /\\ x\' = x + 1\0aDec == x > 0 /\\ x\' = x - 1\0aNext == Inc \\/ Dec\0aInv == x >= 0\0aACons == x\' # x\0aCons == x < 3\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aACTION_CONSTRAINT ACons\0aCONSTRAINT Cons\0a' 0 1.024)
+  [min.outdeg.r mean.outdeg.r p95.outdeg.r max.outdeg.r]
+::
+++  test-stream-coverage-constraint-next-0
+  %+  expect-eq
+    !>  'S 0 x = 1'
+  !>
+  =/  src  (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aInc == x < 5 /\\ x\' = x + 1\0aDec == x > 0 /\\ x\' = x - 1\0aNext == Inc \\/ Dec\0aInv == x >= 0\0aACons == x\' # x\0aCons == x < 3\0a====\0a']])
+  =/  ir  (solve-init:ne 'A' src 'Init')
+  ?:  ?=(%| -.ir)  'INIT-FAILED'
+  ?:  (lth (lent p.ir) 1)  'NO-SUCH-INIT-STATE'
+  =/  r  (solve-next:ne 'A' src 'Next' (snag 0 p.ir))
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-stream-coverage-disj-init
+  %+  expect-eq
+    !>  'S 0 x = 0'
+  !>
+  =/  r  (solve-init:ne 'A' (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aNext == (x = 0 /\\ x\' = 1) \\/ (x = 1 /\\ x\' = 0)\0aInit == x = 0\0aInv == x < 2\0a====\0a']]) 'Init')
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-outdeg-coverage-disj
+  %+  expect-eq
+    !>  ^-  [@ud @ud @ud @ud]
+    [0 1 1 1]
+  !>
+  =/  r  (run-stats-full:check '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aNext == (x = 0 /\\ x\' = 1) \\/ (x = 1 /\\ x\' = 0)\0aInit == x = 0\0aInv == x < 2\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a' 0 1.024)
+  [min.outdeg.r mean.outdeg.r p95.outdeg.r max.outdeg.r]
+::
+++  test-stream-coverage-disj-next-0
+  %+  expect-eq
+    !>  'S 0 x = 1'
+  !>
+  =/  src  (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aNext == (x = 0 /\\ x\' = 1) \\/ (x = 1 /\\ x\' = 0)\0aInit == x = 0\0aInv == x < 2\0a====\0a']])
+  =/  ir  (solve-init:ne 'A' src 'Init')
+  ?:  ?=(%| -.ir)  'INIT-FAILED'
+  ?:  (lth (lent p.ir) 1)  'NO-SUCH-INIT-STATE'
+  =/  r  (solve-next:ne 'A' src 'Next' (snag 0 p.ir))
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-stream-coverage-exists-init
+  %+  expect-eq
+    !>  'S 0 x = 0; y = 0'
+  !>
+  =/  r  (solve-init:ne 'A' (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aBump(i) == /\\ x\' = (x + i) % 3\0a           /\\ y\' = y\0aYup == /\\ y\' = (y + 1) % 2\0a       /\\ x\' = x\0aNext == (\\E i \\in 1..2 : Bump(i)) \\/ Yup\0aInv == x < 3\0a====\0a']]) 'Init')
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-outdeg-coverage-exists
+  %+  expect-eq
+    !>  ^-  [@ud @ud @ud @ud]
+    [0 1 3 3]
+  !>
+  =/  r  (run-stats-full:check '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aBump(i) == /\\ x\' = (x + i) % 3\0a           /\\ y\' = y\0aYup == /\\ y\' = (y + 1) % 2\0a       /\\ x\' = x\0aNext == (\\E i \\in 1..2 : Bump(i)) \\/ Yup\0aInv == x < 3\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a' 0 1.024)
+  [min.outdeg.r mean.outdeg.r p95.outdeg.r max.outdeg.r]
+::
+++  test-stream-coverage-exists-next-0
+  %+  expect-eq
+    !>  'S 0 x = 1; y = 0\0aS 1 x = 2; y = 0\0aS 2 x = 0; y = 1'
+  !>
+  =/  src  (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aBump(i) == /\\ x\' = (x + i) % 3\0a           /\\ y\' = y\0aYup == /\\ y\' = (y + 1) % 2\0a       /\\ x\' = x\0aNext == (\\E i \\in 1..2 : Bump(i)) \\/ Yup\0aInv == x < 3\0a====\0a']])
+  =/  ir  (solve-init:ne 'A' src 'Init')
+  ?:  ?=(%| -.ir)  'INIT-FAILED'
+  ?:  (lth (lent p.ir) 1)  'NO-SUCH-INIT-STATE'
+  =/  r  (solve-next:ne 'A' src 'Next' (snag 0 p.ir))
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-stream-coverage-init-reject-init
+  %+  expect-eq
+    !>  'S 0 x = 2\0aS 1 x = 3'
+  !>
+  =/  r  (solve-init:ne 'A' (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..3 /\\ x > 1\0aNext == x\' = x\0aInv == x >= 0\0a====\0a']]) 'Init')
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-outdeg-coverage-init-reject
+  %+  expect-eq
+    !>  ^-  [@ud @ud @ud @ud]
+    [0 0 0 0]
+  !>
+  =/  r  (run-stats-full:check '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..3 /\\ x > 1\0aNext == x\' = x\0aInv == x >= 0\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a' 0 1.024)
+  [min.outdeg.r mean.outdeg.r p95.outdeg.r max.outdeg.r]
+::
+++  test-stream-coverage-init-reject-next-0
+  %+  expect-eq
+    !>  'S 0 x = 2'
+  !>
+  =/  src  (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..3 /\\ x > 1\0aNext == x\' = x\0aInv == x >= 0\0a====\0a']])
+  =/  ir  (solve-init:ne 'A' src 'Init')
+  ?:  ?=(%| -.ir)  'INIT-FAILED'
+  ?:  (lth (lent p.ir) 1)  'NO-SUCH-INIT-STATE'
+  =/  r  (solve-next:ne 'A' src 'Next' (snag 0 p.ir))
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
+++  test-stream-coverage-init-reject-next-1
+  %+  expect-eq
+    !>  'S 0 x = 3'
+  !>
+  =/  src  (malt ~[['A' '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..3 /\\ x > 1\0aNext == x\' = x\0aInv == x >= 0\0a====\0a']])
+  =/  ir  (solve-init:ne 'A' src 'Init')
+  ?:  ?=(%| -.ir)  'INIT-FAILED'
+  ?:  (lth (lent p.ir) 2)  'NO-SUCH-INIT-STATE'
+  =/  r  (solve-next:ne 'A' src 'Next' (snag 1 p.ir))
+  ?:(?=(%| -.r) 'SOLVE-FAILED' (wc (render-stream p.r)))
+::
 ++  test-stream-deadlock-init
   %+  expect-eq
     !>  'S 0 x = 0'

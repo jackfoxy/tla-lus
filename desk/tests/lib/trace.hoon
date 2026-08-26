@@ -98,15 +98,18 @@
     ==
   !>  (state-labels (check:check named cfg))
 ::
-::  +|  Coverage action SET (R1.5.11)
+::  +|  Coverage action SET (R1.5.11) and the counterexample refusal (R2.7.4.2b)
 ::
-::  The `coverage` safety corpus case. `tlc2.TLC -coverage 1` reports one line
-::  per action — `<Init …> 1`, `<Inc …> 3`, `<Dec …> 3` — whose COUNTS are
-::  `getEvalCount()`, an engine-internal cost-model tally that a structurally
-::  different evaluator cannot reproduce (a documented approved difference, like
-::  UniqueString order). The action SET and its order ARE reproducible, and this
-::  asserts exactly that half: getActions decomposes `Next == Inc \/ Dec` into
-::  the two named leaf actions, in source order.
+::  The `coverage` safety corpus case. R1.5.11 could only assert the action SET
+::  here, because the COUNTS were then believed to be `getEvalCount()`, an
+::  engine-internal evaluation tally. R2.7.4.0 MEASURED otherwise -- every
+::  number on an INIT / NEXT / CONSTRAINT line is a count of STATES at a checker
+::  boundary (`Worker.addElement`, `Tool.getInitStates`, `Tool.isInModel`) --
+::  so the counts are now reproduced and compared line for line in the
+::  GENERATED `tests/lib/coverage` shard (tools/gen-coverage-tests.py).
+::
+::  What stays here is the decomposition this all rests on: getActions splits
+::  `Next == Inc \/ Dec` into the two named leaf actions, in source order.
 ++  cov-spec
   ^-  @t
   %-  crip
@@ -129,4 +132,40 @@
   ?~  nsb  ~['NO-NEXT']
   =/  e  (base-env:ne u.mo ~ ~)
   (turn (get-actions:check u.nsb 'Next' defs e) |=([n=@t *] n))
+::
+::  A run that PRINTS A COUNTEREXAMPLE reports NO coverage block. tlc2
+::  reconstructs the trace by re-invoking the initial predicate and the actions
+::  with coverage still recording, so its counters there are the search's PLUS
+::  that re-solve: the same spec that reports `<Init …>: 1:1` / `<A …>: 2:2`
+::  under `-deadlock` reports `3:3` / `2:6` when the deadlock trace is printed
+::  (measured 2026-08-25, re-measured with `-noGenerateSpecTE`, unchanged).
+::  The port does not reproduce the re-solve, so it withholds the numbers and
+::  says so by name rather than publishing different ones (R2.1)
+++  dead-spec
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"  "EXTENDS Naturals\0a"  "VARIABLE x\0a"
+    "Init == x = 0\0a"  "Step == x < 2 /\\ x' = x + 1\0a"
+    "Next == Step\0a"  "Inv == TRUE\0a"  "====\0a"
+  ==
+::
+++  test-coverage-refused-on-counterexample
+  %+  expect-eq
+    !>  ^-  (list @t)
+    :~  '-coverage: no statistics for a run that prints a counterexample.'
+    ==
+  !>
+  %+  skim  (check-cov:check dead-spec cfg)
+  |=(l=@t =('-coverage: no statistics for a run that prints a counterexample.' l))
+::
+::  ...and a clean run of the SAME shape does report one
+++  test-coverage-reported-on-clean-run
+  %+  expect-eq
+    !>  %.y
+  !>
+  =/  w  (check-cov:check cov-spec cfg)
+  ?&  (lien w |=(l=@t =('The coverage statistics ' (end [3 24] l))))
+      (lien w |=(l=@t =('End of statistics.' l)))
+  ==
 --

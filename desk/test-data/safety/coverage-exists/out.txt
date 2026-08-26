@@ -1,0 +1,13 @@
+SAFETY
+VERDICT ok
+EC 0
+STAT generated 19
+STAT distinct 6
+STAT queue 0
+STAT depth 3
+STAT outdegree 0 1 3 3
+COVERAGE <Init line 4, col 1 to line 4, col 4 of module A>: 1:1
+COVERAGE <Bump line 5, col 1 to line 5, col 7 of module A>: 2:12
+COVERAGE <Yup line 7, col 1 to line 7, col 3 of module A>: 3:6
+COVERAGE <Inv line 10, col 1 to line 10, col 3 of module A>
+TRACE 0

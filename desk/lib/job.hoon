@@ -407,6 +407,14 @@
   ::  Refused by name rather than accepted and ignored (R2.1)
   ?:  ?&(continue.opts.op.req ?=(%dfid -.mode.opts.op.req))
     `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
+  ::  `-coverage` (R2.7.4.2b) is collected on the EXHAUSTIVE safety search's
+  ::  BFS cursor -- `Worker.addElement` / `Tool.isInModel` / `Tool.getInitStates`
+  ::  are its three counting sites, and the simulation and DFID engines pass
+  ::  through none of them. tlc2 does report coverage under `-simulate` and
+  ::  `-dfid`; this port does not, and refuses by name rather than reporting a
+  ::  block of zeroes (R2.1)
+  ?:  ?&(coverage.opts.op.req !?=(%exhaustive -.mode.opts.op.req))
+    `'unsupported: -coverage outside exhaustive mode (the counters live on the safety search)'
   ?:  ?=(%clay -.src.req)
     ::  a %clay bundle selects its config by PATH, not by name: the desk has
     ::  no `%cfg` mark, so the file's mark is part of the reference (hence
@@ -1436,7 +1444,15 @@
   =/  isr  -.isc
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
-  =/  cvi  [(lent is) irej.+.isc]
+  ::  R2.7.4.2b: everything the coverage block needs and the search does not
+  ::  otherwise carry. `irej` is the R2.7.4.1a carrier's INIT rejection count
+  =/  cvo=cov-opts:check
+    :*  coverage.opts.op.request.j  modn
+        ?:(?=(%init-next -.mode.rs) ?~(init.mode.rs '' u.init.mode.rs) '')
+        [(lent is) irej.+.isc]
+        (resolve-names:check defs constraints.rs)
+        (resolve-names:check defs action-constraints.rs)
+    ==
   ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
   ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
   ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior on its
@@ -1532,7 +1548,7 @@
         :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-            vwb  max-set-size.lims  continue.opts.op.request.j  ~  cvi
+            vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
       (more j pre)
@@ -1564,7 +1580,8 @@
     ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
       :*  nsb  invs  ~  ~  vars  order  ~  defs  consts  |
-          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~  cvi
+          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
+          *cov-opts:check
       ==
     =.  cont.j
       %-  save-kont
@@ -1576,10 +1593,14 @@
   ::  safety search: all invariants (ordered), state/action constraints, and
   ::  the effective deadlock flag (CLI flag AND the cfg CHECK_DEADLOCK flag,
   ::  matching TLC's `deadlock && getCheckDeadlock()`)
+  ::  the getActions decomposition is built ONCE here and carried on the opts
+  ::  (R2.7.4.2b): `+finish-bfs` needs the same list for the trace labels, and
+  ::  passing it in removes the per-slice rebuild R2.7.4.2a's timing measured
+  =/  acts  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
   =/  o=bfs-opts:check
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-        vwb  max-set-size.lims  continue.opts.op.request.j  ~  cvi
+        vwb  max-set-size.lims  continue.opts.op.request.j  acts  cvo
     ==
   =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
   (more j pre)
@@ -1606,7 +1627,10 @@
       ?:  (noun-over cont.j max-noun-bytes)
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
-    (finish-bfs j out.r (od-stats:check outdeg.cur.r) o.kk nl.kk act.kk aname.kk al.kk vr.kk pre)
+    %:  finish-bfs
+      j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
+      nl.kk  act.kk  aname.kk  al.kk  vr.kk  pre
+    ==
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
@@ -1630,7 +1654,7 @@
     ::  temporal PROPERTY (R2.3.2), so `~` is the whole story for the alias
     ?:  ?=(%inv -.out.r)
       %:  finish-bfs
-        j  out.r  (od-stats:check outdeg.cur.r)  o.kk
+        j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
         nl.kk  act.kk  aname.kk  ~  ~  pre
       ==
     ?.  ?=(%ok -.out.r)
@@ -1645,6 +1669,9 @@
 ++  finish-bfs
   ::  seal a safety search: wire result, stats, report + trace artifacts
   |=  $:  j=jobstate  out=outcome:check  od=out-degree  o=bfs-opts:check
+          ::  the final cursor, which carries the coverage counters
+          ::  (R2.7.4.2b); everything else reads `out`
+          cur=bfs-cursor:check
           nl=@t  act=next-act  aname=@t  al=(unit sem:semantic)
           vr=(unit sem:semantic)
           pre=(list event)
@@ -1670,14 +1697,21 @@
   ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
   ::  keeps the whole-Next label it has always rendered.
   =/  env   (make-env:ne defs.o consts.o vars.o)
-  =/  acts  (get-actions:check next.o aname defs.o env)
+  ::  R2.7.4.2b: `+do-config` built this list once and put it on the opts, so
+  ::  the trace labels and the coverage counters index the SAME decomposition
+  =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
   =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
   ::  the ALIAS reaches BOTH artifacts (R2.3.2): the report through
   ::  `+render-outcome` and the typed trace through `+trace-states`. `env` is
   ::  passed where `*eenv:ne` used to be because evaluating the alias needs it;
   ::  it changes nothing else, since `actions` stays `~` and the only other
   ::  reader of `e` is the per-action label that `~` disables
-  =/  report  (wain-text (render-outcome:check out nl ~ env ~ '' al vr |))
+  =/  report
+    %-  wain-text
+    %:  render-outcome:check
+      out  nl  ~  env  ~  ''  al  vr  |
+      (cov-report:check o cur acts)
+    ==
   =/  tr=(unit trace)
     ?+  -.out  ~
       %inv       `[%safety (trace-states trace.out act acts env order.o modn al) ~]

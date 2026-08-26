@@ -1568,7 +1568,21 @@
   ^-  sout
   =/  b  (eval-bool n (senv mode cur part e))
   ?:  ?=(%| -.b)  [b s]
-  ?:(p.b [[%& ~[part]] s] [[%& ~] s])
+  ?:  p.b  [[%& ~[part]] s]
+  ::  R2.7.4.2b: the INIT coverage line's SECOND column is
+  ::  `getEvalCount() + secondary`, and the secondary counts exactly this --
+  ::  an initial-state candidate rejected by a conjunct evaluated once the
+  ::  state was ALREADY FULLY ASSIGNED. That is `Tool.getInitStates`'s
+  ::  `ps.allAssigned()` branch (`Tool.java:536-556`), which increments
+  ::  `cm.getRoot().incSecondary()` and abandons the candidate; a rejection
+  ::  while a variable is still unassigned increments nothing. Measured at the
+  ::  pin: `Init == x \in 0..3 /\ y = 0 /\ x > 1` reports `2:4`, and the same
+  ::  conjuncts reordered so `x > 1` runs before `y` is bound report `2:2`.
+  ::  Counted ONCE per rejected candidate, which falls out of the solver's
+  ::  short-circuit: a filter that yields no state leaves `+solve-each` with
+  ::  nothing to iterate, so no later conjunct is evaluated for it
+  =?  irej.s  ?&(?=(%init mode) (complete part vars.e))  +(irej.s)
+  [[%& ~] s]
 ::
 ++  solve-letin
   |=  [n=sem-letin:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]

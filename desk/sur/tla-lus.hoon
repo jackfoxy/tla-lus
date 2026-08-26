@@ -182,6 +182,17 @@
       ::  by PATH (`src.cfg`) instead, because the file's Clay mark is part of
       ::  the reference and a bare name cannot supply it
       cfg=(unit source-name)
+      ::  tlc2's `-coverage` (R2.7.4.2b): report the per-action / per-constraint
+      ::  coverage counters after the run. A BOOLEAN, not tlc2's interval
+      ::  argument -- `TLCGlobals.coverageInterval` only gates PERIODIC
+      ::  reporting, and the end-of-run block is byte-identical for
+      ::  `-coverage 0`, `1` and `2` because a corpus-sized run never reaches
+      ::  the interval. The interval is therefore a WALL-CLOCK behaviour, and
+      ::  no reproducible run may observe the wall clock (the rule R2.6.1
+      ::  applied to `TLCGet("duration")`), so the port has no field for it and
+      ::  a caller who wants one is refused by name rather than served a number
+      ::  that does nothing (R2.1)
+      coverage=?
       mode=check-mode
   ==
 +$  op

@@ -33,7 +33,7 @@ import java.util.Map;
  *   STAT queue <n>
  *   STAT depth <n>
  *   STAT outdegree <min> <mean> <p95> <max>   (success runs, when collected)
- *   COVERAGE <action-or-line> <count>          (only with -coverage)
+ *   COVERAGE <label>[: <A>:<B>]                (only with -coverage)
  *   TRACE <count>
  *   STATE <num> <fingerprint>
  *   LABEL <action name / initial predicate / back-to-state / stuttering>
@@ -128,11 +128,39 @@ public final class SafetyDump {
     }
 
     // Coverage (only present when -coverage was requested).
+    //
+    // R2.7.4.2b widened this from "INIT/NEXT, argument index 2" to the WHOLE
+    // reportable block, rendered exactly as MP renders it, so the Hoon side can
+    // be compared line for line rather than number by number:
+    //
+    //   TLC_COVERAGE_INIT/NEXT/CONSTRAINT -> "%1%: %2%:%3%"
+    //   TLC_COVERAGE_PROPERTY             -> "%1%"          (invariants; no counts)
+    //
+    // The per-code lists are emitted in CostModelCreator.report()'s own order --
+    // INIT, then the NEXT actions (sorted by the action's span), then the
+    // invariants, then the action constraints followed by the state constraints,
+    // both of which are TLC_COVERAGE_CONSTRAINT and keep their emission order
+    // inside that list. So walking the codes in this fixed sequence reproduces
+    // the block's order without needing a global emission clock.
+    //
+    // Deliberately NOT projected, and declared as approved differences: the
+    // per-VARIABLE TLC_COVERAGE_VAR line (a HyperLogLog estimate) and the
+    // indented per-node TLC_COVERAGE_VALUE / _COST sub-expression lines.
     for (int code : new int[]{EC.TLC_COVERAGE_INIT, EC.TLC_COVERAGE_NEXT}) {
       for (Object o : REC.getOrDefault(code, new ArrayList<>())) {
         String[] c = (String[]) o;
-        out.append("COVERAGE ").append(c[0]).append(" ").append(c[2]).append("\n");
+        out.append("COVERAGE ").append(c[0]).append(": ")
+           .append(c[1]).append(":").append(c[2]).append("\n");
       }
+    }
+    for (Object o : REC.getOrDefault(EC.TLC_COVERAGE_PROPERTY, new ArrayList<>())) {
+      String[] c = (String[]) o;
+      out.append("COVERAGE ").append(c[0]).append("\n");
+    }
+    for (Object o : REC.getOrDefault(EC.TLC_COVERAGE_CONSTRAINT, new ArrayList<>())) {
+      String[] c = (String[]) o;
+      out.append("COVERAGE ").append(c[0]).append(": ")
+         .append(c[1]).append(":").append(c[2]).append("\n");
     }
 
     // Counterexample trace, in generation order, with per-state fingerprints.

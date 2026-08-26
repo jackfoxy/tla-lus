@@ -390,7 +390,102 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
-### The dev ship will not accept a NEW FILE — and it is not the code's fault
+## R2.7.4.2b — the coverage block — DONE 2026-08-26
+
+`tlc-coverage` now reports the block, and the row closes as a NARROWED
+`approved-difference`: three declared absences, no wrong numbers.
+
+### What landed
+
+- **`+get-actions` gained tlc2's applied-operator rule.** `Tool.getActionsAppl`'s
+  `opcode == 0` branch evaluates an applied user operator's arguments against
+  `TLCState.Empty`, conses them onto the context and recurses into
+  `opDef.getBody()` **under the operator's name**, whenever every argument is
+  constant-level. The port only inlined ARITY-0 references, so
+  `(\E i \in 1..2 : Bump(i)) \/ Yup` decomposed into two actions both named
+  `Next` and spanned at the `Bump(i)` application. New `+bind-args` does the
+  binding in both the env and the action's carried context, and returns `~` on
+  any evaluation failure — tlc2's `catch (Throwable e) { /*SKIP*/ }` fallback to
+  the single leaf action. Every label-bearing shard stayed green
+  (`trace`, `mc`, `safety-gen`, `liveness-lasso`), so no existing golden
+  depended on the wrong name.
+- **`+decl-span` / `+cov-label`.** The coverage label is
+  `Action.getDeclaration()` — the `N_IdentLHS` subtree — where the TRACE label
+  is the body span. **No mold change was needed**: the declaration starts where
+  the definition starts and ends at the name's last column (arity 0) or one
+  past the last parameter's last column (the `)`), both derivable from
+  `sem-def`'s `at` and `params`. Verified against the pin on `Init` (col 1-4),
+  `Cons2` (col 1-5) and `Bump(i)` (col 1-7). The 1:N suffix
+  ` (bl bc el ec)` is appended when the action's own span differs from the
+  definition BODY's span — measured
+  `<Next line 5, col 1 to line 5, col 4 of module PD (5 10 5 24)>`.
+- **The counters.** `cvn` (per action) was already on the cursor from the
+  earlier increment; `cvc` / `cva` (per state / action constraint) joined it,
+  tallied by `+cov-tally` from `+con-hold-n` / `+acon-hold-n`, which report how
+  many constraints the loop evaluated. `Tool.isInModel`/`isInActions` count the
+  OPPOSITE way round from an action — primary on FALSE, secondary on TRUE,
+  reported `secondary : primary + secondary` — and both loops short-circuit on
+  the first false, which is why the tally happens at the loop and not from the
+  state counts.
+- **`rst.irej` is now WRITTEN**, in `+solve-filter`, when the mode is `%init`
+  and the partial state is already complete. That is the one number in the
+  block that needed the R2.7.4.1a carrier, and it is `Tool.getInitStates`'s
+  `allAssigned` branch exactly: `Init == x \in 0..3 /\ x > 1` reports `2:4`
+  and the reordered form `2:2`. Counting once per rejected candidate falls out
+  of the solver's own short-circuit — a filter that yields no state leaves
+  `+solve-each` nothing to iterate.
+- **The report.** `+cov-report` renders in `CostModelCreator.report()`'s order:
+  INIT, the NEXT actions, the INVARIANTs, the ACTION_CONSTRAINTs, the state
+  CONSTRAINTs. Two structural facts had to be reproduced: actions sharing a
+  `pred` NODE share one `ActionWrapper` (`CostModelCreator.create`'s `cms` map
+  is keyed on `nextAction.pred`), so an `\E`'s N actions report as ONE line
+  with SUMMED counters; and the lines are ordered by the action's own span
+  (a `TreeSet` on `pred.getLocation()`), which is why `Next == Dec \/ Inc`
+  reports `Inc` first. A CONSTANT-level invariant is filtered out of the block
+  because `SpecProcessor` never adds it to the invariant vector (it resolves to
+  a `BoolValue`, warns EC 2158 and drops it). The port still CHECKS such an
+  invariant — a separate, pre-existing difference on `tlc-safety-invariant`,
+  recorded here rather than fixed inside this row.
+- **The wire.** `check-opts` gained `coverage=?`; `bfs-opts` gained a `cov`
+  record (on / module name / INIT name and counts / constraint names) that
+  subsumes the earlier `cvi` field. `-coverage` is refused BY NAME outside
+  exhaustive mode, alongside a temporal PROPERTY, and under a
+  SPECIFICATION-form config (where the INIT action has no declaration to label:
+  tlc2 builds it with a null `opDef` and `printLocation()` falls back to
+  `action.toString()`).
+
+### The three approved differences, all absences
+
+1. the per-VARIABLE `TLC_COVERAGE_VAR` line — a `SyncedHyperLogLog(10)`
+   ESTIMATE over `v.fingerPrint(FP64.New())`;
+2. the indented per-node `TLC_COVERAGE_VALUE`/`_COST` sub-expression lines —
+   the only coverage quantity that needs the R2.7.4.1b evaluator carrier;
+3. **any block at all for a run that PRINTS A COUNTEREXAMPLE.** Re-measured
+   2026-08-26 with `-noGenerateSpecTE` (which changes nothing): tlc2
+   reconstructs the trace by re-invoking the initial predicate and the actions
+   with coverage still recording, so P7 under deadlock checking reports
+   `<Init …>: 3:3` and `<A …>: 2:6` where the clean run reports `1:1` and
+   `2:2`. The port emits `+cov-refusal` there instead — two lines naming the
+   reason — rather than publishing its own (un-inflated) numbers under the same
+   label.
+
+### Evidence
+
+`tools/gen-coverage-tests.py` emits `desk/tests/lib/coverage.hoon` from the
+safety corpus's `-coverage` cases, comparing the WHOLE block line for line
+against SafetyDump's widened `COVERAGE` projection (which now renders all four
+reportable line kinds through MP's own templates, in report order). Five cases:
+`coverage` (the pre-existing one), `coverage-constraint` (invariant +
+ACTION_CONSTRAINT + CONSTRAINT), `coverage-disj` (two inline disjuncts, both
+1:N), `coverage-exists` (`Bump(i)` collapsed to one line, `2:12`), and
+`coverage-init-reject` (`2:4`). `tests/lib/trace` pins the refusal and its
+clean-run counterpart.
+
+### The dev ship will not accept a NEW FILE — RESOLVED by a rebuild
+
+**RESOLVED 2026-08-26**: the user rebuilt the pier, and file additions work
+again (`+ /~zod/tla-lus/7/tests/lib/coverage/hoon` committed clean). The
+diagnosis below stands as the record of the symptom and of what it was NOT.
 
 **Any `|commit` that ADDS a file kills the serf** (`pier: serf unexpectedly shut
 down`, not a compile error). Isolated on 2026-08-26 by bisection:
