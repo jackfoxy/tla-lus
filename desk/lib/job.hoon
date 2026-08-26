@@ -1429,9 +1429,14 @@
   =/  invs   (resolve-invs:check defs invariants.rs)
   =/  cons   (resolve-bodies:check defs constraints.rs)
   =/  acons  (resolve-bodies:check defs action-constraints.rs)
-  =/  isr  (init-states:ne isb (make-env:ne defs consts vars))
+  ::  R2.7.4.2b: the carrier-keeping variant, for the INIT coverage counts --
+  ::  `irej` is the candidates the initial predicate rejected once they were
+  ::  already fully assigned, which is the `secondary` half of the INIT line
+  =/  isc  (init-states-rs:ne isb (make-env:ne defs consts vars) empty-rst:ne)
+  =/  isr  -.isc
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
+  =/  cvi  [(lent is) irej.+.isc]
   ::  seeded simulation (unit 9.2): SimulationWorker over the semantic graph,
   ::  drawing with java.util.Random (lib/rng) so a run reproduces `tlc2.TLC
   ::  -simulate -workers 1`. A temporal PROPERTY is checked per behavior on its
@@ -1527,7 +1532,7 @@
         :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-            vwb  max-set-size.lims  continue.opts.op.request.j
+            vwb  max-set-size.lims  continue.opts.op.request.j  ~  cvi
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
       (more j pre)
@@ -1558,7 +1563,9 @@
     ::  violation is the state search's own verdict and pre-empts the liveness
     ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
-      [nsb invs ~ ~ vars order ~ defs consts | max-states.lims max-depth.lims vwb max-set-size.lims |]
+      :*  nsb  invs  ~  ~  vars  order  ~  defs  consts  |
+          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~  cvi
+      ==
     =.  cont.j
       %-  save-kont
       :*  %live  %build  p.osr  u.pp  modn  act  nl
@@ -1572,7 +1579,7 @@
   =/  o=bfs-opts:check
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-        vwb  max-set-size.lims  continue.opts.op.request.j
+        vwb  max-set-size.lims  continue.opts.op.request.j  ~  cvi
     ==
   =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
   (more j pre)

@@ -348,3 +348,87 @@ the touched shards):
    real (if narrow) difference once writes exist.
 6. Unify `pst.es` with `rst.es` on the `-generate` path, so there is one RNG
    channel rather than two.
+
+## R2.7.4.2b — counters plumbed, report not yet rendered (2026-08-26)
+
+Landed and green (uncommitted, `lib/check.hoon` + `lib/job.hoon`):
+
+- **`bfs-opts` gains `acts=(list act)` and `cvi=[gen=@ud rej=@ud]`.** `acts` is the
+  getActions decomposition built ONCE by the caller and passed in (`~` still means
+  "build it in `+bfs-step`"), which removes the per-slice rebuild R2.7.4.2a's
+  timing measured — the caller usually has the list already for trace labels.
+  `cvi` is the INIT coverage pair, known before the search starts.
+- **`bfs-cursor` gains `cvn=(map @ud [gen=@ud dis=@ud])`** — per-ACTION generated
+  and newly-distinct counts, keyed by index into `acts`, incremented in
+  `+bfs-step`'s per-action loop where the successors are produced.
+- **`sctx` gains `iname` and `irej`**, the latter from `+init-states-rs` — the
+  R2.7.4.1a carrier delivering the number that blocked this unit.
+
+Every touched shard green (`mc`, `stats`, `job`, `trace`, `safety-gen`): the
+counters are computed but nothing reads them yet, so behaviour is unchanged.
+
+### Still owed for the row to close
+
+1. CONSTRAINT counters. `+con-hold` / `+acon-hold` short-circuit on the first
+   false constraint, which matches `Tool.isInModel`; they need to report how many
+   they evaluated so the per-constraint tallies can be attributed by index, and
+   `cons`/`acons` need to carry NAMES (like `invs` already does) for the labels.
+2. The report itself, in the pin's order, measured 2026-08-26 on probe PC:
+   VARs, INIT actions, **NEXT actions sorted by the action's own span** (a TreeSet
+   on `pred.getLocation()` — `Next == Dec \/ Inc` reports `Inc` first), then
+   INVARIANTS, then action constraints, then state constraints.
+3. **The INVARIANT line has NO counts** — `<Inv line 8, col 1 to line 8, col 3 of
+   module PC>` and nothing else (`TLC_COVERAGE_PROPERTY`, template `%1%`).
+4. The `<Name decl>` label. **No `sem-def` mold change is needed**: the
+   declaration span is derivable from what is already stored — it starts at the
+   definition span's start and ends at `start-col + |name| - 1` for an arity-0
+   def, or at the last parameter's span end + 1 for a parameterized one (checked
+   against `Init` → col 1-4 and `Bump(i)` → col 1-7).
+5. The 1:N suffix `(bl bc el ec)`, printed when the action's span differs from the
+   definition body's span.
+6. The wire option (`check-opts` + `bfs-opts`), with the interval refused by name.
+7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
+   differences, and the ledger flip.
+
+### The dev ship will not accept a NEW FILE — and it is not the code's fault
+
+**Any `|commit` that ADDS a file kills the serf** (`pier: serf unexpectedly shut
+down`, not a compile error). Isolated on 2026-08-26 by bisection:
+
+| commit | result |
+|---|---|
+| `+coverage-probe` arm added inside `lib/check.hoon` | serf dies |
+| same logic as a scratch `lib/probe-cov.hoon` | serf dies |
+| same, with the wet `turn` over `act` removed | serf dies |
+| **`lib/probe-nil.hoon`, three lines, no imports, `++ x 42`** | **serf dies** |
+| `|commit` with no changes at all | fine |
+| MODIFYING an existing file (`lib/check.hoon`, many times today) | fine |
+
+So the coverage-probe arm was innocent and removing it from `check.hoon` was a
+wrong inference from a real symptom — recorded here so the next session does not
+re-derive it. `.urb/chk` is 480MB against a 4096MB loom and `/mnt/mars` has 1.4TB
+free, so it is neither the `recover: dig: meme` shape nor disk.
+
+Diagnosed further on 2026-08-26, and it is **pier-wide, not desk-scoped and not
+compile-related**:
+
+| test | result |
+|---|---|
+| add a plain `.txt` under `desk/test-data/` (no compile) | serf dies |
+| `|unmount %tla-lus` + `|mount %tla-lus`, then add a file | serf dies |
+| add a file to **`%base`** | serf dies |
+| modify an existing file, any desk | fine |
+
+So Clay on this pier cannot take a file ADDITION at all. Remount does not fix it.
+**The pier needs rebuilding** — the same decay that forced the 2026-08-25 rebuild.
+Nothing in Clay is unique: the whole desk lives in git, so a rebuild costs only
+the boot plus `|install our %tla-lus`.
+
+**This blocks R2.7.4.2b's verification**, which needs a new scratch lib to hold
+the differential probe, and it will block every later unit that adds a test shard
+or a corpus consumer. The pier was itself rebuilt on 2026-08-25 for instability;
+this looks like the same decay. Next session should try, in order: a `|bump` /
+fresh boot, `|commit` of an added file on a DIFFERENT desk to confirm the scope,
+and a pier rebuild if it reproduces. Modifying existing files still works, so the
+counters already in the tree can keep being developed meanwhile — they just
+cannot be differentially checked until a new file can be committed.
