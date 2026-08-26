@@ -359,6 +359,60 @@
     ?:((gth cnt pos) i.l $(l t.l))
   [i.ks mean p95 mx]
 ::
+++  first-decimal
+  ::  the text of the first decimal literal anywhere in a parse tree, `~` if
+  ::  there is none (R2.7.3).
+  ::
+  ::  tlc2 rejects a decimal at SPEC PROCESSING, not at evaluation:
+  ::  `SpecProcessor.processConstantDefns` fails on a `DecimalKind` node. So the
+  ::  scope is the whole module, not the reachable definitions -- measured at
+  ::  the pin, an UNUSED `Dec == 1.5`, a decimal inside an action-level `Next`
+  ::  and one inside an unused state-level definition all abort the run before
+  ::  any state is computed. The port used to reject at evaluation, which meant
+  ::  a spec with an unused decimal RAN here and ABORTED there: not a difference
+  ::  of timing but of VERDICT
+  |=  n=node
+  ^-  (unit @t)
+  ::  every leaf under the node, joined: `+num-value` takes only the FIRST,
+  ::  which is the integer part -- `1.5` came back as `1`
+  ?:  (is-kind n %n-real)  `(real-text n)
+  =/  ks  (kids-of n)
+  |-  ^-  (unit @t)
+  ?~  ks  ~
+  =/  hit  (first-decimal i.ks)
+  ?^  hit  hit
+  $(ks t.ks)
+::
+++  err-lines
+  ::  a typed failure rendered as TLC's console lines. Most carry one line, but
+  ::  a few of the pin's templates are MULTI-LINE -- EC 2244's is
+  ::  `TLC can't handle real numbers.\n%1%` -- and collapsing those into one
+  ::  cord printed the literal on the same line as the message (R2.7.3)
+  |=  msg=@t
+  ^-  wain
+  =/  t=tape  (trip (cat 3 'Error: ' msg))
+  =|  cur=tape
+  =|  out=wain
+  |-  ^-  wain
+  ?~  t  (flop [(crip (flop cur)) out])
+  ?:  =(10 i.t)
+    $(t t.t, cur ~, out [(crip (flop cur)) out])
+  $(t t.t, cur [i.t cur])
+::
+++  real-text
+  ::  the full text of an N_Real, reassembled from its leaves
+  |=  n=node
+  ^-  @t
+  %+  rap  3
+  %+  turn  (skim (kids-of n) |=(k=node ?=(%leaf -.k)))
+  |=(k=node (leaf-text k))
+::
+++  decimal-error
+  ::  the pinned EC 2244 failure for a spec carrying a decimal literal
+  |=  txt=@t
+  ^-  @t
+  (ec-body:diag 2.244 ~[txt])
+::
 ++  first-violated
   ::  the first invariant (declaration order) violated by `st`; ~ = all hold,
   ::  [%& name] = violated, [%| msg] = an evaluation error during the check
@@ -1653,6 +1707,11 @@
   =/  pr  (parse:syntax spec)
   ?:  ?=(%| -.pr)  [%| 'parse error']
   =/  tree  p.pr
+  ::  R2.7.3: a decimal literal takes the module down at SPEC PROCESSING, before
+  ::  anything is evaluated, so the check belongs here rather than in the
+  ::  evaluator (see `+first-decimal`)
+  =/  dec  (first-decimal tree)
+  ?^  dec  [%| (decimal-error u.dec)]
   =/  vars  (var-names tree)
   =/  order  (var-order tree)
   =/  cr  (parse-cfg:config cfg)
@@ -1928,7 +1987,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   (render-counts:tp oss.p.sc)
 ::
 ++  live-tabs
@@ -1949,7 +2008,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =/  modn  (module-name-of tree.p.sc)
   (render-struct:tp oss.p.sc modn (live-tabs oss.p.sc modn))
 ::
@@ -2035,7 +2094,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   (render-product (product-counts p.sc) (product-blocks p.sc))
 ::
 ++  live-verdict-lines
@@ -2044,7 +2103,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
@@ -2062,7 +2121,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
@@ -2279,7 +2338,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 |]
   =/  g       (build-graph is.c o)
@@ -2948,7 +3007,7 @@
   |=  [spec=@t cfg=@t maxd=@ud]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  su  (dfid-setup c maxd 0)
   ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
@@ -3174,7 +3233,7 @@
   |=  [spec=@t cfg=@t]
   ^-  wain
   =/  sc  (search-ctx spec cfg)
-  ?:  ?=(%| -.sc)  ~[(cat 3 'Error: ' p.sc)]
+  ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]

@@ -1261,6 +1261,10 @@
   ?.  ?&(?=(^ k) ?=(%tree -.u.k))
     (finish j [%failed 'internal: %config without a parsed tree'] pre)
   =/  tree  t.u.k
+  ::  R2.7.3: the same spec-processing rejection the console path applies --
+  ::  a decimal anywhere in the module aborts before any state is computed
+  =/  dec  (first-decimal:check tree)
+  ?^  dec  (finish j [%failed (decimal-error:check u.dec)] pre)
   ?>  ?=(%check -.op.request.j)
   =/  so  (srcs-of j (k-srcs k))
   ?~  so

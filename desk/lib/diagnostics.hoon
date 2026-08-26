@@ -130,6 +130,11 @@
       %2.105  (mp-subst 'Evaluating assumption %1% failed.\0a%2%' params)
       %2.107  (mp-subst 'Invariant %1% is violated by the initial state:\0a%2%' params)
       %2.110  (mp-subst 'Invariant %1% is violated.' params)
+      ::  R2.7.3: raised at SPEC PROCESSING, not at evaluation --
+      ::  `SpecProcessor.processConstantDefns` fails on a `DecimalKind` node, so
+      ::  ANY decimal anywhere in the module takes the run down before any state
+      ::  is computed, whether or not the definition holding it is ever used
+      %2.244  (mp-subst 'TLC can\'t handle real numbers.\0a%1%' params)
       ::  the DFID reporter (R2.5). DFID does NOT reuse the BFS lines: its
       ::  final counts carry no queue term, its progress line is per LEVEL
       ::  rather than per Progress(N), and its init line is the only one of

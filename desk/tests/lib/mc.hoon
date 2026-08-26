@@ -87,6 +87,19 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ x\' = x + 1\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
 ::
+++  test-mc-decimal-unused
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: TLC can\'t handle real numbers.'
+        '1.5'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aUnused == 1.5\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
 ++  test-mc-gate-no-fair
   %+  expect-eq
     !>  ^-  wain
