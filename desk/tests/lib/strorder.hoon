@@ -23,7 +23,7 @@
   ::  core directly
   |=  [vals=(list @t) want=tape]
   ^-  tang
-  =/  s  (normalize:v [%set (turn vals |=(nm=@t `value:v`[%model nm]))])
+  =/  s  (normalize:v [%set %set-enum (turn vals |=(nm=@t `value:v`[%model nm]))])
   (expect-eq !>(want) !>((render:v s)))
 ::
 ::  +|  Where the two orders agree
