@@ -287,3 +287,64 @@ or not coverage is on. Two causes, one of which is removable:
    compute the same list (`+safety-run`, `+do-explore`), so `.2b` should carry
    `acts` on `bfs-opts` — the same field change it needs anyway for the root
    action name — and pass it in rather than rebuilding it.
+
+## R2.7.4.1a — the SOLVER carrier — DONE 2026-08-25
+
+`+$ rst` (registers + RNG seed + the INIT rejection count) and `+$ sout [sres rst]`
+now exist in `lib/node-eval.hoon`, and the whole action solver carries them:
+`+solve`, `+solve-filter`, `+solve-letin`, `+solve-conj`, `+solve-each`,
+`+solve-disj`, `+solve-ite`, `+solve-exists`, `+solve-forall`,
+`+solve-unchanged`, plus the new `+init-states-rs` / `+next-states-rs`.
+
+Nothing writes to it yet, so behaviour is unchanged by construction. The public
+entry points keep their signatures as **carrier-discarding wrappers** —
+`+init-states`, `+next-states`, `+solve-init`, `+solve-next`, `+eval-enabled` —
+which is the signature policy the plan set, and it kept ~100 test call sites and
+every `check`/`job`/`liveness` site untouched. One external direct caller of
+`+solve` (`lib/liveness.hoon:345`, the `ENABLED <A>_e` test) was updated in place.
+
+**This unblocks R2.7.4.2b**: `irej` is on `rst`, so the INIT coverage line's
+`secondary` now has a channel out of the solver.
+
+### The trap that cost the first two compiles: faces on the carrier pair
+
+`+$ sout [res=sres st=rst]` compiles, but every `=^ r rs (solve ...)` that binds
+from it produces `-find.p.r` at the next use. The face on the head leaks into the
+bound variable, so `p.r` looks for `p` inside `res=…` and does not find it. The
+`-generate` path had the answer already: `+psolve` returns a bare `[pres pst]`
+with no faces, and its `=^ res p (psolve …)` + `?=(%none -.res)` narrowing works.
+
+**Both carrier pairs are unfaced** for that reason. Do not add faces to them.
+
+## R2.7.4.1b — the EVALUATOR carrier — STARTED, dispatch layer only
+
+The evaluator is 47 arms returning `^- eres`, and every one of them has to carry
+`rst` before `TLCSet` (R2.7.4.3) or `RandomElement` (R2.7.4.4) can work. That is
+too large to land as one edit, so it is being done as an **incremental split that
+keeps the tree green at every step**:
+
+- `+eval-rs` is the carrying evaluator; **`+eval` is now the discarding wrapper**
+  (`-:(eval-rs n e empty-rst)`), so no unconverted arm and no test call site had
+  to change.
+- Each batch converts one layer to an `-rs` arm; anything not yet converted is
+  called from the carrying layer wrapped as `[(legacy-arm …) rs]`, which is
+  correct precisely because nothing writes to `rst` yet.
+
+**Landed so far:** `+eval-rs` and `+eval-apply-rs` (the dispatch layer). Everything
+below them — `+eval-builtin`, `+eval-user`, `+apply-const`, `+eval-args`,
+`+eval-bool`, and the ~40 builtin evaluators — is still wrapped.
+
+**Remaining, in the order they should be converted** (each batch compiles and runs
+the touched shards):
+
+1. `+eval-args`, `+eval-bool`, `+eval-domain` — the helpers every builtin uses.
+2. `+apply-const`, `+eval-user`, `+apply-def`, `+eval-letin` — application.
+3. `+eval-builtin`'s switch and its ~40 leaf arms.
+4. `+eval-node-op` and the `@Evaluation` overrides (`+eval-tlc-get`,
+   `+eval-tlc-eval`, `+eval-assert-error`, `+eval-tlc-cache`, `+eval-tlc-defer`),
+   which is where `TLCSet` and the RNG will actually write.
+5. `+eval-enabled` and the solver's own `+eval`/`+eval-bool`/`+eval-domain` call
+   sites, which today discard — ENABLED is the one place where discarding is a
+   real (if narrow) difference once writes exist.
+6. Unify `pst.es` with `rst.es` on the `-generate` path, so there is one RNG
+   channel rather than two.

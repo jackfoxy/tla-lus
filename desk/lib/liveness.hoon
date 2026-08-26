@@ -342,7 +342,8 @@
   |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne env=eenv:ne]
   ^-  ?
   ?:  &(box ?=(^ sub))  &
-  =/  r  (solve:ne a %next s0 ~ env(enabled &))
+  ::  R2.7.4.1: an ENABLED test discards the run carrier, like +eval-enabled
+  =/  r=sres:ne  -:(solve:ne a %next s0 ~ env(enabled &) empty-rst:ne)
   ?:  ?=(%| -.r)  |
   ?~  sub
     (lien p.r |=(st=state:ne (complete:ne st vars.env)))

@@ -75,6 +75,42 @@
 ::  the action solver yields the ordered list of complete states satisfying
 ::  an action; a typed failure short-circuits (matching tlc2's stream)
 +$  sres  (each (list state) eval-err:v)
+::  +|  The Run Carrier (R2.7.4.1)
+::
+::  `eenv` is read-only by construction, so nothing an evaluation MUTATES can
+::  escape through it. Three consumers need exactly that -- a register store
+::  `TLCSet` writes and `TLCGet(int)` reads back, an RNG that must advance
+::  across draws inside ONE evaluation, and the initial-state coverage counter
+::  -- so the mutable run state rides the RETURN instead, threaded by `=^`.
+::
+::  It is carried on BOTH branches of a result, never inside the success
+::  branch: a write that precedes a CAUGHT failure (`TLCExt!AssertError`) is
+::  still a write at the pin, which mutated a Java field before throwing.
+::
+::  `rst` is NOT part of the checked state and never enters a fingerprint: it
+::  is worker-local side-channel state, which is what `IdThread.setLocalValue`
+::  is at the pin.
++$  rst
+  $:  ::  the `TLCSet` register store (R2.7.4.3)
+      regs=(map @ud value:v)
+      ::  `java.util.Random` state for Randomization/RandomElement
+      ::  (R2.7.4.4/.5), the same seed `+next-int-bound:rg` advances
+      es=@
+      ::  initial-state candidates rejected by a conjunct evaluated once the
+      ::  state was ALREADY FULLY ASSIGNED -- the `secondary` half of the INIT
+      ::  coverage line, which is what `SafetyDump` projects (R2.7.4.2b).
+      ::  Measured at the pin: `x \in 0..3 /\ y = 0 /\ x > 1` reports 2:4,
+      ::  the same conjuncts reordered so the rejection happens while `y` is
+      ::  still unassigned reports 2:2 (`Tool.getInitStates`'s allAssigned
+      ::  branch is the only site that increments it)
+      irej=@ud
+  ==
+::  a solver result carrying the run state, and its evaluator sibling. UNFACED,
+::  like `[pres pst]` on the `-generate` path: a face on the head leaks into
+::  whatever `=^` binds, so `p.r` on the bound result stops resolving
++$  sout  [sres rst]
++$  eout  [eres rst]
+++  empty-rst  ^-(rst [~ 0 0])
 ::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
 ::  and coarse category, message, source location, operator/evaluation stack,
 ::  and whether a checker may recover. Per-site emission (replacing the bare
@@ -113,14 +149,23 @@
 ::  +|  Top-Level Dispatch
 ::
 ++  eval
+  ::  the carrier-discarding wrapper (R2.7.4.1). The ~100 call sites that do
+  ::  not care about run state -- every test entrypoint, every constant-level
+  ::  evaluation -- keep this shape; the paths that must see a `TLCSet` write
+  ::  or an advanced RNG seed take `+eval-rs`
   |=  [n=sem:sm e=eenv]
   ^-  eres
+  -:(eval-rs n e empty-rst)
+::
+++  eval-rs
+  |=  [n=sem:sm e=eenv rs=rst]
+  ^-  eout
   ?-  -.n
-    %lit      (eval-lit n)
-    %atref    ?~(atv.e [%| 0 'no @ value in scope.'] [%& u.atv.e])
-    %nullodn  [%| 0 'unresolved operator (nullODN).']
-    %letin    (eval-letin n e)
-    %apply    (eval-apply n e)
+    %lit      [(eval-lit n) rs]
+    %atref    ?~(atv.e [[%| 0 'no @ value in scope.'] rs] [[%& u.atv.e] rs])
+    %nullodn  [[%| 0 'unresolved operator (nullODN).'] rs]
+    %letin    [(eval-letin n e) rs]
+    %apply    (eval-apply-rs n e rs)
   ==
 ::
 ++  eval-lit
@@ -143,32 +188,32 @@
     %dec  [%| 0 (cat 3 'TLC can\'t handle real numbers. ' val.n)]
   ==
 ::
-++  eval-apply
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
+++  eval-apply-rs
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
   =/  nm  name.op.n
   =/  kd  kind.op.n
-  ?:  ?=(%builtin kd)  (eval-builtin n e)
+  ?:  ?=(%builtin kd)  [(eval-builtin n e) rs]
   ?-  kd
-      %constant      (apply-const nm n e)
-      %new-constant  (apply-const nm n e)
-      %user-op       (eval-user n e)
+      %constant      [(apply-const nm n e) rs]
+      %new-constant  [(apply-const nm n e) rs]
+      %user-op       [(eval-user n e) rs]
       %formal-param
-    ?.  =(~ args.n)  (eval-user n e)
+    ?.  =(~ args.n)  [(eval-user n e) rs]
     ::  a param bound call-by-name (a substituted argument node) is evaluated
     ::  in place; otherwise it is a value parameter resolved from `vals`
-    =/  s  (~(get by psub.e) nm)
-    ?~(s (lookup-val nm e) (eval u.s e))
+    =/  sb  (~(get by psub.e) nm)
+    ?~(sb [(lookup-val nm e) rs] (eval-rs u.sb e rs))
   ::
     ::  a substituted name resolves to the node it was bound to, in the
     ::  OUTER scope -- `v <- x` makes the inner module's `v` read the outer
     ::  state's `x`. Same call-by-name shape `%formal-param` uses (R2.3.5)
       %variable
-    =/  s  (~(get by psub.e) nm)
-    ?~(s (lookup-var nm e) (eval u.s e))
+    =/  sb  (~(get by psub.e) nm)
+    ?~(sb [(lookup-var nm e) rs] (eval-rs u.sb e rs))
   ::
-    %thm-assump       [%| 0 'a theorem/assumption is not an evaluable value.']
-    %module-instance  [%| 0 'a module instance is not an evaluable value.']
+    %thm-assump       [[%| 0 'a theorem/assumption is not an evaluable value.'] rs]
+    %module-instance  [[%| 0 'a module instance is not an evaluable value.'] rs]
   ==
 ::
 ++  lookup-val
@@ -1452,47 +1497,47 @@
   $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
 ::
 ++  solve
-  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   ?.  ?=(%apply -.n)
-    ?:  ?=(%letin -.n)  (solve-letin n mode cur part e)
-    (solve-filter n mode cur part e)
+    ?:  ?=(%letin -.n)  (solve-letin n mode cur part e s)
+    (solve-filter n mode cur part e s)
   =/  nm  name.op.n
   ?:  |(=(nm '$ConjList') =(nm '\\land'))
-    (solve-conj args.n mode cur part e)
+    (solve-conj args.n mode cur part e s)
   ?:  |(=(nm '$DisjList') =(nm '\\lor'))
-    (solve-disj args.n mode cur part e)
-  ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e)
-  ?:  =(nm '$BoundedExists')  (solve-exists n mode cur part e)
-  ?:  =(nm '$BoundedForall')  (solve-forall n mode cur part e)
-  ?:  =(nm 'UNCHANGED')  (solve-unchanged (snag 0 args.n) mode cur part e)
+    (solve-disj args.n mode cur part e s)
+  ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e s)
+  ?:  =(nm '$BoundedExists')  (solve-exists n mode cur part e s)
+  ?:  =(nm '$BoundedForall')  (solve-forall n mode cur part e s)
+  ?:  =(nm 'UNCHANGED')  (solve-unchanged (snag 0 args.n) mode cur part e s)
   ?:  =(nm '=')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
-    ?~  as  (solve-filter n mode cur part e)
+    ?~  as  (solve-filter n mode cur part e s)
     =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
-    ?:  ?=(%| -.rv)  rv
-    [%& ~[(~(put by part) u.as p.rv)]]
+    ?:  ?=(%| -.rv)  [rv s]
+    [[%& ~[(~(put by part) u.as p.rv)]] s]
   ::  `x \in S` on an unbound assignable var is a NONDETERMINISTIC assignment:
   ::  enumerate S in TLC order, one successor per element (init + next). Any
   ::  other `\in` (a bound var, a membership filter) prunes as a boolean.
   ?:  =(nm '\\in')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
-    ?~  as  (solve-filter n mode cur part e)
+    ?~  as  (solve-filter n mode cur part e s)
     =/  sd  (eval-domain (snag 1 args.n) (senv mode cur part e))
-    ?:  ?=(%| -.sd)  sd
+    ?:  ?=(%| -.sd)  [sd s]
     =/  els  (drain-sexp p.sd)
-    ?:  ?=(%| -.els)  els
-    [%& (turn p.els |=(x=value:v (~(put by part) u.as x)))]
+    ?:  ?=(%| -.els)  [els s]
+    [[%& (turn p.els |=(x=value:v (~(put by part) u.as x)))] s]
   ::  `x \subseteq S` on an unbound assignable var enumerates the powerset of S
   ::  as candidate assignments (the set-valued sibling of `\in`)
   ?:  =(nm '\\subseteq')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
-    ?~  as  (solve-filter n mode cur part e)
+    ?~  as  (solve-filter n mode cur part e s)
     =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
-    ?:  ?=(%| -.rv)  rv
+    ?:  ?=(%| -.rv)  [rv s]
     =/  els  (drain-sexp [%subset p.rv])
-    ?:  ?=(%| -.els)  els
-    [%& (turn p.els |=(x=value:v (~(put by part) u.as x)))]
+    ?:  ?=(%| -.els)  [els s]
+    [[%& (turn p.els |=(x=value:v (~(put by part) u.as x)))] s]
   ::  a user-op reference in action position is expanded to its body and solved
   ::  (e.g. `Next == Inc \/ Dec`), so a primed variable in the body is not
   ::  filtered as a boolean. Parameters are bound call-by-name (`+bind-psub`):
@@ -1503,97 +1548,98 @@
   ::  evaluated as a boolean filter instead of solved as an assignment (R2.3.5)
   ?:  ?=(^ (anysubstin-mod:sm nm))
     =/  sp  (substin-parts:sm n)
-    ?~  sp  (solve-filter n mode cur part e)
+    ?~  sp  (solve-filter n mode cur part e s)
     =/  e2  (bind-substs (senv mode cur part e) names.u.sp exprs.u.sp)
-    ?:  ?=(%| -.e2)  e2
-    (solve inner.u.sp mode cur part p.e2)
+    ?:  ?=(%| -.e2)  [e2 s]
+    (solve inner.u.sp mode cur part p.e2 s)
   ?:  ?=(%user-op kind.op.n)
     =/  d  (~(get by ops.e) nm)
-    ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e)
-    ?.  =((lent params.u.d) (lent args.n))  (solve-filter n mode cur part e)
-    ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
+    ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e s)
+    ?.  =((lent params.u.d) (lent args.n))  (solve-filter n mode cur part e s)
+    ?:  =(0 fuel.e)
+      [[%| 0 'evaluation recursion/resource limit exceeded.'] s]
     =/  e2  (bind-psub e(fuel (dec fuel.e)) params.u.d args.n)
-    ?:  ?=(%| -.e2)  e2
-    (solve u.body.u.d mode cur part p.e2)
-  (solve-filter n mode cur part e)
+    ?:  ?=(%| -.e2)  [e2 s]
+    (solve u.body.u.d mode cur part p.e2 s)
+  (solve-filter n mode cur part e s)
 ::
 ++  solve-filter
-  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  b  (eval-bool n (senv mode cur part e))
-  ?:  ?=(%| -.b)  b
-  ?:(p.b [%& ~[part]] [%& ~])
+  ?:  ?=(%| -.b)  [b s]
+  ?:(p.b [[%& ~[part]] s] [[%& ~] s])
 ::
 ++  solve-letin
-  |=  [n=sem-letin:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
-  ?~  body.n  [%| 0 'LET with no body in an action.']
+  |=  [n=sem-letin:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
+  ?~  body.n  [[%| 0 'LET with no body in an action.'] s]
   =/  e2=eenv
     =/  os  ops.e
     |-  ^-  eenv
     ?~  lets.n  e(ops os)
     $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
-  (solve u.body.n mode cur part e2)
+  (solve u.body.n mode cur part e2 s)
 ::
 ++  solve-conj
   ::  thread the partial state left-to-right across the conjuncts
-  |=  [cs=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [cs=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  acc=(list state)  ~[part]
-  |-  ^-  sres
-  ?~  cs  [%& acc]
-  =/  step  (solve-each i.cs mode cur acc e)
-  ?:  ?=(%| -.step)  step
+  |-  ^-  sout
+  ?~  cs  [[%& acc] s]
+  =^  step  s  (solve-each i.cs mode cur acc e s)
+  ?:  ?=(%| -.step)  [step s]
   $(cs t.cs, acc p.step)
 ::
 ++  solve-each
   ::  solve `n` from every partial state, concatenating results in order
-  |=  [n=sem:sm mode=?(%init %next) cur=state parts=(list state) e=eenv]
-  ^-  sres
+  |=  [n=sem:sm mode=?(%init %next) cur=state parts=(list state) e=eenv s=rst]
+  ^-  sout
   =|  out=(list state)
-  |-  ^-  sres
-  ?~  parts  [%& out]
-  =/  r  (solve n mode cur i.parts e)
-  ?:  ?=(%| -.r)  r
+  |-  ^-  sout
+  ?~  parts  [[%& out] s]
+  =^  r  s  (solve n mode cur i.parts e s)
+  ?:  ?=(%| -.r)  [r s]
   $(parts t.parts, out (weld out p.r))
 ::
 ++  solve-disj
   ::  branch: each disjunct solved from the same partial state, in order
-  |=  [ds=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [ds=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =|  out=(list state)
-  |-  ^-  sres
-  ?~  ds  [%& out]
-  =/  r  (solve i.ds mode cur part e)
-  ?:  ?=(%| -.r)  r
+  |-  ^-  sout
+  ?~  ds  [[%& out] s]
+  =^  r  s  (solve i.ds mode cur part e s)
+  ?:  ?=(%| -.r)  [r s]
   $(ds t.ds, out (weld out p.r))
 ::
 ++  solve-ite
-  |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  b  (eval-bool (snag 0 as) (senv mode cur part e))
-  ?:  ?=(%| -.b)  b
-  (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e)
+  ?:  ?=(%| -.b)  [b s]
+  (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e s)
 ::
 ++  solve-exists
   ::  \E x \in S : A — branch over the domain in enumeration order
-  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  bs  (flatten-bound bound.n)
   ?.  ?=([* ~] bs)
-    [%| 0 'an action existential over multiple binders is unsupported.']
+    [[%| 0 'an action existential over multiple binders is unsupported.'] s]
   =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
-  ?:  ?=(%| -.sd)  sd
+  ?:  ?=(%| -.sd)  [sd s]
   =/  els  (drain-sexp p.sd)
-  ?:  ?=(%| -.els)  els
+  ?:  ?=(%| -.els)  [els s]
   =/  body  (snag 0 args.n)
   =|  out=(list state)
   =/  xs  p.els
-  |-  ^-  sres
-  ?~  xs  [%& out]
+  |-  ^-  sout
+  ?~  xs  [[%& out] s]
   =/  e2  (bind-group e i.bs i.xs)
-  =/  r  (solve body mode cur part e2)
-  ?:  ?=(%| -.r)  r
+  =^  r  s  (solve body mode cur part e2 s)
+  ?:  ?=(%| -.r)  [r s]
   $(xs t.xs, out (weld out p.r))
 ::
 ++  solve-forall
@@ -1602,29 +1648,29 @@
   ::  in getInitStates/getNextStates); thread the partial state through each
   ::  element in enumeration order, so `x = e` on the first element assigns and
   ::  a later element filters against it
-  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  bs  (flatten-bound bound.n)
   ?.  ?=([* ~] bs)
-    [%| 0 'an action universal over multiple binders is unsupported.']
+    [[%| 0 'an action universal over multiple binders is unsupported.'] s]
   =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
-  ?:  ?=(%| -.sd)  sd
+  ?:  ?=(%| -.sd)  [sd s]
   =/  els  (drain-sexp p.sd)
-  ?:  ?=(%| -.els)  els
+  ?:  ?=(%| -.els)  [els s]
   =/  body  (snag 0 args.n)
   =/  acc=(list state)  ~[part]
   =/  xs  p.els
-  |-  ^-  sres
-  ?~  xs  [%& acc]
+  |-  ^-  sout
+  ?~  xs  [[%& acc] s]
   =/  e2  (bind-group e i.bs i.xs)
-  =/  step  (solve-each body mode cur acc e2)
-  ?:  ?=(%| -.step)  step
+  =^  step  s  (solve-each body mode cur acc e2 s)
+  ?:  ?=(%| -.step)  [step s]
   $(xs t.xs, acc p.step)
 ::
 ++  solve-unchanged
   ::  UNCHANGED e assigns each named variable to its current value
-  |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv]
-  ^-  sres
+  |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
   =/  names  (unchanged-vars arg psub.e)
   =/  out=state  part
   =.  out
@@ -1633,7 +1679,7 @@
     =/  cv  (~(get by cur) i.names)
     ?~  cv  $(names t.names)
     $(names t.names, out (~(put by out) i.names u.cv))
-  [%& ~[out]]
+  [[%& ~[out]] s]
 ::
 ++  eval-enabled
   ::  ENABLED A: a successor satisfying A exists from the current state; the
@@ -1642,7 +1688,11 @@
   ::  satisfying PARTIAL assignment enables A — completeness is not required.
   |=  [n=sem:sm e=eenv]
   ^-  eres
-  =/  r  (solve n %next s0.e ~ e(enabled &))
+  ::  R2.7.4.1: ENABLED discards the carrier -- its witness is thrown away and
+  ::  so is anything the witness search wrote. That is not yet a difference:
+  ::  nothing writes to `rst` until R2.7.4.2b, and `+eval` itself does not
+  ::  carry it until R2.7.4.1b, which is where this becomes a real question
+  =/  r=sres  -:(solve n %next s0.e ~ e(enabled &) empty-rst)
   ?:  ?=(%| -.r)  r
   [%& [%bool ?=(^ p.r)]]
 ::
@@ -1720,7 +1770,7 @@
   ?~  d  [%| 0 'definition not found.']
   ?~  body.u.d  [%| 0 'definition has no body.']
   =/  e  (base-env u.mo ~ ~)
-  =/  r  (solve u.body.u.d %init ~ ~ e)
+  =/  r=sres  -:(solve u.body.u.d %init ~ ~ e empty-rst)
   ?:  ?=(%| -.r)  r
   ?.  (levy p.r |=(st=state (complete st vars.e)))
     [%| 0 'incomplete initial state: a variable is unassigned.']
@@ -1736,7 +1786,7 @@
   ?~  d  [%| 0 'definition not found.']
   ?~  body.u.d  [%| 0 'definition has no body.']
   =/  e  (base-env u.mo cur ~)
-  =/  r  (solve u.body.u.d %next cur ~ e)
+  =/  r=sres  -:(solve u.body.u.d %next cur ~ e empty-rst)
   ?:  ?=(%| -.r)  r
   ?.  (levy p.r |=(st=state (complete st vars.e)))
     [%| 0 'incomplete next state: a variable is unassigned.']
@@ -1768,25 +1818,40 @@
   e(run `r)
 ::
 ++  init-states
-  ::  the complete initial-state stream for an Init BODY under a prebuilt env
+  ::  the complete initial-state stream for an Init BODY under a prebuilt env.
+  ::  The carrier-discarding wrapper: R2.7.4.2b adds the variant that keeps it,
+  ::  for the INIT coverage counter
   |=  [body=sem:sm e=eenv]
   ^-  sres
-  =/  r  (solve body %init ~ ~ e)
-  ?:  ?=(%| -.r)  r
+  -:(init-states-rs body e empty-rst)
+::
+++  init-states-rs
+  |=  [body=sem:sm e=eenv s=rst]
+  ^-  sout
+  =^  r  s  (solve body %init ~ ~ e s)
+  ?:  ?=(%| -.r)  [r s]
   ?.  (levy p.r |=(st=state (complete st vars.e)))
-    [%| 0 'incomplete initial state: a variable is unassigned.']
-  [%& p.r]
+    [[%| 0 'incomplete initial state: a variable is unassigned.'] s]
+  [[%& p.r] s]
 ::
 ++  next-states
   ::  the complete successor stream of `cur` for a Next BODY under a prebuilt
-  ::  env (the checker's per-state call; the graph is generated once, upstream)
+  ::  env (the checker's per-state call; the graph is generated once, upstream).
+  ::  The carrier-discarding wrapper, per R2.7.4.1's signature policy: the
+  ::  ~100 existing call sites keep their shape and only the paths that need
+  ::  the run state take the `-rs` variant
   |=  [cur=state body=sem:sm e=eenv]
   ^-  sres
-  =/  r  (solve body %next cur ~ e(s0 cur))
-  ?:  ?=(%| -.r)  r
+  -:(next-states-rs cur body e empty-rst)
+::
+++  next-states-rs
+  |=  [cur=state body=sem:sm e=eenv s=rst]
+  ^-  sout
+  =^  r  s  (solve body %next cur ~ e(s0 cur) s)
+  ?:  ?=(%| -.r)  [r s]
   ?.  (levy p.r |=(st=state (complete st vars.e)))
-    [%| 0 'incomplete next state: a variable is unassigned.']
-  [%& p.r]
+    [[%| 0 'incomplete next state: a variable is unassigned.'] s]
+  [[%& p.r] s]
 ::
 ::
 ::  +|  Probabilistic Successors (tlc2 `-generate`, R2.4.6)
