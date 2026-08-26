@@ -560,6 +560,18 @@
   ::  `cur`, so recursing with a fresh wide cursor never nest-fails
   |=  [o=bfs-opts cur=bfs-cursor budget=@ud]
   ^-  bfs-slice
+  ::  R2.7.4.2: the next-state relation is expanded PER ACTION, in getActions
+  ::  order, the way tlc2's worker loop does it -- `Tool.getNextStates(action,
+  ::  ...)` once per action, `Worker.addElement` once per successor. It is the
+  ::  same decomposition the trace labels already use. Expanding here rather
+  ::  than solving the whole relation in one call is what makes a successor
+  ::  ATTRIBUTABLE to the action that produced it: measured at the pin, two
+  ::  actions generating the SAME successor are counted separately and the
+  ::  distinct credit goes to whichever ran first, which no after-the-fact
+  ::  fingerprint match can reconstruct (R2.7.4.0). The action list depends
+  ::  only on the spec and the constants -- tlc2 evaluates a constant-level
+  ::  `\E` bound against `TLCState.Empty` -- so it is built once per slice
+  =/  acts  (get-actions next.o '' defs.o (env-of o))
   =/  spent  0
   |-  ^-  bfs-slice
   ?:  (gte spent budget)  [%more cur]
@@ -576,23 +588,39 @@
     [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
   =/  fp   i.q
   =/  vis  (~(got by seen.cur) fp)
-  =/  nr  (next-states:ne st.vis next.o (env-at o cur depth.vis))
-  ?:  ?=(%| -.nr)  [%done [%error msg.p.nr] cur]
-  =/  nexts  p.nr
-  ?~  nexts
+  ::  the statistics `TLCGet` reads are those standing BEFORE this expansion,
+  ::  so the environment is built once for the whole state and not per action
+  ::  (R2.6.1's measured read point)
+  =/  e    (env-at o cur depth.vis)
+  =/  before  distinct.cur
+  ::  each action's successors are registered as they are generated, so a
+  ::  violation found under an earlier action pre-empts a later one -- tlc2's
+  ::  order, since `doNextCheckInvariants` throws out of the worker loop
+  ::  before the remaining actions are evaluated
+  =/  rr
+    =/  as  acts
+    =/  c2  cur(queue t.q)
+    |-  ^-  [out=(unit outcome) cur=bfs-cursor]
+    ?~  as  [~ c2]
+    =/  nr  (next-states:ne st.vis body.i.as (act-env e ctx.i.as))
+    ?:  ?=(%| -.nr)  [`[%error msg.p.nr] c2]
+    =.  gen.c2  (add gen.c2 (lent p.nr))
+    =/  r  (register-all o c2 p.nr +(depth.vis) fp `st.vis)
+    ?^  out.r  r
+    $(as t.as, c2 cur.r)
+  ?^  out.rr  [%done u.out.rr cur.rr]
+  =/  cost  (sub gen.cur.rr gen.cur)
+  ?:  =(0 cost)
     ::  a dequeued state with NO successors still contributes a 0 out-degree
     ::  sample: TLC calls outDegree.addSample(unseenSuccessorStates) for every
     ::  state it dequeues, so a sink pulls the distribution's min to 0 (R1.5.12b)
-    =.  outdeg.cur  (~(put by outdeg.cur) 0 +((~(gut by outdeg.cur) 0 0)))
-    ?.  deadlock.o  $(cur cur(queue t.q), spent +(spent))
+    =.  outdeg.cur.rr  (~(put by outdeg.cur.rr) 0 +((~(gut by outdeg.cur.rr) 0 0)))
+    ?.  deadlock.o  $(cur cur.rr, spent +(spent))
     :+  %done
-      [%deadlock gen.cur distinct.cur (lent t.q) depth.cur (trace-to seen.cur fp)]
-    cur(queue t.q)
-  =/  cost  (lent nexts)
-  =/  before  distinct.cur
-  =/  rr
-    (register-all o cur(queue t.q, gen (add gen.cur cost)) nexts +(depth.vis) fp `st.vis)
-  ?^  out.rr  [%done u.out.rr cur.rr]
+      :*  %deadlock  gen.cur.rr  distinct.cur.rr  (lent queue.cur.rr)
+          depth.cur.rr  (trace-to seen.cur.rr fp)
+      ==
+    cur.rr
   ::  TLC out-degree sample: the number of newly-distinct successors this state
   ::  produced (Worker.outDegree.addSample of unseenSuccessorStates)
   =/  sample  (sub distinct.cur.rr before)
