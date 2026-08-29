@@ -150,6 +150,60 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aFalsy == FALSE\0aSpec == Falsy /\\ Init /\\ [][Next]_x\0a====\0a'
   'SPECIFICATION Spec\0a'
 ::
+++  test-mc-gh1389-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* upstream test-model/Github1389.tla (issue #1389): RECURSIVE operators\0a\\* whose body reaches temporal level, expanded by Liveness.astToLive with\0a\\* only the constant-guard IF branch translated. Three shapes: a boolean\0a\\* guard, a numeric guard walked down to 0, and the recursion in THEN.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE ap_0(_)\0aap_0(u) == IF u THEN <>(x = TRUE) ELSE ap_0(~u)\0aRECURSIVE ap_2(_)\0aap_2(n) == IF n = 0 THEN <>(x = TRUE) ELSE ap_2(n - 1)\0aRECURSIVE ap_3(_)\0aap_3(n) == IF n > 0 THEN ap_3(n - 1) ELSE <>(x = TRUE)\0aSpec == x = TRUE /\\ [][x\' = ~x]_x\0aPropIf      == ap_0(TRUE)\0aPropDepth   == ap_2(3)\0aPropElseRec == ap_3(3)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTIES\0a    PropIf\0a    PropDepth\0a    PropElseRec\0a'
+::
+++  test-mc-gh1389-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property PropViolated was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 9 to line 10, col 18 of module spec>'
+        'x = 1'
+        'Back to state 1: <Next line 10, col 9 to line 10, col 18 of module spec>'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* upstream test-model/Github1389Violated.tla: the expanded property is\0a\\* genuinely violated, so the recursion must reach the tableau and surface\0a\\* as TLC_TEMPORAL_PROPERTY_VIOLATED rather than EC 2213.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN <>(x = 99) ELSE Reach(n - 1)\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aPropViolated == Reach(3)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
+::
+++  test-mc-gh1389-violb
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property PropViolated was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 9 to line 10, col 18 of module spec>'
+        'x = 1'
+        'Back to state 1: <Next line 10, col 9 to line 10, col 18 of module spec>'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* upstream test-model/Github1389ViolatedB.tla: the recursive call sits\0a\\* under <> rather than in the ELSE, and Reach(0) expands to a level-1\0a\\* state predicate although Reach is temporal.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 99) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aPropViolated == Reach(3)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
+::
 ++  test-mc-implied-act-pass
   %+  expect-eq
     !>  ^-  wain

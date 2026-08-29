@@ -28,7 +28,12 @@ DROP = re.compile(
     r"worker on|Estimates|because two|calculated |average outdeg|"
     r"Finished in|Finished comp|^TLC2 Version|probability|Trace exploration|"
     r"^Warning: The invariant|Progress\(|"
-    r"^Implied-temporal|^Checking temporal|Finished checking temporal")
+    #  the multi-PROPERTY form of "Checking temporal properties" carries a
+    #  wall-clock timestamp exactly as the single-property form does, and
+    #  its branch count is already reported by the dropped
+    #  "Implied-temporal checking" line (first seen: `gh1389-ok`)
+    r"^Implied-temporal|^Checking temporal|Finished checking temporal|"
+    r"^Checking [0-9]+ branches of temporal")
 
 
 #  Cases whose GOLDEN is captured and frozen but whose arm is not emitted,
@@ -48,6 +53,25 @@ SKIPS = {
         "the witness ends at the last state anyway, and no existing liveness "
         "case has a graph that extends PAST its witness. Frozen so the fix "
         "has a target."),
+    #  R2.7.6.0 measured both, and they are ONE difference, not two.
+    "gh1389-loops": (
+        "R2.7.6.0: the expansion does not reach a base case, so tlc2 inlines "
+        "until the JVM stack overflows and `TLC.process` reports EC 1005 (the "
+        "four-line StackOverflowError template). The port bounds the "
+        "expansion at `+expand-cap` (1.000 nested expansions) and falls "
+        "through to `+user-op`'s `fall`, which raises EC 2213 `TLC cannot "
+        "handle the temporal formula` at the property's location --- a Hoon "
+        "runaway is an uncatchable hang, not a throwable, so the bound is the "
+        "same trade `live-graph-cap` makes. SAME OUTCOME (the run does not "
+        "produce a verdict), different code and text. Frozen here; R2.7.6.1 "
+        "turns it into a tested approved-difference with a support-matrix "
+        "row, at which point this entry is deleted."),
+    "gh1389-guard": (
+        "R2.7.6.0: same difference as `gh1389-loops`, reached the other way "
+        "--- the recursive operator's parameter is bound to a state variable, "
+        "so the IF guard never resolves during tableau construction and the "
+        "expansion does not terminate. Pin: EC 1005. Port: EC 2213 at "
+        "`Prop == op(x)`. Frozen for R2.7.6.1."),
 }
 
 
