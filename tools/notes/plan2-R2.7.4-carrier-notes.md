@@ -390,6 +390,86 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
+## R2.7.4.1b — the EVALUATOR carrier — DONE 2026-08-28
+
+All six batches landed. `+eval-rs` now threads `rst` from the top of the
+evaluator down to the arms where `TLCSet` (R2.7.4.3) and `RandomElement`
+(R2.7.4.4) will write, and back out again. Nothing writes yet, so the change
+is behaviour-free by construction -- and 11 evaluator shards plus the RNG /
+simulation set say so.
+
+### What carries
+
+| batch | arms |
+|---|---|
+| 1 | `+eval-args-rs`, `+eval-bool-rs` (new molds `ares`/`aout`, `bres`/`bout`); the old names stay as discarding wrappers for the ~100 call sites outside this file |
+| 2 | `+apply-const`, `+eval-user`, `+apply-def-rs`, `+eval-letin`, and the `+eval-apply-rs` dispatch that reaches them |
+| 3 | `+eval-builtin-rs` and its eager leaves: `+bi-eq`, `+un-not`, `+bi-imply`, `+bi-equiv`, `+eval-unchanged`, `+bi-in`, `+eval-conj`, `+eval-disj`, `+eval-fcnapply`, `+eval-setenum`, `+eval-tuple`, `+eval-rcd`, `+eval-rcd-select`, `+eval-ite`, `+eval-case`, `+eval-except`, plus the `DOMAIN`, prime and `$SubstIn` branches |
+| 4 | `+eval-node-op-rs` and the `@Evaluation` overrides -- `+eval-tlc-eval`, `+eval-assert-error`, `+eval-tlc-cache`, and `SelectSeq`'s per-element `+apply-def-rs` loop. **This is the write point.** |
+| 5 | the SOLVER's own eval sites: `+solve`'s `=` and `\subseteq` right-hand sides, `+solve-filter`, `+solve-ite`. The R2.7.4.1a solver carrier and the evaluator carrier are now ONE loop |
+| 6 | `pst` EMBEDS `rst`, so there is a single enumeration seed |
+
+### Three things worth recording
+
+1. **`+conj-list:v` / `+disj-list:v` / `+if-val:v` / `+case-val:v` had to be
+   INLINED.** Each takes a `bthunk`/`vthunk` and decides whether to call it;
+   a thunk has no way to hand `rst` back out. Conjunction is exactly where the
+   carrier matters -- measured at the pin, a `TLCSet` write is visible to a
+   LATER CONJUNCT of the same evaluation -- so `+eval-conj` now walks its own
+   list with `=^`. Semantics are unchanged (stop at the first FALSE, suppress
+   later errors); only the threading is new. Same for the other three.
+2. **`RandomElement` and `-generate` share one generator, so `pst` had to
+   absorb the carrier.** `SetEnumValue.randomElement` / 
+   `IntervalValue.randomElement` draw through `RandomEnumerableValues.get()`,
+   which is the same object `-generate`'s probabilistic enumeration spends.
+   Two seed channels would have let a spec using both diverge silently, which
+   is why the plan called for this. `+$ pst [rs=rst ls=@ ngen=@ud]`; `es.rs.p`
+   is the one enumeration seed, and `ls` (the SIMULATION generator, tlc2's
+   worker-local `localRng`) stays separate because at the pin it IS separate.
+3. **`ENABLED` still discards, now deliberately.** `Tool.enabled` throws its
+   witness away and the port does the same, so anything the witness search
+   wrote goes with it. Harmless today; R2.7.4.3 must MEASURE the pin before
+   claiming parity, because tlc2's `TLCSet` writes a STATIC field and would
+   survive a discarded witness where this does not.
+
+### THE CARRIER BOUNDARY — what R2.7.4.3/.4 must live within
+
+The carrier reaches the EAGER SPINE. It does **not** reach:
+
+- anything inside a lazy set descriptor (`+eval-domain` and the `sexp`
+  cursors), and
+- anything inside a STREAMING BINDER body -- `\A`, `\E`, `CHOOSE`,
+  `{x \in S : p}`, `{e : x \in S}`, `[x \in S |-> e]`, a recursive function
+  spec. Each hands a per-element gate to a combinator in `lib/value.hoon`
+  (`all-ctx`, `ex-ctx`, `choose-over`, `filter-over`, `map-over`, `fcn-over`,
+  `ctx-map`, `ctx-fcn`) that does not carry `rst`.
+
+Extending past that boundary means reshaping `lib/value.hoon`'s lazy layer,
+which is a bigger change than this one and is NOT what tlc2 needs to do --
+there `TLCSet` writes a static field and `RandomEnumerableValues` is a
+singleton, so neither notices the boundary at all.
+
+The corpus shapes `.3` and `.4` are planned around (`Next == x' = x +
+TLCGet(0) /\ TLCSet(0, …)`, `x' = RandomElement(0..2) /\ y' =
+RandomElement(0..2)`) are conjunction spines and DO carry. What does not is
+e.g. `\E i \in 1..2 : x' = RandomElement(S)`, where the draw would advance a
+seed that is then dropped. **`.4` must either add a corpus case that pins
+this and refuse it by name, or extend the boundary** -- it must not be left
+to be discovered as a wrong number.
+
+### Verified
+
+`ok=%.y`, 0 failures, echo-anchored: `eval`, `core-eval`, `node-eval`,
+`neval-mc`, `neval-action`, `neval-state`, `neval-fp`, `mc`, `coverage`,
+`stream`, `safety-gen`.
+
+### One Hoon trap
+
+`empty-rst:ne(es es.cur)` does NOT mutate the arm's product -- `:` binds
+looser than `%=`, so it parses as a `%=` on `ne`, the library core, and fails
+`-find.es` / `-tack.es`. Bind the product to its own face first
+(`=/ rs0=rst:ne empty-rst:ne`, then `rs0(es es.cur)`).
+
 ## R2.7.4.2b — the coverage block — DONE 2026-08-26
 
 `tlc-coverage` now reports the block, and the row closes as a NARROWED

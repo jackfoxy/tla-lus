@@ -1622,7 +1622,14 @@
   ::  draws, so neither may be lost across a retry
   =/  fnd
     =/  tries  0
-    =/  pp=pst:ne  [es.cur s.cur 0]
+    ::  R2.7.4.1b: `pst` now EMBEDS the R2.7.4.1 carrier, because the
+    ::  enumeration seed and `RandomElement`'s are the same generator at the
+    ::  pin. The cursor still owns the seed across steps; it is loaded into
+    ::  the carrier here and read back below
+    ::  bound to its own face first: `empty-rst:ne(es …)` parses as a `%=` on
+    ::  `ne`, the library core, not on the arm's product
+    =/  rs0=rst:ne  empty-rst:ne
+    =/  pp=pst:ne  [rs0(es es.cur) s.cur 0]
     |-  ^-  [step-res pst:ne]
     ?:  =(tries alen)  [[%none ~] pp]
     =/  a  (nth-action index actions.o)
@@ -1632,7 +1639,7 @@
     ?.  ?=(%none -.r)  [r pp]
     $(tries +(tries), index (mod (add index p) alen))
   =/  found  -.fnd
-  =.  es.cur   es.fnd
+  =.  es.cur   es.rs.fnd
   =.  s.cur    ls.fnd
   =.  gen.cur  (add gen.cur ngen.fnd)
   ?:  ?=(%err -.found)

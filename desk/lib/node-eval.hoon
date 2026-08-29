@@ -164,7 +164,7 @@
     %lit      [(eval-lit n) rs]
     %atref    ?~(atv.e [[%| 0 'no @ value in scope.'] rs] [[%& u.atv.e] rs])
     %nullodn  [[%| 0 'unresolved operator (nullODN).'] rs]
-    %letin    [(eval-letin n e) rs]
+    %letin    (eval-letin n e rs)
     %apply    (eval-apply-rs n e rs)
   ==
 ::
@@ -193,13 +193,13 @@
   ^-  eout
   =/  nm  name.op.n
   =/  kd  kind.op.n
-  ?:  ?=(%builtin kd)  [(eval-builtin n e) rs]
+  ?:  ?=(%builtin kd)  (eval-builtin-rs n e rs)
   ?-  kd
-      %constant      [(apply-const nm n e) rs]
-      %new-constant  [(apply-const nm n e) rs]
-      %user-op       [(eval-user n e) rs]
+      %constant      (apply-const nm n e rs)
+      %new-constant  (apply-const nm n e rs)
+      %user-op       (eval-user n e rs)
       %formal-param
-    ?.  =(~ args.n)  [(eval-user n e) rs]
+    ?.  =(~ args.n)  (eval-user n e rs)
     ::  a param bound call-by-name (a substituted argument node) is evaluated
     ::  in place; otherwise it is a value parameter resolved from `vals`
     =/  sb  (~(get by psub.e) nm)
@@ -228,15 +228,15 @@
   ::  (`CONSTANT F(_)` bound by a cfg `F(a) = v` enumeration) is applied at the
   ::  argument (arity 1) or the argument tuple (arity n) — the config builds it
   ::  as a function value (tlc2's OpRcdValue), so application is `F[args]`
-  |=  [nm=@t n=sem-apply:sm e=eenv]
-  ^-  eres
-  ?~  args.n  (lookup-val nm e)
+  |=  [nm=@t n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?~  args.n  [(lookup-val nm e) rs]
   =/  fv  (~(get by vals.e) nm)
-  ?~  fv  [%| 0 (rap 3 ~['undefined identifier: ' nm])]
-  =/  as  (eval-args args.n e)
-  ?:  ?=(%| -.as)  as
+  ?~  fv  [[%| 0 (rap 3 ~['undefined identifier: ' nm])] rs]
+  =^  as  rs  (eval-args-rs args.n e rs)
+  ?:  ?=(%| -.as)  [as rs]
   =/  dp=value:v  ?:(=(1 (lent p.as)) (snag 0 p.as) [%seq p.as])
-  (apply:v u.fv dp |)
+  [(apply:v u.fv dp |) rs]
 ::
 ++  lookup-var
   ::  a variable resolves from the successor state under a prime, else the
@@ -254,23 +254,46 @@
 ::  +|  Helpers: Argument And Boolean Evaluation
 ::
 ++  eval-args
+  ::  the carrier-discarding wrapper (R2.7.4.1b), kept for the arms that have
+  ::  not been converted yet and for the ~100 call sites outside this file
   |=  [as=(list sem:sm) e=eenv]
   ^-  (each (list value:v) eval-err:v)
+  -:(eval-args-rs as e empty-rst)
+::
++$  ares  (each (list value:v) eval-err:v)
++$  aout  [ares rst]
+::
+++  eval-args-rs
+  ::  arguments are evaluated LEFT TO RIGHT and each one's effect on the run
+  ::  state is visible to the next, which is tlc2's order too -- `Tool.eval`
+  ::  walks `args[i]` in index order against the same worker
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  aout
   =|  acc=(list value:v)
-  |-  ^-  (each (list value:v) eval-err:v)
-  ?~  as  [%& (flop acc)]
-  =/  r  (eval i.as e)
-  ?:  ?=(%| -.r)  r
+  |-  ^-  aout
+  ?~  as  [[%& (flop acc)] rs]
+  =^  r  rs  (eval-rs i.as e rs)
+  ?:  ?=(%| -.r)  [r rs]
   $(as t.as, acc [p.r acc])
 ::
 ++  eval-bool
+  ::  the carrier-discarding wrapper (R2.7.4.1b)
   |=  [n=sem:sm e=eenv]
   ^-  (each ? eval-err:v)
-  =/  r  (eval n e)
-  ?:  ?=(%| -.r)  r
+  -:(eval-bool-rs n e empty-rst)
+::
++$  bres  (each ? eval-err:v)
++$  bout  [bres rst]
+::
+++  eval-bool-rs
+  |=  [n=sem:sm e=eenv rs=rst]
+  ^-  bout
+  =^  r  rs  (eval-rs n e rs)
+  ?:  ?=(%| -.r)  [r rs]
   ?.  ?=(%bool -.p.r)
+    :_  rs
     [%| 0 (rap 3 ~['a non-boolean was used where a boolean is required: ' (crip (render:v p.r))])]
-  [%& p.p.r]
+  [[%& p.p.r] rs]
 ::
 ++  lit-str
   ::  the string content of a %lit %str node (record field / selector)
@@ -380,32 +403,41 @@
 ::  +|  Builtin Dispatch
 ::
 ++  eval-builtin
+  ::  the carrier-discarding wrapper (R2.7.4.1b)
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
+  -:(eval-builtin-rs n e empty-rst)
+::
+++  eval-builtin-rs
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
   =/  nm  name.op.n
   =/  as  args.n
   ::  arity-0 constants
-  ?:  =(nm 'TRUE')     [%& [%bool &]]
-  ?:  =(nm 'FALSE')    [%& [%bool |]]
-  ?:  =(nm 'BOOLEAN')  [%& [%set %set-enum ~[[%bool |] [%bool &]]]]
+  ?:  =(nm 'TRUE')     [[%& [%bool &]] rs]
+  ?:  =(nm 'FALSE')    [[%& [%bool |]] rs]
+  ?:  =(nm 'BOOLEAN')  [[%& [%set %set-enum ~[[%bool |] [%bool &]]]] rs]
   ::  equality and logic
-  ?:  =(nm '=')        (bi-eq as e |)
-  ?:  =(nm '/=')       (bi-eq as e &)
-  ?:  |(=(nm '\\lnot') =(nm '\\neg'))  (un-not as e)
-  ?:  =(nm '\\land')   (eval-conj ~[(snag 0 as) (snag 1 as)] e)
-  ?:  =(nm '\\lor')    (eval-disj ~[(snag 0 as) (snag 1 as)] e)
-  ?:  =(nm '$ConjList')  (eval-conj as e)
-  ?:  =(nm '$DisjList')  (eval-disj as e)
-  ?:  =(nm '=>')       (bi-imply as e)
-  ?:  =(nm '\\equiv')  (bi-equiv as e)
+  ?:  =(nm '=')        (bi-eq as e | rs)
+  ?:  =(nm '/=')       (bi-eq as e & rs)
+  ?:  |(=(nm '\\lnot') =(nm '\\neg'))  (un-not as e rs)
+  ?:  =(nm '\\land')   (eval-conj ~[(snag 0 as) (snag 1 as)] e rs)
+  ?:  =(nm '\\lor')    (eval-disj ~[(snag 0 as) (snag 1 as)] e rs)
+  ?:  =(nm '$ConjList')  (eval-conj as e rs)
+  ?:  =(nm '$DisjList')  (eval-disj as e rs)
+  ?:  =(nm '=>')       (bi-imply as e rs)
+  ?:  =(nm '\\equiv')  (bi-equiv as e rs)
   ::  membership
-  ?:  =(nm '\\in')     (bi-in as e |)
-  ?:  =(nm '\\notin')  (bi-in as e &)
-  ?:  =(nm '\\subseteq')  (bi-subseteq as e)
+  ?:  =(nm '\\in')     (bi-in as e | rs)
+  ?:  =(nm '\\notin')  (bi-in as e & rs)
+  ::  `\subseteq` reaches the operands only through `+eval-domain`, which is
+  ::  BELOW the carrier boundary (see the note on that arm), so there is
+  ::  nothing for it to thread
+  ?:  =(nm '\\subseteq')  [(bi-subseteq as e) rs]
   ::  prime and UNCHANGED (state/action; WU6.6)
-  ?:  =(nm '\'')          (eval (snag 0 as) e(primed &))
-  ?:  =(nm 'UNCHANGED')   (eval-unchanged as e)
-  ?:  =(nm 'ENABLED')     (eval-enabled (snag 0 as) e)
+  ?:  =(nm '\'')          (eval-rs (snag 0 as) e(primed &) rs)
+  ?:  =(nm 'UNCHANGED')   (eval-unchanged as e rs)
+  ?:  =(nm 'ENABLED')     [(eval-enabled (snag 0 as) e) rs]
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
     ::  a set constructor whose operand fails to evaluate is a typed failure,
@@ -414,50 +446,58 @@
     ::  function definition reaches whenever a sweep tries a point it cannot
     ::  yet solve (R1.4.2)
     =/  sx  (eval-domain n e)
-    ?:  ?=(%| -.sx)  sx
-    (force:v p.sx setmax.e)
+    ?:  ?=(%| -.sx)  [sx rs]
+    [(force:v p.sx setmax.e) rs]
   ?:  =(nm 'DOMAIN')
-    =/  a  (eval (snag 0 as) e)
-    ?:  ?=(%| -.a)  a
+    =^  a  rs  (eval-rs (snag 0 as) e rs)
+    ?:  ?=(%| -.a)  [a rs]
     ::  tlc2 returns the domain VALUE the function was built from, unchanged,
     ::  so `DOMAIN [i \in 1..3 |-> i]` is an IntervalValue while
     ::  `DOMAIN [i \in {1, 2, 3} |-> i]` is a SetEnumValue for the same set --
     ::  provenance, not shape. The port's `%fcn` does not carry its domain, so
     ::  recover it from the EXPRESSION where the expression reaches a
     ::  constructor; otherwise fall back to enumerating the pairs (R1.4.5b)
-    ?.  ?=(%fcn -.p.a)  (domain:v p.a)
+    ?.  ?=(%fcn -.p.a)  [(domain:v p.a) rs]
     =/  de  (domain-expr (snag 0 as) e 8)
+    :_  rs
     ?~(de (domain:v p.a) [%& u.de])
   ::  functions, tuples, records
-  ?:  =(nm '$FcnApply')   (eval-fcnapply as e)
-  ?:  =(nm '$Except')     (eval-except n e)
-  ?:  =(nm '$SetEnumerate')  (eval-setenum as e)
-  ?:  =(nm '$Tuple')      (eval-tuple as e)
-  ?:  =(nm '$RcdConstructor')  (eval-rcd as e)
-  ?:  =(nm '$RcdSelect')  (eval-rcd-select as e)
+  ?:  =(nm '$FcnApply')   (eval-fcnapply as e rs)
+  ?:  =(nm '$Except')     (eval-except n e rs)
+  ?:  =(nm '$SetEnumerate')  (eval-setenum as e rs)
+  ?:  =(nm '$Tuple')      (eval-tuple as e rs)
+  ?:  =(nm '$RcdConstructor')  (eval-rcd as e rs)
+  ?:  =(nm '$RcdSelect')  (eval-rcd-select as e rs)
   ::  control
-  ?:  =(nm '$IfThenElse')  (eval-ite as e)
-  ?:  =(nm '$Case')       (eval-case as e)
-  ::  binders
-  ?:  =(nm '$BoundedForall')  (eval-forall n e)
-  ?:  =(nm '$BoundedExists')  (eval-exists n e)
-  ?:  =(nm '$BoundedChoose')  (eval-choose n e)
-  ?:  =(nm '$SubsetOf')   (eval-subsetof n e)
-  ?:  =(nm '$SetOfAll')   (eval-setofall n e)
+  ?:  =(nm '$IfThenElse')  (eval-ite as e rs)
+  ?:  =(nm '$Case')       (eval-case as e rs)
+  ::  BINDERS ARE BELOW THE CARRIER BOUNDARY (R2.7.4.1b). Each of these hands
+  ::  a per-element gate to a STREAMING combinator in `lib/value.hoon`
+  ::  (`all-ctx`, `ex-ctx`, `choose-over`, `filter-over`, `map-over`,
+  ::  `fcn-over`, `ctx-map`, `ctx-fcn`), which decides if and when to call it;
+  ::  a gate cannot thread `rst` back out through a combinator that does not
+  ::  carry one. Threading them means reshaping the whole lazy set layer, and
+  ::  that is a change to `lib/value.hoon`, not to this file -- see the notes
+  ::  for what R2.7.4.3/.4 must do about it
+  ?:  =(nm '$BoundedForall')  [(eval-forall n e) rs]
+  ?:  =(nm '$BoundedExists')  [(eval-exists n e) rs]
+  ?:  =(nm '$BoundedChoose')  [(eval-choose n e) rs]
+  ?:  =(nm '$SubsetOf')   [(eval-subsetof n e) rs]
+  ?:  =(nm '$SetOfAll')   [(eval-setofall n e) rs]
   ?:  |(=(nm '$FcnConstructor') =(nm '$NonRecursiveFcnSpec'))
-    (eval-fcncon n e)
-  ?:  =(nm '$RecursiveFcnSpec')  (eval-recfcn n e)
+    [(eval-fcncon n e) rs]
+  ?:  =(nm '$RecursiveFcnSpec')  [(eval-recfcn n e) rs]
   ::  INSTANCE substitution (R2.3.5): `$SubstIn:M` / `$APSubstIn:M` wraps an
   ::  instanced member's body in the instance's `WITH` bindings. tlc2 threads
   ::  these as a `Context` (`Specs.addSubsts` / `SubstInNode`); the port binds
   ::  them into the environment and evaluates the inner body
   ?^  (anysubstin-mod:sm nm)
     =/  sp  (substin-parts:sm n)
-    ?~  sp  [%| 0 (rap 3 ~['malformed substitution wrapper: ' nm])]
+    ?~  sp  [[%| 0 (rap 3 ~['malformed substitution wrapper: ' nm])] rs]
     =/  e2  (bind-substs e names.u.sp exprs.u.sp)
-    ?:  ?=(%| -.e2)  e2
-    (eval inner.u.sp p.e2)
-  [%| 0 (rap 3 ~['unsupported builtin operator: ' nm])]
+    ?:  ?=(%| -.e2)  [e2 rs]
+    (eval-rs inner.u.sp p.e2 rs)
+  [[%| 0 (rap 3 ~['unsupported builtin operator: ' nm])] rs]
 ::
 ++  set-ctor-names
   ^-  (set @t)
@@ -468,62 +508,64 @@
   ==
 ::
 ++  bi-eq
-  |=  [as=(list sem:sm) e=eenv neg=?]
-  ^-  eres
-  =/  a  (eval (snag 0 as) e)
-  ?:  ?=(%| -.a)  a
-  =/  b  (eval (snag 1 as) e)
-  ?:  ?=(%| -.b)  b
+  |=  [as=(list sem:sm) e=eenv neg=? rs=rst]
+  ^-  eout
+  =^  a  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  =^  b  rs  (eval-rs (snag 1 as) e rs)
+  ?:  ?=(%| -.b)  [b rs]
   =/  r  (val-eq:v p.a p.b)
-  ?:  ?=(%| -.r)  r
-  [%& [%bool ?:(neg !p.r p.r)]]
+  ?:  ?=(%| -.r)  [r rs]
+  [[%& [%bool ?:(neg !p.r p.r)]] rs]
 ::
 ++  un-not
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  b  (eval-bool (snag 0 as) e)
-  ?:(?=(%| -.b) b [%& [%bool !p.b]])
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  b  rs  (eval-bool-rs (snag 0 as) e rs)
+  ?:(?=(%| -.b) [b rs] [[%& [%bool !p.b]] rs])
 ::
 ++  bi-imply
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  a  (eval-bool (snag 0 as) e)
-  ?:  ?=(%| -.a)  a
-  ?.  p.a  [%& [%bool &]]
-  =/  b  (eval-bool (snag 1 as) e)
-  ?:(?=(%| -.b) b [%& [%bool p.b]])
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  a  rs  (eval-bool-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  ::  short-circuit: a FALSE antecedent leaves the consequent unevaluated, so
+  ::  a write inside it does not happen -- which is tlc2's behaviour too
+  ?.  p.a  [[%& [%bool &]] rs]
+  =^  b  rs  (eval-bool-rs (snag 1 as) e rs)
+  ?:(?=(%| -.b) [b rs] [[%& [%bool p.b]] rs])
 ::
 ++  bi-equiv
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  a  (eval-bool (snag 0 as) e)
-  ?:  ?=(%| -.a)  a
-  =/  b  (eval-bool (snag 1 as) e)
-  ?:(?=(%| -.b) b [%& [%bool =(p.a p.b)]])
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  a  rs  (eval-bool-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  =^  b  rs  (eval-bool-rs (snag 1 as) e rs)
+  ?:(?=(%| -.b) [b rs] [[%& [%bool =(p.a p.b)]] rs])
 ::
 ++  eval-unchanged
   ::  UNCHANGED e is e' = e: the successor value of e equals its current
   ::  value (tuples and composites compare structurally via +val-eq)
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  cur  (eval (snag 0 as) e(primed |))
-  ?:  ?=(%| -.cur)  cur
-  =/  nxt  (eval (snag 0 as) e(primed &))
-  ?:  ?=(%| -.nxt)  nxt
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  cur  rs  (eval-rs (snag 0 as) e(primed |) rs)
+  ?:  ?=(%| -.cur)  [cur rs]
+  =^  nxt  rs  (eval-rs (snag 0 as) e(primed &) rs)
+  ?:  ?=(%| -.nxt)  [nxt rs]
   =/  r  (val-eq:v p.nxt p.cur)
-  ?:  ?=(%| -.r)  r
-  [%& [%bool p.r]]
+  ?:  ?=(%| -.r)  [r rs]
+  [[%& [%bool p.r]] rs]
 ::
 ++  bi-in
-  |=  [as=(list sem:sm) e=eenv neg=?]
-  ^-  eres
-  =/  x  (eval (snag 0 as) e)
-  ?:  ?=(%| -.x)  x
+  |=  [as=(list sem:sm) e=eenv neg=? rs=rst]
+  ^-  eout
+  =^  x  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.x)  [x rs]
   =/  s  (eval-domain (snag 1 as) e)
-  ?:  ?=(%| -.s)  s
+  ?:  ?=(%| -.s)  [s rs]
   =/  m  (set-member:v p.x p.s)
-  ?:  ?=(%| -.m)  m
-  [%& [%bool ?:(neg !p.m p.m)]]
+  ?:  ?=(%| -.m)  [m rs]
+  [[%& [%bool ?:(neg !p.m p.m)]] rs]
 ::
 ++  subset-arg
   ::  the argument of a `SUBSET _` application, if `n` is one
@@ -557,16 +599,33 @@
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
 ++  eval-conj
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  r  (conj-list:v (turn as |=(a=sem:sm |=(~ (eval-bool a e)))))
-  ?:(?=(%| -.r) r [%& [%bool p.r]])
+  ::  `+conj-list:v`'s short-circuit, inlined so the run state threads from
+  ::  one conjunct to the NEXT. That threading is the whole point of the
+  ::  carrier: measured at the pin, a `TLCSet` write is visible to a later
+  ::  conjunct of the SAME evaluation, and a `bthunk` handed to a combinator
+  ::  in `lib/value.hoon` has no way to hand `rst` back. Semantics are
+  ::  unchanged -- stop at the first FALSE, suppress later errors
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  |-  ^-  eout
+  ?~  as  [[%& [%bool &]] rs]
+  =^  r  rs  (eval-bool-rs i.as e rs)
+  ?:  ?=(%| -.r)  [r rs]
+  ?.  p.r  [[%& [%bool |]] rs]
+  $(as t.as)
 ::
 ++  eval-disj
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  r  (disj-list:v (turn as |=(a=sem:sm |=(~ (eval-bool a e)))))
-  ?:(?=(%| -.r) r [%& [%bool p.r]])
+  ::  `+disj-list:v` inlined, for the reason `+eval-conj` gives: stop at the
+  ::  first TRUE, suppress later errors, thread the run state across the
+  ::  disjuncts that DID run
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  |-  ^-  eout
+  ?~  as  [[%& [%bool |]] rs]
+  =^  r  rs  (eval-bool-rs i.as e rs)
+  ?:  ?=(%| -.r)  [r rs]
+  ?:  p.r  [[%& [%bool &]] rs]
+  $(as t.as)
 ::
 ++  domain-expr
   ::  the domain VALUE a function expression was built from, when the
@@ -618,100 +677,112 @@
   ==
 ::
 ++  eval-fcnapply
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  f  (eval (snag 0 as) e)
-  ?:  ?=(%| -.f)  f
-  =/  x  (eval (snag 1 as) e)
-  ?:  ?=(%| -.x)  x
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  f  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.f)  [f rs]
+  =^  x  rs  (eval-rs (snag 1 as) e rs)
+  ?:  ?=(%| -.x)  [x rs]
   ::  tlc2 words an out-of-domain failure by the function's value class, and a
   ::  lambda FORM is what stays a FcnLambdaValue there (R1.4.5)
-  (apply:v p.f p.x (lambda-form (snag 0 as)))
+  [(apply:v p.f p.x (lambda-form (snag 0 as))) rs]
 ::
 ++  eval-setenum
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  vs  (eval-args as e)
-  ?:(?=(%| -.vs) vs [%& (normalize:v [%set %set-enum p.vs])])
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  vs  rs  (eval-args-rs as e rs)
+  ?:(?=(%| -.vs) [vs rs] [[%& (normalize:v [%set %set-enum p.vs])] rs])
 ::
 ++  eval-tuple
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  vs  (eval-args as e)
-  ?:(?=(%| -.vs) vs [%& [%seq p.vs]])
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  vs  rs  (eval-args-rs as e rs)
+  ?:(?=(%| -.vs) [vs rs] [[%& [%seq p.vs]] rs])
 ::
 ++  eval-rcd
   ::  [a |-> e1, b |-> e2] — args are $Pair(name-str, value-expr)
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
   =|  acc=(list vfield:v)
-  |-  ^-  eres
+  |-  ^-  eout
   ?~  as
-    (mk-rec:v (flop acc))
+    [(mk-rec:v (flop acc)) rs]
   =/  pr  i.as
-  ?.  ?=(%apply -.pr)  [%| 0 'malformed record field.']
+  ?.  ?=(%apply -.pr)  [[%| 0 'malformed record field.'] rs]
   =/  k  (lit-str (snag 0 args.pr))
-  =/  fv  (eval (snag 1 args.pr) e)
-  ?:  ?=(%| -.fv)  fv
+  =^  fv  rs  (eval-rs (snag 1 args.pr) e rs)
+  ?:  ?=(%| -.fv)  [fv rs]
   $(as t.as, acc [[k p.fv] acc])
 ::
 ++  eval-rcd-select
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  r  (eval (snag 0 as) e)
-  ?:  ?=(%| -.r)  r
-  (apply:v p.r [%str (lit-str (snag 1 as))] |)
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  r  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.r)  [r rs]
+  [(apply:v p.r [%str (lit-str (snag 1 as))] |) rs]
 ::
 ++  eval-ite
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =/  c  (eval (snag 0 as) e)
-  ?:  ?=(%| -.c)  c
-  %^  if-val:v  p.c
-    |=(~ (eval (snag 1 as) e))
-  |=(~ (eval (snag 2 as) e))
+  ::  `+if-val:v` inlined so the TAKEN branch's run state comes back out.
+  ::  Only the taken branch is evaluated, exactly as before
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  c  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.c)  [c rs]
+  ?.  ?=(%bool -.p.c)
+    :_  rs
+    [%| 0 (rap 3 ~['A non-boolean was used as an IF guard: ' (crip (render:v p.c)) '.'])]
+  ?:  p.p.c  (eval-rs (snag 1 as) e rs)
+  (eval-rs (snag 2 as) e rs)
 ::
 ++  eval-case
-  ::  args are $Pair(guard, body); an OTHER arm's guard is a %nullodn
-  |=  [as=(list sem:sm) e=eenv]
-  ^-  eres
-  =|  arms=(list [g=bthunk:v b=vthunk:v])
-  =/  other=(unit vthunk:v)  ~
-  |-  ^-  eres
-  ?~  as
-    (case-val:v (flop arms) other)
-  =/  pr  i.as
-  ?.  ?=(%apply -.pr)  [%| 0 'malformed CASE arm.']
+  ::  args are $Pair(guard, body); an OTHER arm's guard is a %nullodn.
+  ::  `+case-val:v` inlined for the carrier: guards run IN ORDER and each
+  ::  one's run state is visible to the next, the first true guard's body
+  ::  runs, unselected bodies are never evaluated (so their errors stay
+  ::  suppressed) -- the same semantics, threaded
+  |=  [as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =/  other=(unit sem:sm)  ~
+  =/  cs  as
+  |-  ^-  eout
+  ?~  cs
+    ?~  other
+      [[%| 0 'CASE: no OTHER case, and no guard evaluated to TRUE.'] rs]
+    (eval-rs u.other e rs)
+  =/  pr  i.cs
+  ?.  ?=(%apply -.pr)  [[%| 0 'malformed CASE arm.'] rs]
   =/  guard  (snag 0 args.pr)
   =/  body   (snag 1 args.pr)
   ?:  ?=(%nullodn -.guard)
-    $(as t.as, other `|=(~ (eval body e)))
-  =/  arm  [`bthunk:v`|=(~ (eval-bool guard e)) `vthunk:v`|=(~ (eval body e))]
-  $(as t.as, arms [arm arms])
+    $(cs t.cs, other `body)
+  =^  g  rs  (eval-bool-rs guard e rs)
+  ?:  ?=(%| -.g)  [g rs]
+  ?:  p.g  (eval-rs body e rs)
+  $(cs t.cs)
 ::
 ::  +|  EXCEPT
 ::
 ++  eval-except
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
-  =/  tv  (eval (snag 0 args.n) e)
-  ?:  ?=(%| -.tv)  tv
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  =^  tv  rs  (eval-rs (snag 0 args.n) e rs)
+  ?:  ?=(%| -.tv)  [tv rs]
   =/  cur  p.tv
   =/  clauses  (slag 1 args.n)
-  |-  ^-  eres
-  ?~  clauses  [%& cur]
+  |-  ^-  eout
+  ?~  clauses  [[%& cur] rs]
   =/  pr  i.clauses
-  ?.  ?=(%apply -.pr)  [%| 0 'malformed EXCEPT clause.']
+  ?.  ?=(%apply -.pr)  [[%| 0 'malformed EXCEPT clause.'] rs]
   =/  seqn  (snag 0 args.pr)
   =/  rhs   (snag 1 args.pr)
-  ?.  ?=(%apply -.seqn)  [%| 0 'malformed EXCEPT path.']
-  =/  pathr  (eval-args args.seqn e)
-  ?:  ?=(%| -.pathr)  pathr
+  ?.  ?=(%apply -.seqn)  [[%| 0 'malformed EXCEPT path.'] rs]
+  =^  pathr  rs  (eval-args-rs args.seqn e rs)
+  ?:  ?=(%| -.pathr)  [pathr rs]
   =/  sel  (except-select:v cur p.pathr)
-  ?:  ?=(%| -.sel)  sel
+  ?:  ?=(%| -.sel)  [sel rs]
   ?~  p.sel  $(clauses t.clauses)
-  =/  rv  (eval rhs e(atv `u.p.sel))
-  ?:  ?=(%| -.rv)  rv
+  =^  rv  rs  (eval-rs rhs e(atv `u.p.sel) rs)
+  ?:  ?=(%| -.rv)  [rv rs]
   $(cur (except-put:v cur p.pathr p.rv), clauses t.clauses)
 ::
 ::  +|  Binders
@@ -945,33 +1016,37 @@
   ::  evaluated — but only for a user module, or for the few StandardModule
   ::  operators the pin leaves un-overridden (`body-ok:so`), because a
   ::  vendored standard body is a dummy
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
   =/  nm  name.op.n
   =/  d   (~(get by ops.e) nm)
   ?~  d
-    [%| 0 (rap 3 ~['undefined operator: ' nm])]
+    [[%| 0 (rap 3 ~['undefined operator: ' nm])] rs]
   =/  def  u.d
   =/  key=op-key:so  [origin.def nm (lent args.n)]
   =/  ov  (lookup:so ov.e key)
   ?^  ov
-    =/  as  (eval-args args.n e)
-    ?:  ?=(%| -.as)  as
-    (gate.u.ov p.as)
+    =^  as  rs  (eval-args-rs args.n e rs)
+    ?:  ?=(%| -.as)  [as rs]
+    ::  a plain override gate is a PURE function of its argument values
+    ::  (`lookup:so` returns `gate`), so it cannot touch the run state; the
+    ::  ones that can are the `node-op` overrides just below, which take the
+    ::  evaluator itself
+    [(gate.u.ov p.as) rs]
   ::  an override that needs the evaluator itself (an operator argument)
   =/  nop  (node-op:so key)
-  ?^  nop  (eval-node-op tag.u.nop n e)
+  ?^  nop  (eval-node-op-rs tag.u.nop n e rs)
   ?:  ?&  (is-standard:so ov.e origin.def)
           !(body-allowed:so ov.e origin.def nm)
       ==
-    [%| (unsupported:so key)]
-  ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
-  ?~  body.def  [%| 0 (rap 3 ~['operator has no evaluable body: ' nm])]
+    [[%| (unsupported:so key)] rs]
+  ?:  =(0 fuel.e)  [[%| 0 'evaluation recursion/resource limit exceeded.'] rs]
+  ?~  body.def  [[%| 0 (rap 3 ~['operator has no evaluable body: ' nm])] rs]
   ?.  =((lent params.def) (lent args.n))
-    [%| 0 (rap 3 ~['wrong number of arguments to ' nm])]
+    [[%| 0 (rap 3 ~['wrong number of arguments to ' nm])] rs]
   =/  e2  (bind-params e params.def args.n)
-  ?:  ?=(%| -.e2)  e2
-  (eval u.body.def p.e2(fuel (dec fuel.e)))
+  ?:  ?=(%| -.e2)  [e2 rs]
+  (eval-rs u.body.def p.e2(fuel (dec fuel.e)) rs)
 ::
 ++  eval-node-op
   ::  StandardModule overrides that take an operator argument. tlc2 receives
@@ -980,41 +1055,52 @@
   ::  applied by the same evaluator, under the same recursion budget
   |=  [tag=@tas n=sem-apply:sm e=eenv]
   ^-  eres
-  ?:  ?=(%bag-of-all tag)     (eval-bag-of-all n e)
-  ?:  ?=(%cardinality tag)    (eval-cardinality n e)
-  ?:  ?=(%is-finite-set tag)  (eval-is-finite n e)
-  ?:  ?=(%sort-seq tag)       (eval-sort-seq n e)
-  ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e)
-  ?:  ?=(%tlc-get tag)        (eval-tlc-get n e)
-  ?:  ?=(%assert-error tag)   (eval-assert-error n e)
-  ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e)
-  ?:  ?=(%tlc-defer tag)      (eval-tlc-defer n e)
-  ?.  ?=(%select-seq tag)  [%| 0 'unsupported operator-argument override.']
+  -:(eval-node-op-rs tag n e empty-rst)
+::
+++  eval-node-op-rs
+  ::  THE WRITE POINT. These are the overrides that receive the unevaluated
+  ::  node and call the evaluator themselves, so they are where `TLCSet`
+  ::  (R2.7.4.3) and `RandomElement` (R2.7.4.4) will read and write `rst`.
+  ::  Everything above this arm now threads the carrier to it and back
+  |=  [tag=@tas n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ::  the FiniteSets / Sequences overrides drive the streaming layer, which is
+  ::  below the carrier boundary; they pass `rst` through untouched
+  ?:  ?=(%bag-of-all tag)     [(eval-bag-of-all n e) rs]
+  ?:  ?=(%cardinality tag)    [(eval-cardinality n e) rs]
+  ?:  ?=(%is-finite-set tag)  [(eval-is-finite n e) rs]
+  ?:  ?=(%sort-seq tag)       [(eval-sort-seq n e) rs]
+  ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e rs)
+  ?:  ?=(%tlc-get tag)        [(eval-tlc-get n e) rs]
+  ?:  ?=(%assert-error tag)   (eval-assert-error n e rs)
+  ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e rs)
+  ?:  ?=(%tlc-defer tag)      [(eval-tlc-defer n e) rs]
+  ?.  ?=(%select-seq tag)  [[%| 0 'unsupported operator-argument override.'] rs]
   ?.  ?=([* * ~] args.n)
-    [%| 0 'SelectSeq expects two arguments.']
-  =/  sv  (eval i.args.n e)
-  ?:  ?=(%| -.sv)  sv
+    [[%| 0 'SelectSeq expects two arguments.'] rs]
+  =^  sv  rs  (eval-rs i.args.n e rs)
+  ?:  ?=(%| -.sv)  [sv rs]
   =/  t  (to-tuple:v p.sv)
-  ?~  t  [%| (arg-error:so 2.169 1 'SelectSeq' 'sequence' | p.sv)]
+  ?~  t  [[%| (arg-error:so 2.169 1 'SelectSeq' 'sequence' | p.sv)] rs]
   ::  an empty sequence is answered before the operator is even examined
-  ?~  u.t  [%& [%seq ~]]
+  ?~  u.t  [[%& [%seq ~]] rs]
   =/  od  (resolve-oparg i.t.args.n e)
-  ?~  od  [%| (op-arg-error 'SelectSeq' 'operator' i.t.args.n)]
-  =/  keep
+  ?~  od  [[%| (op-arg-error 'SelectSeq' 'operator' i.t.args.n)] rs]
+  =^  keep  rs
     ::  widen: `u.t` is narrowed to a non-empty list, which would make the
     ::  loop's `?~` vain
     =/  els=(list value:v)  u.t
     =|  acc=(list value:v)
-    |-  ^-  (each (list value:v) eval-err:v)
-    ?~  els  [%& (flop acc)]
-    =/  r  (apply-def u.od ~[i.els] e)
-    ?:  ?=(%| -.r)  r
+    |-  ^-  aout
+    ?~  els  [[%& (flop acc)] rs]
+    =^  r  rs  (apply-def-rs u.od ~[i.els] e rs)
+    ?:  ?=(%| -.r)  [r rs]
     ?.  ?=(%bool -.p.r)
-      [%| (op-arg-error 'SelectSeq' 'boolean-valued operator' i.t.args.n)]
+      [[%| (op-arg-error 'SelectSeq' 'boolean-valued operator' i.t.args.n)] rs]
     ?:  p.p.r  $(els t.els, acc [i.els acc])
     $(els t.els)
-  ?:  ?=(%| -.keep)  keep
-  [%& [%seq p.keep]]
+  ?:  ?=(%| -.keep)  [keep rs]
+  [[%& [%seq p.keep]] rs]
 ::
 ++  eval-cardinality
   ::  FiniteSets!Cardinality. The argument is evaluated as a lazy DOMAIN, so
@@ -1108,10 +1194,10 @@
   ::  TLC!TLCEval(e) — the pin's `@Evaluation` override: it receives the
   ::  unevaluated node and evaluates it itself (there it defeats TLC's
   ::  caching; here it is the lazy argument contract in one operator)
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
-  ?.  ?=([* ~] args.n)  [%| 0 'TLCEval expects one argument.']
-  (eval i.args.n e)
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* ~] args.n)  [[%| 0 'TLCEval expects one argument.'] rs]
+  (eval-rs i.args.n e rs)
 ::
 ++  eval-assert-error
   ::  TLCExt!AssertError(err, exp) — evaluate `exp`; if it FAILS, compare the
@@ -1126,25 +1212,32 @@
   ::  The `err` argument is checked SYNTACTICALLY, as `assertError` does with
   ::  `Assert.check(args[0] instanceof StringNode, ...)` — a computed string
   ::  is rejected even though it would evaluate to one
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
-  ?.  ?=([* * ~] args.n)  [%| 0 'AssertError expects two arguments.']
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * ~] args.n)  [[%| 0 'AssertError expects two arguments.'] rs]
   =/  ea  i.args.n
   ?.  ?=(%lit -.ea)
+    :_  rs
     :-  %|
     :-  0
     %^  rap  3  'In computing AssertError, a non-string expression was used '
     ~['as the err of an AssertError(err, exp).']
-  =/  ev  (eval ea e)
-  ?:  ?=(%| -.ev)  ev
+  =^  ev  rs  (eval-rs ea e rs)
+  ?:  ?=(%| -.ev)  [ev rs]
   ?.  ?=(%str -.p.ev)
+    :_  rs
     :-  %|
     :-  0
     %^  rap  3  'In computing AssertError, a non-string expression was used '
     ~['as the err of an AssertError(err, exp).']
-  =/  r  (eval i.t.args.n e)
-  ?:  ?=(%& -.r)  [%& %bool |]
-  [%& %bool =(p.p.ev msg.p.r)]
+  ::  R2.7.4.1b: `exp`'s run state is kept even when `exp` FAILS. That is the
+  ::  reason the carrier rides BOTH branches of `eres` (R2.7.4.0): a `TLCSet`
+  ::  write that precedes a failing conjunct really happened at the pin -- it
+  ::  mutated a Java field -- and AssertError is exactly the operator that
+  ::  CATCHES such a failure instead of letting it end the run
+  =^  r  rs  (eval-rs i.t.args.n e rs)
+  ?:  ?=(%& -.r)  [[%& %bool |] rs]
+  [[%& %bool =(p.p.ev msg.p.r)] rs]
 ::
 ++  eval-tlc-cache
   ::  TLCExt!TLCCache(expression, closure) — MEMOIZATION, and memoization of a
@@ -1157,12 +1250,12 @@
   ::  key before it decides anything — so a `closure` that FAILS fails the
   ::  operator here too, rather than being skipped on a cache hit this engine
   ::  does not have
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
-  ?.  ?=([* * ~] args.n)  [%| 0 'TLCCache expects two arguments.']
-  =/  k  (eval i.t.args.n e)
-  ?:  ?=(%| -.k)  k
-  (eval i.args.n e)
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * ~] args.n)  [[%| 0 'TLCCache expects two arguments.'] rs]
+  =^  k  rs  (eval-rs i.t.args.n e rs)
+  ?:  ?=(%| -.k)  [k rs]
+  (eval-rs i.args.n e rs)
 ::
 ++  eval-tlc-defer
   ::  TLCExt!TLCDefer(exp) — returns TRUE and arranges for `exp` to be
@@ -1252,12 +1345,17 @@
   ::  apply an operator definition to already-evaluated arguments
   |=  [d=sem-def:sm vs=(list value:v) e=eenv]
   ^-  eres
-  ?:  =(0 fuel.e)  [%| 0 'evaluation recursion/resource limit exceeded.']
-  ?~  body.d  [%| 0 (rap 3 ~['operator has no evaluable body: ' name.d])]
+  -:(apply-def-rs d vs e empty-rst)
+::
+++  apply-def-rs
+  |=  [d=sem-def:sm vs=(list value:v) e=eenv rs=rst]
+  ^-  eout
+  ?:  =(0 fuel.e)  [[%| 0 'evaluation recursion/resource limit exceeded.'] rs]
+  ?~  body.d  [[%| 0 (rap 3 ~['operator has no evaluable body: ' name.d])] rs]
   ?.  =((lent params.d) (lent vs))
-    [%| 0 (rap 3 ~['wrong number of arguments to ' name.d])]
+    [[%| 0 (rap 3 ~['wrong number of arguments to ' name.d])] rs]
   =/  names  (turn params.d |=(p=spar:sm name.p))
-  (eval u.body.d (bind-names e(fuel (dec fuel.e)) names vs))
+  (eval-rs u.body.d (bind-names e(fuel (dec fuel.e)) names vs) rs)
 ::
 ++  binding-of
   ::  what an operator resolves to, mirroring the oracle's BINDINGS
@@ -1312,15 +1410,15 @@
   (~(get by ops.e) nm)
 ::
 ++  eval-letin
-  |=  [n=sem-letin:sm e=eenv]
-  ^-  eres
-  ?~  body.n  [%| 0 'LET with no body.']
+  |=  [n=sem-letin:sm e=eenv rs=rst]
+  ^-  eout
+  ?~  body.n  [[%| 0 'LET with no body.'] rs]
   =/  e2=eenv
     =/  os  ops.e
     |-  ^-  eenv
     ?~  lets.n  e(ops os)
     $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
-  (eval u.body.n e2)
+  (eval-rs u.body.n e2 rs)
 ::
 ::  +|  Action Solving (WU6.7): initial and successor state streams
 ::
@@ -1514,7 +1612,10 @@
   ?:  =(nm '=')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
     ?~  as  (solve-filter n mode cur part e s)
-    =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
+    ::  R2.7.4.1b: the assignment's RIGHT-HAND SIDE now carries. This is the
+    ::  site R2.7.4.4 needs -- `x' = RandomElement(0..2)` draws here, and the
+    ::  advanced seed has to reach the NEXT conjunct through `+solve-conj`
+    =^  rv  s  (eval-rs (snag 1 args.n) (senv mode cur part e) s)
     ?:  ?=(%| -.rv)  [rv s]
     [[%& ~[(~(put by part) u.as p.rv)]] s]
   ::  `x \in S` on an unbound assignable var is a NONDETERMINISTIC assignment:
@@ -1533,7 +1634,7 @@
   ?:  =(nm '\\subseteq')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
     ?~  as  (solve-filter n mode cur part e s)
-    =/  rv  (eval (snag 1 args.n) (senv mode cur part e))
+    =^  rv  s  (eval-rs (snag 1 args.n) (senv mode cur part e) s)
     ?:  ?=(%| -.rv)  [rv s]
     =/  els  (drain-sexp [%subset p.rv])
     ?:  ?=(%| -.els)  [els s]
@@ -1566,7 +1667,9 @@
 ++  solve-filter
   |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
-  =/  b  (eval-bool n (senv mode cur part e))
+  ::  R2.7.4.1b: a FILTER carries too -- a guard may contain a `TLCSet`, and
+  ::  the pin's write happens whether the guard came back true or false
+  =^  b  s  (eval-bool-rs n (senv mode cur part e) s)
   ?:  ?=(%| -.b)  [b s]
   ?:  p.b  [[%& ~[part]] s]
   ::  R2.7.4.2b: the INIT coverage line's SECOND column is
@@ -1631,7 +1734,7 @@
 ++  solve-ite
   |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
-  =/  b  (eval-bool (snag 0 as) (senv mode cur part e))
+  =^  b  s  (eval-bool-rs (snag 0 as) (senv mode cur part e) s)
   ?:  ?=(%| -.b)  [b s]
   (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e s)
 ::
@@ -1702,10 +1805,14 @@
   ::  satisfying PARTIAL assignment enables A — completeness is not required.
   |=  [n=sem:sm e=eenv]
   ^-  eres
-  ::  R2.7.4.1: ENABLED discards the carrier -- its witness is thrown away and
-  ::  so is anything the witness search wrote. That is not yet a difference:
-  ::  nothing writes to `rst` until R2.7.4.2b, and `+eval` itself does not
-  ::  carry it until R2.7.4.1b, which is where this becomes a real question
+  ::  R2.7.4.1b: ENABLED still DISCARDS the carrier, and now that the
+  ::  evaluator carries it that is a deliberate decision rather than an
+  ::  accident. `Tool.enabled` runs the action's witness search under
+  ::  `EvalControl.Enabled` and throws the witness away; the port does the
+  ::  same, so anything the search wrote is thrown away with it. Nothing
+  ::  writes yet, so it is still behaviour-free -- but R2.7.4.3 must MEASURE
+  ::  the pin before claiming parity here, because tlc2's `TLCSet` writes a
+  ::  static field and would survive a discarded witness where this does not
   =/  r=sres  -:(solve n %next s0.e ~ e(enabled &) empty-rst)
   ?:  ?=(%| -.r)  r
   [%& [%bool ?=(^ p.r)]]
@@ -1895,7 +2002,14 @@
 ::  SIMULATION generator (the worker's `localRng`, which is what
 ::  `TLCGlobals.simulator.getRNG()` hands back on a worker thread, measured --
 ::  NOT the Simulator's own), and the running count of successors GENERATED
-+$  pst  [es=@ ls=@ ngen=@ud]
+::  R2.7.4.1b: the enumeration generator is NOT a second seed channel -- it IS
+::  the carrier's. Measured at the pin: `TLC!RandomElement` draws through
+::  `RandomEnumerableValues.get()` (`SetEnumValue.randomElement` /
+::  `IntervalValue.randomElement`), the very generator `-generate`'s
+::  probabilistic enumeration spends. Keeping two would let a spec that uses
+::  both diverge silently, so `pst` EMBEDS the carrier and `es.rs.p` is the
+::  single enumeration seed
++$  pst  [rs=rst ls=@ ngen=@ud]
 ::  the next-state functor's verdict on one complete successor, i.e. what
 ::  `SimulationWorker.addElement` does after counting: check the invariants (a
 ::  violation throws), then CONSTRAINT / ACTION_CONSTRAINT (a failure drops it)
@@ -1957,7 +2071,7 @@
           acts=(list pitem)  p=pst  fil=$-(state fres)
       ==
   ^-  [pres pst]
-  =/  b  (eval-bool n (senv %next cur part e))
+  =^  b  rs.p  (eval-bool-rs n (senv %next cur part e) rs.p)
   ?:  ?=(%| -.b)  [[%err p.b] p]
   ?.  p.b  [[%none ~] p]
   (pnext cur part acts p fil)
@@ -1979,7 +2093,7 @@
   ^-  [pres pst]
   =/  nn  (lent xs)
   ?:  =(0 nn)  [[%none ~] p]
-  =^  ixs  es.p  (subset-indices:rg es.p nn nn)
+  =^  ixs  es.rs.p  (subset-indices:rg es.rs.p nn nn)
   =/  rr
     |-  ^-  [pres pst]
     ?~  ixs  [[%none ~] p]
@@ -2051,7 +2165,7 @@
     =/  xs=(list value:v)  p.el
     =/  nn  (lent xs)
     ?:  =(0 nn)  [[%none ~] p]
-    =^  ixs  es.p  (subset-indices:rg es.p nn nn)
+    =^  ixs  es.rs.p  (subset-indices:rg es.rs.p nn nn)
     =/  body  (snag 0 args.n)
     |-  ^-  [pres pst]
     ?~  ixs  [[%none ~] p]
@@ -2087,7 +2201,7 @@
   ?:  =(nm '=')
     =/  as  (assignable-sem (snag 0 args.n) %next vars.e part psub.e)
     ?~  as  (pfilter n cur part e acts p fil)
-    =/  rv  (eval (snag 1 args.n) (senv %next cur part e))
+    =^  rv  rs.p  (eval-rs (snag 1 args.n) (senv %next cur part e) rs.p)
     ?:  ?=(%| -.rv)  [[%err p.rv] p]
     (pnext cur (~(put by part) u.as p.rv) acts p fil)
   ?:  =(nm '\\in')
@@ -2101,7 +2215,7 @@
   ?:  =(nm '\\subseteq')
     =/  as  (assignable-sem (snag 0 args.n) %next vars.e part psub.e)
     ?~  as  (pfilter n cur part e acts p fil)
-    =/  rv  (eval (snag 1 args.n) (senv %next cur part e))
+    =^  rv  rs.p  (eval-rs (snag 1 args.n) (senv %next cur part e) rs.p)
     ?:  ?=(%| -.rv)  [[%err p.rv] p]
     =/  el  (drain-sexp [%subset p.rv])
     ?:  ?=(%| -.el)  [[%err p.el] p]
