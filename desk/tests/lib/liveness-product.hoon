@@ -56,6 +56,35 @@
     ==
   !>((live-product:check psrc-boxdiamond-stutter pcfg-boxdiamond-stutter))
 ::
+++  psrc-boximplies-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Step]_x\0aLive == [](x = 1 => [](x # 3))\0a====\0a'
+++  pcfg-boximplies-viol  'SPECIFICATION Spec\0aPROPERTY Live\0aCHECK_DEADLOCK FALSE\0a'
+++  test-product-boximplies-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'PRODUCT'
+        'OOS 1'
+        '--- 0 ---'
+        'NODES 8'
+        'INITS 1'
+        'PNODE 0 2 CS -'
+        'PEDGE 0 2 -> 1 2 CA -'
+        'PNODE 0 5 CS -'
+        'PEDGE 0 5 -> 1 4 CA -'
+        'PEDGE 0 5 -> 1 5 CA -'
+        'PNODE 1 2 CS -'
+        'PNODE 1 4 CS -'
+        'PNODE 1 5 CS -'
+        'PNODE 2 2 CS -'
+        'PEDGE 2 2 -> 3 1 CA -'
+        'PEDGE 2 2 -> 3 2 CA -'
+        'PNODE 3 1 CS -'
+        'PEDGE 3 1 -> 0 5 CA -'
+        'PNODE 3 2 CS -'
+        'PEDGE 3 2 -> 0 2 CA -'
+    ==
+  !>((live-product:check psrc-boximplies-viol pcfg-boximplies-viol))
+::
 ++  psrc-conj-statepred  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = 1 - x /\\ y\' = y\0aLive == <>(x = 1 /\\ y = 0)\0a====\0a'
 ++  pcfg-conj-statepred  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-product-conj-statepred

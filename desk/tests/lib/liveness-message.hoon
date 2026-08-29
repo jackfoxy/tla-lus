@@ -4,11 +4,38 @@
 ::  Stuttering or `Back to state N` closer, and the reachability counts, matching
 ::  tlc2.TLC's console output byte-for-byte (blank lines / timestamp trimmed).
 ::  Covers stuttering, back-to-state, the ~> tableau (leadsto-viol), the LET-leaf
-::  (letin-prop), the multi-step sink (wf-absent-viol), and the first-violated
-::  property name (multi-property -> P1).
+::  (letin-prop), the multi-step sink (wf-absent-viol), the first-violated
+::  property name (multi-property -> P1), and the CLOSER-FREE safety-shaped
+::  property (boximplies-viol, R2.7.5).
 /+  *test
 /=  check  /lib/check
 |%
+::  R2.7.5: the SAFETY-SHAPED temporal property, `[](A => []B)`. tlc2 ends the
+::  counter-example at its last prefix state -- NO `State N: Stuttering`, no
+::  `Back to state` -- because the negated formula `<>(A /\ <>~B)` carries no
+::  `[]`, so no cycle is doing any work and there is nothing to close. Every
+::  other violated case in this shard and in the liveness corpus is a
+::  `<>`/`~>`/`[]<>`/`<>[]`, all of which DO take a closer, which is why the
+::  port emitted one here for eleven units without anything noticing
+++  src-boximplies-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Step]_x\0aLive == [](x = 1 => [](x # 3))\0a====\0a'
+++  cfg-boximplies-viol  'SPECIFICATION Spec\0aPROPERTY Live\0aCHECK_DEADLOCK FALSE\0a'
+++  test-message-boximplies-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~  'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 9 to line 5, col 27 of module A>'
+        'x = 1'
+        'State 3: <Step line 5, col 9 to line 5, col 27 of module A>'
+        'x = 2'
+        'State 4: <Step line 5, col 9 to line 5, col 27 of module A>'
+        'x = 3'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>((live-message-lines:check src-boximplies-viol cfg-boximplies-viol))
 ++  src-diamond-stutter  '---- MODULE A ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aLive == <>(x = 1)\0a====\0a'
 ++  cfg-diamond-stutter  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-message-diamond-stutter
@@ -57,16 +84,23 @@
   %+  expect-eq
     !>(`wain`~['Error: Temporal property P1 was violated.' 'Error: The following behavior constitutes a counter-example:' 'State 1: <Initial predicate>' 'x = 0' 'State 2: Stuttering' '5 states generated, 2 distinct states found, 0 states left on queue.' 'The depth of the complete state graph search is 2.'])
   !>((live-message-lines:check src-multi-property cfg-multi-property))
-::  Symmetry + a temporal property (unit 8.7.2): APPROVED DIFFERENCE. TLC prints
-::  warning 2279 and CONTINUES on the symmetry-reduced graph (out.txt = VERDICT
-::  ok / WARN 2279). The port cannot yet run liveness on this spec class (the
-::  model-value \E action errors "variable unassigned"), so it type-rejects with
-::  the pinned 2279 text. This asserts the diagnostic content, NOT an oracle
-::  match; full warn-and-continue awaits liveness-under-model-values support.
+::  Symmetry + a temporal property: **R2.7.5 makes this WARN AND CONTINUE**,
+::  as tlc2 does. Unit 8.7.2 type-rejected it on an engine blocker -- "the
+::  model-value \E action errors 'variable unassigned'" -- which was
+::  RE-MEASURED and is stale: it predates R1.5.1's solver work and R2.4.6's
+::  `+get-actions` rebuild, the two constructs it names. With the guard
+::  relaxed the port already produced the pin's verdict AND its counts, so
+::  only the warning line was owed. Now an ORACLE MATCH rather than an
+::  asserted diagnostic.
 ++  src-symmetry-live  '---- MODULE A ----\0aEXTENDS TLC\0aVARIABLE x\0aCONSTANT S\0aInit == x \\in S\0aNext == \\E s \\in S : x\' = s\0aPerms == Permutations(S)\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aLive == []<>(\\E s \\in S : x = s)\0a====\0a'
 ++  cfg-symmetry-live  'SPECIFICATION Spec\0aPROPERTY Live\0aSYMMETRY Perms\0aCONSTANT S = {a, b}\0a'
-++  test-message-symmetry-live-rejected
+++  test-message-symmetry-live-warns-and-continues
   %+  expect-eq
-    !>(`wain`~['Error: Declaring symmetry during liveness checking is dangerous. It might cause TLC to miss violations of the stated liveness properties. Please check liveness without symmetry defined.'])
+    !>  ^-  wain
+    :~  'Warning: Declaring symmetry during liveness checking is dangerous. It might cause TLC to miss violations of the stated liveness properties. Please check liveness without symmetry defined.'
+        'Model checking completed. No error has been found.'
+        '4 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
   !>((live-message-lines:check src-symmetry-live cfg-symmetry-live))
 --

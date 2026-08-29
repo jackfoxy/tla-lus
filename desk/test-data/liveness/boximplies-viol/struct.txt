@@ -1,0 +1,44 @@
+LIVESTRUCT
+OOS 1
+--- 0 ---
+PROMISES 2
+CHECKSTATE 0
+CHECKACTION 0
+PEMS 1
+TABLEAU 6
+TBINIT 3
+TBGRAPH
+Node 0.
+{<>/\ (line 7, col 12 to line 7, col 16 of module A)
+   /\ (<>-line 7, col 24 to line 7, col 28 of module A),
+ /\ (line 7, col 12 to line 7, col 16 of module A)
+ /\ (<>-line 7, col 24 to line 7, col 28 of module A),
+ line 7, col 12 to line 7, col 16 of module A,
+ <>-line 7, col 24 to line 7, col 28 of module A,
+ -line 7, col 24 to line 7, col 28 of module A} --> 3 
+Node 1.
+{<>/\ (line 7, col 12 to line 7, col 16 of module A)
+   /\ (<>-line 7, col 24 to line 7, col 28 of module A),
+ /\ (line 7, col 12 to line 7, col 16 of module A)
+ /\ (<>-line 7, col 24 to line 7, col 28 of module A),
+ line 7, col 12 to line 7, col 16 of module A,
+ <>-line 7, col 24 to line 7, col 28 of module A,
+ ()<>-line 7, col 24 to line 7, col 28 of module A} --> 4 5 
+Node 2.
+{<>/\ (line 7, col 12 to line 7, col 16 of module A)
+   /\ (<>-line 7, col 24 to line 7, col 28 of module A),
+ ()<>/\ (line 7, col 12 to line 7, col 16 of module A)
+     /\ (<>-line 7, col 24 to line 7, col 28 of module A)} --> 0 1 2 
+Node 3.
+{} --> 3 
+Node 4.
+{<>-line 7, col 24 to line 7, col 28 of module A,
+ -line 7, col 24 to line 7, col 28 of module A} --> 3 
+Node 5.
+{<>-line 7, col 24 to line 7, col 28 of module A,
+ ()<>-line 7, col 24 to line 7, col 28 of module A} --> 4 5 
+ENDTBGRAPH
+TF
+<>/\ (line 7, col 12 to line 7, col 16 of module A)
+     /\ (<>-line 7, col 24 to line 7, col 28 of module A)
+ENDTF

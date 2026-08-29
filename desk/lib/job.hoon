@@ -1420,18 +1420,27 @@
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
   =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars))
   ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
-  ::  symmetry group (SYMMETRY) with a temporal property: TLC warns (2279) and
-  ::  continues, but the port cannot yet run liveness on the reduced graph, so it
-  ::  type-rejects with the pinned 2279 warning text — keyed on the SYMMETRY
-  ::  declaration, before symmetry-perms/init (which error first) (unit 8.7.2)
-  ?:  &(?=(^ symmetry.rs) ?=(^ pp))
-    =/  msg=@t
-      %^    cat  3
-          'Declaring symmetry during liveness checking is dangerous. '
-        %^  cat  3
-          'It might cause TLC to miss violations of the stated liveness properties. '
-        'Please check liveness without symmetry defined.'
-    (finish j [%failed msg] pre)
+  ::  R2.7.5: SYMMETRY with a temporal PROPERTY WARNS AND CONTINUES (EC 2279),
+  ::  matching tlc2 and the console path. Unit 8.7.2's engine blocker was
+  ::  re-measured and is stale -- see `+search-ctx-seed`'s note. The warning
+  ::  rides `swarn`, the channel R2.3.5's EC 2145 warning already uses
+  ::  FIRST in the list, matching the console path's `(weld symwarn warn)` --
+  ::  tlc2 prints it before the search, ahead of any decomposition warning
+  ::  a `[]P` box-state PROPERTY is folded into the invariants and never
+  ::  reaches the liveness checker, so it draws no warning -- same test the
+  ::  console path uses (`+search-ctx-seed`'s `genuine-temporal`)
+  =/  genuine-temporal
+    ?.  ?=(^ pp)  |
+    =/  psb  (sem-body:check defs u.pp)
+    ?.  ?=(^ psb)  |
+    ?=(~ (box-state-inner:tp u.psb))
+  =?  swarn.j  &(?=(^ symmetry.rs) genuine-temporal)
+    :_  swarn.j
+    %^    cat  3
+        'Warning: Declaring symmetry during liveness checking is dangerous. '
+      %^  cat  3
+        'It might cause TLC to miss violations of the stated liveness properties. '
+      'Please check liveness without symmetry defined.'
   =/  pr  (symmetry-perms:check defs consts vars symmetry.rs)
   ?:  ?=(%| -.pr)  (finish j [%failed p.pr] pre)
   =/  perms  p.pr
@@ -1733,7 +1742,7 @@
     %-  wain-text
     %:  render-outcome:check
       out  nl  ~  env  ~  ''  al  vr  |
-      (cov-report:check o cur acts)
+      (cov-report:check o cur acts)  ~
     ==
   =/  tr=(unit trace)
     ?+  -.out  ~
@@ -1791,7 +1800,7 @@
       ::  is empty by construction; `aname` is carried anyway so the two call
       ::  sites cannot drift (R1.8.3)
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
-          generated.st  distinct.st  depth.st  ~  aname.kk
+          generated.st  distinct.st  depth.st  ~  aname.kk  |
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1829,6 +1838,8 @@
         generated.st  distinct.st  depth.st
         (stutter-gate:check ~[o] sname.kk sloc.kk fair.kk modn.kk)
         aname.kk
+        ::  R2.7.5: same OOS, same test as the console path
+        (box-free-tf:check ~[o])
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))

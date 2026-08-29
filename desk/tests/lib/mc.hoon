@@ -400,6 +400,79 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x < 3\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
+++  test-mc-live-after-deadlock
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 3'
+        'Error: Temporal property NeverThree was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 3'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Step]_x\0aNeverThree == [](x = 1 => [](x # 3))\0aTautology == (x = x) ~> (x = x)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY NeverThree\0aPROPERTY Tautology\0a'
+::
+++  test-mc-live-after-deadlock-lasso
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 12 to line 5, col 26 of module spec>'
+        'x = 1'
+        'State 3: <Step line 6, col 12 to line 6, col 26 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == \\/ x = 0 /\\ x\' = 1\0a        \\/ x = 1 /\\ x\' = 2\0aSpec == Init /\\ [][Step]_x\0aLive == <>(x = 9)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+::
+++  test-mc-live-after-deadlock-queued
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 6, col 12 to line 6, col 26 of module spec>'
+        'x = 5'
+        '4 states generated, 4 distinct states found, 1 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == \\/ x = 0 /\\ x\' = 1\0a        \\/ x = 0 /\\ x\' = 5\0a        \\/ x = 1 /\\ x\' = 2\0a        \\/ x = 2 /\\ x\' = 3\0aSpec == Init /\\ [][Step]_x\0aNoTwo == [](x = 1 => [](x # 2))\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY NoTwo\0a'
+::
 ++  test-mc-live-box
   %+  expect-eq
     !>  ^-  wain

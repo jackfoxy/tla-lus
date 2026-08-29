@@ -51,11 +51,16 @@
     !>  [%.y `@ud`1]
   !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
 ::
-::  symmetry combined with a temporal property is a typed rejection (WU8 owns
-::  liveness under symmetry), never a plausible %ok
-++  test-symmetry-property-rejected
+::  R2.7.5: symmetry alongside a PROPERTY no longer rejects. `Prop == []Inv` is
+::  a BOX-STATE property, folded into the invariant vector by
+::  `processConfigProps`, so it never reaches the liveness checker and tlc2
+::  prints no 2279 warning for it either -- measured: no warning, `ok`, 1
+::  distinct, the same orbit reduction the invariant-only case gets
+++  test-symmetry-box-property-runs
   =/  r  ^-(result:check -:(run-check:check spec-prop cfg-prop 0))
-  (expect-eq !>(%.y) !>(?=([%failed *] r)))
+  %+  expect-eq
+    !>  [%.y `@ud`1]
+  !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
 ::
 ::  a UNION of Permutations over two disjoint model-value sets (R1.5.6). The
 ::  four states (x,y) with x in {a,b}, y in {c,d} collapse to ONE orbit under

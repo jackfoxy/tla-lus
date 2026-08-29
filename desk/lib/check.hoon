@@ -2314,7 +2314,9 @@
   =/  cr  (parse-cfg:config cfg)
   ?:  ?=(%| -.cr)  [%| 'config error']
   =/  ca  p.cr
-  =/  pp  ?~(properties.ca ~ `i.properties.ca)
+  ::  R2.7.5 annotated the mold: a bare `?~(.. ~ `x)` infers a union with no
+  ::  `u` face, so `u.pp` was `-find.u.pp` until the `(unit @t)` named it
+  =/  pp=(unit @t)  ?~(properties.ca ~ `i.properties.ca)
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
@@ -2327,17 +2329,39 @@
   =/  fair  fair.p.rt
   =/  consts  (const-map cfg)
   =/  nb  ?~(nname.p.rt ~ (body-of-def tree u.nname.p.rt))
-  ::  symmetry with a temporal property: TLC warns (2279) and continues on the
-  ::  symmetry-reduced graph. The port cannot yet run liveness on that spec class
-  ::  (model-value \E init/actions error "variable unassigned"), so we type-reject
-  ::  with the pinned 2279 warning text — a tested approved-difference (unit 8.7.2;
-  ::  full warn-and-continue awaits liveness-under-model-values engine support).
-  ::  Keyed on the SYMMETRY declaration (as TLC's warning is) and placed before
-  ::  symmetry-perms/init-states, which error first on such a spec.
-  ?:  &(?=(^ symmetry.ca) ?=(^ pp))
-    :-  %|
+  ::  R2.7.5: SYMMETRY with a temporal PROPERTY now WARNS AND CONTINUES, as
+  ::  tlc2 does (EC 2279), instead of type-rejecting.
+  ::
+  ::  Unit 8.7.2 refused it and recorded an engine blocker — "the port cannot
+  ::  yet run liveness on that spec class (model-value \E init/actions error
+  ::  'variable unassigned')". **Re-measured here, that blocker is STALE.** It
+  ::  predates R1.5.1's solver work and R2.4.6's `+get-actions` rebuild, which
+  ::  are exactly the two constructs it names (`x \in S` as a nondeterministic
+  ::  assignment, a constant-level `\E` in action position). With the guard
+  ::  relaxed the port runs the `symmetry-live` fixture to `Model checking
+  ::  completed. No error has been found.` over 4 generated / 1 distinct /
+  ::  depth 1 — the pin's verdict and the pin's counts exactly. Only the
+  ::  warning LINE was missing.
+  ::
+  ::  Keyed on the SYMMETRY declaration, as tlc2's warning is: `Permutations(S)`
+  ::  over model values yields no perms, so the declaration is what it can see.
+  ::
+  ::  It is NOT keyed on `pp` alone. A `[]P` box-state PROPERTY is folded into
+  ::  the INVARIANT vector by `processConfigProps` and never reaches the
+  ::  liveness checker, so tlc2 prints no warning for it -- measured on
+  ::  `Prop == []Inv` under `SYMMETRY Perms`: no warning, `ok`, 1 distinct. The
+  ::  guard therefore asks for a GENUINE temporal property, the same test
+  ::  `+check` uses to route between the safety and liveness engines
+  =/  genuine-temporal
+    ?.  ?=(^ pp)  |
+    =/  psb  (sem-body defs u.pp)
+    ?.  ?=(^ psb)  |
+    ?=(~ (box-state-inner:tp u.psb))
+  =/  symwarn=(list @t)
+    ?.  &(?=(^ symmetry.ca) genuine-temporal)  ~
+    :_  ~
     %^    cat  3
-        'Declaring symmetry during liveness checking is dangerous. '
+        'Warning: Declaring symmetry during liveness checking is dangerous. '
       %^  cat  3
         'It might cause TLC to miss violations of the stated liveness properties. '
       'Please check liveness without symmetry defined.'
@@ -2408,7 +2432,9 @@
       ::  `-view` is a REQUEST option; `check:check` takes none, so the console
       ::  path never sets it. The kernel supplies it via `+check-opts` (R2.4.3)
       `(unit sem:sem-lib)`~
-      warn.p.rt
+      ::  R2.7.5: the 2279 warning rides the same `swarn` channel R2.3.5's
+      ::  EC 2145 subscript warning uses -- printed BEFORE the verdict
+      (weld symwarn warn.p.rt)
       ?~(init.ca '' u.init.ca)
       irej.+.irc
       +.irc
@@ -2817,6 +2843,7 @@
   :*  l.hit  states  nsb  env  order  modn  defs  pname  gen  distinct  depth
       (stutter-gate o.hit sname sloc fair modn)
       aname
+      (box-free-tf o.hit)
   ==
 ::
 ++  live-render
@@ -2831,6 +2858,11 @@
           gen=@ud  distinct=@ud  depth=@ud
           gate=wain                     ::  EC 2257/2259 hint (R1.8.1.3)
           aname=@t                      ::  root action name (`sctx`'s)
+          ::  R2.7.5: suppress the CLOSER entirely. tlc2 ends the
+          ::  counter-example at its last prefix state -- no `State N:
+          ::  Stuttering`, no `Back to state` -- whenever the violated
+          ::  property's TABLEAU FORMULA carries no `[]`; see `+box-free-tf`
+          noclose=?
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
@@ -2839,24 +2871,10 @@
   =/  actions  (get-actions nsb aname defs env)
   =/  np       (lent prefix.u.l)
   =/  stut     =(%stuttering class.u.l)
-  ::  the numbered prefix states: state 1 is the initial predicate, each later
-  ::  state is labeled with the action that generated it (no fingerprint line)
+  ::  the numbered prefix states (factored out by R2.7.5: the post-error
+  ::  second block renders the same prefix with no closer and no counts)
   =/  body=wain
-    =/  i  1
-    =/  prev=(unit @t)  ~
-    =/  ps  prefix.u.l
-    |-  ^-  wain
-    ?~  ps  ~
-    =/  st  (~(got by states) i.ps)
-    =/  label=@t
-      ?~  prev  '<Initial predicate>'
-      (edge-action-label (~(got by states) u.prev) i.ps actions env order modn)
-    %+  weld
-      ;:  weld
-        ~[(crip "State {(a-tape i)}: {(trip label)}")]
-        (render-state order st ~ *eenv:ne ~)
-      ==
-    $(ps t.ps, i +(i), prev `i.ps)
+    (live-prefix-lines prefix.u.l states actions env order modn)
   ::  the closer: a stuttering self-loop is a new numbered `State`, a
   ::  back-to-state cycle is `Back to state <loop>: <action reaching it>`
   =/  closer=wain
@@ -2871,12 +2889,127 @@
     ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
     ~['Error: The following behavior constitutes a counter-example:']
     body
-    closer
+    ?:(noclose ~ closer)
     ::  the 2257/2259 hint sits between the stuttering marker and the counts,
-    ::  and only after a STUTTERING closer (R1.8.1.3)
-    ?:(stut gate ~)
+    ::  and only after a STUTTERING closer (R1.8.1.3) -- so a suppressed closer
+    ::  suppresses the hint with it: there is no stuttering to explain
+    ?:(|(noclose !stut) ~ gate)
     footer
   ==
+::
+++  live-prefix-lines
+  ::  the numbered prefix states of a lasso: state 1 is the initial predicate,
+  ::  each later state labeled with the action that generated it (no
+  ::  fingerprint line). Shared by `+live-render` and `+post-error-live`
+  |=  $:  prefix=(list @t)  states=(map @t state:ne)  actions=(list act)
+          env=eenv:ne  order=(list @t)  modn=@t
+      ==
+  ^-  wain
+  =/  i  1
+  =/  prev=(unit @t)  ~
+  =/  ps  prefix
+  |-  ^-  wain
+  ?~  ps  ~
+  =/  st  (~(got by states) i.ps)
+  =/  label=@t
+    ?~  prev  '<Initial predicate>'
+    (edge-action-label (~(got by states) u.prev) i.ps actions env order modn)
+  %+  weld
+    ;:  weld
+      ~[(crip "State {(a-tape i)}: {(trip label)}")]
+      (render-state order st ~ *eenv:ne ~)
+    ==
+  $(ps t.ps, i +(i), prev `i.ps)
+::
+++  post-error-live
+  ::  R2.7.5: THE SECOND REPORT BLOCK. A safety error (deadlock, invariant)
+  ::  ends the state search, and R1.6.6 had it pre-empt the liveness report
+  ::  entirely. MEASURED at the pin, that is too strong -- tlc2 prints the
+  ::  safety trace and then, in its own block before the statistics,
+  ::  `Error: Temporal property <P> was violated.` with a counter-example.
+  ::
+  ::  Two conditions, both measured, and BOTH needed:
+  ::
+  ::  1. the state QUEUE IS EMPTY at the error. `Github710d` (deadlock, 0
+  ::     queued) and an invariant violation with 0 queued both print the block;
+  ::     the same specs with one state left on the queue do NOT. Stable from
+  ::     4 states to 20.001.
+  ::  2. the violated property's tableau formula is BOX-FREE -- `+box-free-tf`,
+  ::     the same predicate that decides whether the counter-example carries a
+  ::     closer. Equivalently: tlc2 appends this block exactly for the
+  ::     counter-examples it would render WITHOUT a closer, which is why the
+  ::     block has none.
+  ::
+  ::  The row this unit came from says "after a deadlock". Measured, it is not
+  ::  deadlock-specific: an INVARIANT violation gets the block too, which also
+  ::  corrects R2.3.4's note at the temporal console path ("an INVARIANT
+  ::  alongside a temporal PROPERTY prints ... NO temporal verdict") -- true
+  ::  for the `<>` property that unit measured, not in general.
+  |=  $:  out=outcome  oss=(list oos:tp)  states=(map @t state:ne)
+          inits=(list @t)  nsb=sem:sem-lib  env=eenv:ne
+          order=(list @t)  modn=@t  defs=(map @t sem-def:sem-lib)
+          pname=@t  aname=@t
+      ==
+  ^-  wain
+  ?.  ?=(?(%inv %deadlock) -.out)  ~
+  ?.  =(0 queued.out)  ~
+  ::  the box-free test is PER OrderOfSolution, on the one that produced the
+  ::  lasso -- not over the whole list. `Github710d` declares `NeverThree` AND
+  ::  `Tautology`, and only the first is box-free
+  =/  hit
+    =/  os  oss
+    |-  ^-  [l=(unit lasso:lv) o=(list oos:tp)]
+    ?~  os  [~ ~]
+    =/  r  (oos-lasso:lv i.os states inits nsb env order)
+    ?^(r [r ~[i.os]] $(os t.os))
+  ?~  l.hit  ~
+  ?.  (box-free-tf o.hit)  ~
+  ;:  weld
+    ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
+    ~['Error: The following behavior constitutes a counter-example:']
+    %-  live-prefix-lines
+    :*  prefix.u.l.hit  states  (get-actions nsb aname defs env)
+        env  order  modn
+    ==
+  ==
+::
+++  box-free-tf
+  ::  R2.7.5: does the OrderOfSolution being reported have a BOX-FREE tableau
+  ::  formula? That is the measured discriminator for whether tlc2 prints a
+  ::  closer on the counter-example at all.
+  ::
+  ::  The counterexample for a violated property is a behavior satisfying the
+  ::  NEGATED property, which is the `tf`. When that formula carries no `[]`,
+  ::  the witness is pure reachability -- a finite path, with no obligation
+  ::  left to discharge in the limit -- so there is no cycle doing any work and
+  ::  tlc2 ends the trace at its last prefix state. When it does carry one, the
+  ::  suffix matters and tlc2 closes with `Stuttering` or `Back to state`.
+  ::
+  ::  Measured on one 4-state spec, every property violated, `LivenessStruct`
+  ::  beside `tlc2.TLC`:
+  ::
+  ::    property                    tf                    box?  closer?
+  ::    [](x=1 => [](x#3))          <>(A /\ <>~B)         no    NO
+  ::    <>(x=9)                     []~P                  yes   yes
+  ::    (x=1) ~> (x=9)              <>(A /\ []~B)         yes   yes
+  ::    []<>(x=9)                   <>[]~P                yes   yes
+  ::    <>[](x=9)                   []<>~P                yes   yes
+  ::    [](x=1 => <>(x=9))          <>(A /\ []~B)         yes   yes
+  ::
+  ::  NB this is `has-box:tp` on the TABLEAU FORMULA, not on the PROMISES.
+  ::  `+stutter-gate` asks it of the promises (tlc2's
+  ::  `containsBoxInPromise`), and that does NOT separate these: `<>(x = 9)`
+  ::  has ZERO promises, so a promise-keyed test says nothing about it. An
+  ::  earlier attempt at R2.7.5 used the promise test and mis-classified every
+  ::  `<>` property -- recorded so it is not tried a third time.
+  ::
+  ::  A pure-fairness OrderOfSolution has no `tf` at all; it keeps the closer,
+  ::  which is the behaviour every existing corpus case already pins
+  |=  os=(list oos:tp)
+  ^-  ?
+  ?~  os  |
+  ?~  tf.i.os  |
+  !(has-box:tp u.tf.i.os)
 ::
 ++  stutter-gate
   ::  the hint tlc2 appends AFTER a STUTTERING counterexample (EC 2257 / 2259,
@@ -2958,7 +3091,10 @@
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
     ==
-  report.r
+  ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
+  ::  path (`+check-in`), so the differential wrapper carries it too -- else
+  ::  the EC 2279 warn-and-continue would be invisible to this shard
+  (weld swarn.c report.r)
 ::
 ::
 ::  +|  DFID — Depth-First Iterative Deepening (R2.5)
@@ -3973,7 +4109,7 @@
       =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
-      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c | ~)
+      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c | ~ ~)
     ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
     ::  includes the fairness conjuncts `decompose-spec` extracted from the
     ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
@@ -4022,10 +4158,20 @@
     ::  pass. Measured at the pin -- `INVARIANT Tight` + `PROPERTY Live` prints
     ::  the safety trace and counts, and NO temporal verdict (R2.3.4)
     ?:  ?=(?(%inv %deadlock %error) -.out.bg)
+      ::  R2.7.5: the safety verdict still comes first, but it no longer ENDS
+      ::  the report -- `+post-error-live` appends tlc2's second block when the
+      ::  queue was empty at the error and the property is box-free. `~`
+      ::  otherwise, which is R1.6.6's behaviour unchanged
+      =/  post=wain
+        %-  post-error-live
+        :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
+            (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
+            u.pp.c  aname.c
+        ==
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
-          ~
+          ~  post
       ==
     =/  r
       %-  live-report
@@ -4151,9 +4297,9 @@
   ?:  ?&  ?=(%inv -.out.bg)
           ?|(?=(~ viol) (lte (lent trace.out.bg) (lent u.viol)))
       ==
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~)
   ?~  viol
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~)
   ;:  weld
     ~[(crip "Error: Action property {(trip pname)} is violated.")]
     ~['Error: The behavior up to this point is:']
@@ -4214,7 +4360,7 @@
   =/  r  (explore-full-regs is.c irs.c o)
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
-      (cov-report o cur.r actions)
+      (cov-report o cur.r actions)  ~
   ==
 ::
 ++  render-outcome
@@ -4236,6 +4382,11 @@
           ::  PRINTS A COUNTEREXAMPLE gets `+cov-refusal` in its place, because
           ::  the pin's counters there include its trace re-solve
           cov=wain
+          ::  R2.7.5: the SECOND report block. After a safety error that ends
+          ::  the search with an EMPTY queue, tlc2 still reports a violated
+          ::  temporal property -- its own block, between the safety trace and
+          ::  the statistics. `~` when there is none; see `+post-error-live`
+          post=wain
       ==
   ^-  wain
   ?-    -.res
@@ -4308,6 +4459,7 @@
       ~[(crip "Error: Invariant {(trip name.res)} is violated.")]
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl actions e order modn al vw dif)
+      post
       ?~(cov ~ cov-refusal)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
@@ -4317,6 +4469,7 @@
       ~['Error: Deadlock reached.']
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl actions e order modn al vw dif)
+      post
       ?~(cov ~ cov-refusal)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==

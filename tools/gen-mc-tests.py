@@ -31,6 +31,26 @@ DROP = re.compile(
     r"^Implied-temporal|^Checking temporal|Finished checking temporal")
 
 
+#  Cases whose GOLDEN is captured and frozen but whose arm is not emitted,
+#  each naming what has to change to turn it green --- the idiom
+#  `gen-core-eval-tests.py` uses for its `SKIPS`. A frozen golden gives the
+#  next increment a target; leaving the case out of the corpus entirely would
+#  lose the measurement.
+SKIPS = {
+    "live-after-inv": (
+        "R2.7.5: the post-error temporal block is CORRECT here (right "
+        "property, right shape, appended in the right place) but its "
+        "counter-example runs one state too long --- the pin stops at State 3, "
+        "where `[](x = 0 => [](x # 2))`'s promise is fulfilled, and the port "
+        "continues to State 4 because the graph has that state. That is LASSO "
+        "MINIMALITY in `+oos-lasso` (`tlc-live-lasso`, currently `parity`), "
+        "not the post-error rule: `live-after-deadlock` passes because there "
+        "the witness ends at the last state anyway, and no existing liveness "
+        "case has a graph that extends PAST its witness. Frozen so the fix "
+        "has a target."),
+}
+
+
 def opts_of(case: Path) -> list:
     """Extra `tlc2.TLC` arguments for one case, one per line in opts.txt.
 
@@ -99,6 +119,11 @@ def main() -> None:
             continue
         out = tlc(case)
         (case / "out.txt").write_text(out)
+        #  the golden is captured either way; only the ARM is withheld, and
+        #  the reason is printed so the residue cannot go quiet
+        if case.name in SKIPS:
+            print(f"  SKIP {case.name}: {SKIPS[case.name]}")
+            continue
         glines = out.rstrip("\n").split("\n")
         gitems = "\n".join(f"        '{hcord(l)}'" for l in glines)
         spec = hcord((case / "spec.tla").read_text())

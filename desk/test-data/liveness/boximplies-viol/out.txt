@@ -1,0 +1,24 @@
+LIVENESS
+VERDICT violated-property
+EC 2116
+STAT generated 4
+STAT distinct 4
+STAT queue 0
+STAT depth 4
+TRACE 4
+STATE 1 0xd0ba3e880dcdd983
+LABEL <Initial predicate>
+x = 0
+ENDSTATE
+STATE 2 0xf67893cfa654c4b3
+LABEL <Step line 5, col 9 to line 5, col 27 of module A>
+x = 1
+ENDSTATE
+STATE 3 0x9d3f64075affe3e3
+LABEL <Step line 5, col 9 to line 5, col 27 of module A>
+x = 2
+ENDSTATE
+STATE 4 0xbbfdc940f166fed3
+LABEL <Step line 5, col 9 to line 5, col 27 of module A>
+x = 3
+ENDSTATE

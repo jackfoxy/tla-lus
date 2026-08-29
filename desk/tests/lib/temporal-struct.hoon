@@ -61,6 +61,59 @@
     ==
   !>((live-struct-full:check src-boxdiamond-stutter cfg-boxdiamond-stutter))
 ::
+++  src-boximplies-viol  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Step]_x\0aLive == [](x = 1 => [](x # 3))\0a====\0a'
+++  cfg-boximplies-viol  'SPECIFICATION Spec\0aPROPERTY Live\0aCHECK_DEADLOCK FALSE\0a'
+++  test-struct-boximplies-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'LIVESTRUCT'
+        'OOS 1'
+        '--- 0 ---'
+        'PROMISES 2'
+        'CHECKSTATE 0'
+        'CHECKACTION 0'
+        'PEMS 1'
+        'TABLEAU 6'
+        'TBINIT 3'
+        'TBGRAPH'
+        'Node 0.'
+        '{<>/\\ (line 7, col 12 to line 7, col 16 of module A)'
+        '   /\\ (<>-line 7, col 24 to line 7, col 28 of module A),'
+        ' /\\ (line 7, col 12 to line 7, col 16 of module A)'
+        ' /\\ (<>-line 7, col 24 to line 7, col 28 of module A),'
+        ' line 7, col 12 to line 7, col 16 of module A,'
+        ' <>-line 7, col 24 to line 7, col 28 of module A,'
+        ' -line 7, col 24 to line 7, col 28 of module A} --> 3 '
+        'Node 1.'
+        '{<>/\\ (line 7, col 12 to line 7, col 16 of module A)'
+        '   /\\ (<>-line 7, col 24 to line 7, col 28 of module A),'
+        ' /\\ (line 7, col 12 to line 7, col 16 of module A)'
+        ' /\\ (<>-line 7, col 24 to line 7, col 28 of module A),'
+        ' line 7, col 12 to line 7, col 16 of module A,'
+        ' <>-line 7, col 24 to line 7, col 28 of module A,'
+        ' ()<>-line 7, col 24 to line 7, col 28 of module A} --> 4 5 '
+        'Node 2.'
+        '{<>/\\ (line 7, col 12 to line 7, col 16 of module A)'
+        '   /\\ (<>-line 7, col 24 to line 7, col 28 of module A),'
+        ' ()<>/\\ (line 7, col 12 to line 7, col 16 of module A)'
+        '     /\\ (<>-line 7, col 24 to line 7, col 28 of module A)} --> 0 1 2 '
+        'Node 3.'
+        '{} --> 3 '
+        'Node 4.'
+        '{<>-line 7, col 24 to line 7, col 28 of module A,'
+        ' -line 7, col 24 to line 7, col 28 of module A} --> 3 '
+        'Node 5.'
+        '{<>-line 7, col 24 to line 7, col 28 of module A,'
+        ' ()<>-line 7, col 24 to line 7, col 28 of module A} --> 4 5 '
+        'ENDTBGRAPH'
+        'TF'
+        '<>/\\ (line 7, col 12 to line 7, col 16 of module A)'
+        '     /\\ (<>-line 7, col 24 to line 7, col 28 of module A)'
+        'ENDTF'
+    ==
+  !>((live-struct-full:check src-boximplies-viol cfg-boximplies-viol))
+::
 ++  src-conj-statepred  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = 1 - x /\\ y\' = y\0aLive == <>(x = 1 /\\ y = 0)\0a====\0a'
 ++  cfg-conj-statepred  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
 ++  test-struct-conj-statepred
