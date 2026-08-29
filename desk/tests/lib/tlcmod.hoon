@@ -26,6 +26,28 @@
   ?:  ?=(%| -.r)  (weld "ERR: " (trip msg.p.r))
   (render:v p.r)
 ::
+++  rnd
+  ::  the same driver over a module that also EXTENDS Randomization (R2.7.4.5).
+  ::  A CONSTANT-context evaluation starts from an unseeded (0) carrier, so
+  ::  the draws here are deterministic but their VALUES are not what these arms
+  ::  assert -- the seeded `tests/lib/mc` cases own that. What is asserted here
+  ::  is seed-INDEPENDENT: the argument errors, and the two edges whose result
+  ::  does not depend on which elements come up
+  |=  [body=@t want=tape]
+  ^-  tang
+  =/  src=@t
+    %-  crip
+    ;:  weld
+      "---- MODULE A ----\0a"
+      "EXTENDS Integers, Sequences, FiniteSets, TLC, Randomization\0a"
+      "Expr == "  (trip body)  "\0a===="
+    ==
+  =/  r  (eval-module-def:ne 'A' (malt ~[['A' src]]) 'Expr')
+  %+  expect-eq  !>(want)
+  !>  ^-  tape
+  ?:  ?=(%| -.r)  (weld "ERR: " (trip msg.p.r))
+  (render:v p.r)
+::
 ++  tlc
   ::  an expression in a module that EXTENDS TLC, with helper operators for
   ::  the operator-argument cases and a model-value constant set
@@ -252,6 +274,60 @@
   ::  the pin's wording there would assert something no build can produce
   %+  tlc  'RandomElement(3)'
   "ERR: Applying RandomElement to the following value,\0awhich is not a finite set:\0a3"
+::
+::  +|  Randomization (R2.7.4.5)
+::
+++  test-random-subset-edges
+  ::  `k` is not a bound the pin checks: the result is a SET, and over the
+  ::  ACCEPTED indices the SubsetEnumerator's LCG has period |S|, so asking
+  ::  for more than the set holds simply yields all of it. Measured at the pin
+  ;:  weld
+    (rnd 'RandomSubset(0, 1..5)' "\{}")
+    (rnd 'RandomSubset(7, 1..5)' "\{1, 2, 3, 4, 5}")
+    (rnd 'Cardinality(RandomSubset(3, 1..10))' "3")
+  ==
+::
+++  test-random-subset-arg-errors
+  ;:  weld
+    %+  rnd  'RandomSubset("a", 1..5)'
+    "ERR: The first argument of RandomSubset should be a nonnegative integer, but instead it is:\0a\"a\""
+    ::  the pin's own doubled article: `Randomization.java` passes "a finite
+    ::  set" into a template that already supplies "a". Measured, not inferred
+    %+  rnd  'RandomSubset(2, 7)'
+    "ERR: The second argument of RandomSubset should be a a finite set, but instead it is:\0a7"
+  ==
+::
+++  test-random-set-of-subsets-arg-errors
+  ;:  weld
+    %+  rnd  'RandomSetOfSubsets("a", 2, 1..4)'
+    "ERR: The first argument of RandomSetOfSubsets should be a nonnegative integer, but instead it is:\0a\"a\""
+    %+  rnd  'RandomSetOfSubsets(4, "b", 1..4)'
+    "ERR: The second argument of RandomSetOfSubsets should be a nonnegative integer, but instead it is:\0a\"b\""
+    ::  the THIRD argument passes "finite set" and so reads correctly -- the
+    ::  doubled article is `RandomSubset`'s alone
+    %+  rnd  'RandomSetOfSubsets(4, 2, 9)'
+    "ERR: The third argument of RandomSetOfSubsets should be a finite set, but instead it is:\0a9"
+    %+  rnd  'RandomSetOfSubsets(4, 9, 1..4)'
+    "ERR: The second argument of RandomSetOfSubsets should be a nonnegative integer in range 0..Cardinality(S), but instead it is:\0a9"
+    ::  the `numberOfPicks` bound is checked BEFORE `n` is compared to the
+    ::  cardinality, so this one reports the FIRST argument
+    %+  rnd  'RandomSetOfSubsets(100, 9, 1..4)'
+    "ERR: The first argument of RandomSetOfSubsets should be a nonnegative integer that is smaller than the subset's size of 2^4, but instead it is:\0a100"
+  ==
+::
+++  test-test-random-set-of-subsets-shape
+  ::  five cardinalities, one per RandomSetOfSubsets call. The VALUES are
+  ::  pinned by the seeded `rsos-test-init` mc case (`<<3, 3, 4, 3, 3>>` at
+  ::  `-seed 12345`); what this arm holds is that there are five of them and
+  ::  none exceeds `k` -- which a body-evaluating implementation would also
+  ::  satisfy, so it is a shape check and says so
+  ;:  weld
+    (rnd 'Len(TestRandomSetOfSubsets(4, 2, 1..4))' "5")
+    ::  `1..5`, not `{1, 2, 3, 4, 5}` -- the function's domain stays an
+    ::  IntervalValue and the pin renders it that way. Measured, after this
+    ::  arm first asserted the enumerated form and the port disagreed
+    (rnd 'DOMAIN TestRandomSetOfSubsets(4, 2, 1..4)' "1..5")
+  ==
 ::
 ::  +|  Bindings
 ::

@@ -1080,6 +1080,10 @@
   ?:  ?=(%tlc-get-and-set tag)     (eval-tlc-get-and-set n e rs)
   ::  R2.7.4.4: the DRAW. It spends `es.rs`, so it carries for the same reason
   ?:  ?=(%random-element tag)      (eval-random-element n e rs)
+  ::  R2.7.4.5: the `Randomization` module -- all three DRAW
+  ?:  ?=(%random-subset tag)         (eval-random-subset n e rs)
+  ?:  ?=(%random-set-of-subsets tag)  (eval-random-set-of-subsets n e rs)
+  ?:  ?=(%test-rsos tag)             (eval-test-rsos n e rs)
   ?:  ?=(%assert-error tag)   (eval-assert-error n e rs)
   ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e rs)
   ?:  ?=(%tlc-defer tag)      [(eval-tlc-defer n e) rs]
@@ -1333,6 +1337,174 @@
   =/  els=(list value:v)  p.el
   =^  ix  es.rs  (floor-scaled:rg es.rs (lent els))
   [[%& (snag ix els)] rs]
+::
+++  finite-set-arg
+  ::  a `Randomization` set argument: evaluated as a lazy DOMAIN (so an
+  ::  infinite descriptor is NAMED rather than enumerated, the treatment
+  ::  `Cardinality` and `RandomElement` already get) and then forced to its
+  ::  normalized element list. The pin's guard is
+  ::  `!(v instanceof EnumerableValue) || !isFinite()`, so a non-set and an
+  ::  infinite set take the SAME branch and get the same message -- which is
+  ::  why one arm answers both. A `%|` carries either a genuine evaluation
+  ::  failure to propagate or the offending value ALREADY RENDERED
+  |=  [n=sem:sm e=eenv]
+  ^-  (each (list value:v) (each @t eval-err:v))
+  =/  sd  (eval-domain n e)
+  ?:  ?=(%| -.sd)  [%| (arg-rendered n e)]
+  ?:  (infinite:v p.sd)  [%| %& (crip (sexp-name:v p.sd))]
+  =/  fr  (force:v p.sd setmax.e)
+  ?:  ?=(%| -.fr)  [%| (arg-rendered n e)]
+  ?.  (set-like:v p.fr)  [%| %& (crip (render:v p.fr))]
+  [%& (set-elems:v (normalize:v p.fr))]
+::
+++  arg-rendered
+  ::  the argument as tlc2's `Values.ppr` renders it, for the "but instead it
+  ::  is:" tail -- or the evaluation failure, if it has one to report
+  |=  [n=sem:sm e=eenv]
+  ^-  (each @t eval-err:v)
+  =/  vv  (eval n e)
+  ?:  ?=(%| -.vv)  [%| p.vv]
+  [%& (crip (render:v p.vv))]
+::
+++  int-arg
+  ::  a `Randomization` count argument. The pin checks `instanceof IntValue`
+  ::  and then `< 0`, and BOTH report the same "nonnegative integer" message
+  ::  -- though a negative literal never reaches it, because `-1` fails SANY
+  ::  before TLC runs (measured: "Parsing or semantic analysis failed")
+  |=  [n=sem:sm e=eenv rs=rst]
+  ^-  [(each @ud (each @t eval-err:v)) rst]
+  =^  r  rs  (eval-rs n e rs)
+  ?:  ?=(%| -.r)  [[%| %| p.r] rs]
+  ?.  ?=(%int -.p.r)  [[%| %& (crip (render:v p.r))] rs]
+  ?:  (slth:v p.p.r --0)  [[%| %& (crip (render:v p.r))] rs]
+  [[%& (abs:si p.p.r)] rs]
+::
+++  bad-arg
+  ::  turn a `+int-arg` / `+finite-set-arg` rejection into the answer: a
+  ::  propagated evaluation failure, or the pin's EC 2169 naming the value
+  |=  [r=(each @t eval-err:v) i=@ud op=@t what=@t]
+  ^-  eres
+  ?:  ?=(%| -.r)  [%| p.r]
+  [%| (rsub-arg-error:so i op what p.r)]
+::
+++  eval-random-subset
+  ::  Randomization!RandomSubset(k, S) -- `EnumerableValue.getRandomSubset(k)`,
+  ::  which is `elements(k)` collected into a `SetEnumValue`. The enumeration
+  ::  is tlc2's `SubsetEnumerator`: an LCG over the NORMALIZED element list,
+  ::  seeded with `nextInt(n)` and incremented by a `nextPrime` draw, both from
+  ::  the carrier's enumeration generator. `+subset-indices:rg` is that walk and
+  ::  has been in `lib/rng` since unit 9; R2.7.4.5 is its first LIVE caller.
+  ::
+  ::  The result is a SET, so `k > |S|` is not an error -- over the accepted
+  ::  indices the LCG's period is |S|, so it simply yields every element
+  ::  (measured: `RandomSubset(7, 1..5)` is `{1, 2, 3, 4, 5}`) -- and `k = 0`
+  ::  is the empty set
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * ~] args.n)  [[%| 0 'RandomSubset expects two arguments.'] rs]
+  =^  kr  rs  (int-arg i.args.n e rs)
+  ?:  ?=(%| -.kr)
+    [(bad-arg p.kr 1 'RandomSubset' 'nonnegative integer') rs]
+  =/  sr  (finite-set-arg i.t.args.n e)
+  ?:  ?=(%| -.sr)
+    ::  the pin passes "a finite set" into a template that already supplies
+    ::  the article, so it prints "should be a a finite set". Measured
+    [(bad-arg p.sr 2 'RandomSubset' 'a finite set') rs]
+  =/  els=(list value:v)  p.sr
+  =^  ixs  es.rs  (subset-indices:rg es.rs p.kr (lent els))
+  [[%& [%set %set-enum (norm-set:v (turn ixs |=(i=@ud (snag i els))))]] rs]
+::
+++  eval-random-set-of-subsets
+  ::  Randomization!RandomSetOfSubsets(k, n, S) --
+  ::  `new SubsetValue(S).getRandomSetOfSubsets(k, n / |S|)`, which is the
+  ::  `CoinTossingSubsetEnumerator`: k picks, and each pick walks the whole
+  ::  normalized element list tossing `nextDouble() < probability` per element.
+  ::  The picks land in a SET, so duplicates collapse and the answer usually
+  ::  has FEWER than k elements (measured at the pin:
+  ::  `RandomSetOfSubsets(4, 2, 1..4)` at `-seed 12345` is
+  ::  `{{1, 4}, {2, 3}, {1, 2, 3}}` -- four picks, three distinct).
+  ::
+  ::  NB this is the `(int, double)` overload of `getRandomSetOfSubsets`. The
+  ::  `(int, int)` one -- the only path in tlc2 that touches
+  ::  `util.Combinatorics` -- has no caller at all; see the R2.7.4.5 notes
+  |=  [nd=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * * ~] args.nd)
+    [[%| 0 'RandomSetOfSubsets expects three arguments.'] rs]
+  =^  kr  rs  (int-arg i.args.nd e rs)
+  ?:  ?=(%| -.kr)
+    [(bad-arg p.kr 1 'RandomSetOfSubsets' 'nonnegative integer') rs]
+  =^  nr  rs  (int-arg i.t.args.nd e rs)
+  ?:  ?=(%| -.nr)
+    [(bad-arg p.nr 2 'RandomSetOfSubsets' 'nonnegative integer') rs]
+  =/  sr  (finite-set-arg i.t.t.args.nd e)
+  ?:  ?=(%| -.sr)
+    [(bad-arg p.sr 3 'RandomSetOfSubsets' 'finite set') rs]
+  =/  els=(list value:v)  p.sr
+  =/  size  (lent els)
+  ::  the pin's own order: the `numberOfPicks` bound is checked BEFORE `n` is
+  ::  compared to the cardinality, so `RandomSetOfSubsets(100, 9, 1..4)`
+  ::  reports the FIRST argument, not the second. `31 - numberOfLeadingZeros(k)
+  ::  + 1` is the bit length of k, which is `+xeb`
+  ?:  ?&((gth (xeb p.kr) size) (gth p.kr (bex size)))
+    [[%| (rsos-too-many-error:so p.kr size)] rs]
+  ?:  (gth p.nr size)
+    :_  rs
+    :-  %|
+    %^  rsub-arg-error:so  2  'RandomSetOfSubsets'
+    ['nonnegative integer in range 0..Cardinality(S)' (crip (render-int:v (sun:si p.nr)))]
+  =^  picks  rs  (coin-toss-picks els p.kr p.nr size rs)
+  [[%& [%set %set-enum (norm-set:v picks)]] rs]
+::
+++  coin-toss-picks
+  ::  `CoinTossingSubsetEnumerator`: `k` picks, each one a full pass over the
+  ::  element list spending exactly one `nextDouble` PER ELEMENT -- including
+  ::  the elements it does NOT take, which is what makes the stream position
+  ::  after a pick independent of the pick's contents
+  |=  [els=(list value:v) k=@ud n=@ud size=@ud rs=rst]
+  ^-  [(list value:v) rst]
+  ?:  =(0 size)  [~ rs]
+  =/  prob  (div:rd (sun:rd n) (sun:rd size))
+  =|  out=(list value:v)
+  =/  i  0
+  |-  ^-  [(list value:v) rst]
+  ?:  =(i k)  [(flop out) rs]
+  =^  pick  rs
+    =/  rest  els
+    =|  acc=(list value:v)
+    |-  ^-  [value:v rst]
+    ?~  rest  [[%set %set-enum (norm-set:v (flop acc))] rs]
+    =^  d  es.rs  (next-double:rg es.rs)
+    ?:  (lth:rd d prob)  $(rest t.rest, acc [i.rest acc])
+    $(rest t.rest)
+  $(i +(i), out [pick out])
+::
+++  eval-test-rsos
+  ::  Randomization!TestRandomSetOfSubsets(k, n, S) --
+  ::  `[i \in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`.
+  ::
+  ::  The pin has NO Java override for this one, so tlc2 runs that body. This
+  ::  port cannot: the five draws sit inside a FUNCTION CONSTRUCTOR and under
+  ::  `Cardinality`, and both are below the R2.7.4.1b carrier boundary -- the
+  ::  constructor's binder does not thread `rst`, and `+eval-cardinality` takes
+  ::  its argument as a lazy domain and discards it. Running the body would
+  ::  make ONE draw sequence and report its cardinality five times. So the arm
+  ::  is NATIVE, exactly as `TLCGetAndSet` is in R2.7.4.3 and for the same
+  ::  reason: a silently dropped draw is the one outcome R2's acceptance
+  ::  forbids. Measured at the pin, `TestRandomSetOfSubsets(4, 2, 1..4)` at
+  ::  `-seed 12345` is `<<3, 3, 4, 3, 3>>` -- five DIFFERENT draw sequences
+  |=  [nd=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * * ~] args.nd)
+    [[%| 0 'TestRandomSetOfSubsets expects three arguments.'] rs]
+  =|  out=(list value:v)
+  =/  i  0
+  |-  ^-  eout
+  ?:  =(i 5)  [[%& [%seq (flop out)]] rs]
+  =^  r  rs  (eval-random-set-of-subsets nd e rs)
+  ?:  ?=(%| -.r)  [r rs]
+  =/  c  (sun:si (lent (set-elems:v p.r)))
+  $(i +(i), out [[%int c] out])
 ::
 ++  random-element-wrong
   ::  the argument is not a FINITE set: name its VALUE the way tlc2 does, not

@@ -101,6 +101,9 @@ CLASSIFY = {
     ("TLC", "Any"):          ("excluded", "universal UserValue; no canonical representation"),
     ("Bags", "SubBag"):      ("body", "not overridden by Java; evaluates its TLA+ definition"),
     ("Bags", "Sum"):         ("body", "LOCAL helper of Bags.tla"),
+    ("Randomization", "RandomSubset"): ("required", "R2.7.4.5: `EnumerableValue.getRandomSubset(k)` -- the SubsetEnumerator LCG over the normalized element list, seeded `nextInt(n)` and incremented by a `nextPrime` draw, both from the carrier's enumeration generator. k > |S| is not an error; it yields the whole set"),
+    ("Randomization", "RandomSetOfSubsets"): ("required", "R2.7.4.5: `SubsetValue.getRandomSetOfSubsets(k, n/|S|)`, the CoinTossingSubsetEnumerator -- k picks, one IEEE-754 `nextDouble() < probability` per element per pick, collected into a set so duplicates collapse. This is the (int, double) overload; the (int, int) one is the only path to util.Combinatorics and has no caller"),
+    ("Randomization", "TestRandomSetOfSubsets"): ("required", "R2.7.4.5: no Java method at the pin -- Randomization.tla defines it as `[i \\in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`, whose five draws sit inside a function constructor and under Cardinality, both below the R2.7.4.1b carrier boundary. Evaluating that body would make ONE draw sequence and report it five times, so the port implements it natively -- the same decision TLCGetAndSet got in R2.7.4.3"),
     ("Sequences", "Seq"):    ("required", "non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)"),
     # TLCExt's non-debugger operators (R2.6.3). The module-level default calls
     # every TLCExt surface `excluded`; these five are not, and `class` has to

@@ -367,6 +367,18 @@
   ::  the unevaluated node, which is the whole point of each: `AssertError` has
   ::  to CATCH the argument's evaluation failure, `TLCCache` decides whether to
   ::  evaluate at all, and `TLCDefer` deliberately does not evaluate
+  ::  R2.7.4.5: the `Randomization` module. All three DRAW, so all three ride
+  ::  the carrier. `RandomSubset` and `RandomSetOfSubsets` are Java overrides
+  ::  at the pin; `TestRandomSetOfSubsets` is NOT -- it is a TLA+ body,
+  ::  `[i \in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`, whose five
+  ::  draws sit inside a FUNCTION CONSTRUCTOR and under `Cardinality`, both
+  ::  below the R2.7.4.1b carrier boundary. Evaluating that body would run one
+  ::  draw sequence and report it five times, so it is implemented NATIVELY --
+  ::  the same call the pin's own `RandomSetOfSubsets` makes, five times, on
+  ::  the carrier. Identical reasoning to `TLCGetAndSet` in R2.7.4.3
+  ?:  =(k ['Randomization' 'RandomSubset' 2])            `[%random-subset | 0]
+  ?:  =(k ['Randomization' 'RandomSetOfSubsets' 3])      `[%random-set-of-subsets | 0]
+  ?:  =(k ['Randomization' 'TestRandomSetOfSubsets' 3])  `[%test-rsos | 0]
   ?:  =(k ['TLCExt' 'AssertError' 2])      `[%assert-error & 0]
   ?:  =(k ['TLCExt' 'TLCCache' 2])         `[%tlc-cache & 0]
   ?:  =(k ['TLCExt' 'TLCDefer' 1])         `[%tlc-defer & 0]
@@ -1033,6 +1045,37 @@
   |=  got=value:v
   ^-  eval-err:v
   (wrong-value-error 'RandomElement' 'a finite set' got)
+::
+++  rsub-arg-error
+  ::  `Randomization`'s argument errors are all EC 2169
+  ::  `TLC_MODULE_ARGUMENT_ERROR` on the ordinary template, but the offending
+  ::  value arrives ALREADY RENDERED: an infinite descriptor has no `value:v`
+  ::  to hold, and the pin prints its name bare (`Nat`, not `"Nat"`).
+  ::
+  ::  Two of the pin's `what` strings are reproduced VERBATIM including a
+  ::  quirk: `RandomSubset`'s second argument passes "a finite set" into a
+  ::  template that already supplies the article, so the pin prints "should be
+  ::  a a finite set" -- measured, not inferred. `RandomSetOfSubsets`'s third
+  ::  passes "finite set" and reads correctly. Reproducing the doubled article
+  ::  is the difference between matching the pin and improving on it
+  |=  [i=@ud op=@t what=@t got=@t]
+  ^-  eval-err:v
+  :-  2.169
+  %^  rap  3  'The '
+  :~  (ordinal i)  ' argument of '  op  ' should be a '
+      what  ', but instead it is:\0a'  got
+  ==
+::
+++  rsos-too-many-error
+  ::  the pin's `numberOfPicks` bound: "nonnegative integer that is smaller
+  ::  than the subset's size of 2^<|S|>", and note the value it prints is the
+  ::  INTEGER `numberOfPicks`, not `Values.ppr` of the argument node
+  |=  [k=@ud size=@ud]
+  ^-  eval-err:v
+  =/  what=@t
+    %^  rap  3  'nonnegative integer that is smaller than the subset\'s size of 2^'
+    ~[(crip (render-int:v (sun:si size)))]
+  (rsub-arg-error 1 'RandomSetOfSubsets' what (crip (render-int:v (sun:si k))))
 ::
 ++  tlc-get-or-default
   ::  TLCExt!TLCGetOrDefault(i, d) — the same read as `TLCGet(i)` but an unset

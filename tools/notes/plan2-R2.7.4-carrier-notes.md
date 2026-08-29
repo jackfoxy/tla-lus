@@ -390,6 +390,109 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
+## R2.7.4.5 — the `Randomization` module — DONE 2026-08-29
+
+Three surfaces move `deferred` → `required`: `RandomSubset`,
+`RandomSetOfSubsets`, `TestRandomSetOfSubsets`. All three DRAW, so all three
+ride the R2.7.4.1 carrier the way `RandomElement` does. **`deferred` is now
+zero across all 131 operator rows** — body 3 · excluded 71 · required 57.
+
+### The plan's Combinatorics premise is WRONG, and that is the unit's headline
+
+The row said "`util.Combinatorics` re-enters scope exactly here
+(`RandomSetOfSubsets` is its only live consumer): port the `choose`/Pascal/
+unranking table or record the tested difference." It does not, and there is
+nothing to port.
+
+`SubsetValue` has **two** methods named `getRandomSetOfSubsets`:
+
+| overload | what it does | callers |
+|---|---|---|
+| `(int numOfSubsetsRequested, int maxLengthOfSubsets)` | `bigSumChoose`, `pascalTableUpTo`, `choosePairToInt`, the `Unrank` walk — every `Combinatorics` touch in the tree | **none** |
+| `(int numOfPicks, double probability)` | `CoinTossingSubsetEnumerator` — k picks, one `nextDouble() < p` per element per pick | both call sites in `tlc2/module/Randomization.java` |
+
+`Randomization.java` computes `probability = (1d * n) / ev.size()` and calls
+the **double** one. `Combinatorics` is imported by exactly one file
+(`SubsetValue.java`), and every arm there that uses it — `getUnrank`, the
+`(int, int)` overload, `numberOfKElements`, `kElements`, `kSubset` — is
+called only from inside that same file or from Java unit tests. **No TLA+
+operator reaches any of it.**
+
+So R1.8.0's original exclusion was right; R2.6.2 re-opened the row on a
+stated reason that does not hold (it named `getRandomSetOfSubsets` without
+distinguishing the overloads); and R2.7.4.5 closes it as `excluded` **on
+evidence** rather than on a scope argument. Nothing was ported and nothing is
+owed. This is the seventh time in R2 that measuring a row's premise moved the
+row.
+
+### What the operators actually are
+
+- **`RandomSubset(k, S)`** is `EnumerableValue.getRandomSubset(k)` =
+  `elements(k)` collected into a set: tlc2's `SubsetEnumerator`, an LCG over
+  the NORMALIZED element list seeded with `nextInt(n)` and incremented by a
+  `nextPrime` draw. **`+subset-indices:rg` already was that walk** — ported in
+  unit 9 for `Ordering.RANDOMIZED`, never reached by anything evaluated. This
+  unit is its first LIVE caller, and it was byte-exact on the first try:
+  `{1, 6, 9}` at `-seed 12345`, `{2, 9, 10}` at `987654321`, both matching the
+  pin. The unit-9 port of the LCG, the `computeOptimalMandA` search and the
+  1.341-prime table were all correct and merely untested end to end.
+  `k` is NOT a bound: over the accepted indices the LCG's period is `|S|`, so
+  `RandomSubset(7, 1..5)` is the whole set, and `k = 0` is `{}`.
+- **`RandomSetOfSubsets(k, n, S)`** is the coin-tossing enumerator with
+  `probability = n / |S|` as an IEEE-754 double. Each pick walks the WHOLE
+  element list spending one `nextDouble` per element — including elements it
+  does not take, which is what makes the stream position after a pick
+  independent of the pick's contents. Picks land in a set, so duplicates
+  collapse: measured, `RandomSetOfSubsets(4, 2, 1..4)` at `-seed 12345` is
+  `{{1, 4}, {2, 3}, {1, 2, 3}}` — four picks, three distinct. The comparison
+  goes through `@rd` (`lth:rd`, `div:rd`); an integer ratio rounds differently
+  and picks different elements.
+- **`TestRandomSetOfSubsets(k, n, S)`** has NO Java method. Its TLA+ body is
+  `[i \in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`, and **both**
+  wrappers are below the R2.7.4.1b carrier boundary: the function
+  constructor's binder does not thread `rst`, and `+eval-cardinality` takes
+  its argument as a lazy domain and discards it. Evaluating that body would
+  make ONE draw sequence and report its cardinality five times. So the arm is
+  NATIVE — the identical decision `TLCGetAndSet` got in R2.7.4.3, for the
+  identical reason. Measured at the pin, `TestRandomSetOfSubsets(4, 2, 1..4)`
+  at `-seed 12345` is `<<3, 3, 4, 3, 3>>`; the port reproduces it exactly.
+
+### The pin's doubled article, reproduced
+
+`Randomization.java` passes `"a finite set"` as the `what` of
+`TLC_MODULE_ARGUMENT_ERROR`, whose template already supplies the article. So
+the pin prints, verbatim:
+
+```
+The second argument of RandomSubset should be a a finite set, but instead it is:
+```
+
+`RandomSetOfSubsets`'s third argument passes `"finite set"` and reads
+correctly. Both are measured and both are reproduced; correcting the typo
+would be improving on the pin, which is not what byte-parity means.
+
+Also measured and reproduced: the pin checks the `numberOfPicks` bound BEFORE
+comparing `n` to the cardinality, so `RandomSetOfSubsets(100, 9, 1..4)`
+reports the FIRST argument (`nonnegative integer that is smaller than the
+subset's size of 2^4`), not the second. And a negative literal never reaches
+either check — `-1` fails SANY first ("Parsing or semantic analysis failed").
+
+### Evidence
+
+Seven mc cases, all seeded, all counting something the draws BUILD:
+
+| case | seed | result |
+|---|---|---|
+| `rsub-graph` / `rsub-graph-alt` | 12345 / 987654321 | 3/3 depth 3 vs 4/3 depth 3 — same spec, the SEED changes the graph |
+| `rsub-two-draws` | 12345 | 4/4 depth 4 — the walk only continues while the two draws DIFFER, so a non-advancing stream gives 2/2 |
+| `rsub-init` | 12345 | `x = {1, 6, 9}` |
+| `rsub-init-two` | 12345 | `x = {1, 3}`, `y = {3, 5}` — two draws in the INIT phase, different |
+| `rsos-init` | 987654321 | `x = {{2}, {1, 3}, {1, 2, 3}, {1, 3, 4}}` |
+| `rsos-test-init` | 12345 | `x = <<3, 3, 4, 3, 3>>` |
+| `rsos-graph` | 12345 | 2/2 depth 2 |
+
+plus `tests/lib/tlcmod` for the six argument errors and the two `k` edges.
+
 ## R2.7.4.4 — `TLC!RandomElement` — DONE 2026-08-30
 
 The RNG now rides the carrier and ADVANCES across draws. `RandomElement` moves

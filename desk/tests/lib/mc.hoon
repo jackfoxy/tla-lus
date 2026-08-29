@@ -525,6 +525,123 @@
     'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
   987.654.321
 ::
+++  test-mc-rsos-graph
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '2 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLE x\0aInit == x = {{1, 2, 3}}\0aNext == /\\ {} \\notin x\0a        /\\ x\' = RandomSetOfSubsets(3, 1, 1..3)\0aInv == Cardinality(x) <= 3\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rsos-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = {{2}, {1, 3}, {1, 2, 3}, {1, 3, 4}}'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLE x\0aInit == x = RandomSetOfSubsets(4, 2, 1..4)\0aNext == UNCHANGED x\0aInv == Cardinality(x) < 4\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  987.654.321
+::
+++  test-mc-rsos-test-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = <<3, 3, 4, 3, 3>>'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Sequences, Randomization\0aVARIABLE x\0aInit == x = TestRandomSetOfSubsets(4, 2, 1..4)\0aNext == UNCHANGED x\0aInv == Len(x) = 0\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rsub-graph
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLE x\0aInit == x = {}\0aNext == /\\ 1 \\notin x\0a        /\\ x\' = RandomSubset(2, 1..5)\0aInv == Cardinality(x) <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rsub-graph-alt
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLE x\0aInit == x = {}\0aNext == /\\ 1 \\notin x\0a        /\\ x\' = RandomSubset(2, 1..5)\0aInv == Cardinality(x) <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  987.654.321
+::
+++  test-mc-rsub-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = {1, 6, 9}'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLE x\0aInit == x = RandomSubset(3, 1..10)\0aNext == UNCHANGED x\0aInv == Cardinality(x) < 3\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rsub-init-two
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        '/\\ x = {1, 3}'
+        '/\\ y = {3, 5}'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLES x, y\0aInit == x = RandomSubset(2, 1..9) /\\ y = RandomSubset(2, 1..9)\0aNext == UNCHANGED <<x, y>>\0aInv == x = y\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rsub-two-draws
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets, Randomization\0aVARIABLES x, y\0aInit == x = {} /\\ y = {}\0aNext == /\\ \\/ x = {}\0a           \\/ x # y\0a        /\\ x\' = RandomSubset(1, 1..3)\0a        /\\ y\' = RandomSubset(1, 1..3)\0aInv == Cardinality(x) <= 1\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
 ++  test-mc-spec-inst-flat
   %+  expect-eq
     !>  ^-  wain
