@@ -135,7 +135,14 @@
 +$  pcal-opts  [=fairness termination=? gen-cfg=?]
 +$  analyze-flags  [syntax=? semantic=? level=? lint=?]
 +$  check-mode
-  $%  [%exhaustive deadlock=?]
+  $%  ::  `seed` is tlc2's `-seed` (R2.7.4.4), and it is NOT simulation-only:
+      ::  `RandomEnumerableValues.setSeed(seed)` runs for BFS too, and it is
+      ::  the only thing that makes a spec using `TLC!RandomElement`
+      ::  reproducible -- without `-seed` tlc2 draws one from
+      ::  `new Random().nextLong()` and does not even print it in the BFS
+      ::  banner. The per-predecessor reseed is `fingerPrint ^ seed`, so a
+      ::  reproducing run is pinned to the default FP64 index too (R2.6.2)
+      [%exhaustive deadlock=? seed=@ud]
       ::  `generate` is tlc2's `-generate` (R2.4.6): the same seeded run with
       ::  PROBABILISTIC successor picking (`Tool.probabilistic`). It is a field
       ::  on this variant rather than a variant of its own because tlc2 spells

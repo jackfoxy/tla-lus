@@ -96,7 +96,7 @@ CLASSIFY = {
     ("TLC", "TLCGet"):       ("required", "C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an unreachable engine-state key is a typed rejection naming it. R2.7.4.3: an INTEGER key now reads the register store, so only an UNSET index is EC 2145"),
     ("TLC", "TLCSet"):       ("required", "R2.7.4.3 implements the run-scoped register store on the R2.7.4.1 carrier; measured at the pin it accumulates across state expansions and is visible to a later conjunct of the same evaluation"),
     ("TLC", "TLCEval"):      ("required", "the pin's one plain Evaluation override; C1.6 implements the lazy argument contract with it"),
-    ("TLC", "RandomElement"): ("deferred", "TLC RandomGenerator parity is unit 9"),
+    ("TLC", "RandomElement"): ("required", "R2.7.4.4: one uniform draw, `floor(nextDouble() * size)` over the normalized element list, advancing the enumeration RNG on the R2.7.4.1 carrier. The generator is reseeded `fingerPrint ^ seed` once per PREDECESSOR state, so two draws in one evaluation come from one advancing stream and can differ"),
     ("TLC", "JavaTime"):     ("excluded", "wall-clock nondeterminism"),
     ("TLC", "Any"):          ("excluded", "universal UserValue; no canonical representation"),
     ("Bags", "SubBag"):      ("body", "not overridden by Java; evaluates its TLA+ definition"),
@@ -155,7 +155,7 @@ R2_MODULE_DEFAULT = {
     "Randomization": "R2.7.4",
 }
 R2_CLASSIFY = {
-    ("TLC", "RandomElement"): "R2.7.4",
+    ("TLC", "RandomElement"): "R2.7.4",  # discharged by R2.7.4.4
     ("TLC", "JavaTime"):      "out:wall-clock nondeterminism",
     ("TLC", "Any"):           "out:universal UserValue; no canonical representation",
     # --- TLCExt, per operator. The module-level `excluded` default called all

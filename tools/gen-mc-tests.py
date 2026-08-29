@@ -31,9 +31,24 @@ DROP = re.compile(
     r"^Implied-temporal|^Checking temporal|Finished checking temporal")
 
 
+def opts_of(case: Path) -> list:
+    """Extra `tlc2.TLC` arguments for one case, one per line in opts.txt.
+
+    R2.7.4.4 needs this: `TLC!RandomElement` draws from an RNG seeded with
+    `-seed`, so a case that uses it is only reproducible when the seed is
+    pinned, and the per-predecessor reseeding is `state.fingerPrint() ^ seed`
+    which pins `-fp 0` too. The same shape `gen-safety-tests.py` already has.
+    """
+    f = case / "opts.txt"
+    if not f.exists():
+        return []
+    return [l for l in f.read_text().split("\n") if l.strip()]
+
+
 def tlc(case: Path) -> str:
     shutil.copy(case / "spec-cfg.txt", case / "spec.cfg")
-    r = subprocess.run(["java", "-cp", str(JAR), "tlc2.TLC", "spec.tla"],
+    r = subprocess.run(["java", "-cp", str(JAR), "tlc2.TLC"]
+                       + opts_of(case) + ["spec.tla"],
                        cwd=case, capture_output=True, text=True, timeout=120)
     (case / "spec.cfg").unlink(missing_ok=True)
     # TLC leaves trace-exploration + fingerprint artifacts (.tla/.bin/.fp,
@@ -46,6 +61,16 @@ def tlc(case: Path) -> str:
     lines = [l.rstrip() for l in (r.stdout + r.stderr).split("\n")
              if l.strip() and not DROP.search(l)]
     return "\n".join(lines) + "\n"
+
+
+def hnum(n):
+    """A decimal integer as a Hoon literal (dot-separated in threes)."""
+    d = str(int(n))
+    out = ""
+    while len(d) > 3:
+        out = "." + d[-3:] + out
+        d = d[:-3]
+    return d + out
 
 
 def hcord(s: str) -> str:
@@ -78,6 +103,21 @@ def main() -> None:
         gitems = "\n".join(f"        '{hcord(l)}'" for l in glines)
         spec = hcord((case / "spec.tla").read_text())
         cfg = hcord((case / "spec-cfg.txt").read_text())
+        # A case that pins `-seed` drives the seeded entry point: a spec using
+        # `TLC!RandomElement` is only reproducible with the seed supplied, and
+        # the per-predecessor reseed is `fingerPrint ^ seed` (R2.7.4.4).
+        opts = opts_of(case)
+        seed = opts[opts.index("-seed") + 1] if "-seed" in opts else None
+        # Hoon groups digits in threes from the right: 987654321 is
+        # `987.654.321`, and a bare run of digits is a syntax error
+        if seed is not None:
+            seed = hnum(seed)
+        call = (f"""  %^  check-seed:check
+    '{spec}'
+    '{cfg}'
+  {seed}""" if seed else f"""  %+  check:check
+    '{spec}'
+  '{cfg}'""")
         arms.append(f"""::
 ++  test-mc-{case.name}
   %+  expect-eq
@@ -87,9 +127,7 @@ def main() -> None:
     ==
   !>
   %-  trim
-  %+  check:check
-    '{spec}'
-  '{cfg}'
+{call}
 """)
     OUT.write_text(HEADER + "".join(arms) + "--\n")
     print(f"{len(arms)} mc cases")

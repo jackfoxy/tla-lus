@@ -223,9 +223,35 @@
   (tlc 'Any' "ERR: unsupported StandardModule operator: TLC!Any/0")
 ::
 ++  test-random-element
-  ::  unit 9 owns TLC's RNG
-  %+  tlc  'RandomElement({1, 2})'
-  "ERR: unsupported StandardModule operator: TLC!RandomElement/1"
+  ::  R2.7.4.4: `RandomElement` draws through the enumeration generator on the
+  ::  R2.7.4.1 carrier. A CONSTANT-context evaluation like this one starts from
+  ::  an unseeded (0) carrier, so the draw is deterministic here; what the draw
+  ::  DEPENDS on -- the per-predecessor reseed `fingerPrint ^ seed`, and the
+  ::  fact that two draws in one evaluation come from one advancing stream --
+  ::  is pinned by the `tests/lib/mc` cases `rnd-one-draw` / `rnd-two-draws`
+  ::  / `rnd-two-draws-alt`, whose STATE COUNTS differ by seed
+  (tlc 'RandomElement({1, 2}) \\in {1, 2}' "TRUE")
+::
+++  test-random-element-advances
+  ::  two draws in ONE evaluation come from one ADVANCING stream, so they are
+  ::  independent draws rather than the same value twice -- a fresh-per-eval
+  ::  generator makes `a` and `b` equal. Measured at the pin from the other
+  ::  side: `x' = RandomElement(0..2) /\\ y' = RandomElement(0..2)` produced 2
+  ::  and 1 under `-seed 12345`. Over a 1.000-element domain a coincidence is
+  ::  not what a passing run means, but the STATE COUNTS in the `rnd-two-draws`
+  ::  mc cases are the load-bearing evidence; this arm localizes the failure
+  (tlc 'LET a == RandomElement(0..999) b == RandomElement(0..999) IN a # b' "TRUE")
+::
+++  test-random-element-not-a-set
+  ::  the pin's TLC_MODULE_APPLYING_TO_WRONG_VALUE (EC 2176), naming "a finite
+  ::  set" -- what `toSetEnum` returning null gets, the same arm `Permutations`
+  ::  uses. Measured at the pin on a NON-SET argument rather than on an
+  ::  infinite one: `Nat` and `Seq(S)` in an argument position are both this
+  ::  port's own approved differences (there is no UserValue kind, so the
+  ::  argument is rejected before `RandomElement` ever runs), and asserting
+  ::  the pin's wording there would assert something no build can produce
+  %+  tlc  'RandomElement(3)'
+  "ERR: Applying RandomElement to the following value,\0awhich is not a finite set:\0a3"
 ::
 ::  +|  Bindings
 ::
@@ -244,7 +270,7 @@
     (expect-eq !>(%override) !>((binding-in:ne 'A' src 'TLCGet' 1)))
     ::  C1.6 implements the Evaluation contract with TLCEval
     (expect-eq !>(%override) !>((binding-in:ne 'A' src 'TLCEval' 1)))
-    ::  unit 9 owns TLC's RNG
-    (expect-eq !>(%none) !>((binding-in:ne 'A' src 'RandomElement' 1)))
+    ::  R2.7.4.4 implements the draw; it is a node-op, so it binds
+    (expect-eq !>(%override) !>((binding-in:ne 'A' src 'RandomElement' 1)))
   ==
 --

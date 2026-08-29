@@ -253,6 +253,13 @@
       ::  everything the coverage block needs that the search does not
       ::  otherwise carry (R2.7.4.2b)
       cov=cov-opts
+      ::  tlc2's `-seed` (R2.7.4.4). `RandomEnumerableValues.setSeed(seed)` is
+      ::  called for BFS as well as simulation, and it is the ONLY thing that
+      ::  makes a `RandomElement` run reproducible: without it tlc2 draws a
+      ::  seed from `new Random().nextLong()` and does not even print it in the
+      ::  BFS banner. The per-predecessor reseed is `fingerPrint ^ seed`, so a
+      ::  reproducing run is pinned to `-fp 0` as well (R2.6.2)
+      seed=@ud
   ==
 ::
 +$  cov-opts
@@ -351,17 +358,25 @@
       ::  -- which is why these are tallied where the loop runs
       cvc=(map @ud [pri=@ud sec=@ud])
       cva=(map @ud [pri=@ud sec=@ud])
-      ::  R2.7.4.3: the RUN-SCOPED register store `TLC!TLCSet` writes and
-      ::  `TLCGet(int)` reads back. It lives on the CURSOR, not inside an
-      ::  evaluation, because the pin's store is a worker field that outlives
-      ::  every expansion: measured, `TLCSet(0, TLCGet(0) + 1)` in a
-      ::  next-state relation counts 100, 101, 102, 103 across successive
-      ::  states, and a write made while solving the INITIAL states is still
-      ::  there when `Next` first runs. It is NOT part of the checked state --
-      ::  it never enters a fingerprint and two states differing only in the
-      ::  register are the same state -- so it rides the cursor beside the
-      ::  statistics rather than beside `seen`
-      regs=(map @ud value)
+      ::  R2.7.4.3/.4: the R2.7.4.1 CARRIER, run-scoped, on the cursor rather
+      ::  than inside an evaluation -- because the pin's state is a worker
+      ::  field that outlives every expansion.
+      ::
+      ::  `regs` is `TLC!TLCSet`'s register store: measured,
+      ::  `TLCSet(0, TLCGet(0) + 1)` counts 100, 101, 102, 103 across
+      ::  successive states, and a write made while solving the INITIAL states
+      ::  is still there when `Next` first runs.
+      ::
+      ::  `es` is `RandomEnumerableValues`'s generator. It is NOT run-scoped
+      ::  the way `regs` is: `TLCStateRandom.initialize` reseeds it to
+      ::  `state.fingerPrint() ^ randomSeed` ONCE PER PREDECESSOR STATE and
+      ::  then leaves it alone, so every draw made while expanding that state
+      ::  -- across all its actions and all conjuncts -- comes from one
+      ::  advancing stream. `+bfs-step` reseeds it when it dequeues a state.
+      ::
+      ::  Neither is part of the checked state: neither enters a fingerprint,
+      ::  and two states differing only in them are the same state
+      rs=rst:ne
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -374,27 +389,18 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ ~]
-::
-++  rs-of
-  ::  the R2.7.4.1 carrier loaded from the cursor's run-scoped store. The
-  ::  other two `rst` fields are per-evaluation: `es` belongs to the
-  ::  simulation cursor (`pst`), and `irej` is the INIT rejection count the
-  ::  initial-state solve already reported, so neither is threaded here
-  |=  cur=bfs-cursor
-  ^-  rst:ne
-  =/  r=rst:ne  empty-rst:ne
-  r(regs regs.cur)
+  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne]
 ::
 ++  bfs-init-regs
-  ::  a fresh cursor that INHERITS the register store the initial-state solve
-  ::  already wrote (R2.7.4.3). `Init == x = 0 /\ TLCSet(0, 100)` must leave
-  ::  100 visible to the first `Next`, and the solve happens once at %config,
-  ::  before any cursor exists
-  |=  [is=(list state) regs=(map @ud value)]
+  ::  a fresh cursor that INHERITS the carrier the initial-state solve already
+  ::  built (R2.7.4.3/.4): `Init == x = 0 /\ TLCSet(0, 100)` must leave 100
+  ::  visible to the first `Next`, and the solve happens once at %config,
+  ::  before any cursor exists. The init phase's advanced `es` comes along for
+  ::  the same reason, though `+bfs-step` reseeds it per predecessor state
+  |=  [is=(list state) rs=rst:ne]
   ^-  bfs-cursor
   =/  c  (bfs-init is)
-  c(regs regs)
+  c(rs rs)
 ::
 ++  con-hold
   ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
@@ -445,36 +451,36 @@
   ::  contain a `TLCSet`, and at the pin that write lands in the same store
   ::  the next-state relation reads
   |=  [cs=(list sem:sem-lib) st=state e=eenv:ne rs=rst:ne]
-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  ^-  [(each [ok=? n=@ud] @t) rst:ne]
   =/  n=@ud  0
-  |-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
-  ?~  cs  [[%& & n] regs.rs]
+  |-  ^-  [(each [ok=? n=@ud] @t) rst:ne]
+  ?~  cs  [[%& & n] rs]
   =^  r  rs  (pred-bool-rs:ne i.cs st ~ e rs)
-  ?:  ?=(%| -.r)  [[%| msg.p.r] regs.rs]
-  ?.  p.r  [[%& | +(n)] regs.rs]
+  ?:  ?=(%| -.r)  [[%| msg.p.r] rs]
+  ?.  p.r  [[%& | +(n)] rs]
   $(cs t.cs, n +(n))
 ::
 ++  acon-hold-rs
   ::  `+acon-hold-n` carrying the register store
   |=  [cs=(list sem:sem-lib) cur=state nxt=state e=eenv:ne rs=rst:ne]
-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  ^-  [(each [ok=? n=@ud] @t) rst:ne]
   =/  n=@ud  0
-  |-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
-  ?~  cs  [[%& & n] regs.rs]
+  |-  ^-  [(each [ok=? n=@ud] @t) rst:ne]
+  ?~  cs  [[%& & n] rs]
   =^  r  rs  (pred-bool-rs:ne i.cs cur nxt e rs)
-  ?:  ?=(%| -.r)  [[%| msg.p.r] regs.rs]
-  ?.  p.r  [[%& | +(n)] regs.rs]
+  ?:  ?=(%| -.r)  [[%| msg.p.r] rs]
+  ?.  p.r  [[%& | +(n)] rs]
   $(cs t.cs, n +(n))
 ::
 ++  first-violated-rs
   ::  `+first-violated` carrying the register store: an INVARIANT may write it
   ::  too, and `Tool.isValid` evaluates under the ordinary evaluator
   |=  [ivs=(list [name=@t body=sem:sem-lib]) st=state e=eenv:ne rs=rst:ne]
-  ^-  [(unit (each @t @t)) (map @ud value)]
-  ?~  ivs  [~ regs.rs]
+  ^-  [(unit (each @t @t)) rst:ne]
+  ?~  ivs  [~ rs]
   =^  r  rs  (pred-bool-rs:ne body.i.ivs st ~ e rs)
-  ?:  ?=(%| -.r)  [`[%| msg.p.r] regs.rs]
-  ?.  p.r  [`[%& name.i.ivs] regs.rs]
+  ?:  ?=(%| -.r)  [`[%| msg.p.r] rs]
+  ?.  p.r  [`[%& name.i.ivs] rs]
   $(ivs t.ivs)
 ::
 ++  cov-tally
@@ -624,12 +630,12 @@
   ::  tlc2 counts a FALSE constraint as the primary and a TRUE one as the
   ::  secondary, and its loop stops at the first false, so a later constraint
   ::  contributes nothing for this state
-  =^  ch  regs.cur  (con-hold-rs cons.o st e (rs-of cur))
+  =^  ch  rs.cur  (con-hold-rs cons.o st e rs.cur)
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
   ?^  prev
-    =^  ah  regs.cur  (acon-hold-rs acons.o u.prev st e (rs-of cur))
+    =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st e rs.cur)
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
@@ -645,7 +651,7 @@
   ::  a CONSTRAINT-pruned state is not counted or entered, so the statistics it
   ::  sees are the ones standing before it (R2.6.1)
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
-  =^  iv  regs.cur  (first-violated-rs invs.o st ie (rs-of cur))
+  =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?~  iv  [~ cur]
   ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
   :_  cur
@@ -690,7 +696,7 @@
   ::  counters are read after the increments above. `level` is the state's own
   ::  depth: `isValid(inv, succState)` passes it as s0
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
-  =^  iv  regs.cur  (first-violated-rs invs.o cst ie (rs-of cur))
+  =^  iv  rs.cur  (first-violated-rs invs.o cst ie rs.cur)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is
@@ -773,6 +779,16 @@
   ::  so the environment is built once for the whole state and not per action
   ::  (R2.6.1's measured read point)
   =/  e    (env-at o cur depth.vis)
+  ::  R2.7.4.4: reseed the enumeration RNG for THIS predecessor state, once,
+  ::  before any of its actions run. `TLCStateRandom.initialize` sets
+  ::  `state.fingerPrint() ^ randomSeed` and then refuses to reseed for the
+  ::  same state again, so every draw made while expanding it -- across all
+  ::  actions and all conjuncts -- comes from one advancing stream. That is
+  ::  what makes `x' = RandomElement(S) /\ y' = RandomElement(S)` able to
+  ::  produce two DIFFERENT values, which a fresh-per-evaluation RNG cannot
+  ::  through `+scramble:rng`, because `es` is the RAW 48-bit LCG state and
+  ::  `Random.setSeed` stores `(seed ^ multiplier) & (2^48-1)`, not the seed
+  =.  es.rs.cur  (scramble:rng (mix `@`fp seed.o))
   =/  before  distinct.cur
   ::  each action's successors are registered as they are generated, so a
   ::  violation found under an earlier action pre-empts a later one -- tlc2's
@@ -787,9 +803,7 @@
     ::  R2.7.4.3: the expansion reads AND writes the run-scoped store, so a
     ::  `TLCSet` in one action is visible to the next action, the next state,
     ::  and the constraints/invariants that follow
-    =/  nrs  (next-states-rs:ne st.vis body.i.as (act-env e ctx.i.as) (rs-of c2))
-    =/  nr   -.nrs
-    =.  regs.c2  regs.+.nrs
+    =^  nr  rs.c2  (next-states-rs:ne st.vis body.i.as (act-env e ctx.i.as) rs.c2)
     ?:  ?=(%| -.nr)  [`[%error msg.p.nr] c2]
     =/  ng  (lent p.nr)
     =/  d0  distinct.c2
@@ -845,14 +859,14 @@
   ::  counters live (R2.7.4.2b). Same search, same slicing, same result
   |=  [is=(list state) o=bfs-opts]
   ^-  [out=outcome od=out-degree cur=bfs-cursor]
-  (explore-full-regs is ~ o)
+  (explore-full-regs is empty-rst:ne o)
 ::
 ++  explore-full-regs
-  ::  `+explore-full` seeded with the register store the initial-state solve
-  ::  wrote (R2.7.4.3)
-  |=  [is=(list state) regs=(map @ud value) o=bfs-opts]
+  ::  `+explore-full` seeded with the carrier the initial-state solve left
+  ::  (R2.7.4.3/.4)
+  |=  [is=(list state) rs=rst:ne o=bfs-opts]
   ^-  [out=outcome od=out-degree cur=bfs-cursor]
-  =/  cur  (bfs-init-regs is regs)
+  =/  cur  (bfs-init-regs is rs)
   |-  ^-  [out=outcome od=out-degree cur=bfs-cursor]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)  [out.r (od-stats outdeg.cur.r) cur.r]
@@ -1910,12 +1924,14 @@
       ::  halves of the INIT coverage line
       iname=@t
       irej=@ud
-      ::  R2.7.4.3: the register store as the INITIAL-STATE solve left it. An
-      ::  `Init` conjunct may write it (`Init == x = 0 /\ TLCSet(0, 100)`) and
-      ::  the pin's store outlives that phase -- measured, the first `Next`
-      ::  reads 100 back. The solve happens once at %config, before any cursor
-      ::  exists, so the value is carried here and seeded into the cursor
-      iregs=(map @ud value)
+      ::  R2.7.4.3/.4: the CARRIER as the INITIAL-STATE solve left it. An
+      ::  `Init` conjunct may write the register store
+      ::  (`Init == x = 0 /\ TLCSet(0, 100)`) or draw from the RNG
+      ::  (`Init == x = RandomElement(0..9)`), and the pin's state outlives
+      ::  that phase -- measured, the first `Next` reads 100 back. The solve
+      ::  happens once at %config, before any cursor exists, so it is carried
+      ::  here and seeded into the cursor
+      irs=rst:ne
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -2269,9 +2285,21 @@
   [%& u.isb u.nsb fair.d nname warn.d]
 ::
 ++  search-ctx
+  ::  `+search-ctx-seed` for a run that pins no `-seed`, which is every path
+  ::  that predates R2.7.4.4 and every spec with no `TLC!RandomElement` in it
+  |=  [spec=@t cfg=@t]
+  ^-  (each sctx @t)
+  (search-ctx-seed spec cfg 0)
+::
+++  search-ctx-seed
   ::  parse, generate the WU3 graph, resolve config targets, solve the
   ::  initial states; a typed failure short-circuits with a message line
-  |=  [spec=@t cfg=@t]
+  ::  R2.7.4.4: the INITIAL-state solve draws from the run's `-seed` ALONE.
+  ::  `IdThread.getCurrentState()` is null there -- initial states are computed
+  ::  off a worker -- so `TLCStateRandom` never reseeds and the whole init
+  ::  phase runs from `new Random(randomSeed)`. The per-predecessor
+  ::  `fingerPrint ^ seed` reseeding starts only in `+bfs-step`
+  |=  [spec=@t cfg=@t seed=@ud]
   ^-  (each sctx @t)
   =/  pr  (parse:syntax spec)
   ?:  ?=(%| -.pr)  [%| 'parse error']
@@ -2329,7 +2357,10 @@
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
-  =/  irc  (init-states-rs:ne isb (make-env:ne defs consts vars) empty-rst:ne)
+  =/  rs0=rst:ne  empty-rst:ne
+  =/  irc
+    %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
+    rs0(es (scramble:rng seed))
   =/  ir   -.irc
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
@@ -2380,7 +2411,7 @@
       warn.p.rt
       ?~(init.ca '' u.init.ca)
       irej.+.irc
-      regs.+.irc
+      +.irc
       p.or
   ==
 ::
@@ -2600,7 +2631,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2643,7 +2674,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2681,7 +2712,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2699,7 +2730,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2916,7 +2947,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3865,20 +3896,28 @@
   ::  model-check a spec + config, returning TLC's terminal output lines
   |=  [spec=@t cfg=@t]
   ^-  wain
-  (check-in spec cfg |)
+  (check-in spec cfg | 0)
 ::
 ++  check-cov
   ::  `+check` with tlc2's `-coverage` (R2.7.4.2b): the same run, plus the
   ::  coverage block between the completion line and the statistics
   |=  [spec=@t cfg=@t]
   ^-  wain
-  (check-in spec cfg &)
+  (check-in spec cfg & 0)
+::
+++  check-seed
+  ::  `+check` with tlc2's `-seed` (R2.7.4.4). A spec that draws through
+  ::  `TLC!RandomElement` is only reproducible with the seed pinned, so the
+  ::  differential corpus needs an entry point that supplies one
+  |=  [spec=@t cfg=@t seed=@ud]
+  ^-  wain
+  (check-in spec cfg | seed)
 ::
 ++  check-in
-  ::  `+check` carrying the coverage flag
-  |=  [spec=@t cfg=@t cvg=?]
+  ::  `+check` carrying the coverage flag and the run's `-seed`
+  |=  [spec=@t cfg=@t cvg=? seed=@ud]
   ^-  wain
-  =/  sc  (search-ctx spec cfg)
+  =/  sc  (search-ctx-seed spec cfg seed)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
@@ -3929,7 +3968,7 @@
       =/  o=bfs-opts
         :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
             vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
-            ~  *cov-opts
+            ~  *cov-opts  0
         ==
       =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
       =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -3970,7 +4009,7 @@
     ::  running it. `+bfs-step` already checks `invs` and stops at the first
     ::  violation, so no new checking machinery was needed here, only the list
     =/  o=bfs-opts
-      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts]
+      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -3996,7 +4035,7 @@
       ==
     report.r
   ::  safety: an INVARIANT
-  (safety-run c cvg)
+  (safety-run c cvg seed)
 ::
 ++  implied-action-inner
   ::  the A of a `[][A]_v` implied-action property — a box over a square-action
@@ -4065,7 +4104,7 @@
     =/  r  (pred-bool:ne body i.sts ~ env)
     ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
     `[%prop pname i.sts]
-  ?~  bad  [warn (safety-run c |)]
+  ?~  bad  [warn (safety-run c | 0)]
   ::  EC 2108 is built from `evalAlias(curState, curState)` exactly as EC 2107
   ::  is (`ModelChecker.java:1199`), so an ALIAS renders this state too
   =/  shown=[order=(list @t) st=state]
@@ -4088,7 +4127,7 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 | ~ *cov-opts]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 | ~ *cov-opts 0]
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c env)
   =/  modn     (module-name-of tree.c)
@@ -4161,7 +4200,7 @@
   ::  on with the ordinary model check.
   ::  `cvg` is tlc2's `-coverage` (R2.7.4.2b): it turns the counters on and
   ::  renders the block between the completion line and the statistics
-  |=  [c=sctx cvg=?]
+  |=  [c=sctx cvg=? seed=@ud]
   ^-  wain
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c env)
@@ -4170,9 +4209,9 @@
   ::  (R2.7.4.2b) -- this path needs it for the trace labels anyway
   =/  o=bfs-opts
     :*  nsb.c  invs.c  cons.c  acons.c  vars.c  order.c  perms.c  defs.c
-        consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)
+        consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed
     ==
-  =/  r  (explore-full-regs is.c iregs.c o)
+  =/  r  (explore-full-regs is.c irs.c o)
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
       (cov-report o cur.r actions)
@@ -4310,7 +4349,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -4323,11 +4362,11 @@
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c %.n] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts]
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
     =/  er  (explore is.c o)
     (explore-outcome out.er od.er)
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
   =/  er  (explore is.c o)
   (explore-outcome out.er od.er)
 ::
@@ -4354,7 +4393,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts]
+    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

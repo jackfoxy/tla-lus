@@ -54,7 +54,7 @@ Inv  == x < 4
 ====
 '''
 =cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
-=req  :*  [%check [| ~ [%exhaustive &]]]
+=req  :*  [%check [| ~ [%exhaustive & 0]]]
           [%inline 'Counter' (malt ~[['Counter' spec]]) `cfg]
           default-limits:job-lib
           |

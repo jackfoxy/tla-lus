@@ -24,7 +24,7 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | [%exhaustive &]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
@@ -47,7 +47,7 @@
   ::  a %clay %check request over ~zod/%spec at a pinned revision
   |=  [root=module-name cfg=(unit path) roots=(list path)]
   ^-  request
-  :*  [%check [| | | | ~ | [%exhaustive &]]]
+  :*  [%check [| | | | ~ | [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
       lim  ~  ~
   ==
@@ -307,7 +307,7 @@
   ::  `+write-ref` refuses overlap in EITHER direction, so a target under a
   ::  read root and a read root under the target are both refused.
   =/  req=request
-    :*  [%check [| | | | ~ | [%exhaustive &]]]
+    :*  [%check [| | | | ~ | [%exhaustive & 0]]]
         [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
         lim
         `[%base /spec]
@@ -320,7 +320,7 @@
 ++  test-validate-write-outside-roots-accepted
   ::  the same request with a target that shares no prefix with the roots
   =/  req=request
-    :*  [%check [| | | | ~ | [%exhaustive &]]]
+    :*  [%check [| | | | ~ | [%exhaustive & 0]]]
         [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
         lim
         `[%base /out]
@@ -332,12 +332,12 @@
   ::  an %inline bundle declares no search roots, so nothing of its own can
   ::  be written over
   =/  req=request
-    [[%check [| | | | ~ | [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
+    [[%check [| | | | ~ | [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-write-bad-desk-rejected
   =/  req=request
-    [[%check [| | | | ~ | [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
+    [[%check [| | | | ~ | [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
   %+  expect-eq
     !>(`'invalid desk name \'Bad Desk\'')
   !>((validate:job-lib req))
@@ -371,26 +371,26 @@
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& | | | ~ | [%exhaustive &]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
+    [[%check [& | | | ~ | [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| | | | ~ | [%exhaustive &]]] (bundle cyc-spec ~) lim ~ ~]
+    [[%check [| | | | ~ | [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| | | | ~ | [%exhaustive &]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
+    [[%check [| | | | ~ | [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
-    :*  [%check [| | | | ~ | [%exhaustive &]]]
+    :*  [%check [| | | | ~ | [%exhaustive & 0]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
         lim  ~  ~
     ==
@@ -403,7 +403,7 @@
 ::
 ++  test-validate-too-many-modules
   =/  req=request
-    :*  [%check [| | | | ~ | [%exhaustive &]]]
+    :*  [%check [| | | | ~ | [%exhaustive & 0]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
         lim  ~  ~
     ==
@@ -630,7 +630,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| | | | ~ | [%exhaustive |]]] (bundle dead-spec `mc-cfg) lim ~ ~]
+    [[%check [| | | | ~ | [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -647,7 +647,7 @@
 ::  runs end to end to a safety verdict matching tlc2.TLC
 ++  test-multi-module-check
   =/  req=request
-    :*  [%check [| | | | ~ | [%exhaustive &]]]
+    :*  [%check [| | | | ~ | [%exhaustive & 0]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
         lim  ~  ~
     ==
@@ -1510,7 +1510,7 @@
 ++  ovr-req
   |=  nm=(unit source-name)
   ^-  request
-  [[%check [| | | | nm | [%exhaustive &]]] ovr-bundle lim ~ ~]
+  [[%check [| | | | nm | [%exhaustive & 0]]] ovr-bundle lim ~ ~]
 ::
 ++  test-cfg-override-absent-uses-bundle-cfg
   ::  no override: the bundle's own cfg runs, Loose holds, the run completes
@@ -1537,7 +1537,7 @@
   ::  a %clay bundle selects its config by PATH: the file's mark is part of
   ::  the reference, so a bare name cannot supply it
   =/  req=request
-    :*  [%check [| | | | `'some-cfg' | [%exhaustive &]]]
+    :*  [%check [| | | | `'some-cfg' | [%exhaustive & 0]]]
         [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
         lim  ~  ~
     ==
@@ -1649,7 +1649,7 @@
   ^-  request
   =/  l  lim
   =.  max-set-size.l  n
-  [[%check [| | | | ~ | [%exhaustive &]]] (bundle bigset-spec `mc-cfg) l ~ ~]
+  [[%check [| | | | ~ | [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~]
 ::
 ++  test-max-set-size-default-runs
   ::  the matched half: the same spec under the default bound completes
@@ -1688,7 +1688,7 @@
 ++  cont-req
   |=  c=?
   ^-  request
-  [[%check [| | | c ~ | [%exhaustive &]]] (bundle cont-spec `mc-cfg) lim ~ ~]
+  [[%check [| | | c ~ | [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~]
 ::
 ++  test-continue-off-stops-at-first
   ::  the matched half: without the flag the run STOPS at the first violation
@@ -1741,7 +1741,7 @@
 ++  vw-req
   |=  v=?
   ^-  request
-  [[%check [| v | | ~ | [%exhaustive &]]] (bundle vw-spec `vw-cfg) lim ~ ~]
+  [[%check [| v | | ~ | [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~]
 ::
 ++  test-view-render-off-shows-bindings
   ::  the matched half: without the flag the trace prints the BINDINGS
@@ -1766,7 +1766,7 @@
 ++  test-view-render-without-view-refused
   ::  the flag with no VIEW in the config has nothing to render
   =/  req=request
-    [[%check [| & | | ~ | [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| & | | ~ | [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   %+  expect-eq
     !>(`[%failed 'unsupported: -view without a VIEW in the config (nothing to render)'])
@@ -1776,7 +1776,7 @@
   ::  measured: an exhaustive run is byte-identical with and without the flag,
   ::  so accepting it there would be accepting an option that does nothing
   =/  req=request
-    [[%check [| | & | ~ | [%exhaustive &]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| | & | ~ | [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>((validate:job-lib req))

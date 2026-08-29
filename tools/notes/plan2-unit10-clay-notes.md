@@ -197,7 +197,7 @@ No in-scope Gall/Clay behavior is left unclassified.
   driven from a hand-built bowl because the case pin needs the real desk):
 
   ```
-  :tla-lus &tla-lus-action [%submit ~.c1 [[%check [| ~ [%exhaustive &]]]
+  :tla-lus &tla-lus-action [%submit ~.c1 [[%check [| ~ [%exhaustive & 0]]]
     [%clay our %tla-lus [%da now] 'spec'
       [~ /test-data/clay/multi/cfg/txt] ~[/test-data/clay/multi]]
     [1.000.000 64 100.000 1.000 ~m10 1.000.000] |]]

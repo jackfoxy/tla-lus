@@ -390,6 +390,135 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
+## R2.7.4.4 — `TLC!RandomElement` — DONE 2026-08-30
+
+The RNG now rides the carrier and ADVANCES across draws. `RandomElement` moves
+from `deferred` ("TLC RandomGenerator parity is unit 9" — a note unit 9 had
+already discharged) to `required`.
+
+### The seeding rule, read off `RandomEnumerableValues` and then measured
+
+In BFS the per-worker generator is a `TLCStateRandom`. `initialize()` asks
+`IdThread.getCurrentState()`:
+
+- **null** (generating INITIAL states) → never reseeded, so it runs from the
+  constructor seed `randomSeed` = `-seed`, advancing across the whole init
+  phase;
+- **non-null** (inside the next-state relation) → reseeded to
+  `state.fingerPrint() ^ randomSeed` **once per PREDECESSOR state**, and
+  explicitly *not* again for the same state.
+
+That last clause is the whole point, and the pin's own comment says so: it is
+what lets `Next == x' = RandomElement(0..2) /\ y' = RandomElement(0..2)`
+produce two DIFFERENT values. Measured under `-seed 12345`: x' = 2, y' = 1. A
+fresh-per-evaluation RNG gives x' = y' and is wrong.
+
+Because the seed is `fingerPrint ^ randomSeed`, a reproducing run is pinned to
+`-fp 0` as well — R2.6.2 said so and this confirms it.
+
+### Measured
+
+| probe | result |
+|---|---|
+| two draws in one evaluation, `-seed 12345` | `x'=2, y'=1` — different, from one advancing stream |
+| same spec, `-seed 12345` vs `987654321` | 4 states/3 distinct vs 6/5 — the SEED drives the state graph |
+| `\E i \in 1..2 : x' = RandomElement(0..2)` | both branches draw, and differ; 7 generated / 3 distinct |
+| `Init == x = RandomElement(0..9)` | seed-dependent, and REPRODUCIBLE across runs |
+| `RandomElement(Nat)` | `Applying RandomElement to the following value,\nwhich is not a finite set:\nNat` |
+| **seed sweep 1, 2, 3, 7, 8, 42** | **ALL give 7** |
+
+That last row is the trap the plan flagged as "the `-seed 7`/`-seed 8`
+collision on record", and it is worse than a single collision: every SMALL seed
+collides, because `java.util.Random.setSeed` scrambles multiplicatively and the
+first `nextDouble` barely moves. **A seed sweep must use WIDE seeds.** The
+corpus uses 12345 and 987654321, which do separate (4/3 vs 6/5).
+
+### What landed
+
+- `RandomElement` is a `node-op` (it draws, so it needs the carrier; and its
+  argument is a SET, so it needs the lazy-domain treatment `Cardinality` has).
+  `+eval-random-element` forces the domain and spends exactly one
+  `+floor-scaled:rg` — `floor(nextDouble() * size)` over the NORMALIZED element
+  list, so which element it names rests on `tlc-value-order`, already parity.
+  An infinite descriptor reports the pin's "a finite set" rather than the
+  forcing failure, the same shape `+cardinality-error` uses.
+- **`es` moved onto the BFS cursor with `regs`** (the cursor now carries the
+  whole `rst`). `+bfs-step` reseeds `es` to `fingerPrint ^ seed` when it
+  DEQUEUES a state, and every draw made while expanding it — across all
+  actions and all conjuncts — comes from that one stream.
+- **The wire gained a seed.** `check-mode`'s `%exhaustive` is now
+  `[%exhaustive deadlock=? seed=@ud]`. `-seed` is not simulation-only at the
+  pin: `RandomEnumerableValues.setSeed(seed)` runs for BFS too, and without it
+  tlc2 draws one from `new Random().nextLong()` and does not even print it in
+  the BFS banner — so an unseeded `RandomElement` run is not reproducible by
+  anyone. `+check-seed` is the console entry point.
+- **`gen-mc-tests.py` gained the `opts.txt` hook** the plan asked for (the
+  shape `gen-safety-tests.py` already had), and emits `+check-seed:check` for
+  any case that pins `-seed`.
+
+### Two defects the corpus caught, and what each was
+
+The first cut passed `rnd-one-draw` and `rnd-two-draws` and FAILED
+`rnd-two-draws-alt` and `rnd-exists` — the same spec at a different seed
+passing and failing is what said the mechanism, not the wiring, was wrong.
+
+**(1) The reseed skipped `java.util.Random`'s seed scrambling.** `rst.es` is
+the RAW 48-bit LCG state (that is how `lib/rng` has always carried it, because
+simulation persists it across slices), and `Random.setSeed` stores
+`(seed ^ 0x5DEECE66D) & (2^48-1)`. Writing `fingerPrint ^ seed` straight into
+`es` runs a stream nobody's tlc2 would produce. It has to go through
+`+scramble:rng`. The coarse cases passed anyway: over a 3-element domain a
+wrong `nextDouble` still floors to the right index about a third of the time,
+which is exactly why `0..2` corpus cases are not sufficient evidence on their
+own.
+
+The measurement that isolated it: `Init == x = 0`,
+`Next == x < 9 /\ x' = RandomElement(0..9)` at `-seed 12345` gives 6 at the
+pin and gave 7 in the port — and 7 is the first draw of `new Random(small)`,
+i.e. of an unscrambled/zero state. Confirmed from the other direction by
+replaying `java.util.Random` outside both: with the PORT's own fingerprint for
+`x = 0` (`0xd0ba.3e88.0dcd.d983`), `floor(Random(fp ^ 12345).nextDouble()*10)`
+is 6 and `floor(Random(fp ^ 987654321).nextDouble()*10)` is 9 — both the
+pin's values. So the port's FP64 state fingerprint was right all along and
+only the seeding step was wrong.
+
+**(2) The INITIAL-state solve was not seeded at all.** It ran from
+`empty-rst`. `+search-ctx` gained `+search-ctx-seed` (the old name is now the
+`seed = 0` wrapper, so none of its fourteen callers moved) and the job kernel
+seeds its own init solve, both to `(scramble:rng seed)`. `%dfid` carries no
+seed on this wire and so runs from 0; `%simulate` uses its own, which is the
+same number tlc2 passes to `RandomEnumerableValues.setSeed`. Two corpus cases
+pin it — `rnd-init-draw` / `rnd-init-draw-alt`, `Init == x = RandomElement(0..99)`
+under `Inv == x < 30`, which the pin violates AT the initial state with x = 36
+at seed 12345 and x = 30 at 987654321.
+
+### `RandomElement` of a non-set: what is actually testable here
+
+The pin's wording for an infinite argument is
+`Applying RandomElement to the following value,\nwhich is not a finite set:\nNat`,
+and asserting it on `Nat` does not work in this port — `Nat` in an argument
+position is rejected as `Naturals!Nat/0` before `RandomElement` runs, which is
+this port's OWN long-standing approved difference (there is no UserValue kind).
+`Seq({1, 2})` is rejected the same way. So the arm tests the reachable half of
+that message: a NON-SET argument, `RandomElement(3)`, where port and pin agree
+byte for byte — the same EC 2176 arm `Permutations(3)` already used. The
+infinite-argument wording stays unreachable for the reason the `Nat` row in
+`compatibility.md` already gives, and no test claims otherwise.
+
+### The binder question, resolved
+
+R2.7.4.1b handed `.4` an open worry: `\E i \in S : x' = RandomElement(T)`
+might lose draws at the carrier boundary. It does NOT. The boundary is about
+the EVALUATOR's binders (`+eval-exists` and friends, which hand a gate to a
+`lib/value.hoon` streaming combinator). An `\E` in ACTION position goes through
+`+solve-exists`, which has carried since R2.7.4.1a. The `rnd-exists` corpus
+case pins it: 7 generated / 3 distinct, matching the pin.
+
+What remains outside is an `\E`/`CHOOSE`/set-comprehension in EXPRESSION
+position containing a draw. That is the same boundary R2.7.4.3 met with
+`TLCGetAndSet` and solved by implementing natively; here there is no operator
+to reimplement, so it stays the declared limit.
+
 ## R2.7.4.3 — the REGISTER STORE — DONE 2026-08-29
 
 `TLC!TLCSet` / `TLC!TLCGet(int)` / `TLCExt!TLCGetOrDefault` /

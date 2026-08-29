@@ -1078,6 +1078,8 @@
   ?:  ?=(%tlc-set tag)        (eval-tlc-set n e rs)
   ?:  ?=(%tlc-get-or-default tag)  (eval-tlc-get-or-default n e rs)
   ?:  ?=(%tlc-get-and-set tag)     (eval-tlc-get-and-set n e rs)
+  ::  R2.7.4.4: the DRAW. It spends `es.rs`, so it carries for the same reason
+  ?:  ?=(%random-element tag)      (eval-random-element n e rs)
   ?:  ?=(%assert-error tag)   (eval-assert-error n e rs)
   ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e rs)
   ?:  ?=(%tlc-defer tag)      [(eval-tlc-defer n e) rs]
@@ -1296,6 +1298,51 @@
   =^  k  rs  (eval-rs i.args.n e rs)
   ?:  ?=(%| -.k)  [k rs]
   [(tlc-get:so ~[p.k] run.e regs.rs) rs]
+::
+++  eval-random-element
+  ::  TLC!RandomElement(S) — one uniform draw from a FINITE set, ADVANCING
+  ::  the enumeration generator on the carrier (R2.7.4.4).
+  ::
+  ::  The pin is `SetEnumValue.randomElement` / `IntervalValue.randomElement`:
+  ::  `elems.elementAt((int) Math.floor(get().nextDouble() * size()))` over the
+  ::  NORMALIZED element list. So the draw is exactly one `nextDouble`, scaled
+  ::  and floored — `+floor-scaled:rg`, the same arm the `-generate` path
+  ::  already spends — and which element it names depends on the port's element
+  ::  ORDER matching tlc2's normalized order (`tlc-value-order`, parity).
+  ::
+  ::  The argument goes through `+eval-domain` and is then FORCED, the way
+  ::  `+eval-cardinality` does it, so an infinite descriptor (`Nat`, `Int`,
+  ::  `Seq(S)`) reports the pin's "a finite set" rather than being enumerated:
+  ::  there `toSetEnum` returns null and `RandomElement` throws
+  ::  TLC_MODULE_APPLYING_TO_WRONG_VALUE
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* ~] args.n)  [[%| 0 'RandomElement expects one argument.'] rs]
+  =/  sd  (eval-domain i.args.n e)
+  ?:  ?=(%| -.sd)  [sd rs]
+  ::  an INFINITE descriptor must report "a finite set" rather than the
+  ::  forcing failure: measured at the pin, `RandomElement(Nat)` is
+  ::  `Applying RandomElement to the following value,\0awhich is not a finite
+  ::  set:\0aNat` -- `toSetEnum()` returns null there and the operator throws
+  ::  its own TLC_MODULE_APPLYING_TO_WRONG_VALUE, never an enumeration error
+  =/  fr  (force:v p.sd setmax.e)
+  ?:  ?=(%| -.fr)  [(random-element-wrong i.args.n e) rs]
+  =/  el  (elemsof-e:v p.fr)
+  ?:  ?=(%| -.el)  [[%| (random-element-error:so p.fr)] rs]
+  ?~  p.el  [[%| (random-element-error:so p.fr)] rs]
+  =/  els=(list value:v)  p.el
+  =^  ix  es.rs  (floor-scaled:rg es.rs (lent els))
+  [[%& (snag ix els)] rs]
+::
+++  random-element-wrong
+  ::  the argument is not a FINITE set: name its VALUE the way tlc2 does, not
+  ::  the enumeration failure -- the same shape `+cardinality-error` uses for
+  ::  the same reason
+  |=  [n=sem:sm e=eenv]
+  ^-  eres
+  =/  vv  (eval n e)
+  ?:  ?=(%| -.vv)  vv
+  [%| (random-element-error:so p.vv)]
 ::
 ++  eval-tlc-set
   ::  TLC!TLCSet(i, v) — the register WRITE (R2.7.4.3). Both arguments are

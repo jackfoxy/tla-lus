@@ -437,6 +437,94 @@
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
 ::
+++  test-mc-rnd-exists
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '7 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == /\\ x < 3\0a        /\\ \\E i \\in 1..2 : x\' = RandomElement(0..2)\0aInv == x <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rnd-init-draw
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = 36'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = RandomElement(0..99)\0aNext == UNCHANGED x\0aInv == x < 30\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rnd-init-draw-alt
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = 30'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = RandomElement(0..99)\0aNext == UNCHANGED x\0aInv == x < 30\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  987.654.321
+::
+++  test-mc-rnd-one-draw
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = RandomElement(0..2)\0aInv == x <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rnd-two-draws
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ x < 3\0a        /\\ x\' = RandomElement(0..2)\0a        /\\ y\' = RandomElement(0..2)\0aInv == x <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
+++  test-mc-rnd-two-draws-alt
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '6 states generated, 5 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ x < 3\0a        /\\ x\' = RandomElement(0..2)\0a        /\\ y\' = RandomElement(0..2)\0aInv == x <= 2\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  987.654.321
+::
 ++  test-mc-spec-inst-flat
   %+  expect-eq
     !>  ^-  wain

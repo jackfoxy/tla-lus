@@ -11,6 +11,7 @@
 /=  mod       /lib/modules
 /=  stdmods   /lib/stdmods
 /=  sp        /lib/source-path
+/=  rng       /lib/rng
 |%
   ::  Resumable Job Kernel (unit P2-1)
   ::
@@ -1440,7 +1441,21 @@
   ::  R2.7.4.2b: the carrier-keeping variant, for the INIT coverage counts --
   ::  `irej` is the candidates the initial predicate rejected once they were
   ::  already fully assigned, which is the `secondary` half of the INIT line
-  =/  isc  (init-states-rs:ne isb (make-env:ne defs consts vars) empty-rst:ne)
+  ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode,
+  ::  and the INITIAL-state solve draws from that seed alone -- off a worker
+  ::  `IdThread.getCurrentState()` is null, so `TLCStateRandom` never reseeds
+  ::  and the whole init phase runs from `new Random(randomSeed)`. `%dfid`
+  ::  carries no seed on this wire, so it runs from the 0 default
+  =/  eseed=@ud
+    ?-  -.mode
+      %exhaustive  seed.mode
+      %simulate    seed.mode
+      %dfid        0
+    ==
+  =/  rs0=rst:ne  empty-rst:ne
+  =/  isc
+    %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
+    rs0(es (scramble:rng eseed))
   =/  isr  -.isc
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
@@ -1549,6 +1564,7 @@
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
             vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
+            0
         ==
       =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
       (more j pre)
@@ -1581,7 +1597,7 @@
     =/  o=bfs-opts:check
       :*  nsb  invs  ~  ~  vars  order  ~  defs  consts  |
           max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
-          *cov-opts:check
+          *cov-opts:check  0
       ==
     =.  cont.j
       %-  save-kont
@@ -1601,11 +1617,15 @@
     :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb  max-set-size.lims  continue.opts.op.request.j  acts  cvo
+        ::  R2.7.4.4: tlc2's `-seed`, which seeds `RandomEnumerableValues` for
+        ::  BFS as well as simulation. `mode` is already narrowed to
+        ::  `%exhaustive` here -- the dfid and simulate branches returned above
+        seed.mode
     ==
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
   =.  cont.j
-    (save-kont [%bfs nl act aname o (bfs-init-regs:check is regs.+.isc) alb vrb])
+    (save-kont [%bfs nl act aname o (bfs-init-regs:check is +.isc) alb vrb])
   (more j pre)
 ::
 ::  +|  Stage: %explore

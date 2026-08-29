@@ -356,6 +356,10 @@
   ::  `TLCGetAndSet(1, Add, 10, 0)` returns 0, 10, 20 on successive
   ::  expansions while the register goes 10, 20, 30; the native arm reproduces
   ::  exactly that
+  ::  R2.7.4.4: `TLC!RandomElement` DRAWS -- it advances the enumeration RNG
+  ::  the carrier holds, and its argument is a SET, so it needs both the
+  ::  carrier and the lazy-domain treatment `Cardinality` gets
+  ?:  =(k ['TLC' 'RandomElement' 1])        `[%random-element | 0]
   ?:  =(k ['TLC' 'TLCSet' 2])               `[%tlc-set | 0]
   ?:  =(k ['TLCExt' 'TLCGetOrDefault' 2])   `[%tlc-get-or-default | 0]
   ?:  =(k ['TLCExt' 'TLCGetAndSet' 4])      `[%tlc-get-and-set | 0]
@@ -1023,6 +1027,12 @@
   ?.  (syn:si p.i.as)
     [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs]
   [[%& %bool &] (~(put by regs) (abs:si p.i.as) i.t.as)]
+::
+++  random-element-error
+  ::  the pin's message when the argument is not a finite set
+  |=  got=value:v
+  ^-  eval-err:v
+  (wrong-value-error 'RandomElement' 'a finite set' got)
 ::
 ++  tlc-get-or-default
   ::  TLCExt!TLCGetOrDefault(i, d) — the same read as `TLCGet(i)` but an unset
