@@ -481,6 +481,34 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
+++  test-mc-tlcext-getandset
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC, TLCExt\0aVARIABLE x\0aAdd(a, b) == a + b\0aInit == x = 0\0aNext == /\\ x < 3\0a        /\\ x\' = TLCGetAndSet(1, Add, 10, 0) + 1\0aInv == x >= 0\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-tlcext-getordefault
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC, TLCExt\0aVARIABLE x\0aInit == x = TLCGetOrDefault(5, 0)\0aNext == /\\ x < 3\0a        /\\ TLCSet(5, 1)\0a        /\\ x\' = x + TLCGetOrDefault(5, 99)\0aInv == x >= 0\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-tlcext-ops
   %+  expect-eq
     !>  ^-  wain
@@ -545,6 +573,34 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x < 4 /\\ x\' = x + 1\0aInv == TLCGet("distinct") < 3 /\\ TLCGet("generated") < 4 /\\ TLCGet("queue") < 2 /\\ TLCGet("diameter") < 4\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-tlcset-graph
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 5 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0 /\\ TLCSet(0, 100)\0aNext == /\\ x < 4\0a        /\\ TLCSet(0, TLCGet(0) + 1)\0a        /\\ x\' = TLCGet(0) - 100\0aInv == x < 10\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-tlcset-same-eval
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '2 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0 /\\ TLCSet(0, 7)\0aNext == /\\ x < 2\0a        /\\ TLCSet(0, 42)\0a        /\\ x\' = TLCGet(0)\0aInv == x >= 0\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-twobit
   %+  expect-eq

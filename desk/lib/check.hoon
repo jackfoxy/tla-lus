@@ -351,6 +351,17 @@
       ::  -- which is why these are tallied where the loop runs
       cvc=(map @ud [pri=@ud sec=@ud])
       cva=(map @ud [pri=@ud sec=@ud])
+      ::  R2.7.4.3: the RUN-SCOPED register store `TLC!TLCSet` writes and
+      ::  `TLCGet(int)` reads back. It lives on the CURSOR, not inside an
+      ::  evaluation, because the pin's store is a worker field that outlives
+      ::  every expansion: measured, `TLCSet(0, TLCGet(0) + 1)` in a
+      ::  next-state relation counts 100, 101, 102, 103 across successive
+      ::  states, and a write made while solving the INITIAL states is still
+      ::  there when `Next` first runs. It is NOT part of the checked state --
+      ::  it never enters a fingerprint and two states differing only in the
+      ::  register are the same state -- so it rides the cursor beside the
+      ::  statistics rather than beside `seen`
+      regs=(map @ud value)
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -363,7 +374,27 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~]
+  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ ~]
+::
+++  rs-of
+  ::  the R2.7.4.1 carrier loaded from the cursor's run-scoped store. The
+  ::  other two `rst` fields are per-evaluation: `es` belongs to the
+  ::  simulation cursor (`pst`), and `irej` is the INIT rejection count the
+  ::  initial-state solve already reported, so neither is threaded here
+  |=  cur=bfs-cursor
+  ^-  rst:ne
+  =/  r=rst:ne  empty-rst:ne
+  r(regs regs.cur)
+::
+++  bfs-init-regs
+  ::  a fresh cursor that INHERITS the register store the initial-state solve
+  ::  already wrote (R2.7.4.3). `Init == x = 0 /\ TLCSet(0, 100)` must leave
+  ::  100 visible to the first `Next`, and the solve happens once at %config,
+  ::  before any cursor exists
+  |=  [is=(list state) regs=(map @ud value)]
+  ^-  bfs-cursor
+  =/  c  (bfs-init is)
+  c(regs regs)
 ::
 ++  con-hold
   ::  do all state constraints (CONSTRAINT) hold on `st`? (each bool / eval err)
@@ -408,6 +439,43 @@
   ?:  ?=(%| -.r)  [%| msg.p.r]
   ?.  p.r  [%& | +(n)]
   $(cs t.cs, n +(n))
+::
+++  con-hold-rs
+  ::  `+con-hold-n` carrying the R2.7.4.3 register store: a CONSTRAINT may
+  ::  contain a `TLCSet`, and at the pin that write lands in the same store
+  ::  the next-state relation reads
+  |=  [cs=(list sem:sem-lib) st=state e=eenv:ne rs=rst:ne]
+  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  =/  n=@ud  0
+  |-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  ?~  cs  [[%& & n] regs.rs]
+  =^  r  rs  (pred-bool-rs:ne i.cs st ~ e rs)
+  ?:  ?=(%| -.r)  [[%| msg.p.r] regs.rs]
+  ?.  p.r  [[%& | +(n)] regs.rs]
+  $(cs t.cs, n +(n))
+::
+++  acon-hold-rs
+  ::  `+acon-hold-n` carrying the register store
+  |=  [cs=(list sem:sem-lib) cur=state nxt=state e=eenv:ne rs=rst:ne]
+  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  =/  n=@ud  0
+  |-  ^-  [(each [ok=? n=@ud] @t) (map @ud value)]
+  ?~  cs  [[%& & n] regs.rs]
+  =^  r  rs  (pred-bool-rs:ne i.cs cur nxt e rs)
+  ?:  ?=(%| -.r)  [[%| msg.p.r] regs.rs]
+  ?.  p.r  [[%& | +(n)] regs.rs]
+  $(cs t.cs, n +(n))
+::
+++  first-violated-rs
+  ::  `+first-violated` carrying the register store: an INVARIANT may write it
+  ::  too, and `Tool.isValid` evaluates under the ordinary evaluator
+  |=  [ivs=(list [name=@t body=sem:sem-lib]) st=state e=eenv:ne rs=rst:ne]
+  ^-  [(unit (each @t @t)) (map @ud value)]
+  ?~  ivs  [~ regs.rs]
+  =^  r  rs  (pred-bool-rs:ne body.i.ivs st ~ e rs)
+  ?:  ?=(%| -.r)  [`[%| msg.p.r] regs.rs]
+  ?.  p.r  [`[%& name.i.ivs] regs.rs]
+  $(ivs t.ivs)
 ::
 ++  cov-tally
   ::  fold one constraint-loop outcome into a per-index counter map: the first
@@ -556,12 +624,12 @@
   ::  tlc2 counts a FALSE constraint as the primary and a TRUE one as the
   ::  secondary, and its loop stops at the first false, so a later constraint
   ::  contributes nothing for this state
-  =/  ch  (con-hold-n cons.o st e)
+  =^  ch  regs.cur  (con-hold-rs cons.o st e (rs-of cur))
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
   ?^  prev
-    =/  ah  (acon-hold-n acons.o u.prev st e)
+    =^  ah  regs.cur  (acon-hold-rs acons.o u.prev st e (rs-of cur))
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
@@ -577,7 +645,7 @@
   ::  a CONSTRAINT-pruned state is not counted or entered, so the statistics it
   ::  sees are the ones standing before it (R2.6.1)
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
-  =/  iv  (first-violated invs.o st ie)
+  =^  iv  regs.cur  (first-violated-rs invs.o st ie (rs-of cur))
   ?~  iv  [~ cur]
   ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
   :_  cur
@@ -622,7 +690,7 @@
   ::  counters are read after the increments above. `level` is the state's own
   ::  depth: `isValid(inv, succState)` passes it as s0
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
-  =/  iv  (first-violated invs.o cst ie)
+  =^  iv  regs.cur  (first-violated-rs invs.o cst ie (rs-of cur))
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is
@@ -716,7 +784,12 @@
     =/  c2  cur(queue t.q)
     |-  ^-  [out=(unit outcome) cur=bfs-cursor]
     ?~  as  [~ c2]
-    =/  nr  (next-states:ne st.vis body.i.as (act-env e ctx.i.as))
+    ::  R2.7.4.3: the expansion reads AND writes the run-scoped store, so a
+    ::  `TLCSet` in one action is visible to the next action, the next state,
+    ::  and the constraints/invariants that follow
+    =/  nrs  (next-states-rs:ne st.vis body.i.as (act-env e ctx.i.as) (rs-of c2))
+    =/  nr   -.nrs
+    =.  regs.c2  regs.+.nrs
     ?:  ?=(%| -.nr)  [`[%error msg.p.nr] c2]
     =/  ng  (lent p.nr)
     =/  d0  distinct.c2
@@ -772,7 +845,14 @@
   ::  counters live (R2.7.4.2b). Same search, same slicing, same result
   |=  [is=(list state) o=bfs-opts]
   ^-  [out=outcome od=out-degree cur=bfs-cursor]
-  =/  cur  (bfs-init is)
+  (explore-full-regs is ~ o)
+::
+++  explore-full-regs
+  ::  `+explore-full` seeded with the register store the initial-state solve
+  ::  wrote (R2.7.4.3)
+  |=  [is=(list state) regs=(map @ud value) o=bfs-opts]
+  ^-  [out=outcome od=out-degree cur=bfs-cursor]
+  =/  cur  (bfs-init-regs is regs)
   |-  ^-  [out=outcome od=out-degree cur=bfs-cursor]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)  [out.r (od-stats outdeg.cur.r) cur.r]
@@ -1830,6 +1910,12 @@
       ::  halves of the INIT coverage line
       iname=@t
       irej=@ud
+      ::  R2.7.4.3: the register store as the INITIAL-STATE solve left it. An
+      ::  `Init` conjunct may write it (`Init == x = 0 /\ TLCSet(0, 100)`) and
+      ::  the pin's store outlives that phase -- measured, the first `Next`
+      ::  reads 100 back. The solve happens once at %config, before any cursor
+      ::  exists, so the value is carried here and seeded into the cursor
+      iregs=(map @ud value)
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -2294,6 +2380,7 @@
       warn.p.rt
       ?~(init.ca '' u.init.ca)
       irej.+.irc
+      regs.+.irc
       p.or
   ==
 ::
@@ -4085,7 +4172,7 @@
     :*  nsb.c  invs.c  cons.c  acons.c  vars.c  order.c  perms.c  defs.c
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)
     ==
-  =/  r  (explore-full is.c o)
+  =/  r  (explore-full-regs is.c iregs.c o)
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
       (cov-report o cur.r actions)

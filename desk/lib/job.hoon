@@ -1602,7 +1602,10 @@
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb  max-set-size.lims  continue.opts.op.request.j  acts  cvo
     ==
-  =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
+  ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
+  ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
+  =.  cont.j
+    (save-kont [%bfs nl act aname o (bfs-init-regs:check is regs.+.isc) alb vrb])
   (more j pre)
 ::
 ::  +|  Stage: %explore

@@ -7,6 +7,25 @@
 /=  so  /lib/stdops
 /=  v   /lib/value
 |%
+++  tlcext
+  ::  the same driver over a module that also EXTENDS TLCExt, for the two
+  ::  register surfaces that live there (R2.7.4.3)
+  |=  [body=@t want=tape]
+  ^-  tang
+  =/  src=@t
+    %-  crip
+    ;:  weld
+      "---- MODULE A ----\0a"
+      "EXTENDS Integers, Sequences, FiniteSets, TLC, TLCExt\0a"
+      "Add(a, b) == a + b\0a"
+      "Expr == "  (trip body)  "\0a===="
+    ==
+  =/  r  (eval-module-def:ne 'A' (malt ~[['A' src]]) 'Expr')
+  %+  expect-eq  !>(want)
+  !>  ^-  tape
+  ?:  ?=(%| -.r)  (weld "ERR: " (trip msg.p.r))
+  (render:v p.r)
+::
 ++  tlc
   ::  an expression in a module that EXTENDS TLC, with helper operators for
   ::  the operator-argument cases and a model-value constant set
@@ -129,17 +148,71 @@
   ::  the pin's own EC 2145 for a key it does not define
   (tlc 'TLCGet("zork")' "ERR: TLCGet(zork) was undefined.")
 ::
-++  test-tlc-get-register
-  ::  an integer key reads the register store `TLCSet` writes. Nothing writes
-  ::  it yet, so every index is unset -- the pin's EC 2145 for that index
+++  test-tlc-get-register-unset
+  ::  R2.7.4.3: an integer key reads the register store `TLCSet` writes. An
+  ::  index nothing has written is still the pin's EC 2145 FOR THAT INDEX --
+  ::  measured, `TLCGet(3)` on a fresh run reports `TLCGet(3) was undefined.`
+  ::  The blanket "every integer index is undefined" of R2.6.1 is gone; only
+  ::  an unset one is.
+  ::
+  ::  A constant-context evaluation like this one has an EMPTY store, so the
+  ::  answer is the same text it always was -- what changed is that a run
+  ::  which HAS written the index now answers the value, which the
+  ::  `tests/lib/mc` cases `tlcset-graph` / `tlcset-same-eval` pin by BUILDING
+  ::  THE STATE GRAPH out of it
   (tlc 'TLCGet(3)' "ERR: TLCGet(3) was undefined.")
 ::
-++  test-tlc-set
-  ::  R2.6.1 measured what the write IS -- a run-scoped register that
-  ::  accumulates across state expansions -- and the reason it stays refused
-  ::  is now that measurement rather than a generality
+++  test-tlc-set-returns-true
+  ::  R2.7.4.3: `TLCSet` is implemented. It answers TRUE so it composes as a
+  ::  conjunct, which is how every spec uses it
+  (tlc 'TLCSet(0, 42)' "TRUE")
+::
+++  test-tlc-set-then-get
+  ::  the write is visible to a LATER CONJUNCT of the SAME evaluation --
+  ::  measured at the pin, `TLCSet(0, 42) /\ x' = TLCGet(0)` builds x = 42.
+  ::  Here the same fact in one constant expression
+  (tlc 'TLCSet(0, 42) /\\ TLCGet(0) = 42' "TRUE")
+::
+++  test-tlc-set-non-integer-key
+  ::  a key that is neither a nonnegative integer nor one of the pin's string
+  ::  surfaces is the pin's own POSITIONAL argument error -- measured,
+  ::  `TLCGetSet.TLCSet` throws TLC_MODULE_ARGUMENT_ERROR with
+  ::  `{"first", "TLCSet", "nonnegative integer", …}`
+  %+  tlc  'TLCSet("zork", TRUE)'
+  "ERR: The first argument of TLCSet should be a nonnegative integer, but instead it is:\0a\"zork\""
+::
+++  test-tlc-set-exit-refused
+  ::  `TLCSet("exit", TRUE)` is a REAL tlc2 capability -- it stops the checker
+  ::  mid-run -- so it must not be reported as a bad argument. Refused by
+  ::  name, which is what separates "this port has not built it" from "your
+  ::  spec is wrong" (R2.1)
   %+  tlc  'TLCSet("exit", TRUE)'
-  "ERR: unsupported StandardModule operator: TLC!TLCSet; it writes a run-scoped register the evaluator cannot carry out of an evaluation"
+  "ERR: unsupported StandardModule operator: TLC!TLCSet(\"exit\"); it stops the checker mid-run, which this engine has no control channel for"
+::
+++  test-tlc-set-pause-refused
+  %+  tlc  'TLCSet("pause", TRUE)'
+  "ERR: unsupported StandardModule operator: TLC!TLCSet(\"pause\"); it suspends the search until stdin is read, and no reproducible run may block on a console"
+::
+++  test-tlc-get-or-default-unset
+  ::  TLCExt!TLCGetOrDefault(i, d) answers `d` on an unset index instead of
+  ::  raising EC 2145 -- measured 77 before the write, 9 after it
+  (tlcext 'TLCGetOrDefault(5, 77)' "77")
+::
+++  test-tlc-get-or-default-set
+  (tlcext 'TLCSet(5, 9) /\\ TLCGetOrDefault(5, 77) = 9' "TRUE")
+::
+++  test-tlc-get-and-set
+  ::  TLCExt!TLCGetAndSet(key, Op, val, default) returns the OLD value and
+  ::  stores `Op(old, val)`. The pin has no Java method for it -- TLCExt.tla
+  ::  defines it as `CHOOSE v \\in {oldVal} : TLCSet(key, Op(oldVal, val))` --
+  ::  and the port implements it NATIVELY, because that body hides its write
+  ::  inside a CHOOSE, which is below the R2.7.4.1b carrier boundary and would
+  ::  drop it silently. Measured at the pin: 0, then 10, then 20, with the
+  ::  register at 10, 20, 30
+  (tlcext 'TLCGetAndSet(1, Add, 10, 0)' "0")
+::
+++  test-tlc-get-and-set-stores
+  (tlcext 'TLCGetAndSet(1, Add, 10, 0) = 0 /\\ TLCGetOrDefault(1, 99) = 10' "TRUE")
 ::
 ::  +|  Excluded operators stay typed rejections
 ::

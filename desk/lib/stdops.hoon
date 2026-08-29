@@ -150,7 +150,6 @@
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
     [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
     [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
-    [['TLC' 'TLCSet' 2] [| 0 |=(a=(list value:v) (tlc-set a))]]
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
     [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
@@ -341,6 +340,25 @@
   ::  so TLC never constant-folds it); the datum is carried and checked even
   ::  though this engine has no constant-folding pass
   ?:  =(k ['TLC' 'TLCGet' 1])              `[%tlc-get & 1]
+  ::  R2.7.4.3: the REGISTER STORE. `TLCSet` is a plain `@TLAPlusOperator` in
+  ::  the pin, not an `@Evaluation` one, but it belongs here rather than in the
+  ::  registry because a registry gate is a PURE function of its argument
+  ::  VALUES and this one WRITES: it needs the R2.7.4.1 carrier, which only the
+  ::  evaluator holds. `TLCGetOrDefault` reads the same store, and
+  ::  `TLCGetAndSet` reads-modifies-writes it through an operator argument.
+  ::
+  ::  `TLCGetAndSet` has no Java method at the pin at all -- it is a TLA+ body
+  ::  in TLCExt.tla, `CHOOSE v \in {oldVal} : TLCSet(key, Op(oldVal, val))`.
+  ::  The port implements it NATIVELY instead of evaluating that body, because
+  ::  the body hides its write inside a CHOOSE and CHOOSE is below the
+  ::  R2.7.4.1b carrier boundary -- running it would DROP the write silently,
+  ::  which is the one outcome R2's acceptance forbids. Measured at the pin,
+  ::  `TLCGetAndSet(1, Add, 10, 0)` returns 0, 10, 20 on successive
+  ::  expansions while the register goes 10, 20, 30; the native arm reproduces
+  ::  exactly that
+  ?:  =(k ['TLC' 'TLCSet' 2])               `[%tlc-set | 0]
+  ?:  =(k ['TLCExt' 'TLCGetOrDefault' 2])   `[%tlc-get-or-default | 0]
+  ?:  =(k ['TLCExt' 'TLCGetAndSet' 4])      `[%tlc-get-and-set | 0]
   ::  TLCExt's non-debugger `@Evaluation` overrides (R2.6.3). All three receive
   ::  the unevaluated node, which is the whole point of each: `AssertError` has
   ::  to CATCH the argument's evaluation failure, `TLCCache` decides whether to
@@ -903,14 +921,24 @@
   ::  `level` is the exception that needs no checker: `TLCGetStringValue` tests
   ::  `EvalControl.isConst/isInit` FIRST and returns `INIT_LEVEL - 1` = 0 before
   ::  it ever touches `mainChecker`
-  |=  [as=(list value:v) run=(unit tlc-run)]
+  |=  [as=(list value:v) run=(unit tlc-run) regs=(map @ud value:v)]
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'TLCGet expects one argument.']
   ?:  ?=(%int -.i.as)
-    ::  an integer key reads the per-worker register store `TLCSet` writes.
-    ::  Unset, the pin raises EC 2145 for that index -- and since this engine
-    ::  has no writer yet (see `+tlc-set`), every index is unset
-    [%| 2.145 (rap 3 ~['TLCGet(' (crip (render:v i.as)) ') was undefined.'])]
+    ::  R2.7.4.3: an integer key reads the run-scoped register store `TLCSet`
+    ::  writes (`IdThread.getLocalValue`). Only an UNSET index is EC 2145 now
+    ::  -- measured at the pin, `TLCGet(3)` with nothing written reports
+    ::  `TLCGet(3) was undefined.`, and a written index answers its value.
+    ::  A NEGATIVE index is the argument error, not the undefined one:
+    ::  `TLCGetSet.TLCGetEval` guards `idx >= 0` and falls through to
+    ::  TLC_MODULE_ONE_ARGUMENT_ERROR otherwise
+    ?:  (syn:si p.i.as)
+      =/  ix  (abs:si p.i.as)
+      =/  hit  (~(get by regs) ix)
+      ?~  hit
+        [%| 2.145 (rap 3 ~['TLCGet(' (crip (render:v i.as)) ') was undefined.'])]
+      [%& u.hit]
+    [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
   ?.  ?=(%str -.i.as)
     [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
   ?.  (~(has in tlc-get-keys) p.i.as)
@@ -949,26 +977,67 @@
   [%& i.as]
 ::
 ++  tlc-set
-  ::  TLCSet(k, v) WRITES, and that is what still makes it a typed rejection.
+  ::  TLC!TLCSet(i, v) — the run-scoped, worker-local REGISTER STORE
+  ::  (`IdThread.setLocalValue`), read back by `TLCGet(i)` and
+  ::  `TLCExt!TLCGetOrDefault(i, d)`. Returns TRUE, so it composes as a
+  ::  conjunct.
   ::
-  ::  R2.6.1 measured what the write actually is: a run-scoped mutable register
-  ::  store (`IdThread.setLocalValue`), read back by `TLCGet(int)`. Measured at
-  ::  the pin, `TLCSet(0, TLCGet(0) + 1)` in a next-state relation accumulates
-  ::  ACROSS state expansions -- 100, 101, 102, 103 -- and the write is visible
-  ::  to a later conjunct of the SAME evaluation. So the store cannot live on
-  ::  `eenv`, which is read-only by construction: every eval's RETURN would
-  ::  have to carry it.
+  ::  MEASURED at the pin (R2.7.4.3), and every one of these is a corpus case:
+  ::    * the store ACCUMULATES across state expansions --
+  ::      `TLCSet(0, TLCGet(0) + 1)` in a next-state relation prints
+  ::      100, 101, 102, 103, and an `Init` write is still there in `Next`;
+  ::    * the write is visible to a LATER CONJUNCT of the SAME evaluation --
+  ::      `TLCSet(0, 42) /\ x' = TLCGet(0)` builds the state x = 42;
+  ::    * it is NOT part of the checked state, so it never enters a
+  ::      fingerprint; two states differing only in the register are the
+  ::      same state.
   ::
-  ::  That is the identical cross-cutting change `tlc-coverage` (R2.7.4) was
-  ::  re-sized L/high for, for the identical reason -- Hoon has no mutable
-  ::  counter, so an upward-accumulating quantity has to ride the result. Doing
-  ::  the two separately means the same surgery twice, so this half is left
-  ::  refused BY NAME rather than half-built
-  |=  as=(list value:v)
+  ::  The index must be a nonnegative integer; the pin guards `idx >= 0` and
+  ::  otherwise raises the argument error, which is the same shape `TLCGet`
+  ::  uses. A non-integer index is that error too
+  |=  [as=(list value:v) regs=(map @ud value:v)]
+  ^-  [eres (map @ud value:v)]
+  ?.  ?=([* * ~] as)  [[%| 0 'TLCSet expects two arguments.'] regs]
+  ::  the STRING keys are not register indices at all: `"exit"` stops the
+  ::  checker and `"pause"` blocks the search on stdin. Both are real tlc2
+  ::  capabilities, so neither may be reported as a bad argument -- they are
+  ::  refused BY NAME, which is what separates "this port has not built it"
+  ::  from "your spec is wrong" (R2.1)
+  ?:  ?&(?=(%str -.i.as) =('exit' p.i.as))
+    :_  regs
+    :-  %|
+    :-  0
+    %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("exit"); it '
+    ~['stops the checker mid-run, which this engine has no control channel for']
+  ?:  ?&(?=(%str -.i.as) =('pause' p.i.as))
+    :_  regs
+    :-  %|
+    :-  0
+    %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("pause"); it '
+    ~['suspends the search until stdin is read, and no reproducible run may block on a console']
+  ::  anything else is the pin's own POSITIONAL argument error -- measured,
+  ::  `TLCGetSet.TLCSet` throws TLC_MODULE_ARGUMENT_ERROR with
+  ::  `{"first", "TLCSet", "nonnegative integer", …}`
+  ?.  ?=(%int -.i.as)
+    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs]
+  ?.  (syn:si p.i.as)
+    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs]
+  [[%& %bool &] (~(put by regs) (abs:si p.i.as) i.t.as)]
+::
+++  tlc-get-or-default
+  ::  TLCExt!TLCGetOrDefault(i, d) — the same read as `TLCGet(i)` but an unset
+  ::  index answers `d` instead of raising EC 2145. Measured at the pin:
+  ::  77 before the write, 9 after it.
+  ::
+  ::  The pin does NOT guard `idx >= 0` here (unlike `TLCGet`), and a key that
+  ::  is neither an integer nor a named-register string falls through to
+  ::  `return defVal` -- so an unusable key is the DEFAULT, not an error. The
+  ::  named-register form (`"s:..."`) is a separate surface this does not claim
+  |=  [as=(list value:v) regs=(map @ud value:v)]
   ^-  eres
-  ?.  ?=([* * ~] as)  [%| 0 'TLCSet expects two arguments.']
-  :-  %|
-  :-  0
-  %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet; '
-  ~['it writes a run-scoped register the evaluator cannot carry out of an evaluation']
+  ?.  ?=([* * ~] as)  [%| 0 'TLCGetOrDefault expects two arguments.']
+  ?.  ?=(%int -.i.as)  [%& i.t.as]
+  ?.  (syn:si p.i.as)  [%& i.t.as]
+  =/  hit  (~(get by regs) (abs:si p.i.as))
+  ?~(hit [%& i.t.as] [%& u.hit])
 --

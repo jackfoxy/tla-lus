@@ -93,8 +93,8 @@ CLASSIFY = {
     ("TLC", "ToString"):     ("required", "canonical rendering already owned by value.hoon (C1.5)"),
     ("TLC", "Print"):        ("required", "typed engine output channel, never a silent no-op (C1.5)"),
     ("TLC", "PrintT"):       ("required", "typed engine output channel, never a silent no-op (C1.5)"),
-    ("TLC", "TLCGet"):       ("required", "C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an engine-state read is a typed rejection naming the key"),
-    ("TLC", "TLCSet"):       ("required", "C1.5 implements the rejection; it mutates engine state the evaluator does not own"),
+    ("TLC", "TLCGet"):       ("required", "C1.5/C1.6: the key taxonomy, EC 2145, and the pin's Evaluation contract (it receives the node at minLevel 1); an unreachable engine-state key is a typed rejection naming it. R2.7.4.3: an INTEGER key now reads the register store, so only an UNSET index is EC 2145"),
+    ("TLC", "TLCSet"):       ("required", "R2.7.4.3 implements the run-scoped register store on the R2.7.4.1 carrier; measured at the pin it accumulates across state expansions and is visible to a later conjunct of the same evaluation"),
     ("TLC", "TLCEval"):      ("required", "the pin's one plain Evaluation override; C1.6 implements the lazy argument contract with it"),
     ("TLC", "RandomElement"): ("deferred", "TLC RandomGenerator parity is unit 9"),
     ("TLC", "JavaTime"):     ("excluded", "wall-clock nondeterminism"),
@@ -110,6 +110,8 @@ CLASSIFY = {
     ("TLCExt", "TLCCache"):    ("required", "memoization of a pure expression is the identity; the pin returns exactly the expression's value (R2.6.3)"),
     ("TLCExt", "TLCDefer"):    ("required", "TRUE without evaluating: `execCallable` is run by the Simulation/Exploration workers, NOT by ModelChecker, so under BFS the deferred expression never runs (R2.6.3)"),
     ("TLCExt", "TLCNoOp"):     ("required", "the identity function (`return val`) (R2.6.3)"),
+    ("TLCExt", "TLCGetOrDefault"): ("required", "reads the same register store as TLCGet, answering the default on an unset index instead of EC 2145 (R2.7.4.3)"),
+    ("TLCExt", "TLCGetAndSet"):    ("required", "read-modify-write on the register store, returning the OLD value. No Java method at the pin: TLCExt.tla defines it as `CHOOSE v \\in {oldVal} : TLCSet(key, Op(oldVal, val))`, whose write sits inside a CHOOSE and so below the R2.7.4.1b carrier boundary -- the port implements it natively rather than evaluate a body that would drop the write (R2.7.4.3)"),
 }
 
 # ---------------------------------------------------------------------------
@@ -410,14 +412,21 @@ def build_inventory() -> tuple:
             mod, name, str(arity), vis or "undeclared",
             f"{cls}.{jname}", params, ann, method_ecs(cls, jname), cl, why,
             r2_scope(mod, name, cl, why)]
+    native = set(hoon_contracts())
     for (mod, name, arity), vis in declared.items():
         if (mod, name, arity) in rows:
             continue
         cl, why = classify(mod, name)
-        if cl == "required":
+        if cl == "required" and (mod, name, arity) not in native:
             # in-scope module, no Java override: the TLA+ definition is the
-            # behavior, so the port evaluates the vendored body
+            # behavior, so the port evaluates the vendored body...
             cl, why = "body", "no Java override; evaluates its TLA+ definition"
+            # ...UNLESS lib/stdops claims the key itself (`native` above). A
+            # vendored body is not always safe to run: TLCExt!TLCGetAndSet is
+            # `CHOOSE v \in {oldVal} : TLCSet(key, Op(oldVal, val))`, whose
+            # write sits inside a CHOOSE and so below the R2.7.4.1b carrier
+            # boundary -- evaluating it would DROP the write. A surface the
+            # port implements natively stays `required` (R2.7.4.3)
         rows[(mod, name, arity)] = [
             mod, name, str(arity), vis, "-", "-", "-", "-", cl, why,
             r2_scope(mod, name, cl, why)]

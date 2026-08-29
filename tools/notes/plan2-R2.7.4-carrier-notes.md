@@ -390,6 +390,76 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
+## R2.7.4.3 — the REGISTER STORE — DONE 2026-08-29
+
+`TLC!TLCSet` / `TLC!TLCGet(int)` / `TLCExt!TLCGetOrDefault` /
+`TLCExt!TLCGetAndSet` now work, on the R2.7.4.1 carrier. `tlc-module-tlc`'s
+owed half closes.
+
+### Measured FIRST, and every measurement is a corpus case
+
+| probe | measured at the pin |
+|---|---|
+| `TLCSet(0, TLCGet(0)+1)` in `Next`, `TLCSet(0,100)` in `Init` | prints 101, 102, 103 — the store ACCUMULATES across expansions AND the `Init` write survives into `Next` |
+| `TLCSet(0, 42) /\ x' = TLCGet(0)` | 2 states, x = 42 — the write is visible to a LATER CONJUNCT of the same evaluation |
+| `TLCGet(3)`, nothing written | `TLCGet(3) was undefined.` — EC 2145 naming the INDEX |
+| `TLCGetOrDefault(5, 77)` | 77 unset, 9 after `TLCSet(5, 9)` |
+| `TLCGetAndSet(1, Add, 10, 0)` ×3 | returns 0, 10, 20 while the register goes 10, 20, 30 |
+| `ENABLED A` with a `TLCSet` inside A | register 1, then 2 — **the witness search's writes PERSIST** |
+| `TLCSet(0,55) /\ 1 = "a"` inside `AssertError` | register 55 afterwards — a write before a CAUGHT failure persists |
+| `TLCSet("zork", …)` | `The first argument of TLCSet should be a nonnegative integer…` (POSITIONAL, not the one-argument variant) |
+
+### Four things the measurements forced
+
+1. **The store is RUN-SCOPED, so it lives on the BFS CURSOR.** The first
+   implementation kept it inside one evaluation and the corpus caught it
+   immediately: `tlcset-graph` reported `TLCGet(0) was undefined.` because
+   `Init`'s write never reached `Next`, and `tlcext-getandset` collapsed
+   3 distinct states to 2 because the register did not accumulate. `bfs-cursor`
+   gained `regs`, `+bfs-step` reads and writes it around each action's
+   expansion, and `+bfs-init-regs` seeds it from the initial-state solve
+   (`sctx.iregs`, `+search-ctx`'s carrier). It is NOT part of the checked
+   state: it never enters a fingerprint, and two states differing only in the
+   register are the same state.
+2. **`ENABLED` must NOT discard.** R2.7.4.1b left it discarding, correctly,
+   while nothing wrote — and flagged that `.3` had to measure it. It did, and
+   the answer reversed the decision: `Tool.enabled` throws the WITNESS away
+   but `TLCSet` writes a static field, so the search's writes survive.
+   `+eval-enabled-rs` now takes the carrier in and hands it back.
+3. **`TLCGetAndSet` is implemented NATIVELY.** The pin has no Java method: it
+   is a TLA+ body, `CHOOSE v \in {oldVal} : TLCSet(key, Op(oldVal, val))`.
+   That write sits inside a CHOOSE, which is BELOW the R2.7.4.1b carrier
+   boundary, so evaluating the vendored body would DROP it silently — the one
+   outcome R2's acceptance forbids. `gen-stdops-tests.py` learned the general
+   rule: a no-Java surface is `body` UNLESS `lib/stdops` claims the key
+   natively.
+4. **Corpus cases must be CLEAN runs.** `tlcext-getandset` with a violation
+   made *tlc2 itself* fail: `Failed to recover the initial state from its
+   fingerprint … This is probably a TLC bug`. A state graph built out of the
+   register cannot have its counterexample re-solved, because the re-solve
+   replays the writes. Same rule R2.7.4.2b's coverage cases follow, same
+   underlying cause. The `tlcget-unset` case was also dropped from `mc`: its
+   golden is the pin's Java-`RuntimeException` wrapper (method signature and
+   nested-expression positions), which the port never reproduces — the message
+   itself is pinned in `tests/lib/tlcmod` instead.
+
+### Still refused BY NAME
+
+`TLCSet("exit", TRUE)` (stops the checker — a real capability, so it must not
+be misreported as a bad argument) and `TLCSet("pause", TRUE)` (blocks on
+stdin; no reproducible run may wait on a console). Plus the `TLCGet` statistic
+keys R2.6.1 already refused.
+
+### Evidence
+
+`gen-mc-tests`: `tlcset-graph` (5 states, the graph is the accumulating
+register), `tlcset-same-eval` (x = 42 read back inside one conjunct list),
+`tlcext-getordefault` (4 states), `tlcext-getandset` (3 states) — each one's
+STATE COUNT depends on the store, so a dropped write cannot pass.
+`tests/lib/tlcmod`: unset index, set/get, set-then-get, the positional
+argument error, the two refusals, `TLCGetOrDefault` both ways, `TLCGetAndSet`
+and its store.
+
 ## R2.7.4.1b — the EVALUATOR carrier — DONE 2026-08-28
 
 All six batches landed. `+eval-rs` now threads `rst` from the top of the

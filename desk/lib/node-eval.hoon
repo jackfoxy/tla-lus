@@ -437,7 +437,7 @@
   ::  prime and UNCHANGED (state/action; WU6.6)
   ?:  =(nm '\'')          (eval-rs (snag 0 as) e(primed &) rs)
   ?:  =(nm 'UNCHANGED')   (eval-unchanged as e rs)
-  ?:  =(nm 'ENABLED')     [(eval-enabled (snag 0 as) e) rs]
+  ?:  =(nm 'ENABLED')     (eval-enabled-rs (snag 0 as) e rs)
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
     ::  a set constructor whose operand fails to evaluate is a typed failure,
@@ -1071,7 +1071,13 @@
   ?:  ?=(%is-finite-set tag)  [(eval-is-finite n e) rs]
   ?:  ?=(%sort-seq tag)       [(eval-sort-seq n e) rs]
   ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e rs)
-  ?:  ?=(%tlc-get tag)        [(eval-tlc-get n e) rs]
+  ::  R2.7.4.3: the REGISTER STORE. These four are the reason the carrier
+  ::  exists -- `%tlc-get` READS `regs.rs`, `%tlc-set` WRITES it, and the two
+  ::  TLCExt surfaces do both
+  ?:  ?=(%tlc-get tag)        (eval-tlc-get n e rs)
+  ?:  ?=(%tlc-set tag)        (eval-tlc-set n e rs)
+  ?:  ?=(%tlc-get-or-default tag)  (eval-tlc-get-or-default n e rs)
+  ?:  ?=(%tlc-get-and-set tag)     (eval-tlc-get-and-set n e rs)
   ?:  ?=(%assert-error tag)   (eval-assert-error n e rs)
   ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e rs)
   ?:  ?=(%tlc-defer tag)      [(eval-tlc-defer n e) rs]
@@ -1284,12 +1290,75 @@
   ::  the node and evaluates the key itself. The answer is tlc2's EC 2145 for
   ::  a key TLC does not define, and a typed rejection naming a key it does
   ::  (this evaluator cannot reach engine state)
-  |=  [n=sem-apply:sm e=eenv]
-  ^-  eres
-  ?.  ?=([* ~] args.n)  [%| 0 'TLCGet expects one argument.']
-  =/  k  (eval i.args.n e)
-  ?:  ?=(%| -.k)  k
-  (tlc-get:so ~[p.k] run.e)
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* ~] args.n)  [[%| 0 'TLCGet expects one argument.'] rs]
+  =^  k  rs  (eval-rs i.args.n e rs)
+  ?:  ?=(%| -.k)  [k rs]
+  [(tlc-get:so ~[p.k] run.e regs.rs) rs]
+::
+++  eval-tlc-set
+  ::  TLC!TLCSet(i, v) — the register WRITE (R2.7.4.3). Both arguments are
+  ::  evaluated left to right, and each one's own effect on the store is
+  ::  visible to the next, which is what makes `TLCSet(0, TLCGet(0) + 1)`
+  ::  accumulate
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * ~] args.n)  [[%| 0 'TLCSet expects two arguments.'] rs]
+  =^  as  rs  (eval-args-rs args.n e rs)
+  ?:  ?=(%| -.as)  [as rs]
+  =^  r  regs.rs  (tlc-set:so p.as regs.rs)
+  [r rs]
+::
+++  eval-tlc-get-or-default
+  ::  TLCExt!TLCGetOrDefault(i, d) — the register READ that answers `d` on an
+  ::  unset index rather than raising EC 2145
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * ~] args.n)
+    [[%| 0 'TLCGetOrDefault expects two arguments.'] rs]
+  =^  as  rs  (eval-args-rs args.n e rs)
+  ?:  ?=(%| -.as)  [as rs]
+  [(tlc-get-or-default:so p.as regs.rs) rs]
+::
+++  eval-tlc-get-and-set
+  ::  TLCExt!TLCGetAndSet(key, Op(_,_), val, defaultVal) — read-modify-write,
+  ::  returning the OLD value.
+  ::
+  ::  The pin has no Java method for this: TLCExt.tla defines it as
+  ::  `LET oldVal == TLCGetOrDefault(key, defaultVal)
+  ::   IN CHOOSE v \in {oldVal} : TLCSet(key, Op(oldVal, val))`.
+  ::  The port implements it natively rather than evaluating that body,
+  ::  because the body hides its write inside a CHOOSE and CHOOSE is BELOW the
+  ::  R2.7.4.1b carrier boundary -- `+choose-over:v` takes a gate that cannot
+  ::  hand `rst` back, so evaluating the body would drop the write silently.
+  ::  Measured at the pin: with `Op == +` and `val = 10` from default 0, the
+  ::  successive answers are 0, 10, 20 while the register becomes 10, 20, 30
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* * * * ~] args.n)
+    [[%| 0 'TLCGetAndSet expects four arguments.'] rs]
+  =/  keyn  i.args.n
+  =/  opn   i.t.args.n
+  =/  valn  i.t.t.args.n
+  =/  defn  i.t.t.t.args.n
+  ::  argument order follows the TLA+ body: the key, then the default (both
+  ::  needed for the READ), then the operand
+  =^  kv  rs  (eval-rs keyn e rs)
+  ?:  ?=(%| -.kv)  [kv rs]
+  =^  dv  rs  (eval-rs defn e rs)
+  ?:  ?=(%| -.dv)  [dv rs]
+  =/  old  (tlc-get-or-default:so ~[p.kv p.dv] regs.rs)
+  ?:  ?=(%| -.old)  [old rs]
+  =^  vv  rs  (eval-rs valn e rs)
+  ?:  ?=(%| -.vv)  [vv rs]
+  =/  od  (resolve-oparg opn e)
+  ?~  od  [[%| (op-arg-error 'TLCGetAndSet' 'operator' opn)] rs]
+  =^  nv  rs  (apply-def-rs u.od ~[p.old p.vv] e rs)
+  ?:  ?=(%| -.nv)  [nv rs]
+  =^  sr  regs.rs  (tlc-set:so ~[p.kv p.nv] regs.rs)
+  ?:  ?=(%| -.sr)  [sr rs]
+  [[%& p.old] rs]
 ::
 ++  eval-sort-seq
   ::  TLC!SortSeq(s, cmp): tlc2's insertion sort, with the comparator applied
@@ -1805,17 +1874,25 @@
   ::  satisfying PARTIAL assignment enables A — completeness is not required.
   |=  [n=sem:sm e=eenv]
   ^-  eres
-  ::  R2.7.4.1b: ENABLED still DISCARDS the carrier, and now that the
-  ::  evaluator carries it that is a deliberate decision rather than an
-  ::  accident. `Tool.enabled` runs the action's witness search under
-  ::  `EvalControl.Enabled` and throws the witness away; the port does the
-  ::  same, so anything the search wrote is thrown away with it. Nothing
-  ::  writes yet, so it is still behaviour-free -- but R2.7.4.3 must MEASURE
-  ::  the pin before claiming parity here, because tlc2's `TLCSet` writes a
-  ::  static field and would survive a discarded witness where this does not
-  =/  r=sres  -:(solve n %next s0.e ~ e(enabled &) empty-rst)
-  ?:  ?=(%| -.r)  r
-  [%& [%bool ?=(^ p.r)]]
+  -:(eval-enabled-rs n e empty-rst)
+::
+++  eval-enabled-rs
+  ::  R2.7.4.3 MEASURED the pin and the answer is that ENABLED must NOT
+  ::  discard. `Tool.enabled` throws the WITNESS away, but `TLCSet` writes a
+  ::  static field, so anything the witness search wrote survives: with
+  ::  `A == TLCSet(0, TLCGetOrDefault(0,0) + 1) /\ x' = x + 1`, evaluating
+  ::  `ENABLED A` once per expansion leaves the register at 1, then 2. So the
+  ::  carrier goes IN (the search must read the live store) and comes back
+  ::  OUT (its writes are kept) -- only the witness state is dropped.
+  ::
+  ::  R2.7.4.1b had this discarding, correctly, while nothing wrote; this is
+  ::  the increment that makes it observable, and the measurement is what
+  ::  changed it
+  |=  [n=sem:sm e=eenv rs=rst]
+  ^-  eout
+  =^  r  rs  (solve n %next s0.e ~ e(enabled &) rs)
+  ?:  ?=(%| -.r)  [r rs]
+  [[%& [%bool ?=(^ p.r)]] rs]
 ::
 ::  +|  Test / Driver Entrypoints
 ::
@@ -2237,10 +2314,20 @@
   (pfilter n cur part e acts p fil)
 ::
 ++  pred-bool
-  ::  a state/action predicate BODY as a boolean under given states
+  ::  a state/action predicate BODY as a boolean under given states.
+  ::  The carrier-discarding wrapper (R2.7.4.1's signature policy)
   |=  [body=sem:sm s0=state s1=state e=eenv]
   ^-  (each ? eval-err:v)
   (eval-bool body e(s0 s0, s1 s1))
+::
+++  pred-bool-rs
+  ::  R2.7.4.3: the carrying form. A CONSTRAINT or an INVARIANT may contain a
+  ::  `TLCSet`, and at the pin that write lands in the same static store the
+  ::  next-state relation reads -- `Tool.isInModel` / `Tool.isValid` evaluate
+  ::  under the ordinary evaluator with nothing special about the store
+  |=  [body=sem:sm s0=state s1=state e=eenv rs=rst]
+  ^-  bout
+  (eval-bool-rs body e(s0 s0, s1 s1) rs)
 ::
 ++  render-states
   ::  a stable rendering of a state stream for differential comparison:
