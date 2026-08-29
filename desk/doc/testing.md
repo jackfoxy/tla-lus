@@ -406,3 +406,47 @@ to be wired.
    from the pinned oracle.
 3. Commit the fixture, the golden, and the regenerated shard together.
 4. Confirm both tier-1 halves are green.
+
+### A case for a RANDOMIZED operator (R2.7.4)
+
+`TLC!RandomElement` and the three `Randomization` operators draw from a seeded
+generator, so a case that uses one needs `test-data/<case>/opts.txt` pinning
+**both** `-fp 0` and `-seed N` — `gen-mc-tests.py` and `gen-safety-tests.py`
+both read it, and `gen-mc-tests.py` emits `+check-seed:check` for any case that
+names a seed. `-fp` matters because the per-predecessor reseed is
+`state.fingerPrint() ^ seed`; a different fingerprint function is a different
+draw sequence.
+
+Three rules that R2.7.4.4/.5 learned the expensive way:
+
+- **Use WIDE seeds.** Measured: seeds 1, 2, 3, 7, 8 and 42 all produce the
+  *same* first draw, because `Random.setSeed` scrambles multiplicatively and
+  the first `nextDouble` barely moves. Agreement at a small seed is worth
+  nothing as evidence. The corpus uses 12345 and 987654321, which separate.
+- **Use a domain big enough to discriminate.** A case drawing from `0..2`
+  passed against a *wrong* generator about a third of the time — the wrong
+  `nextDouble` still floored to the right index. R2.7.4.4's scramble bug
+  survived two corpus cases for exactly this reason and was only caught by a
+  third. Draw from something with ten or more elements, or make the case count
+  states that a repeated draw would collapse.
+- **Make the STATE COUNT depend on the draws.** A case whose graph is shaped by
+  a step counter reports the same numbers however the draws come out. Shape the
+  guard with the drawn value (`1 \notin x`, `x # y`) so a dropped or repeated
+  draw changes `states generated` / `distinct` / `depth`, or violate an
+  invariant so the trace prints the value itself.
+
+A run whose state graph is BUILT from draws (or from the `TLCSet` register)
+cannot have its counterexample reliably re-solved by tlc2 — measured,
+`tlcext-getandset` reported `Failed to recover the initial state from its
+fingerprint … probably a TLC bug`. So a corpus case of this kind should either
+be a clean `VERDICT ok` run or violate at the INITIAL state, where there is no
+trace to re-solve.
+
+### Reading a `-test` verdict from the ship (a trap hit four times)
+
+`tmux capture-pane -S -N | grep FAILED` spans **several runs**. Every stale hit
+looks exactly like a live one, and chasing an already-fixed failure has cost
+this port roughly half an hour per occurrence. Anchor the read to the current
+run: slice the scrollback between the *previous* `ok=%` line and the last one,
+and report only what falls inside. The dojo prints its command echo at the
+*end* of a run, so anchoring on the echo alone selects the wrong block.

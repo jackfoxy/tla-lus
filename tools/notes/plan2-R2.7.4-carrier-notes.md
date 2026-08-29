@@ -390,6 +390,90 @@ counters are computed but nothing reads them yet, so behaviour is unchanged.
 7. Corpus cases, `tests/lib/trace.hoon` extended to the counts, the two approved
    differences, and the ledger flip.
 
+## R2.7.4.6 — close-out — DONE 2026-08-29
+
+### The three ledger rows, and what each earned
+
+| row | before R2.7.4 | now | why |
+|---|---|---|---|
+| `tlc-coverage` | `partial` (approval withdrawn by R2.0) | **`approved-difference`** | .2b built the block. What stays approved is narrower than what was withdrawn: two of the five line kinds (per-VARIABLE, per-node sub-expression) are absent, and a run printing a counterexample reports no block |
+| `tlc-module-tlc` | `approved-difference`, with three surfaces owed | **`approved-difference`**, nothing owed | .3 shipped the register store, .4 the last deferred surface. What remains approved is `Print`'s missing output channel, the two named `TLCSet` keys, and normalized `MethodValue` argument text — all three genuinely deliberate |
+| `tlc-util-combinatorics` | `partial` (R2.6.2 re-opened it) | **`excluded`** | .5 measured the premise and it was an overload confusion; nothing to port |
+
+Ledger **126 terminal / 5 owed** (was 125 / 6). The five that remain belong to
+other units: `semantic-graph`, `tlc-driver`, `tlc-module-excluded`,
+`tlc-live-normalize`, `tlc-live-diagnostics`.
+
+**`tlc-module-excluded` deliberately does NOT flip.** Its `deferred` bucket is
+empty and R2's whole slice is built, but the inventory still records
+`later: 3` — `TLCEvalDefinition`, `TLCFP`, `TLCModelValue` need no engine state
+the port lacks and no R2 subunit owns them. Flipping the row would file three
+un-owned surfaces under "excluded by design", which they are not. It stays
+`partial`, honestly, and the three stay findable in the `r2-scope` column.
+
+### The close-out found a stale count, and then made it checkable
+
+`compatibility.md`'s support matrix opens `**Seven** ledger rows are
+`approved-difference``. It has been eight since .2b closed `tlc-coverage`.
+Check (5) of `check-portmap.py` keeps the matrix COMPLETE — every approved row
+appears — and check (4) compares quoted tallies, but its patterns are all
+numeric and the sentence counts itself in **words**, so the two could disagree
+indefinitely and no gate would notice.
+
+Check (4) now also reads that sentence, in words or digits, against
+`check-parity.py`'s own `approved-difference` count. **Verified to bite**:
+setting it to "Nine" fails the gate and names the row. This is the same lesson
+R1.9.0/R1.9.1 recorded twice — a check that only recognizes the phrasing you
+thought of has a hole in it — and this is its third instance, which is why the
+fix keys on the computed count rather than on the prose.
+
+### `testing.md` gained the RNG-corpus rules
+
+Three of them, each learned by being burned:
+
+1. **Wide seeds only.** Seeds 1, 2, 3, 7, 8, 42 all give the same first draw.
+2. **Domains big enough to discriminate.** R2.7.4.4's scramble bug PASSED two
+   `0..2` corpus cases — a wrong `nextDouble` still floors to the right index
+   about a third of the time over three elements.
+3. **The state count must depend on the draws**, not on a step counter.
+
+Plus the `-fp 0` requirement (the reseed is `fingerPrint ^ seed`), the rule
+that an RNG- or register-built graph must be a clean run or an initial-state
+violation (tlc2 cannot re-solve its own counterexample there), and — finally
+written down — how to read a `-test` verdict without picking up the previous
+run's `FAILED` lines, a trap this unit hit four times.
+
+### `validate.py --check` caught a stale evidence count
+
+Tier 1 flagged `evidence-counts.md` on the first pass: it recorded
+`gen-mc-tests.py | 33` when the corpus holds **51**, and a compared-cases total
+of 1189 against the real 1207. The 33 predates R2.7.4 entirely — the mc corpus
+had already grown past it before this unit started — so nothing between then
+and now had run tier 1. Regenerated, second pass clean. Exactly the class of
+drift the gate exists for, and a reminder that per-increment shard runs (the
+right discipline) structurally cannot see it.
+
+### What R2.7.4 leaves open, stated plainly
+
+The **carrier boundary** is unchanged and is now the unit's one declared limit.
+`rst` threads through the eager spine — every solver arm, every evaluator arm,
+every node-op. It does NOT thread through:
+
+- `lib/value.hoon`'s streaming binder combinators and the lazy `sexp`
+  descriptors `+eval-domain` builds;
+- therefore a draw or a `TLCSet` inside an EXPRESSION-position `\E` / `\A` /
+  `CHOOSE` / set comprehension, or inside an argument to `Cardinality` /
+  `IsFiniteSet` / `SelectSeq` / `BagOfAll`, is evaluated and its effect
+  discarded.
+
+Both operators that would have hit this — `TLCExt!TLCGetAndSet` (.3) and
+`Randomization!TestRandomSetOfSubsets` (.5) — are implemented NATIVELY for that
+reason, and each says so at its arm. What remains is a spec that writes or draws
+inside one of those constructs *itself*; there is no operator to reimplement
+there, so closing it means carrying `+eval-domain` and the combinators, a change
+of the same shape as R2.7.4.1 and a unit of its own. An ACTION-position `\E`
+is NOT affected — it goes through `+solve-exists`, which has carried since .1a.
+
 ## R2.7.4.5 — the `Randomization` module — DONE 2026-08-29
 
 Three surfaces move `deferred` → `required`: `RandomSubset`,

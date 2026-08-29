@@ -167,11 +167,31 @@ def check_tally() -> None:
                 stale.append(f"{doc.name} quotes owed={om}, computed {owed}")
             if int(rows) != terminal + owed:
                 stale.append(f"{doc.name} quotes rows={rows}, computed {terminal + owed}")
+    # R2.7.4.6: the support matrix opens by counting itself in WORDS
+    # ("**Seven** ledger rows are `approved-difference`"), a phrasing none of
+    # the numeric patterns above could see -- and it went stale the moment
+    # R2.7.4.2b closed `tlc-coverage` back to approved, 7 -> 8. Check (5)
+    # keeps the matrix COMPLETE but says nothing about the sentence over it,
+    # so the count and the table could disagree with each other indefinitely.
+    m3 = re.search(r"approved-difference\s+(\d+)", r.stdout)
+    approved = int(m3.group(1)) if m3 else -1
+    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+             7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
+             12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+    mtx = re.search(r"\*\*(\w+)\*\* ledger rows are `approved-difference`",
+                    (DESK / "doc/compatibility.md").read_text())
+    if mtx:
+        said = mtx.group(1).lower()
+        want = words.get(approved, str(approved))
+        if said not in (want, str(approved)):
+            stale.append(f"compatibility.md's support matrix says "
+                         f"'{mtx.group(1)}' approved-difference rows, computed {approved}")
     if stale:
         for s in stale:
             bad(s)
     else:
-        ok(f"quoted tallies agree with check-parity.py ({terminal} terminal, {owed} owed)")
+        ok(f"quoted tallies agree with check-parity.py ({terminal} terminal, "
+           f"{owed} owed, {approved} approved-difference)")
 
 
 def check_approved_differences() -> None:
