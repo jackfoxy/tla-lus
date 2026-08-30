@@ -363,18 +363,27 @@ TLC_BATCH_REASONS = {}
 # wrong is the claim that tlc2's final liveness check "never runs". It does:
 # tlc2 prints the deadlock trace, THEN `Error: Temporal property NeverThree was
 # violated.` with its own counter-example, and only then the statistics. The
-# port emits the deadlock report alone. A second report block, not a different
-# answer — owned by R1.6, and reachable only by restructuring the `%deadlock`
-# path to append a liveness report before the counts.
-TLC_LIVENESS_DIVERGENCES = ["Github710d -> Error: Deadlock reached."]
+# port emitted the deadlock report alone.
+#
+# R2.7.5 built that second block and R2.7.6.0 RETIRED THE ENTRY — the batch now
+# agrees on all 9. The retirement was not free, and how it was caught is the
+# point: R2.7.5 deferred regenerating this census, so its `Github710d` entry
+# went stale in BOTH directions at once. The full ship suite reported
+# `Github710e` in 710d's place, and that was a REGRESSION R2.7.5 introduced,
+# not a second missing block — the port emitted a temporal block for 710e where
+# tlc2 emits none.
+#
+# Cause (R2.7.6.0, measured): `+box-free-tf` tested only the tableau formula.
+# `VisitsTwoThenStaysSmall` negates to `<>(A /\ <>B) /\ []<>(x >= 2)`, whose
+# `[]<>` half lands in a PEM CONDITION rather than in `tf` — box-free tf, live
+# obligation. The predicate now also requires box-free promises and
+# condition-free PEMs. Confirmed on the pin both ways: with `CHECK_DEADLOCK
+# FALSE` 710e prints `State 4: Stuttering` plus the fairness warning, and with
+# deadlock checking ON it prints no second block at all. Both are `mc` cases
+# (`gh710e`, `gh710e-nodl`) so the pair is pinned rather than argued.
+TLC_LIVENESS_DIVERGENCES = []
 # grouped cause, keyed by module
-TLC_LIVENESS_REASONS = {
-    "Github710d": "after a deadlock tlc2 STILL reports the violated temporal "
-                  "property and its counter-example (a second report block "
-                  "before the statistics); the port's R1.6.6 pre-emption emits "
-                  "the deadlock report alone. Same verdict, missing block — "
-                  "R1.6",
-}
+TLC_LIVENESS_REASONS = {}
 # `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE
 # (no verdict in 480 s where TLC answers in 1.8 s over 5 distinct states). Root
 # cause found and fixed in R1.8.1.4 rather than censused: every liveness graph

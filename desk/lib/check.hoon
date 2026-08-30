@@ -3004,12 +3004,33 @@
   ::  `<>` property -- recorded so it is not tried a third time.
   ::
   ::  A pure-fairness OrderOfSolution has no `tf` at all; it keeps the closer,
-  ::  which is the behaviour every existing corpus case already pins
+  ::  which is the behaviour every existing corpus case already pins.
+  ::
+  ::  R2.7.6.0: **the tf alone is not the whole obligation, and `Github710e`
+  ::  is the case that shows it.** `<>(x = 1 /\ <>(x = 2)) => <>[](x < 2)`
+  ::  negates to `<>(A /\ <>B) /\ []<>(x >= 2)`, and the decomposition puts
+  ::  the `[]<>` half into a PEM CONDITION rather than into `tf` -- so the tf
+  ::  is box-free while the witness still needs an infinite suffix. Measured
+  ::  at the pin: `CHECK_DEADLOCK FALSE` prints `State 4: Stuttering` and the
+  ::  fairness warning, and with deadlock checking ON the second report block
+  ::  is NOT printed. The tf-only test said the opposite on both.
+  ::
+  ::  So the predicate is "a FINITE PREFIX discharges everything": the tf
+  ::  carries no `[]`, no promise carries one, and every PEM is itself
+  ::  condition-free -- the same `isEmpty` notion `+stutter-gate`'s `quiet`
+  ::  already uses (no `<>[]A`, no `[]<>S`, no `[]<>A`). This flips exactly
+  ::  the box-free-tf-with-a-live-PEM shape; none of R2.7.5's six measured
+  ::  properties had it, which is why one spec's worth of measurement missed
+  ::  it and the frozen tier-2 census caught it.
   |=  os=(list oos:tp)
   ^-  ?
   ?~  os  |
   ?~  tf.i.os  |
-  !(has-box:tp u.tf.i.os)
+  ?.  !(has-box:tp u.tf.i.os)  |
+  ?:  (lien promises.i.os has-box:tp)  |
+  %+  levy  pems.i.os
+  |=  m=pem:tp
+  &(=(~ ea-action.m) =(~ ae-state.m) =(~ ae-action.m))
 ::
 ++  stutter-gate
   ::  the hint tlc2 appends AFTER a STUTTERING counterexample (EC 2257 / 2259,

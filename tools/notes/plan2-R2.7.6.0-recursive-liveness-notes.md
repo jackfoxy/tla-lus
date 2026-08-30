@@ -113,6 +113,80 @@ until the next unit ran the gate — which is this unit.
 No action beyond regenerating: the counts were understated, never overstated,
 and the goldens themselves never drifted.
 
+## Cross-shard breakage the full suite caught, belonging to R2.7.4
+
+The user's full-suite run failed two arms in `tests/lib/stdops` — a shard this
+unit did not touch, and neither did the units that broke it.
+
+| arm | cause | fix |
+|---|---|---|
+| `test-unimplemented-operator-names-itself` | It asserted that `TLC!RandomElement/1` names itself as unsupported. **R2.7.4.4 implemented it**, so the arm read `1` — a drawn value — instead of the rejection. | Re-pointed at **`TLC!JavaTime/0`**, excluded on WALL-CLOCK NONDETERMINISM rather than on effort, so no later capability unit can turn it green the way one turned `RandomElement` green. |
+| `test-registry-row-count` | Expected 38, got 37. **R2.7.4.3 moved `TLC!TLCSet` out of `registry` into the node-op table**, because writing the run-scoped register store needs the `rst` carrier a plain `(list value)` row cannot reach. | 37, with the comment recording that this is the counter's **first decrement** — every prior change added. |
+
+Both are hand-written drift guards, which is exactly why they broke silently:
+`gen-stdops-tests.py` regenerates `stdops-diff.hoon` and `inventory.txt`, and
+both were correct throughout — `RandomElement` and `TLCSet` read `required`
+there. The machine-checked record was right and the hand-written one was
+stale, so tier 1, the scaffold gate and `check-portmap.py` all stayed green.
+
+**R1.8.8's finding, a second time**: a unit runs the shards it touched, and
+that discipline is structurally blind to a shard that asserts something about
+code the unit changed. R2.7.4.3/.4 changed `lib/stdops.hoon`'s registry and
+`tests/lib/stdops.hoon` asserts its SIZE; nothing links them but the full
+suite. `tests/lib/tlcmod.hoon` was updated in the same units, so the miss was
+this one shard, not a habit.
+
+No status moves: `tlc-module-tlc` is `approved-difference` and both operators
+were already `required` in the inventory. What was wrong was two test
+expectations.
+
+## A REGRESSION the full suite caught, and the third defect behind it
+
+The suite also failed `tests/lib/tier2/test-tlc-liveness-batch`:
+
+```text
+expected: <|Github710d -> Error: Deadlock reached.|>
+actual  : <|Github710e -> Error: Deadlock reached.|>
+```
+
+Read carelessly this looks like the stale census R2.7.5 already flagged. It is
+not. **710d was retired as R2.7.5 intended, and 710e was newly BROKEN by the
+same unit** — the frozen entry was wrong in both directions at once, and only
+the full suite could see it, because the census asserts the exact list.
+
+Measured at the pin, both ways:
+
+| run | pin | port before this fix |
+|---|---|---|
+| `Github710e` as configured (deadlock checking ON) | `Error: Deadlock reached.` and **no temporal block** | deadlock report **plus** `Error: Temporal property VisitsTwoThenStaysSmall was violated.` |
+| the same spec with `CHECK_DEADLOCK FALSE` | violation, `State 4: Stuttering`, and the EC 2259 fairness warning | violation, same three prefix states, **no closer and no warning** |
+
+One predicate explains both, in opposite directions: `+box-free-tf`.
+
+**The tf is not the whole obligation.** `VisitsTwoThenStaysSmall ==
+<>(x = 1 /\ <>(x = 2)) => <>[](x < 2)` negates to `<>(A /\ <>B) /\ []<>(x >= 2)`,
+and the OrderOfSolution decomposition puts the `[]<>` half into a **PEM
+condition**, not into `tf`. So the tf is box-free while the witness still needs
+an infinite suffix — the port therefore dropped the closer where tlc2 prints
+one, and printed the second report block where tlc2 prints none.
+
+`+box-free-tf` now asks whether **a finite prefix discharges everything**: the
+tf carries no `[]`, no promise carries one, and every PEM is condition-free —
+the same `isEmpty` notion `+stutter-gate`'s `quiet` already used. That flips
+exactly the box-free-tf-with-a-live-PEM shape, so none of R2.7.5's six measured
+properties move.
+
+**Why one spec's worth of measurement was not enough.** R2.7.5 measured six
+property shapes on a single 4-state spec, and not one of them had a box-free tf
+*and* a live PEM. The case that does is in the corpus — it was `Github710e`,
+inside the very census the unit chose not to regenerate. The deferral and the
+defect were the same decision.
+
+Both directions are now pinned as `mc` cases, `gh710e` and `gh710e-nodl`, so
+the pair cannot regress quietly. `TLC_LIVENESS_DIVERGENCES` is **empty**: all
+nine liveness-batch specs agree. **R2.8.2a's `Github710d` retirement is
+therefore discharged here**, ahead of its unit.
+
 ## Evidence
 
 `-test /=tla-lus=/tests/lib/mc ~` — **`ok=%.y`**, 57 emitted arms (59 cases,

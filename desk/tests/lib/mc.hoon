@@ -204,6 +204,50 @@
     '---- MODULE spec ----\0a\\* upstream test-model/Github1389ViolatedB.tla: the recursive call sits\0a\\* under <> rather than in the ELSE, and Reach(0) expands to a level-1\0a\\* state predicate although Reach is temporal.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 99) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aPropViolated == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
 ::
+++  test-mc-gh710e
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Inc line 7, col 8 to line 7, col 26 of module spec>'
+        'x = 1'
+        'State 3: <Inc line 7, col 8 to line 7, col 26 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a\0aInit == x = 0\0a\0aInc == x < 2 /\\ x\' = x + 1 \\* x <= 2 - see git commit msg.\0aNext == Inc\0a\0aSpec == Init /\\ [][Next]_x\0a\0aFairSpec == Spec /\\ WF_x(Next)\0a\0aVisitsTwoThenStaysSmall == <>(x = 1 /\\ <>(x = 2)) => <>[](x < 2)\0a\0aneg_VisitsTwoThenStaysSmall == ~(VisitsTwoThenStaysSmall)\0a\0aEventuallyZero == <>(x = 0)\0aEventuallyTwo == <>(x = 2)\0a\0aTautology == (x = x) ~> (x = x)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY VisitsTwoThenStaysSmall\0aPROPERTY neg_VisitsTwoThenStaysSmall\0aPROPERTY EventuallyZero\0aPROPERTY Tautology\0a'
+::
+++  test-mc-gh710e-nodl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property VisitsTwoThenStaysSmall was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Inc line 7, col 8 to line 7, col 26 of module spec>'
+        'x = 1'
+        'State 3: <Inc line 7, col 8 to line 7, col 26 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        'Warning: The stuttering counterexample above may be caused by the absence of a fairness constraint in the behavior specification Spec defined at line 10, col 1 to line 10, col 26 of module spec. To rule out such counterexamples, conjoin a suitable fairness constraint to Spec (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a\0aInit == x = 0\0a\0aInc == x < 2 /\\ x\' = x + 1 \\* x <= 2 - see git commit msg.\0aNext == Inc\0a\0aSpec == Init /\\ [][Next]_x\0a\0aFairSpec == Spec /\\ WF_x(Next)\0a\0aVisitsTwoThenStaysSmall == <>(x = 1 /\\ <>(x = 2)) => <>[](x < 2)\0a\0aneg_VisitsTwoThenStaysSmall == ~(VisitsTwoThenStaysSmall)\0a\0aEventuallyZero == <>(x = 0)\0aEventuallyTwo == <>(x = 2)\0a\0aTautology == (x = x) ~> (x = x)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY VisitsTwoThenStaysSmall\0aPROPERTY neg_VisitsTwoThenStaysSmall\0aPROPERTY EventuallyZero\0aPROPERTY Tautology\0a'
+::
 ++  test-mc-implied-act-pass
   %+  expect-eq
     !>  ^-  wain

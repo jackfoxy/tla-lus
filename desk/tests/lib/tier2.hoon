@@ -437,8 +437,7 @@
 ++  test-tlc-liveness-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'Github710d -> Error: Deadlock reached.'
-    ==
+    ~
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])

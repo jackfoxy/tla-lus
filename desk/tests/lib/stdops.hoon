@@ -97,12 +97,17 @@
 ::
 ++  test-unimplemented-operator-names-itself
   ::  a declared-but-unimplemented StandardModule operator names itself
-  ::  rather than evaluating its vendored body. RandomElement is unit 9's
-  ::  (it needs TLC's RNG)
+  ::  rather than evaluating its vendored body.
+  ::
+  ::  R2.7.6.0: this arm asserted RandomElement, which R2.7.4.4 IMPLEMENTED
+  ::  -- the arm then read `1`, a drawn value, instead of the rejection.
+  ::  JavaTime replaces it because it is excluded on WALL-CLOCK
+  ::  NONDETERMINISM rather than on effort, so no later capability unit can
+  ::  turn it green the way one turned RandomElement green.
   %-  val
-  :+  (one "EXTENDS Integers, TLC" ~["Expr == RandomElement(1..2)"])
+  :+  (one "EXTENDS Integers, TLC" ~["Expr == JavaTime"])
     'Expr'
-  "ERR: unsupported StandardModule operator: TLC!RandomElement/1"
+  "ERR: unsupported StandardModule operator: TLC!JavaTime/0"
 ::
 ::  +|  Body-Evaluable Standard Operators
 ::
@@ -162,6 +167,10 @@
   ::  C1.5 added the TLC value-shaped rows, C1.6 moved TLCGet to the
   ::  node-op table because the pin evaluates it lazily, R2.6.3 added
   ::  TLCExt!TLCNoOp -- its three siblings are node-ops, being `@Evaluation`
-  ::  overrides, and AssertEq is a `body`)
-  (expect-eq !>(38) !>(~(wyt by registry:so)))
+  ::  overrides, and AssertEq is a `body`).
+  ::
+  ::  R2.7.4.3 is the FIRST DECREMENT: TLCSet left the registry for the
+  ::  node-op table, because writing the run-scoped register store needs the
+  ::  carrier `rst` that a plain `(list value)` row cannot reach. 38 -> 37.
+  (expect-eq !>(37) !>(~(wyt by registry:so)))
 --

@@ -183,12 +183,19 @@
 ++  test-unclaimed-operators-are-typed-rejections
   ::  everything the registry, the node-op table, and the descriptors leave
   ::  unclaimed is a typed rejection naming itself — never a value
+  ::
+  ::  R2.7.6.0: `RandomElement` was one of the three unclaimed names and
+  ::  R2.7.4.4 IMPLEMENTED it, so this arm read %override. It is now asserted
+  ::  on the other side — deleting it would drop the only guard that the
+  ::  operator still resolves — and the two names left standing are excluded
+  ::  on SEMANTICS (a wall clock, a value with no canonical representation)
+  ::  rather than on effort, so no later capability unit moves them.
   =/  src
     (one "EXTENDS Integers, TLC, Bags" ~["Expr == 1"])
   ;:  weld
-    (expect-eq !>(%none) !>((binding-in:ne 'A' src 'RandomElement' 1)))
     (expect-eq !>(%none) !>((binding-in:ne 'A' src 'JavaTime' 0)))
     (expect-eq !>(%none) !>((binding-in:ne 'A' src 'Any' 0)))
+    (expect-eq !>(%override) !>((binding-in:ne 'A' src 'RandomElement' 1)))
     ::  and the body-evaluable exception is still exactly one operator
     (expect-eq !>(%body) !>((binding-in:ne 'A' src 'SubBag' 1)))
   ==
