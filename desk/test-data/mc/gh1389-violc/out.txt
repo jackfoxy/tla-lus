@@ -1,0 +1,4 @@
+Error: Temporal property PropViolated was violated.
+Error: The following behavior constitutes a counter-example:
+10001 states generated, 100 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 2.

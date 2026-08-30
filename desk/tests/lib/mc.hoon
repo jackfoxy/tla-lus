@@ -10,6 +10,24 @@
   ^-  wain
   (skip w |=(l=@t =('' l)))
 ::
+++  verdict-only
+  ::  R2.7.6.2: the projection for a case whose counter-example WITNESS is
+  ::  nondeterministic at the pin (six runs of the same jar gave six different
+  ::  loop states). Keeps the verdict, the counter-example header and the
+  ::  counts; drops the numbered trace -- the discipline `gen-dfid-tests.py`
+  ::  already applies to a DFID counterexample, for the same reason: where
+  ::  tlc2's own answer varies run to run, no port can match it and no oracle
+  ::  says what matching would mean
+  |=  w=wain
+  ^-  wain
+  %+  skim  w
+  |=  l=@t
+  ?|  =('Error:' (end [3 6] l))
+      =('Model checking' (end [3 14] l))
+      =('The depth' (end [3 9] l))
+      !=(~ (find "states generated" (trip l)))
+  ==
+::
 ++  test-mc-alias
   %+  expect-eq
     !>  ^-  wain
@@ -651,6 +669,78 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-witness
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 9, col 9 to line 9, col 25 of module spec>'
+        'x = 5'
+        'Back to state 1: <Next line 9, col 9 to line 9, col 25 of module spec>'
+        '10 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.2 probe, reduced from upstream Github1389ViolatedC: the property is\0a\\* violated, and the counter-example must AVOID the witness value -- a lasso\0a\\* through x = 99 satisfies <>(x = 99) and is not a counter-example at all.\0a\\* The only sound loop value here is 5.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' \\in {0, 5, 99}\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <>(x = 99)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-witness-many
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        '101 states generated, 10 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  verdict-only
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.2 probe: the same shape as `live-witness` but with TEN successors,\0a\\* so the port has a real choice among sound witnesses (1..8) as well as the\0a\\* unsound one (9, which satisfies the promise and cannot be on a\0a\\* counter-example).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <>(x = 9)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-witness-nested
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 9, col 9 to line 9, col 25 of module spec>'
+        'x = 5'
+        'Back to state 1: <Next line 9, col 9 to line 9, col 25 of module spec>'
+        '10 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.2 probe (nested eventualities), reduced from upstream Github1389ViolatedC: the property is\0a\\* violated, and the counter-example must AVOID the witness value -- a lasso\0a\\* through x = 99 satisfies <>(x = 99) and is not a counter-example at all.\0a\\* The only sound loop value here is 5.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' \\in {0, 5, 99}\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <><><>(x = 99)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-witness-nested-many
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        '101 states generated, 10 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  verdict-only
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.2 probe (nested eventualities, ten successors): the same shape as `live-witness` but with TEN successors,\0a\\* so the port has a real choice among sound witnesses (1..8) as well as the\0a\\* unsound one (9, which satisfies the promise and cannot be on a\0a\\* counter-example).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <><><>(x = 9)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
 ++  test-mc-rnd-exists
   %+  expect-eq
