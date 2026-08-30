@@ -53,26 +53,55 @@ SKIPS = {
         "the witness ends at the last state anyway, and no existing liveness "
         "case has a graph that extends PAST its witness. Frozen so the fix "
         "has a target."),
-    #  R2.7.6.0 measured both, and they are ONE difference, not two.
-    "gh1389-loops": (
-        "R2.7.6.0: the expansion does not reach a base case, so tlc2 inlines "
-        "until the JVM stack overflows and `TLC.process` reports EC 1005 (the "
-        "four-line StackOverflowError template). The port bounds the "
-        "expansion at `+expand-cap` (1.000 nested expansions) and falls "
-        "through to `+user-op`'s `fall`, which raises EC 2213 `TLC cannot "
-        "handle the temporal formula` at the property's location --- a Hoon "
-        "runaway is an uncatchable hang, not a throwable, so the bound is the "
-        "same trade `live-graph-cap` makes. SAME OUTCOME (the run does not "
-        "produce a verdict), different code and text. Frozen here; R2.7.6.1 "
-        "turns it into a tested approved-difference with a support-matrix "
-        "row, at which point this entry is deleted."),
-    "gh1389-guard": (
-        "R2.7.6.0: same difference as `gh1389-loops`, reached the other way "
-        "--- the recursive operator's parameter is bound to a state variable, "
-        "so the IF guard never resolves during tableau construction and the "
-        "expansion does not terminate. Pin: EC 1005. Port: EC 2213 at "
-        "`Prop == op(x)`. Frozen for R2.7.6.1."),
 }
+
+
+#  Cases where the port's answer differs from the pin by an APPROVED
+#  DIFFERENCE (R2.7.6.1). The golden stays the PIN's -- regenerated every run,
+#  so a change at the pin shows up as a diff -- and the emitted arm asserts the
+#  PORT's own output instead. That tests the difference in BOTH directions: a
+#  port regression fails the arm, and a port that quietly starts agreeing with
+#  the pin fails it too, so the approval has to be re-decided rather than
+#  lapsing into silence. A withheld arm (`SKIPS`) proves nothing; this does.
+#
+#  Both entries here have the same PIN outcome -- EC 1005, the four-line
+#  `This was a Java StackOverflowError` template, because tlc2 has no bound on
+#  tableau expansion and dies on the JVM stack -- and, measured, two DIFFERENT
+#  port behaviours. Neither run produces a verdict on either side.
+APPROVED = {
+    "gh1389-loops": (
+        ["Error: expansion bound reached (1000 nested user-operator "
+         "expansions) translating the temporal formula line 7, col 37 to "
+         "line 7, col 42 of module spec; the recursion reaches no base case. "
+         "tlc2 has no bound here: it overflows the JVM stack and reports "
+         "EC 1005"],
+        "the expansion genuinely runs away (guard FALSE, ELSE re-invokes with "
+        "the same argument), so `+expand-cap` stops it at 1.000 nested "
+        "expansions and `+user-op` PROPAGATES that rejection rather than "
+        "swallowing it -- a Hoon runaway is an uncatchable hang, not a "
+        "throwable, the same trade `live-graph-cap` makes"),
+    "gh1389-guard": (
+        ["Error: TLC cannot handle the temporal formula line 12, col 9 to "
+         "line 12, col 13 of module spec"],
+        "NOT a cap case, measured: the recursion is guarded by a STATE "
+        "variable, so the expansion fails on its first attempt and never "
+        "recurses -- re-running with `+expand-cap` lowered to 3 leaves this "
+        "output byte-identical. The port refuses the translation with the "
+        "pin's own EC 2213 text; tlc2 attempts it and dies on the stack"),
+}
+
+
+def wrap_note(s: str) -> str:
+    """A reason wrapped as `::  ` continuation lines, for the emitted arm."""
+    out, line = [], "::  "
+    for w in s.split():
+        if len(line) + len(w) + 1 > 76:
+            out.append(line)
+            line = "::  " + w
+        else:
+            line = (line + " " + w) if line.strip() != "::" else line + w
+    out.append(line)
+    return "\n".join(out)[4:]
 
 
 def opts_of(case: Path) -> list:
@@ -149,6 +178,17 @@ def main() -> None:
             print(f"  SKIP {case.name}: {SKIPS[case.name]}")
             continue
         glines = out.rstrip("\n").split("\n")
+        note = ""
+        if case.name in APPROVED:
+            #  the arm asserts the PORT's text; the pin's golden is still
+            #  captured in out.txt and quoted here so the two sit side by side
+            lines_, why = APPROVED[case.name]
+            print(f"  APPROVED-DIFFERENCE {case.name}: {why}")
+            note = ("::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts "
+                    "the PORT's output,\n::  not the pin's. "
+                    + wrap_note(why) + "\n::  the pin (out.txt): "
+                    + wrap_note(" / ".join(glines)) + "\n")
+            glines = lines_
         gitems = "\n".join(f"        '{hcord(l)}'" for l in glines)
         spec = hcord((case / "spec.tla").read_text())
         cfg = hcord((case / "spec-cfg.txt").read_text())
@@ -168,7 +208,7 @@ def main() -> None:
     '{spec}'
   '{cfg}'""")
         arms.append(f"""::
-++  test-mc-{case.name}
+{note}++  test-mc-{case.name}
   %+  expect-eq
     !>  ^-  wain
     :~

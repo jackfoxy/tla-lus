@@ -150,6 +150,50 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aFalsy == FALSE\0aSpec == Falsy /\\ Init /\\ [][Next]_x\0a====\0a'
   'SPECIFICATION Spec\0a'
 ::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. NOT a cap case, measured: the recursion is guarded by a STATE variable,
+::  so the expansion fails on its first attempt and never recurses --
+::  re-running with `+expand-cap` lowered to 3 leaves this output
+::  byte-identical. The port refuses the translation with the pin's own EC
+::  2213 text; tlc2 attempts it and dies on the stack
+::  the pin (out.txt): Error: This was a Java StackOverflowError. It was probably the result /
+::  of an incorrect recursive function definition that caused TLC to enter /
+::  an infinite loop when trying to compute the function or its application
+::  / to an element in its putative domain.
+++  test-mc-gh1389-guard
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: TLC cannot handle the temporal formula line 12, col 9 to line 12, col 13 of module spec'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* upstream test-model/Github1389StateGuard.tla: the recursive operator\'s\0a\\* parameter is bound to a state variable, so the IF guard never resolves\0a\\* during tableau construction and the expansion does not terminate.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE op(_)\0aop(n) == IF n = 0 THEN <>(x = 0) ELSE op(n - 1)\0aInit == x = 0\0aNext == x\' \\in 0..3\0aSpec == Init /\\ [][Next]_x\0aProp == op(x)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. the expansion genuinely runs away (guard FALSE, ELSE re-invokes with the
+::  same argument), so `+expand-cap` stops it at 1.000 nested expansions and
+::  `+user-op` PROPAGATES that rejection rather than swallowing it -- a Hoon
+::  runaway is an uncatchable hang, not a throwable, the same trade
+::  `live-graph-cap` makes
+::  the pin (out.txt): Error: This was a Java StackOverflowError. It was probably the result /
+::  of an incorrect recursive function definition that caused TLC to enter /
+::  an infinite loop when trying to compute the function or its application
+::  / to an element in its putative domain.
+++  test-mc-gh1389-loops
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: expansion bound reached (1000 nested user-operator expansions) translating the temporal formula line 7, col 37 to line 7, col 42 of module spec; the recursion reaches no base case. tlc2 has no bound here: it overflows the JVM stack and reports EC 1005'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* upstream test-model/Github1389Loops.tla: the expansion does NOT reach a\0a\\* base case (the guard is FALSE and the ELSE re-invokes with the same\0a\\* argument). tlc2 overflows the JVM stack and reports EC 1005.\0aVARIABLE x\0aRECURSIVE bad(_)\0abad(u) == IF u THEN [][TRUE]_x ELSE bad(u)\0aSpec == x = TRUE /\\ [][x\' = ~x]_x\0aProp == bad(FALSE)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
 ++  test-mc-gh1389-ok
   %+  expect-eq
     !>  ^-  wain

@@ -30,6 +30,16 @@
   ::  and rejects with a typed diagnostic instead — the same trade `live-graph-cap`
   ::  makes for the graph build. Terminating expansions are far below it.
   ^~  1.000
+::
+++  cap-ec
+  ::  a PORT-LOCAL sentinel, not a tlc2 EC: it marks the `+expand-cap`
+  ::  rejection so `+user-op` can propagate that one error where it swallows
+  ::  every other (R2.7.6.1). `aerr`'s `ec` is never rendered — both consumers
+  ::  (`+live-struct-raw` on the console, `job.hoon`'s `[%failed msg]`) read
+  ::  `msg` alone — so this code never reaches a caller. 0 is NOT usable as the
+  ::  marker: `lib/stdops`' unsupported-operator rejection uses it and can
+  ::  reach here through `+eval-const`, and that one must keep tlc2's swallow.
+  ^~  1
 ::  +|  Live-expression tree (LN* analogue)
 ::
 +$  live-expr
@@ -432,14 +442,23 @@
     ::  observationally the same in both cases -- the level of an application is
     ::  the level of its definition -- and needs no `recursive` flag.
     ?.  (gth (sem-lvl s) 2)  fall
-    ?:  (gte dep.c expand-cap)  fall
+    ?:  (gte dep.c expand-cap)  capped
     =/  r  (ast u.body.u.d c(dep +(dep.c)) (bind-formals params.u.d as env))
     ::  a FAILURE inside the expansion falls through rather than propagating:
     ::  tlc2 swallows it for a non-recursive operator and re-throws for a
     ::  recursive one, and the re-throw exists ONLY to stop an enclosing
     ::  OPCODE_ite from retrying disjunctively and re-entering the recursion --
     ::  `+ite-of` computes its chosen branch outside any recovery, so there is
-    ::  no such retry here and nothing to distinguish
+    ::  no such retry here and nothing to distinguish.
+    ::
+    ::  ONE exception, and it is the port's own (R2.7.6.1): the expansion cap
+    ::  PROPAGATES. It has no tlc2 counterpart to imitate — the pin overflows
+    ::  the JVM stack there — so swallowing it would walk back out to `fall`
+    ::  and report the pin's EC 2213 text for a failure the pin never has,
+    ::  which is the difference hiding itself. Every other failure still falls
+    ::  through, including an ec-0 unsupported-operator error arriving through
+    ::  `+eval-const`
+    ?:  ?&(?=(%| -.r) =(cap-ec ec.p.r))  r
     ?:  ?=(%| -.r)  fall
     ?:  (gth (le-level p.r) 2)  r
     ::  expanded, but at or below action level: a leaf of the ORIGINAL call at
@@ -451,6 +470,25 @@
   ::  tlc2 raises EC 2213 rather than making an LNAction of a temporal formula
   ::  -- which is what the port used to do, and what sent five test-model specs
   ::  into the EC 2214 fallback (R1.6.0)
+  ::  the expansion bound was reached: a REJECTION that names the bound, rather
+  ::  than `fall`'s EC 2213. The two are different failures and a caller has to
+  ::  be able to tell them apart -- EC 2213 means tlc2 cannot handle the formula
+  ::  either (`Github525`, `Github742`, both refused at the pin), where this one
+  ::  means only that the PORT stopped. Reached only above action level, since
+  ::  the level gate above has already run
+  ++  capped
+    ^-  (each live-expr aerr)
+    :-  %|
+    :-  cap-ec
+    %+  rap  3
+    :~  'expansion bound reached ('
+        (crip ((d-co:co 1) expand-cap))
+        ' nested user-operator expansions) translating the temporal formula '
+        (crip (loc-leaf modn.c s))
+        '; the recursion reaches no base case. tlc2 has no bound here: it '
+        'overflows the JVM stack and reports EC 1005'
+    ==
+  ::
   ++  fall
     ^-  (each live-expr aerr)
     =/  l  (sem-lvl s)
