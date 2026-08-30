@@ -11,6 +11,7 @@
 /-  *tla-lus
 /=  sm      /lib/semantic
 /=  ne      /lib/node-eval
+/=  vl      /lib/value
 /=  config  /lib/config
 |%
 ::  a typed rejection surfaced during normalization (astToLive constant-leaf
@@ -93,6 +94,22 @@
   $+  le-state
   $:  %state
       p=sem:sm
+      ::  R2.7.6.3: the translation-time BINDINGS this leaf must be evaluated
+      ::  under, and tlc2's own shape. When `+user-op` expands an operator
+      ::  whose expansion lands at or below action level, both engines wrap the
+      ::  original CALL opaquely and evaluate it against concrete states later
+      ::  — measured against `LivenessStruct`, the pin's leaf for
+      ::  `Reach(n - 1)` is that call's span, not the base case's. tlc2 carries
+      ::  `Context con1` with the formals bound; the port carried NOTHING, so
+      ::  `n` was unbound at evaluation, `+pred-bool` failed, and the failure
+      ::  was read as FALSE — which made `[]~leaf` true at every state and
+      ::  produced a counter-example for a property that HOLDS.
+      ::
+      ::  Empty for every other leaf, so no other leaf's noun changes: only
+      ::  `+leaf-ctx` fills these. `+le-equal` compares `%state` leaves by
+      ::  SPAN, and `+render-struct` prints the span, so neither sees them.
+      ctx=(map @t value:vl)
+      nsub=(map @t sem:sm)
   ==
 +$  le-enabled
   $+  le-enabled
@@ -463,8 +480,10 @@
     ?:  (gth (le-level p.r) 2)  r
     ::  expanded, but at or below action level: a leaf of the ORIGINAL call at
     ::  the EXPANSION's level, not the call's. `Github1389ViolatedB`'s `Reach(0)`
-    ::  expands to a level-1 state predicate although `Reach` is temporal
-    (leaf s (le-level p.r) env)
+    ::  expands to a level-1 state predicate although `Reach` is temporal.
+    ::  R2.7.6.3: the leaf CARRIES the expansion's bindings — the call names
+    ::  formals that live nowhere else
+    (leaf-ctx s (le-level p.r) env)
   ::  no expansion was made (unresolved, level-gated, capped, or failed):
   ::  Liveness.java:295-300. Above action level there is nothing to build, and
   ::  tlc2 raises EC 2213 rather than making an LNAction of a temporal formula
@@ -550,7 +569,31 @@
   |=  [s=sem:sm l=@ud env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  =(0 l)     (eval-const s env)
-  ?:  (lte l 1)  [%& [%state s]]
+  ?:  (lte l 1)  [%& [%state s ~ ~]]
+  [%& [%act | ~ s]]
+::
+++  leaf-ctx
+  ::  `+leaf` for an EXPANDED user-operator call (R2.7.6.3): identical, except
+  ::  that a state leaf captures the bindings of the expansion it came from.
+  ::  The node is still the CALL — that is what the pin renders — but the call
+  ::  mentions the operator's FORMALS, which exist only in this env. Without
+  ::  them the leaf is unevaluable, and `+st-pred-bool` used to read that as
+  ::  FALSE.
+  ::
+  ::  The env is the CALLER's, not the expansion's — the call node lives in the
+  ::  caller's scope, and tlc2 falls through to the level-based handling with
+  ::  `con`, not with the `con1` it built for the body. Capturing `con1`
+  ::  instead binds the CALLEE's formal into the caller's argument expression:
+  ::  measured, `R(n - 1)` with `n` bound to the callee's 0 evaluates `R(-1)`,
+  ::  walks into the ELSE branch and bails on `<>`.
+  ::
+  ::  Both maps are needed: `+bind-formals` puts a formal in `vals` when its
+  ::  argument evaluated in this scope and in `psub` when it reads a state
+  ::  variable.
+  |=  [s=sem:sm l=@ud env=eenv:ne]
+  ^-  (each live-expr aerr)
+  ?:  =(0 l)     (eval-const s env)
+  ?:  (lte l 1)  [%& [%state s vals.env psub.env]]
   [%& [%act | ~ s]]
 ::
 ++  eval-const

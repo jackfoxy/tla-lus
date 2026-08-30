@@ -63,29 +63,6 @@ SKIPS = {
         "simpler one: no post-error block is involved, this is an ordinary "
         "counting-safety property (`AtMost(4)`). Verdict and all three counts "
         "already match. Target for R2.7.11 (`tlc-live-lasso`)."),
-    "gh1389-violc": (
-        "R2.7.6.2: an UNSOUND witness. The port's counter-example is "
-        "`0 -> 99 -> back to state 1`, and `x = 99` SATISFIES the violated "
-        "property `<><><>(x = 99)`, so the behavior is not a counter-example "
-        "at all. Verdict and all three counts match (10001/100/depth 2); only "
-        "the witness is wrong. Reduced to `live-witness-rec` --- see its entry "
-        "for the isolated trigger. Withheld, not projected, for the reason given "
-        "there: the projection would pass and hide it."),
-    "live-witness-rec": (
-        "R2.7.6.2: the 13-line reduction of `gh1389-violc`, and the isolated "
-        "trigger. `<><><>(x = 9)` reached through RECURSIVE OPERATOR "
-        "EXPANSION picks `x = 9` --- the promise value itself, an unsound "
-        "witness --- where the SAME property written LITERALLY "
-        "(`live-witness-nested-many`, green in every respect but the choice) "
-        "picks a sound one. So the expansion produces a live-expression tree "
-        "that loses the inner obligation; the three passing controls "
-        "(`live-witness`, `-nested`, `-nested-many`) bracket it. A SOUNDNESS "
-        "defect, and the sharpest target in the liveness stack. WITHHELD RATHER "
-        "THAN PROJECTED: `VARIES` drops the trace here too, so the projected "
-        "comparison PASSES -- verdict and counts are right -- and would hide "
-        "exactly the defect. The arm returns when the witness is sound; what "
-        "it can never be again is a byte comparison against a pin draw that "
-        "changes every run."),
 }
 
 
@@ -146,6 +123,9 @@ APPROVED = {
 VARIES = {
     "live-witness-many": "witness choice; pin drew 1/2/3/2/5/6 over six runs",
     "live-witness-nested-many": "witness choice; pin drew 1/8/5/5/4/8",
+    #  R2.7.6.3 fixed the SOUNDNESS defect these two carried (the port drew
+    #  the promise value itself); they are ordinary VARIES cases now, and
+    #  their arms are emitted rather than withheld.
     "live-witness-rec": "witness choice; pin drew 8/5/1/4/3/5 -- all sound",
     "gh1389-violc": "witness choice; pin drew 6/64/11/3/21/11 -- all sound",
 }

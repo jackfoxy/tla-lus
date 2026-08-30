@@ -266,6 +266,22 @@
     '---- MODULE spec ----\0a\\* upstream test-model/Github1389ViolatedB.tla: the recursive call sits\0a\\* under <> rather than in the ELSE, and Reach(0) expands to a level-1\0a\\* state predicate although Reach is temporal.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 99) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aPropViolated == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
 ::
+++  test-mc-gh1389-violc
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property PropViolated was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        '10001 states generated, 100 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  verdict-only
+  %-  trim
+  %+  check:check
+    '--------------------------- MODULE spec ---------------------------\0aEXTENDS Naturals, FiniteSets, TLCExt\0a\0aVARIABLE x\0a\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 99) ELSE <>(Reach(n - 1))\0a\0aInit == x = 0\0aNext == x\' \\in 0..99\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0a\0aPropViolated == Reach(3)\0a\0a\\* Postcondition asserting the shape of the counterexample.  WF_x(Next)\0a\\* forces the lasso to actually move x rather than stutter, so TLC finds a\0a\\* two-state cycle x = 0 -> x = v -> back to x = 0 for some v.  The\0a\\* specific value v depends on state-space exploration order; v must be\0a\\* in 1..98 because\0a\\*   - v # 0:  WF_x(Next) requires a non-stuttering step, so x must change,\0a\\*   - v # 99: the lasso violates <>(x = 99), so no state on it has x = 99.\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a        \\* x-value of the non-initial state on the lasso (varies; in 1..98).\0a        s2v == LET t == CHOOSE t \\in S : t[1] = 2 IN t[2].x\0a    IN\0a    /\\ Cardinality(S) = 2\0a    /\\ Cardinality(A) = 2\0a    /\\ <<1, [x |-> 0]>> \\in S\0a    /\\ <<2, [x |-> s2v]>> \\in S\0a    /\\ s2v \\in 1..98\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a    /\\ \\E a \\in A : a[1] = <<1, [x |-> 0]>> /\\ a[3] = <<2, [x |-> s2v]>>\0a    /\\ \\E a \\in A : a[1] = <<2, [x |-> s2v]>> /\\ a[3] = <<1, [x |-> 0]>>\0a==================================================================\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
+::
 ++  test-mc-gh710e
   %+  expect-eq
     !>  ^-  wain
@@ -670,6 +686,20 @@
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
 ::
+++  test-mc-live-rec-holds
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.3 probe: the same recursive shape as `live-witness-rec`, but the\0a\\* property HOLDS. If the expanded leaf (the recursive CALL, evaluated as a\0a\\* state predicate) is evaluated wrongly, this flips the VERDICT rather than\0a\\* just the witness -- a stronger and deterministic check.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN (x = 0) ELSE <>(R(n - 1))\0aInit == x = 0\0aNext == x\' \\in {0, 1}\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == R(1)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
 ++  test-mc-live-witness
   %+  expect-eq
     !>  ^-  wain
@@ -740,6 +770,22 @@
   %-  trim
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.6.2 probe (nested eventualities, ten successors): the same shape as `live-witness` but with TEN successors,\0a\\* so the port has a real choice among sound witnesses (1..8) as well as the\0a\\* unsound one (9, which satisfies the promise and cannot be on a\0a\\* counter-example).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <><><>(x = 9)\0a====\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-witness-rec
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        '101 states generated, 10 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  verdict-only
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.6.2 probe: `live-witness-nested-many` with the nested eventualities\0a\\* reached through RECURSIVE OPERATOR EXPANSION instead of written literally\0a\\* -- the one structural difference left between the passing probes and\0a\\* upstream\'s Github1389ViolatedC.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 9) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
 ++  test-mc-rnd-exists

@@ -14,6 +14,22 @@
 |%
 +$  pg-key  [fp=@t tidx=@ud]        ::  a product node (state fingerprint, node)
 ::
+++  leaf-env
+  ::  the env a `%state` leaf is evaluated under (R2.7.6.3). An ordinary leaf
+  ::  carries no bindings and this is the identity; a leaf built by
+  ::  `+leaf-ctx:temporal` — the opaque wrapper around an EXPANDED user
+  ::  operator's call — carries the formals of the expansion it came from, and
+  ::  they must win over the run env, being locals. tlc2 keeps the same thing
+  ::  as the `Context` it hands to `tool.eval`
+  |=  [x=live-expr:tp env=eenv:ne]
+  ^-  eenv:ne
+  ?>  ?=(%state -.x)
+  ?:  &(=(~ ctx.x) =(~ nsub.x))  env
+  %=  env
+    vals  (~(uni by vals.env) ctx.x)
+    psub  (~(uni by psub.env) nsub.x)
+  ==
+::
 ++  st-pred-bool
   ::  a tableau node's state predicate (level<=1) at a state, via node-eval; an
   ::  evaluation failure reads as inconsistent.
@@ -37,8 +53,15 @@
     %disj   (lien ds.x |=(y=live-expr (st-pred-bool y s0 env)))
   ::
       %state
-    =/  r  (pred-bool:ne p.x s0 ~ env)
-    ?:(?=(%& -.r) p.r |)
+    =/  r  (pred-bool:ne p.x s0 ~ (leaf-env x env))
+    ?:  ?=(%& -.r)  p.r
+    ::  R2.7.6.3: an unevaluable leaf is NOT false. Reading a failure as FALSE
+    ::  is what hid the missing bindings for two releases: `[]~leaf` then holds
+    ::  at every state and the checker reports a counter-example for a property
+    ::  that HOLDS. tlc2's `LNState.eval` calls `tool.eval`, which THROWS; the
+    ::  port's analogue is a named bail, caught by the kernel's `mule` and
+    ::  reported, never answered
+    ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
   ::  ENABLED is `LNStateEnabled extends LNState`, so its level is VARIABLE and
   ::  `+state-preds-of` keeps it -- tlc2 evaluates it here through
@@ -267,8 +290,15 @@
     %disj   (lien ds.x |=(y=live-expr (cs-eval y s0 env)))
   ::
       %state
-    =/  r  (pred-bool:ne p.x s0 ~ env)
-    ?:(?=(%& -.r) p.r |)
+    =/  r  (pred-bool:ne p.x s0 ~ (leaf-env x env))
+    ?:  ?=(%& -.r)  p.r
+    ::  R2.7.6.3: an unevaluable leaf is NOT false. Reading a failure as FALSE
+    ::  is what hid the missing bindings for two releases: `[]~leaf` then holds
+    ::  at every state and the checker reports a counter-example for a property
+    ::  that HOLDS. tlc2's `LNState.eval` calls `tool.eval`, which THROWS; the
+    ::  port's analogue is a named bail, caught by the kernel's `mule` and
+    ::  reported, never answered
+    ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
   ::  ENABLED is state-level (`LNStateEnabled extends LNState`), so it can be a
   ::  checkState entry and tlc2 evaluates it (R1.2.7)
@@ -295,8 +325,15 @@
     %disj   (lien ds.x |=(y=live-expr (ca-eval y s0 s1 env)))
   ::
       %state
-    =/  r  (pred-bool:ne p.x s0 ~ env)
-    ?:(?=(%& -.r) p.r |)
+    =/  r  (pred-bool:ne p.x s0 ~ (leaf-env x env))
+    ?:  ?=(%& -.r)  p.r
+    ::  R2.7.6.3: an unevaluable leaf is NOT false. Reading a failure as FALSE
+    ::  is what hid the missing bindings for two releases: `[]~leaf` then holds
+    ::  at every state and the checker reports a counter-example for a property
+    ::  that HOLDS. tlc2's `LNState.eval` calls `tool.eval`, which THROWS; the
+    ::  port's analogue is a named bail, caught by the kernel's `mule` and
+    ::  reported, never answered
+    ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
     %act      (act-eval box.x sub.x a.x s0 s1 env)
     %enabled  (enabled-eval box.x sub.x p.x s0 env)

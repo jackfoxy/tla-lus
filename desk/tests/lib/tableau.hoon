@@ -6,7 +6,9 @@
 /=  tp  /lib/temporal
 |%
 ::  a state-predicate leaf with a distinct span (column c), and negation/box
-++  stp  |=(c=@ud `live-expr:tp`[%state [%lit %num '0' `[[1 c] [1 +(c)]]]])
+::  R2.7.6.3: `%state` carries the translation-time bindings an expanded
+::  user-operator call needs; a synthetic probe leaf has none
+++  stp  |=(c=@ud `live-expr:tp`[%state [%lit %num '0' `[[1 c] [1 +(c)]]] ~ ~])
 ++  box  |=(x=live-expr:tp `live-expr:tp`[%all x])
 ++  neg  |=(x=live-expr:tp `live-expr:tp`[%neg x])
 ++  evn  |=(x=live-expr:tp `live-expr:tp`[%even x])
