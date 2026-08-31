@@ -413,7 +413,8 @@
 ++  test-tlc-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    ~
+    :~  'SubseteqNextState -> Error: unsupported: POSTCONDITION PossibleCounts; tlc2 evaluates it after state-space exploration and fails the run when it is false, so accepting it here would report `ok` for a run tlc2 fails'
+    ==
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])

@@ -1297,6 +1297,14 @@
   =/  rso  (run-spec-with:config u.mo cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
   =/  rs  p.rso
+  ::  R2.7.7.1: refuse a parsed-but-unacted `.cfg` keyword BY NAME, before the
+  ::  run starts. `run-spec` does not carry these four fields, so the check
+  ::  takes the parsed AST directly -- and it is a `config-fail` with code 0,
+  ::  the port-local code, because the pin SUPPORTS these keywords and has no
+  ::  EC for refusing them
+  =/  pca  (parse-cfg:config cfg)
+  =/  ukw  ?:(?=(%| -.pca) ~ (unsupported-kw:config p.pca))
+  ?^  ukw  (config-fail j [0 u.ukw] pre)
   ::  all invariants are checked in declaration order (7.3); `iv` is the first
   ::  one, still used for the INVARIANT/PROPERTY-conflict guard and definition
   ::  existence checks below

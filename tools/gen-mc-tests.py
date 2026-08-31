@@ -71,17 +71,21 @@ SKIPS = {
         "at <loc> is false.` --- and the port reports `Model checking "
         "completed. No error has been found.` **A run reported `ok` where "
         "tlc2 reports a failure**, which is R2's `no option is accepted and "
-        "ignored` invariant broken in the direction that matters. Target for "
-        "R2.7.7.3 (evaluation); R2.7.7.1's typed rejection makes it a refusal "
-        "rather than a false `ok` in the meantime."),
+        "ignored` invariant broken in the direction that matters. **R2.7.7.1 "
+        "made it a REFUSAL rather than a false `ok`** -- the port now answers "
+        "`unsupported: POSTCONDITION Post; tlc2 evaluates it after "
+        "state-space exploration ...`, which is honest but still not the "
+        "pin's answer, so the arm stays withheld until R2.7.7.3 evaluates "
+        "the postcondition."),
     "cfg-post-undef": (
         "R2.7.7.0: the POSTCONDITION names an operator that does not exist. "
         "Measured, and it CORRECTS this plan's own claim that the name check "
         "happens `before a single state is computed`: the pin prints the "
         "state counts FIRST and only then throws --- `getPostConditionSpecs` "
         "resolves the name when the postconditions are FETCHED, after "
-        "exploration, not at spec processing. The port runs to a clean "
-        "verdict. Target for R2.7.7.2 (validation)."),
+        "exploration, not at spec processing. The port ran to a clean verdict; "
+        "since R2.7.7.1 it refuses the keyword by name instead. Target for "
+        "R2.7.7.2 (the three name rejections)."),
 }
 
 

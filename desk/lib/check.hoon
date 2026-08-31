@@ -2314,6 +2314,12 @@
   =/  cr  (parse-cfg:config cfg)
   ?:  ?=(%| -.cr)  [%| 'config error']
   =/  ca  p.cr
+  ::  R2.7.7.1: a `.cfg` keyword this engine parses but does not act on is
+  ::  refused BY NAME here, before anything runs. Both paths parse the config
+  ::  themselves, so the kernel repeats this check rather than sharing a call
+  ::  site -- the shape R2.7.5 used for the EC 2279 guard
+  =/  ukw  (unsupported-kw:config ca)
+  ?^  ukw  [%| u.ukw]
   ::  R2.7.5 annotated the mold: a bare `?~(.. ~ `x)` infers a union with no
   ::  `u` face, so `u.pp` was `-find.u.pp` until the `(unit @t)` named it
   =/  pp=(unit @t)  ?~(properties.ca ~ `i.properties.ca)

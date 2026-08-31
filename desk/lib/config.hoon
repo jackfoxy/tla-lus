@@ -555,6 +555,78 @@
       deadlock=?                         ::  getCheckDeadlock: true unless FALSE
   ==
 ::
+++  kw-handled
+  ::  the `.cfg` keywords the engine ACTS on (R2.7.7.1). Together with
+  ::  `+kw-refused` this must cover `+keywords` exactly -- `tests/lib/cfg`
+  ::  asserts it, which is the drift guard `gen-stdops-tests.py` gives the
+  ::  operator surfaces and R2.7.7.0 found this side lacked. A new keyword
+  ::  lands in one list or the other; it cannot land in neither and be
+  ::  silently accepted, which is what POSTCONDITION did for two releases
+  ^-  (set @t)
+  %-  silt
+  ^-  (list @t)
+  :~  constant:k  constants:k  'CONSTRAINT'  'CONSTRAINTS'
+      action-constraint:k  'ACTION_CONSTRAINTS'
+      invariant:k  'INVARIANTS'  init:k  next:k  view:k  symmetry:k
+      specification:k  property:k  'PROPERTIES'  'ALIAS'  'CHECK_DEADLOCK'
+  ==
+::
+++  kw-refused
+  ::  parsed, and REFUSED BY NAME rather than ignored (R2.7.7.1). Each is a
+  ::  capability tlc2 has and this engine does not yet:
+  ::
+  ::    POSTCONDITION(S)  evaluated after exploration; a false one is
+  ::                      EC TLC_POSTCONDITION_FALSE, so ignoring it reports
+  ::                      `ok` for a run tlc2 fails            -- R2.7.7.3
+  ::    _POSSIBLE         named counters read back through
+  ::                      TLCGet("all:named")["s:_possible"]   -- R2.7.7.4
+  ::    _PERIODIC         evaluated INSIDE the search loop; false ends the run
+  ::                      with EC.TLC_ASSUMPTION_FALSE         -- R2.7.7.5
+  ::    _RL_REWARD        only consumed by RLSimulationWorker, behind a JVM
+  ::                      system property -- the capability is out of scope,
+  ::                      but accepting the keyword silently is not
+  ^-  (set @t)
+  (silt ~['POSTCONDITION' 'POSTCONDITIONS' '_POSSIBLE' '_PERIODIC' '_RL_REWARD'])
+::
+++  unsupported-kw
+  ::  the typed rejection for a `.cfg` keyword this engine parses but does not
+  ::  act on: it NAMES the keyword and what it would take, and never lets the
+  ::  run proceed. R2's invariant, applied to `.cfg` keywords rather than to
+  ::  `request` fields (R2.1 swept only the latter, which is how these four
+  ::  survived). Checked in declaration order; `~` when the config is clean
+  |=  a=cfg-ast
+  ^-  (unit @t)
+  ?^  postconditions.a
+    :-  ~
+    %^  rap  3  'unsupported: POSTCONDITION '
+    :~  i.postconditions.a
+        '; tlc2 evaluates it after state-space exploration and fails the run '
+        'when it is false, so accepting it here would report `ok` for a run '
+        'tlc2 fails'
+    ==
+  ?^  possible.a
+    :-  ~
+    %^  rap  3  'unsupported: _POSSIBLE '
+    :~  i.possible.a
+        '; it builds the named counters `TLCGet("all:named")["s:_possible"]` '
+        'reads, and no engine path produces them'
+    ==
+  ?^  periodic.a
+    :-  ~
+    %^  rap  3  'unsupported: _PERIODIC '
+    :~  u.periodic.a
+        '; tlc2 evaluates it inside the search loop and ENDS the run when it '
+        'is false, which no completed run here could report'
+    ==
+  ?^  rlreward.a
+    :-  ~
+    %^  rap  3  'unsupported: _RL_REWARD '
+    :~  u.rlreward.a
+        '; its only consumer is the reinforcement-learning simulation worker, '
+        'which this engine does not have'
+    ==
+  ~
+::
 ++  sem-span
   ::  the source span of an IR expression node (nullodn has none)
   |=  s=sem:sem-lib

@@ -341,9 +341,25 @@ TLC_LIVENESS_BATCH = [
 # (`+alias-state`, plus the EC 2107 initial-state branch of `+render-outcome`,
 # which `ModelChecker.java:1187` builds from `evalAlias(curState, curState)`).
 # The TLC safety batch agrees on every spec again.
-TLC_BATCH_DIVERGENCES = []
+# R2.7.7.1 adds exactly one, and it is a REFUSAL rather than a wrong answer.
+# `SubseteqNextState` carries `_POSSIBLE FullSet GainThree` and a
+# `POSTCONDITION` reading `TLCGet("all:named")["s:_possible"][1]`. Both were
+# parsed and IGNORED here, and the spec passed the batch anyway -- because the
+# postcondition HOLDS at the pin, so a verdict+counts comparison could not see
+# it. R2.7.7.1 refuses both keywords by name, which is the honest state and
+# makes the gap visible in the census instead of invisible in a green batch.
+# It closes with R2.7.7.3 + R2.7.7.4, which land together for this reason.
+# Frozen from the SHIP RUN, not predicted: the first draft of this entry
+# guessed `_POSSIBLE` because that is the keyword the row is about, and the
+# port refuses on POSTCONDITION first -- `+unsupported-kw` checks in
+# declaration order -- with the console `Error: ` prefix. The test caught it.
+TLC_BATCH_DIVERGENCES = ["SubseteqNextState -> Error: unsupported: POSTCONDITION PossibleCounts; tlc2 evaluates it after state-space exploration and fails the run when it is false, so accepting it here would report `ok` for a run tlc2 fails"]
 # grouped cause, keyed by module
-TLC_BATCH_REASONS = {}
+TLC_BATCH_REASONS = {
+    "SubseteqNextState": "`_POSSIBLE` and `POSTCONDITION` are parsed and not "
+                         "acted on, so the run is refused by name (R2.7.7.1) "
+                         "rather than reported `ok` -- R2.7.7.3/.4",
+}
 
 # Liveness batch modules whose Hoon check disagrees with TLC, frozen from the
 # ship run in TLC_LIVENESS_BATCH order (the arm returns processing order via
