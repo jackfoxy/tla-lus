@@ -873,6 +873,31 @@
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. R2.7.7.5: `_PERIODIC` is evaluated by tlc2's PERIODIC-WORK THREAD on a
+::  WALL-CLOCK timer, not by the search. Measured: on this spec the timer
+::  never fires and the pin COMPLETES with an always-FALSE `_PERIODIC`; on a
+::  long-running spec the same config stops the run at wherever the timer
+::  landed -- 1 677 194 states one run, 1 740 872 the next, same jar and
+::  spec. So the keyword's observable effect is a function of machine speed,
+::  and no port can match it: this is `tlc-dfid`'s argument in its strongest
+::  form. The port REFUSES by name (R2.7.7.1), which is reproducible, and
+::  the arm asserts that refusal against the pin's completion
+::  the pin (out.txt): Model checking completed. No error has been found. / 4 states generated,
+::  4 distinct states found, 0 states left on queue. / The depth of the
+::  complete state graph search is 4.
+++  test-mc-periodic-fast
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: unsupported: _PERIODIC Falsehood; tlc2 evaluates it inside the search loop and ENDS the run when it is false, which no completed run here could report'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.5: `_PERIODIC` is evaluated by tlc2\'s PERIODIC-WORK THREAD, which is\0a\\* driven by a wall-clock timer (`AbstractChecker` waits, then calls\0a\\* `doPeriodicWork`), not by the search. On a spec this small the timer never\0a\\* fires, so an always-FALSE `_PERIODIC` has NO effect and the run completes.\0a\\* On a long-running spec the same config stops the run at whatever point the\0a\\* timer happens to fire -- measured twice at the pin: 1 677 194 states in one\0a\\* run and 1 740 872 in the next.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aFalsehood == FALSE\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_PERIODIC Falsehood\0a'
+::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. R2.7.7.4b: a `_POSSIBLE` predicate never witnessed fails through the
 ::  generated `_CheckName` postcondition -- EC 2404 with the USER's
 ::  predicate name and body location, byte-exact. What differs is one line
