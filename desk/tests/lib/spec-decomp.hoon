@@ -106,16 +106,17 @@
   ====
   '''
 ::
-++  test-instance-sibling-reference-refused-by-name
-  ::  NOT a substitution failure -- substitution works, as the arm above shows.
-  ::  The root `defs` map holds instanced members QUALIFIED (`I!InitI`), so a
-  ::  bare sibling reference inside the substitution resolves to nothing. That
-  ::  is instance GENERATION (unit 3), and it is refused by name because
-  ::  dropping it produced `the SPECIFICATION has no initial predicate` --
-  ::  true of nothing the caller wrote
+++  test-instance-sibling-reference-runs
+  ::  R2.7.8 CLOSED what R2.3.5 refused. `g-instance` now rewrites a member's
+  ::  body so a sibling reference names the entry the root defs map holds
+  ::  (`InitI` -> `I!InitI`), which is the port's analogue of tlc2 LINKING the
+  ::  `SubstInNode` body straight to the sibling's `OpDefNode`. Byte-exact
+  ::  against the pin, including the counts
   %+  expect-eq
     !>  ^-  wain
-    :~  'Error: unsupported: instanced member references a sibling of its own module (InitI); the root defs map holds instanced members qualified (unit 3)'
+    :~  'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
     ==
   !>  (check:check mod-inst-sibling 'SPECIFICATION Spec\0aINVARIANT Inv\0a')
 ::

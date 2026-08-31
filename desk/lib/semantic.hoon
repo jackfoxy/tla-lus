@@ -1404,6 +1404,66 @@
   ?~  nls  ~
   `[~ local ~ i.nls]
 ::
+++  qualify-siblings
+  ::  R2.7.8: rewrite an instanced member's body so a reference to a SIBLING
+  ::  member of the same module names the entry the ROOT defs map holds.
+  ::
+  ::  `g-instance` imports each non-local definition of the instanced module as
+  ::  `I!Name` with its body wrapped in `$SubstIn`. The body is the INNER
+  ::  module's, so `SpecI == InitI /\ [][NextI]_v` carries a bare `InitI` --
+  ::  and the root map has only `I!InitI`, so it resolved to nothing (R2.3.5
+  ::  refused it by name rather than dropping it).
+  ::
+  ::  tlc2 has no lookup to get wrong: `SubstInNode`'s body LINKS to the
+  ::  sibling's `OpDefNode`. The port's IR names its references, so the
+  ::  faithful analogue is to name the entry that exists. Only names in `sibs`
+  ::  are rewritten -- a formal parameter, a substituted VARIABLE, a CONSTANT
+  ::  and a standard operator all keep theirs.
+  |=  [s=sem inm=(unit @t) sibs=(map @t @t)]
+  ^-  sem
+  ?~  inm  s
+  |-  ^-  sem
+  ?-  -.s
+      %apply
+    =/  op2
+      ?.  ?=(%user-op kind.op.s)  op.s
+      =/  q  (~(get by sibs) name.op.s)
+      ?~(q op.s op.s(name u.q))
+    =/  args2
+      |-  ^-  (list sem)
+      ?~  args.s  ~
+      [^$(s i.args.s) $(args.s t.args.s)]
+    ::  the bound ranges carry expressions too
+    =/  bound2
+      |-  ^-  (list sem-bound)
+      ?~  bound.s  ~
+      :-  i.bound.s(range ?~(range.i.bound.s ~ `^$(s u.range.i.bound.s)))
+      $(bound.s t.bound.s)
+    s(op op2, args args2, bound bound2)
+  ::
+      %letin
+    =/  lets2
+      |-  ^-  (list sem-def)
+      ?~  lets.s  ~
+      :-  i.lets.s(body ?~(body.i.lets.s ~ `^$(s u.body.i.lets.s)))
+      $(lets.s t.lets.s)
+    s(lets lets2, body ?~(body.s ~ `$(s u.body.s)))
+  ::
+      %lit      s
+      %atref    s
+      %nullodn  s
+  ==
+::
+++  local-inst-name
+  ::  the reserved name a LOCAL member of an instanced module is imported
+  ::  under (R2.7.8). `$` cannot begin a TLA+ identifier, so no source can
+  ::  name this entry -- it exists only for `+qualify-siblings` to point at,
+  ::  the same trick `$SubstIn:` and `$Sel` already use
+  |=  [inm=(unit @t) opn=@t]
+  ^-  @t
+  ?~  inm  opn
+  (rap 3 ~['$Local:' u.inm '!' opn])
+::
 ++  inst-op-name
   |=  [inm=(unit @t) opn=@t]
   ^-  @t
@@ -2902,6 +2962,30 @@
     |=  [[param=@t expr=node] acc=@ud]
     (max acc (expr-level expr c))
   =/  bunits  (body-of-module tree.u.bt)
+  ::  R2.7.8: the instanced module's own NON-LOCAL member names -- the set a
+  ::  sibling reference inside one of their bodies can name. Collected in a
+  ::  first pass, since a member may reference a sibling defined LATER
+  =/  sibs=(map @t @t)
+    =|  acc=(map @t @t)
+    =/  bus  bunits
+    |-  ^-  (map @t @t)
+    ?~  bus  acc
+    =/  bu  i.bus
+    ?.  ?|  (is-kind bu %n-operatordefinition)
+            (is-kind bu %n-functiondefinition)
+        ==
+      $(bus t.bus)
+    =/  gd  (g-def bu bctx)
+    ?~  r.gd  $(bus t.bus)
+    ::  a LOCAL member is visible to its siblings and NOT exported -- measured
+    ::  at the pin, `LOCAL Bound == k` referenced by an imported member runs
+    ::  fine, while `I!Bound` is not a name a caller may write. It is imported
+    ::  under a RESERVED name no source can produce, so the reference resolves
+    ::  and nothing leaks
+    =/  qn
+      ?:  local.u.r.gd  (local-inst-name name.iu name.u.r.gd)
+      (inst-op-name name.iu name.u.r.gd)
+    $(bus t.bus, acc (~(put by acc) name.u.r.gd qn))
   =/  idefs
     =|  out=(list sem-def)
     =|  ds=(list sdiag)
@@ -2916,7 +3000,6 @@
     =/  gd  (g-def bu bctx)
     ?~  r.gd  $(bus t.bus, ds (weld ds ds.gd))
     =/  base  u.r.gd
-    ?:  local.base  $(bus t.bus)
     =/  ilvl  (max lvl.base sub-lvl)
     =/  subw=sem
       :*  %apply  [(cat 3 '$SubstIn:' mod.ip) %builtin]  ilvl  (span-of:ast u)
@@ -2924,13 +3007,19 @@
           ~
           %+  weld  exs.gsubs
           ^-  (list sem)
-          ?~(body.base ~ [u.body.base ~])
+          ::  R2.7.8: sibling references inside the member's own body name the
+          ::  QUALIFIED entries the root defs map holds
+          ?~  body.base  ~
+          [(qualify-siblings u.body.base name.iu sibs) ~]
       ==
     =/  wrapped=sem-def
       :*  %sdef
+          ?:  local.base  (local-inst-name name.iu name.base)
           (inst-op-name name.iu name.base)
           (add (lent iparams) arity.base)
-          local.iu
+          ::  a local member stays local: exported only to its siblings,
+          ::  through the reserved name above
+          ?|(local.iu local.base)
           ilvl
           (span-of:ast u)
           (weld isps params.base)
