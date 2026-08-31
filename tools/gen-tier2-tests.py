@@ -349,17 +349,17 @@ TLC_LIVENESS_BATCH = [
 # it. R2.7.7.1 refuses both keywords by name, which is the honest state and
 # makes the gap visible in the census instead of invisible in a green batch.
 # It closes with R2.7.7.3 + R2.7.7.4, which land together for this reason.
-# Frozen from the SHIP RUN, not predicted. R2.7.7.1 froze this as POSTCONDITION
-# because `+unsupported-kw` checks in declaration order; R2.7.7.3 now EVALUATES
-# postconditions, so the same spec is refused one keyword later, on `_POSSIBLE`
-# -- which is R2.7.7.4's, and closes the entry.
-TLC_BATCH_DIVERGENCES = ["SubseteqNextState -> Error: unsupported: _POSSIBLE FullSet; it builds the named counters `TLCGet(\"all:named\")[\"s:_possible\"]` reads, and no engine path produces them"]
+# CLOSED by R2.7.7.4b. The entry existed for two units: R2.7.7.1 refused
+# `SubseteqNextState` by name because `_POSSIBLE` and its POSTCONDITION were
+# parsed and ignored (it had been PASSING the batch with both ignored, since
+# the postcondition happens to hold at the pin, so a verdict+counts comparison
+# could not see it); R2.7.7.3 moved the refusal one keyword later; R2.7.7.4b
+# tracks `_POSSIBLE` and the spec agrees again -- this time for the right
+# reason, its postcondition asserting `FullSet = 8` and `GainThree = 16`
+# against counters the port now produces.
+TLC_BATCH_DIVERGENCES = []
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
-    "SubseteqNextState": "`_POSSIBLE` is parsed and not acted on, so the run "
-                         "is refused by name (R2.7.7.1) rather than reported "
-                         "`ok`. POSTCONDITION no longer contributes -- "
-                         "R2.7.7.3 evaluates it; the counters are R2.7.7.4",
 }
 
 # Liveness batch modules whose Hoon check disagrees with TLC, frozen from the

@@ -413,8 +413,7 @@
 ++  test-tlc-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'SubseteqNextState -> Error: unsupported: _POSSIBLE FullSet; it builds the named counters `TLCGet("all:named")["s:_possible"]` reads, and no engine path produces them'
-    ==
+    ~
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])

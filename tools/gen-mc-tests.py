@@ -90,6 +90,19 @@ APPROVED = {
         "expansions and `+user-op` PROPAGATES that rejection rather than "
         "swallowing it -- a Hoon runaway is an uncatchable hang, not a "
         "throwable, the same trade `live-graph-cap` makes"),
+    "possible-never": (
+        ["Error: Postcondition Never at line 11, col 10 to line 11, col 15 "
+         "of module spec is false.",
+         "4 states generated, 4 distinct states found, 0 states left on "
+         "queue.",
+         "The depth of the complete state graph search is 4."],
+        "R2.7.7.4b: a `_POSSIBLE` predicate never witnessed fails through the "
+        "generated `_CheckName` postcondition -- EC 2404 with the USER's "
+        "predicate name and body location, byte-exact. What differs is one "
+        "line ABOVE it: `_CheckName`'s body is `PrintT(counts) /\\ FALSE`, so "
+        "the pin also prints `[Never |-> 0]`, and this engine has no Print "
+        "channel. That is the standing `tlc-module-tlc` difference, not a new "
+        "one -- the verdict, the location and the counts all match"),
     "gh1389-guard": (
         ["Error: TLC cannot handle the temporal formula line 12, col 9 to "
          "line 12, col 13 of module spec"],

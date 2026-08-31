@@ -872,6 +872,58 @@
     '---- MODULE spec ----\0a\\* R2.7.6.2 probe: `live-witness-nested-many` with the nested eventualities\0a\\* reached through RECURSIVE OPERATOR EXPANSION instead of written literally\0a\\* -- the one structural difference left between the passing probes and\0a\\* upstream\'s Github1389ViolatedC.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 9) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. R2.7.7.4b: a `_POSSIBLE` predicate never witnessed fails through the
+::  generated `_CheckName` postcondition -- EC 2404 with the USER's
+::  predicate name and body location, byte-exact. What differs is one line
+::  ABOVE it: `_CheckName`'s body is `PrintT(counts) /\ FALSE`, so the pin
+::  also prints `[Never |-> 0]`, and this engine has no Print channel. That
+::  is the standing `tlc-module-tlc` difference, not a new one -- the
+::  verdict, the location and the counts all match
+::  the pin (out.txt): [Never |-> 0] / Error: Postcondition Never at line 11, col 10 to line
+::  11, col 15 of module spec is false. / 4 states generated, 4 distinct
+::  states found, 0 states left on queue. / The depth of the complete state
+::  graph search is 4.
+++  test-mc-possible-never
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Postcondition Never at line 11, col 10 to line 11, col 15 of module spec is false.'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0aNever == x = 99\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Never\0a'
+::
+++  test-mc-possible-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Reached Moved\0a'
+::
+++  test-mc-possible-temporal
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: The possible of Temporal is equal to a temporal formula; only state- and action-level predicates are supported'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0aTemporal == []<>(x = 1)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Temporal\0a'
+::
 ++  test-mc-rnd-exists
   %+  expect-eq
     !>  ^-  wain

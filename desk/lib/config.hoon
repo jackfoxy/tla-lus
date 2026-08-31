@@ -556,6 +556,8 @@
       ::  now ACTS on them -- evaluated after exploration -- and the kernel has
       ::  no other hand-off from the config to the render
       postconditions=(list @t)
+      ::  R2.7.7.4b: `_POSSIBLE`'s names, for the same reason
+      possible=(list @t)
       deadlock=?                         ::  getCheckDeadlock: true unless FALSE
   ==
 ::
@@ -575,6 +577,8 @@
       specification:k  property:k  'PROPERTIES'  'ALIAS'  'CHECK_DEADLOCK'
       ::  R2.7.7.3 evaluates these after exploration
       'POSTCONDITION'  'POSTCONDITIONS'
+      ::  R2.7.7.4b tracks this one at the constraint positions
+      '_POSSIBLE'
   ==
 ::
 ++  kw-refused
@@ -582,15 +586,14 @@
   ::  capability tlc2 has and this engine does not yet:
   ::
   ::  (POSTCONDITION left this list at R2.7.7.3, which evaluates it.)
-  ::    _POSSIBLE         named counters read back through
-  ::                      TLCGet("all:named")["s:_possible"]   -- R2.7.7.4
+  ::  (_POSSIBLE left this list at R2.7.7.4b, which tracks it.)
   ::    _PERIODIC         evaluated INSIDE the search loop; false ends the run
   ::                      with EC.TLC_ASSUMPTION_FALSE         -- R2.7.7.5
   ::    _RL_REWARD        only consumed by RLSimulationWorker, behind a JVM
   ::                      system property -- the capability is out of scope,
   ::                      but accepting the keyword silently is not
   ^-  (set @t)
-  (silt ~['_POSSIBLE' '_PERIODIC' '_RL_REWARD'])
+  (silt ~['_PERIODIC' '_RL_REWARD'])
 ::
 ++  unsupported-kw
   ::  the typed rejection for a `.cfg` keyword this engine parses but does not
@@ -600,13 +603,6 @@
   ::  survived). Checked in declaration order; `~` when the config is clean
   |=  a=cfg-ast
   ^-  (unit @t)
-  ?^  possible.a
-    :-  ~
-    %^  rap  3  'unsupported: _POSSIBLE '
-    :~  i.possible.a
-        '; it builds the named counters `TLCGet("all:named")["s:_possible"]` '
-        'reads, and no engine path produces them'
-    ==
   ?^  periodic.a
     :-  ~
     %^  rap  3  'unsupported: _PERIODIC '
@@ -778,7 +774,20 @@
   |-  ^-  (unit cfg-vdiag)
   ?~  ps  ~
   =/  r  (ck-snapshot-def dm 'possible' i.ps)
-  ?^(r r $(ps t.ps))
+  ?^  r  r
+  ::  R2.7.7.4b: `_POSSIBLE` alone rejects a TEMPORAL-level predicate.
+  ::  `processConfigPossible` guards `level >= TemporalLevel` with EC 2230 and
+  ::  the message below, measured verbatim (tlaplus#827): `_Track` wraps the
+  ::  predicate into a CONSTRAINT, which a temporal formula cannot be
+  =/  de  (~(get by dm) i.ps)
+  ?:  ?&(?=(^ de) ?=(%def -.u.de) (gth lvl.d.u.de 2))
+    :-  ~
+    :-  2.230
+    %+  rap  3
+    :~  'The possible of '  i.ps  ' is equal to a temporal formula; '
+        'only state- and action-level predicates are supported'
+    ==
+  $(ps t.ps)
 ::
 ++  ck-formula
   ::  INVARIANT/PROPERTY/SPECIFICATION resolution: unresolved -> 2229;
@@ -1337,6 +1346,7 @@
       view=view.a
       alias=alias.a
       postconditions=postconditions.a
+      possible=possible.a
       deadlock=!=(%false deadlock.a)
   ==
 ::

@@ -1,0 +1,1 @@
+Error: The possible of Temporal is equal to a temporal formula; only state- and action-level predicates are supported

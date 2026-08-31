@@ -123,9 +123,15 @@
     (expect-eq !>(|) !>((~(has in kw-refused:config) 'POSTCONDITION')))
   ==
 ::
-++  test-cfg-possible-refused-by-name
-  =/  r  (ukw 'INIT Init\0aNEXT Next\0a_POSSIBLE Inv Inv2\0a')
-  (starts r "unsupported: _POSSIBLE Inv")
+++  test-cfg-possible-is-handled-not-refused
+  ::  R2.7.7.4b TRACKS `_POSSIBLE`, so it left `+kw-refused` for
+  ::  `+kw-handled` -- the same move POSTCONDITION made at R2.7.7.3, and the
+  ::  coverage guard is what makes either move impossible to forget
+  ;:  weld
+    (expect-eq !>("~") !>((ukw 'INIT Init\0aNEXT Next\0a_POSSIBLE Inv\0a')))
+    (expect-eq !>(&) !>((~(has in kw-handled:config) '_POSSIBLE')))
+    (expect-eq !>(|) !>((~(has in kw-refused:config) '_POSSIBLE')))
+  ==
 ::
 ++  test-cfg-periodic-refused-by-name
   ::  verdict-affecting at the pin: false ENDS the run (EC.TLC_ASSUMPTION_FALSE)

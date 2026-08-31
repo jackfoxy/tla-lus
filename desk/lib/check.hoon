@@ -223,6 +223,10 @@
       invs=(list [name=@t body=sem:sem-lib])   ::  invariants, declaration order
       cons=(list sem:sem-lib)                  ::  state constraints (CONSTRAINT)
       acons=(list sem:sem-lib)                 ::  action constraints
+      ::  R2.7.7.4b: `_POSSIBLE`'s predicates with their LEVELS. Not folded
+      ::  into `cons`/`acons` because `_Track` must never prune -- it answers
+      ::  TRUE whatever the predicate does, and only the count is kept
+      poss=(list [name=@t body=sem:sem-lib lvl=@ud])
       vars=(set @t)
       order=(list @t)   ::  vars in TLC declaration order (FP64 byte order)
       perms=(list (map @t @t))   ::  symmetry group (empty = no symmetry)
@@ -446,6 +450,53 @@
   ?.  p.r  [%& | +(n)]
   $(cs t.cs, n +(n))
 ::
+++  poss-key  ^~(`@t`'s:_possible')
+::
+++  track-possible
+  ::  `_Possible!_Track(P, "P")` (R2.7.7.4b), natively rather than through the
+  ::  synthetic module `SpecProcessor.processConfigPossible` generates. The
+  ::  vendored body is
+  ::
+  ::    _Track(expr, name) == TLCSet("s:_possible", <update>(TLCGetOrDefault(
+  ::                            "s:_possible", <<>>), expr))
+  ::
+  ::  where the update INCREMENTS the name's count when `expr` is TRUE and
+  ::  otherwise ensures the name is PRESENT at 0 (`old @@ (name :> 0)` keeps an
+  ::  existing count, since `@@` prefers the left). So a never-witnessed
+  ::  predicate ends at 0 rather than absent, and `_CheckName` fails on either.
+  ::
+  ::  It is wired as a CONSTRAINT at the pin, which is why it always answers
+  ::  TRUE -- it must never prune. This arm therefore returns only the carrier:
+  ::  the predicate's own truth value is counted, never propagated.
+  |=  [ps=(list [name=@t body=sem:sem-lib lvl=@ud]) st=state nxt=(unit state) e=eenv:ne rs=rst:ne]
+  ^-  rst:ne
+  ?~  ps  rs
+  =/  rec  (~(gut by named.rs) poss-key `value`[%fcn ~])
+  =^  r  rs
+    ?~  nxt  (pred-bool-rs:ne body.i.ps st ~ e rs)
+    (pred-bool-rs:ne body.i.ps st u.nxt e rs)
+  ::  an evaluation FAILURE is not a witness and not a crash: the pin evaluates
+  ::  this inside a constraint, where a throw would end the run -- but nothing
+  ::  in the corpus reaches it, so it is counted as not-witnessed rather than
+  ::  guessed at
+  =/  hit=?  &(?=(%& -.r) p.r)
+  ::  narrowed ONCE: the union does not survive into the later expressions
+  =/  pairs=(list vpair:vl)  ?:(?=(%fcn -.rec) p.rec ~)
+  =/  key=value  [%str name.i.ps]
+  =/  cur=@ud
+    =/  f  (skim pairs |=(v=vpair:vl =(d.v key)))
+    ?~(f 0 ?:(?=(%int -.r.i.f) (abs:si p.r.i.f) 0))
+  =/  nv=@ud  ?:(hit +(cur) cur)
+  =/  others  (skip pairs |=(v=vpair:vl =(d.v key)))
+  ::  the record is kept in canonical (sorted-domain) order, as every other
+  ::  `%fcn` this engine builds is
+  =.  named.rs
+    %+  ~(put by named.rs)  poss-key
+    :-  %fcn
+    %+  sort  `(list vpair:vl)`[[key `value`[%int (sun:si nv)]] others]
+    |=([a=vpair:vl b=vpair:vl] (vlth:vl d.a d.b))
+  $(ps t.ps, rs rs)
+::
 ++  con-hold-rs
   ::  `+con-hold-n` carrying the R2.7.4.3 register store: a CONSTRAINT may
   ::  contain a `TLCSet`, and at the pin that write lands in the same store
@@ -630,11 +681,20 @@
   ::  tlc2 counts a FALSE constraint as the primary and a TRUE one as the
   ::  secondary, and its loop stops at the first false, so a later constraint
   ::  contributes nothing for this state
+  ::  R2.7.7.4b: `_POSSIBLE`'s STATE-level predicates are model constraints at
+  ::  the pin, evaluated by `isInModel` for EVERY discovered state -- including
+  ::  a terminal one, which is the pin's stated reason for not routing them
+  ::  through action constraints. Tracked BEFORE the constraint check, since a
+  ::  constraint-pruned state was still discovered
+  =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (lte l 1))) st ~ e rs.cur)
   =^  ch  rs.cur  (con-hold-rs cons.o st e rs.cur)
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
   ?^  prev
+    ::  and the ACTION-level ones are action constraints, evaluated on every
+    ::  transition
+    =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (gth l 1))) u.prev `st e rs.cur)
     =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st e rs.cur)
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
@@ -1933,6 +1993,10 @@
       ::  resolved yet -- the pin resolves them when it fetches them, after
       ::  the search, so an unresolvable name must fail there and not before
       pcs=(list @t)
+      ::  R2.7.7.4b: `_POSSIBLE`'s predicates, resolved with their LEVELS --
+      ::  state-level ones are tracked as model constraints, action-level ones
+      ::  as action constraints, which is how the pin wires them
+      poss=(list [name=@t body=sem:sem-lib lvl=@ud])
       ::  R2.7.4.3/.4: the CARRIER as the INITIAL-STATE solve left it. An
       ::  `Init` conjunct may write the register store
       ::  (`Init == x = 0 /\ TLCSet(0, 100)`) or draw from the RNG
@@ -2463,6 +2527,15 @@
       ?~(init.ca '' u.init.ca)
       irej.+.irc
       postconditions.ca
+      ::  resolved here, where `defs` is in scope; the config validator has
+      ::  already rejected an unresolvable or temporal-level name
+      %+  murn  possible.ca
+      |=  nm=@t
+      ^-  (unit [@t sem:sem-lib @ud])
+      =/  d  (~(get by defs) nm)
+      ?~  d  ~
+      ?~  body.u.d  ~
+      `[nm u.body.u.d lvl.u.d]
       +.irc
       p.or
   ==
@@ -2677,9 +2750,17 @@
   ::  next-state relation sees the count. Evaluating with a fresh `rst` answers
   ::  `TLCGet(s:c) was undefined.` instead, so the run's FINAL carrier is
   ::  passed in
-  |=  [pcs=(list @t) defs=(map @t sem-def:sem-lib) e=eenv:ne modn=@t rs=rst:ne]
+  |=  $:  pcs=(list @t)  defs=(map @t sem-def:sem-lib)  e=eenv:ne  modn=@t
+          rs=rst:ne
+          ::  R2.7.7.4b: `_POSSIBLE` generates one `_CheckName(P)` POSTCONDITION
+          ::  per predicate. They run after the config's own, and each reports
+          ::  the USER's predicate name and BODY location, not the generated
+          ::  operator's -- the pin wraps them in a `PossibleAction` for exactly
+          ::  that. `_CheckName` fails when the count is 0 OR the name is absent
+          poss=(list [name=@t body=sem:sem-lib lvl=@ud])
+      ==
   ^-  wain
-  ?~  pcs  ~
+  ?~  pcs  (possible-lines poss rs modn)
   =/  d  (~(get by defs) i.pcs)
   ::  an unresolvable name is the pin's `getPostConditionSpecs` failure, and it
   ::  arrives as an UNEXPECTED EXCEPTION rather than a typed diagnostic --
@@ -2696,6 +2777,28 @@
   ::  a postcondition's own writes are visible to the NEXT one, as they are to
   ::  a later conjunct of one (R2.7.4.3's measured rule)
   $(pcs t.pcs, rs +.r)
+::
+++  possible-lines
+  ::  the generated `_Possible!_CheckName` postconditions (R2.7.7.4b): a
+  ::  `_POSSIBLE` predicate never witnessed is EC 2404, exactly as a false
+  ::  config postcondition is.
+  ::
+  ::  The pin ALSO prints the counts record first (`_CheckName`'s body is
+  ::  `PrintT(counts) /\ FALSE`). This engine has no Print channel -- the
+  ::  standing `tlc-module-tlc` difference -- so that line is absent here and
+  ::  the case is an approved difference rather than byte-exact
+  |=  [poss=(list [name=@t body=sem:sem-lib lvl=@ud]) rs=rst:ne modn=@t]
+  ^-  wain
+  ?~  poss  ~
+  =/  rec  (~(gut by named.rs) poss-key `value`[%fcn ~])
+  =/  pairs=(list vpair:vl)  ?:(?=(%fcn -.rec) p.rec ~)
+  =/  f  (skim pairs |=(v=vpair:vl =(d.v `value`[%str name.i.poss])))
+  =/  n=@ud  ?~(f 0 ?:(?=(%int -.r.i.f) (abs:si p.r.i.f) 0))
+  ?:  =(0 n)
+    %-  err-lines
+    %+  ec-body:diag  2.404
+    ~[name.i.poss (loc-str:config modn (sem-span:config body.i.poss))]
+  $(poss t.poss)
 ::
 ++  unexpected-exception
   ::  tlc2's wrapper for a throw it has no handler for (`TLC.process`'s catch,
@@ -2770,7 +2873,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2813,7 +2916,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2851,7 +2954,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2869,7 +2972,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3214,7 +3317,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -4236,7 +4339,7 @@
       ::  state, tlc2 names `Tight` -- the config's, not the property's. This
       ::  branch used to pass ONLY the property, silently dropping the config's
       =/  o=bfs-opts
-        :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c
+        :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c  poss.c
             vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
             ~  *cov-opts  0
         ==
@@ -4279,7 +4382,7 @@
     ::  running it. `+bfs-step` already checks `invs` and stops at the first
     ::  violation, so no new checking machinery was needed here, only the list
     =/  o=bfs-opts
-      [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0]
+      [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0]
     =/  bg    (build-graph-out is.c o)
     =/  modn  (module-name-of tree.c)
     ?:  capped.bg
@@ -4314,6 +4417,7 @@
           [| 0 `[depth.bst distinct.bst queued.bst gen.bst]]
           modn
           rs.bg
+          poss.c
         ==
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
@@ -4420,7 +4524,7 @@
   |=  [c=sctx pname=@t body=sem:sem-lib]
   ^-  wain
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 | ~ *cov-opts 0]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 | ~ *cov-opts 0]
   =/  env      (make-env:ne defs.c consts.c vars.c)
   =/  actions  (get-actions nsb.c aname.c defs.c env)
   =/  modn     (module-name-of tree.c)
@@ -4501,7 +4605,7 @@
   ::  the getActions decomposition is passed IN rather than rebuilt per slice
   ::  (R2.7.4.2b) -- this path needs it for the trace labels anyway
   =/  o=bfs-opts
-    :*  nsb.c  invs.c  cons.c  acons.c  vars.c  order.c  perms.c  defs.c
+    :*  nsb.c  invs.c  cons.c  acons.c  poss.c  vars.c  order.c  perms.c  defs.c
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed
     ==
   =/  r  (explore-full-regs is.c irs.c o)
@@ -4517,6 +4621,7 @@
       (with-run:ne env [| 0 `[depth.st distinct.st queued.st gen.st]])
       modn
       rs.cur.r
+      poss.c
     ==
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
@@ -4669,7 +4774,7 @@
       ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
       ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
       ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0]
+      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0]
       =/  bg  (build-graph-cap is.c o)
       ::  the liveness graph build samples no out-degree (no BFS frontier)
       =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -4682,11 +4787,11 @@
       ?~(l [[%ok st] st] [[%violated [%property u.pp.c %.n] st] st])
     ::  box-state P as a safety invariant
     =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
+      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
     =/  er  (explore is.c o)
     (explore-outcome out.er od.er)
   ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
   =/  er  (explore is.c o)
   (explore-outcome out.er od.er)
 ::
@@ -4713,7 +4818,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

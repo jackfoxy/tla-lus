@@ -8,8 +8,7 @@
 # in one mule-isolated arm; 0 disagree with Java (142/142 agree):
 
 # tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
-# 1 disagree with TLC (13/14 agree):
-tlc-batch	SubseteqNextState -> Error: unsupported: _POSSIBLE FullSet; it builds the named counters `TLCGet("all:named")["s:_possible"]` reads, and no engine path produces them	`_POSSIBLE` is parsed and not acted on, so the run is refused by name (R2.7.7.1) rather than reported `ok`. POSTCONDITION no longer contributes -- R2.7.7.3 evaluates it; the counters are R2.7.7.4
+# 0 disagree with TLC (14/14 agree):
 
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
 # 0 disagree with TLC (9/9 agree):

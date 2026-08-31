@@ -1375,6 +1375,17 @@
   =/  order  (var-order:check tree)
   =/  modn  (module-name-of:check tree)
   =/  defs    (defmap-of:ne mo)
+  ::  R2.7.7.4b: `_POSSIBLE`'s predicates with their levels, resolved the same
+  ::  way the console resolves them
+  =/  poss
+    %+  murn  possible.rs
+    |=  nm=@t
+    ^-  (unit [@t sem:semantic @ud])
+    =/  d  (~(get by defs) nm)
+    ?~  d  ~
+    ?~  body.u.d  ~
+    `[nm u.body.u.d lvl.u.d]
+
   ::  the VIEW body, resolved like any other config target (R2.3.1)
   =/  vwb=(unit sem:semantic)  ?~(view.rs ~ (sem-body:check defs u.view.rs))
   ::  the ALIAS body, resolved like any other config target (R2.3.2)
@@ -1581,7 +1592,7 @@
       ::  box-state property, and BEFORE it -- `processConfigInvariants()`
       ::  fills `invVec` first and `processConfigProps` appends to it
       =/  o=bfs-opts:check
-        :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  vars  order
+        :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  poss  vars  order
             perms  defs
             consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
             vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
@@ -1616,7 +1627,7 @@
     ::  violation is the state search's own verdict and pre-empts the liveness
     ::  report, exactly as it does on the console path
     =/  o=bfs-opts:check
-      :*  nsb  invs  ~  ~  vars  order  ~  defs  consts  |
+      :*  nsb  invs  ~  ~  ~  vars  order  ~  defs  consts  |
           max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
           *cov-opts:check  0
       ==
@@ -1635,7 +1646,7 @@
   ::  passing it in removes the per-slice rebuild R2.7.4.2a's timing measured
   =/  acts  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
   =/  o=bfs-opts:check
-    :*  nsb  invs  cons  acons  vars  order  perms  defs  consts
+    :*  nsb  invs  cons  acons  poss  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb  max-set-size.lims  continue.opts.op.request.j  acts  cvo
         ::  R2.7.4.4: tlc2's `-seed`, which seeds `RandomEnumerableValues` for
@@ -1772,6 +1783,7 @@
         [| 0 `[depth.pst distinct.pst queued.pst gen.pst]]
         modn
         rs.cur
+        poss.o
       ==
     %:  render-outcome:check
       out  nl  ~  env  ~  ''  al  vr  |
