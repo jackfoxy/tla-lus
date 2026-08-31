@@ -552,6 +552,10 @@
       symmetry=(unit @t)
       view=(unit @t)
       alias=(unit @t)
+      ::  R2.7.7.3: the POSTCONDITION names. On the run-spec because the engine
+      ::  now ACTS on them -- evaluated after exploration -- and the kernel has
+      ::  no other hand-off from the config to the render
+      postconditions=(list @t)
       deadlock=?                         ::  getCheckDeadlock: true unless FALSE
   ==
 ::
@@ -569,15 +573,15 @@
       action-constraint:k  'ACTION_CONSTRAINTS'
       invariant:k  'INVARIANTS'  init:k  next:k  view:k  symmetry:k
       specification:k  property:k  'PROPERTIES'  'ALIAS'  'CHECK_DEADLOCK'
+      ::  R2.7.7.3 evaluates these after exploration
+      'POSTCONDITION'  'POSTCONDITIONS'
   ==
 ::
 ++  kw-refused
   ::  parsed, and REFUSED BY NAME rather than ignored (R2.7.7.1). Each is a
   ::  capability tlc2 has and this engine does not yet:
   ::
-  ::    POSTCONDITION(S)  evaluated after exploration; a false one is
-  ::                      EC TLC_POSTCONDITION_FALSE, so ignoring it reports
-  ::                      `ok` for a run tlc2 fails            -- R2.7.7.3
+  ::  (POSTCONDITION left this list at R2.7.7.3, which evaluates it.)
   ::    _POSSIBLE         named counters read back through
   ::                      TLCGet("all:named")["s:_possible"]   -- R2.7.7.4
   ::    _PERIODIC         evaluated INSIDE the search loop; false ends the run
@@ -586,7 +590,7 @@
   ::                      system property -- the capability is out of scope,
   ::                      but accepting the keyword silently is not
   ^-  (set @t)
-  (silt ~['POSTCONDITION' 'POSTCONDITIONS' '_POSSIBLE' '_PERIODIC' '_RL_REWARD'])
+  (silt ~['_POSSIBLE' '_PERIODIC' '_RL_REWARD'])
 ::
 ++  unsupported-kw
   ::  the typed rejection for a `.cfg` keyword this engine parses but does not
@@ -596,14 +600,6 @@
   ::  survived). Checked in declaration order; `~` when the config is clean
   |=  a=cfg-ast
   ^-  (unit @t)
-  ?^  postconditions.a
-    :-  ~
-    %^  rap  3  'unsupported: POSTCONDITION '
-    :~  i.postconditions.a
-        '; tlc2 evaluates it after state-space exploration and fails the run '
-        'when it is false, so accepting it here would report `ok` for a run '
-        'tlc2 fails'
-    ==
   ?^  possible.a
     :-  ~
     %^  rap  3  'unsupported: _POSSIBLE '
@@ -1340,6 +1336,7 @@
       symmetry=symmetry.a
       view=view.a
       alias=alias.a
+      postconditions=postconditions.a
       deadlock=!=(%false deadlock.a)
   ==
 ::

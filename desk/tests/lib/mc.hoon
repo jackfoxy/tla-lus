@@ -108,6 +108,39 @@
     '---- MODULE spec ----\0a\\* R2.7.7.2: `_PERIODIC` naming an operator that does not exist. tlc2\0a\\* resolves the name at SPEC PROCESSING (SpecProcessor lines 944-948), before\0a\\* a single state is computed -- unlike POSTCONDITION, which resolves after\0a\\* exploration.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aTwo(a) == a = 1\0a====\0a'
   'INIT Init\0aNEXT Next\0a_POSSIBLE NoSuchOp\0a'
 ::
+++  test-mc-cfg-post-false
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Postcondition Post at line 9, col 9 to line 9, col 32 of module spec is false.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.0: a POSTCONDITION that is FALSE after exploration. tlc2 completes\0a\\* the search, then evaluates it and fails; the port parses the keyword into\0a\\* `cfg-ast` and evaluates nothing, so it reports a clean run.\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aPost == TLCGet("distinct") = 999\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPOSTCONDITION Post\0a'
+::
+++  test-mc-cfg-post-undef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: TLC threw an unexpected exception.'
+        'This was probably caused by an error in the spec or model.'
+        'See the User Output or TLC Console for clues to what happened.'
+        'The exception was a java.lang.RuntimeException'
+        ': The post condition NoSuchOp specified in the configuration file'
+        'is not defined in the specification.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.0: a POSTCONDITION naming an operator that does not exist. tlc2\0a\\* rejects this at SPEC PROCESSING, before a single state is computed; the\0a\\* port runs the spec to completion.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPOSTCONDITION NoSuchOp\0a'
+::
 ++  test-mc-cfg-rlreward-undef
   %+  expect-eq
     !>  ^-  wain

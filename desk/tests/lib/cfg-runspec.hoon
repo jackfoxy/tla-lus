@@ -111,13 +111,16 @@
 ++  test-cfg-clean-config-is-not-refused
   (expect-eq !>("~") !>((ukw 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a')))
 ::
-++  test-cfg-postcondition-refused-by-name
-  ::  the one that reported `ok` for a run tlc2 FAILS (R2.7.7.0's
-  ::  `cfg-post-false`), so the refusal names the keyword and says why
-  =/  r  (ukw 'INIT Init\0aNEXT Next\0aPOSTCONDITION Post\0a')
+++  test-cfg-postcondition-is-handled-not-refused
+  ::  R2.7.7.3 EVALUATES the postconditions, so the keyword left `+kw-refused`
+  ::  for `+kw-handled` and a config carrying one is no longer refused here.
+  ::  What used to be `test-cfg-postcondition-refused-by-name` asserted the
+  ::  opposite; the drift guard would have caught the move either way, and
+  ::  this arm is what says the move was intended
   ;:  weld
-    (starts r "unsupported: POSTCONDITION Post")
-    (expect-eq !>(&) !>(!=(~ (find "after state-space exploration" r))))
+    (expect-eq !>("~") !>((ukw 'INIT Init\0aNEXT Next\0aPOSTCONDITION Inv\0a')))
+    (expect-eq !>(&) !>((~(has in kw-handled:config) 'POSTCONDITION')))
+    (expect-eq !>(|) !>((~(has in kw-refused:config) 'POSTCONDITION')))
   ==
 ::
 ++  test-cfg-possible-refused-by-name

@@ -1924,6 +1924,11 @@
       ::  halves of the INIT coverage line
       iname=@t
       irej=@ud
+      ::  R2.7.7.3: the POSTCONDITION names, evaluated after exploration.
+      ::  Carried here rather than re-parsed at the render site, and NOT
+      ::  resolved yet -- the pin resolves them when it fetches them, after
+      ::  the search, so an unresolvable name must fail there and not before
+      pcs=(list @t)
       ::  R2.7.4.3/.4: the CARRIER as the INITIAL-STATE solve left it. An
       ::  `Init` conjunct may write the register store
       ::  (`Init == x = 0 /\ TLCSet(0, 100)`) or draw from the RNG
@@ -2453,6 +2458,7 @@
       (weld symwarn warn.p.rt)
       ?~(init.ca '' u.init.ca)
       irej.+.irc
+      postconditions.ca
       +.irc
       p.or
   ==
@@ -2627,6 +2633,85 @@
   ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]
   ?.  p.r  `[2.104 'An assumption is false.']
   $(asmz t.asmz)
+::
+++  out-stats
+  ::  the four counters off an outcome. Each arm carries them, but `%limited`
+  ::  leads with `what`, so the faces do not line up across the union and a
+  ::  bare `depth.out` cannot resolve -- hence the explicit dispatch
+  |=  o=outcome
+  ^-  [gen=@ud distinct=@ud queued=@ud depth=@ud]
+  ?-  -.o
+    %ok        [gen.o distinct.o queued.o depth.o]
+    %inv       [gen.o distinct.o queued.o depth.o]
+    %deadlock  [gen.o distinct.o queued.o depth.o]
+    %limited   [gen.o distinct.o queued.o depth.o]
+    %error     [0 0 0 0]
+  ==
+::
+++  post-cond-lines
+  ::  POSTCONDITION, evaluated AFTER state-space exploration (R2.7.7.3), the
+  ::  way `Tool.checkPostConditionWithContext` does. Measured at the pin:
+  ::
+  ::    - it runs on a CLEAN run and after a VIOLATION alike, and its line
+  ::      sits between the safety trace and the counts -- the slot R2.7.5's
+  ::      post-error temporal block already uses;
+  ::    - on a clean run whose postcondition is FALSE, `Model checking
+  ::      completed. No error has been found.` is NOT printed: the error
+  ::      replaces it (`MP.printError` is the run's outcome);
+  ::    - the NAMES resolve here, not at spec processing -- the pin prints the
+  ::      state counts first and only then fails on an unresolvable one, which
+  ::      is why R2.7.7.2 left this clause to this unit.
+  ::
+  ::  EC 2404 `Postcondition %1% at %2% is false.`, EC 2405 for an evaluation
+  ::  failure, where %2% is the BODY's location (tlc2 passes
+  ::  `pc.getPred().toString()`, an ExprNode, whose toString is its location).
+  ::  `e` must already carry the run statistics -- a postcondition typically
+  ::  reads them through `TLCGet`
+  |=  [pcs=(list @t) defs=(map @t sem-def:sem-lib) e=eenv:ne modn=@t]
+  ^-  wain
+  ?~  pcs  ~
+  =/  d  (~(get by defs) i.pcs)
+  ::  an unresolvable name is the pin's `getPostConditionSpecs` failure, and it
+  ::  arrives as an UNEXPECTED EXCEPTION rather than a typed diagnostic --
+  ::  `Assert.fail` throws where TLC has no handler for it (measured:
+  ::  `cfg-post-undef`)
+  ?~  d  (unexpected-exception (v-notdef:config 'post condition' i.pcs))
+  ?~  body.u.d  (unexpected-exception (v-notdef:config 'post condition' i.pcs))
+  =/  loc  (loc-str:config modn (sem-span:config u.body.u.d))
+  =/  r  (pred-bool:ne u.body.u.d ~ ~ e)
+  ?:  ?=(%| -.r)
+    (err-lines (ec-body:diag 2.405 ~[i.pcs loc msg.p.r]))
+  ?.  p.r
+    (err-lines (ec-body:diag 2.404 ~[i.pcs loc]))
+  $(pcs t.pcs)
+::
+++  unexpected-exception
+  ::  tlc2's wrapper for a throw it has no handler for (`TLC.process`'s catch,
+  ::  EC.GENERAL): four fixed lines, the exception's class, then the message.
+  ::  Reproduced rather than replaced by a typed diagnostic because that is
+  ::  what a caller comparing output sees -- and because a postcondition name
+  ::  that does not resolve reaches the pin through exactly this path
+  |=  msg=@t
+  ^-  wain
+  ::  only the FIRST line carries `Error: `; the message follows on its own
+  ::  lines, the first of them opening with `: ` -- so this cannot go through
+  ::  `+err-lines`, which prefixes every rendering it makes
+  =/  t=tape  (trip (cat 3 ': ' msg))
+  =|  cur=tape
+  =|  out=wain
+  =/  tail=wain
+    |-  ^-  wain
+    ?~  t  (flop [(crip (flop cur)) out])
+    ?:  =(10 i.t)
+      $(t t.t, cur ~, out [(crip (flop cur)) out])
+    $(t t.t, cur [i.t cur])
+  %+  weld
+    :~  'Error: TLC threw an unexpected exception.'
+        'This was probably caused by an error in the spec or model.'
+        'See the User Output or TLC Console for clues to what happened.'
+        'The exception was a java.lang.RuntimeException'
+    ==
+  tail
 ::
 ++  live-struct
   ::  the temporal-normalization count projection (unit 8.1) for a spec+cfg,
@@ -4146,7 +4231,7 @@
       =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
       =/  env      (make-env:ne defs.c consts.c vars.c)
       =/  modn     (module-name-of tree.c)
-      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c | ~ ~)
+      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
     ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
     ::  includes the fairness conjuncts `decompose-spec` extracted from the
     ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
@@ -4205,10 +4290,19 @@
             (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
             u.pp.c  aname.c
         ==
+      ::  R2.7.7.3: the postconditions run here too -- measured, they run
+      ::  after a VIOLATION as well as on a clean run
+      =/  pcl=wain
+        ?:  ?=(%error -.out.bg)  ~
+        %^  post-cond-lines  pcs.c  defs.c
+        :_  modn
+        =/  st  (out-stats out.bg)
+        %+  with-run:ne  (make-env:ne defs.c consts.c vars.c)
+        [| 0 `[depth.st distinct.st queued.st gen.st]]
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
-          ~  post
+          ~  post  pcl
       ==
     =/  r
       %-  live-report
@@ -4334,9 +4428,9 @@
   ?:  ?&  ?=(%inv -.out.bg)
           ?|(?=(~ viol) (lte (lent trace.out.bg) (lent u.viol)))
       ==
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
   ?~  viol
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~)
+    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
   ;:  weld
     ~[(crip "Error: Action property {(trip pname)} is violated.")]
     ~['Error: The behavior up to this point is:']
@@ -4395,9 +4489,19 @@
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed
     ==
   =/  r  (explore-full-regs is.c irs.c o)
+  ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
+  ::  what `TLCGet("distinct")` inside one reads, and reading them before the
+  ::  search would answer with the counters standing at zero
+  =/  pcl=wain
+    ?:  ?=(%error -.out.r)  ~
+    %^  post-cond-lines  pcs.c  defs.c
+    :_  modn
+    =/  st  (out-stats out.r)
+    %+  with-run:ne  env
+    [| 0 `[depth.st distinct.st queued.st gen.st]]
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
-      (cov-report o cur.r actions)  ~
+      (cov-report o cur.r actions)  ~  pcl
   ==
 ::
 ++  render-outcome
@@ -4424,6 +4528,11 @@
           ::  temporal property -- its own block, between the safety trace and
           ::  the statistics. `~` when there is none; see `+post-error-live`
           post=wain
+          ::  R2.7.7.3: the POSTCONDITION lines, in the same slot as `post`.
+          ::  On a CLEAN run a failing postcondition REPLACES `Model checking
+          ::  completed. No error has been found.` -- measured: the pin prints
+          ::  the error and the counts, and no completion line
+          pcl=wain
       ==
   ^-  wain
   ?-    -.res
@@ -4457,7 +4566,7 @@
       ?~(viols.res cov cov-refusal)
     ;:  weld
       vlines
-      ~['Model checking completed. No error has been found.']
+      ?^(pcl pcl ~['Model checking completed. No error has been found.'])
       blk
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
@@ -4497,6 +4606,7 @@
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl actions e order modn al vw dif)
       post
+      pcl
       ?~(cov ~ cov-refusal)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
@@ -4507,6 +4617,7 @@
       ~['Error: The behavior up to this point is:']
       (render-trace trace.res nl actions e order modn al vw dif)
       post
+      pcl
       ?~(cov ~ cov-refusal)
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==

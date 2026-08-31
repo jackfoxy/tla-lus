@@ -349,16 +349,17 @@ TLC_LIVENESS_BATCH = [
 # it. R2.7.7.1 refuses both keywords by name, which is the honest state and
 # makes the gap visible in the census instead of invisible in a green batch.
 # It closes with R2.7.7.3 + R2.7.7.4, which land together for this reason.
-# Frozen from the SHIP RUN, not predicted: the first draft of this entry
-# guessed `_POSSIBLE` because that is the keyword the row is about, and the
-# port refuses on POSTCONDITION first -- `+unsupported-kw` checks in
-# declaration order -- with the console `Error: ` prefix. The test caught it.
-TLC_BATCH_DIVERGENCES = ["SubseteqNextState -> Error: unsupported: POSTCONDITION PossibleCounts; tlc2 evaluates it after state-space exploration and fails the run when it is false, so accepting it here would report `ok` for a run tlc2 fails"]
+# Frozen from the SHIP RUN, not predicted. R2.7.7.1 froze this as POSTCONDITION
+# because `+unsupported-kw` checks in declaration order; R2.7.7.3 now EVALUATES
+# postconditions, so the same spec is refused one keyword later, on `_POSSIBLE`
+# -- which is R2.7.7.4's, and closes the entry.
+TLC_BATCH_DIVERGENCES = ["SubseteqNextState -> Error: unsupported: _POSSIBLE FullSet; it builds the named counters `TLCGet(\"all:named\")[\"s:_possible\"]` reads, and no engine path produces them"]
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
-    "SubseteqNextState": "`_POSSIBLE` and `POSTCONDITION` are parsed and not "
-                         "acted on, so the run is refused by name (R2.7.7.1) "
-                         "rather than reported `ok` -- R2.7.7.3/.4",
+    "SubseteqNextState": "`_POSSIBLE` is parsed and not acted on, so the run "
+                         "is refused by name (R2.7.7.1) rather than reported "
+                         "`ok`. POSTCONDITION no longer contributes -- "
+                         "R2.7.7.3 evaluates it; the counters are R2.7.7.4",
 }
 
 # Liveness batch modules whose Hoon check disagrees with TLC, frozen from the

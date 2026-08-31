@@ -130,6 +130,12 @@
       %2.105  (mp-subst 'Evaluating assumption %1% failed.\0a%2%' params)
       %2.107  (mp-subst 'Invariant %1% is violated by the initial state:\0a%2%' params)
       %2.110  (mp-subst 'Invariant %1% is violated.' params)
+      ::  R2.7.7.3: the postconditions, evaluated AFTER state-space exploration
+      ::  (`Tool.checkPostConditionWithContext`) -- measured, they run on a
+      ::  clean run AND after a violation, and their line sits between the
+      ::  safety trace and the counts
+      %2.404  (mp-subst 'Postcondition %1% at %2% is false.' params)
+      %2.405  (mp-subst 'Evaluating postcondition %1% at %2% failed.\0a%3%' params)
       ::  R2.7.3: raised at SPEC PROCESSING, not at evaluation --
       ::  `SpecProcessor.processConstantDefns` fails on a `DecimalKind` node, so
       ::  ANY decimal anywhere in the module takes the run down before any state

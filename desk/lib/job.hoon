@@ -148,6 +148,10 @@
           o=bfs-opts:check
           cur=bfs-cursor:check
           al=(unit sem:semantic)
+          ::  R2.7.7.3: the POSTCONDITION names, carried across the slices so
+          ::  `+finish-bfs` can evaluate them after the search -- the config
+          ::  itself is not retained
+          pcs=(list @t)
           ::  `-view` render body (R2.4.3); ~ unless the flag is set
           vr=(unit sem:semantic)
       ==
@@ -1583,7 +1587,7 @@
             vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
             0
         ==
-      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb vrb])
+      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb postconditions.rs vrb])
       (more j pre)
     ::  the lasso trace is rendered by the %liveness stage, which takes no
     ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
@@ -1642,7 +1646,7 @@
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
   =.  cont.j
-    (save-kont [%bfs nl act aname o (bfs-init-regs:check is +.isc) alb vrb])
+    (save-kont [%bfs nl act aname o (bfs-init-regs:check is +.isc) alb postconditions.rs vrb])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -1669,7 +1673,7 @@
       (more j pre)
     %:  finish-bfs
       j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
-      nl.kk  act.kk  aname.kk  al.kk  vr.kk  pre
+      nl.kk  act.kk  aname.kk  al.kk  vr.kk  pcs.kk  pre
     ==
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
@@ -1695,7 +1699,10 @@
     ?:  ?=(%inv -.out.r)
       %:  finish-bfs
         j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
-        nl.kk  act.kk  aname.kk  ~  ~  pre
+        ::  the %live kont carries no postcondition names: the liveness path
+        ::  keeps them on its own kont, and this branch is the safety
+        ::  violation that pre-empts it (R2.3.4)
+        nl.kk  act.kk  aname.kk  ~  ~  ~  pre
       ==
     ?.  ?=(%ok -.out.r)
       (finish j [%failed 'internal: unexpected graph outcome'] pre)
@@ -1714,6 +1721,8 @@
           cur=bfs-cursor:check
           nl=@t  act=next-act  aname=@t  al=(unit sem:semantic)
           vr=(unit sem:semantic)
+          ::  R2.7.7.3: the POSTCONDITION names, from the kont
+          pcs=(list @t)
           pre=(list event)
       ==
   ^-  step-out
@@ -1748,9 +1757,21 @@
   ::  reader of `e` is the per-action label that `~` disables
   =/  report
     %-  wain-text
+    ::  R2.7.7.3: the kernel evaluates the postconditions on the same terms as
+    ::  the console -- after the search, with the run's final statistics, and
+    ::  in the same slot. The NAMES ride on the kont (`pcs`) because the config
+    ::  is long gone by the time this renders
+    ::  (no `%error` guard: `out` is already narrowed here, and the test
+    ::  mint-vains)
+    =/  pcl=wain
+      =/  st  (out-stats:check out)
+      %^  post-cond-lines:check  pcs  defs.o
+      :_  modn
+      %+  with-run:ne  env
+      [| 0 `[depth.st distinct.st queued.st gen.st]]
     %:  render-outcome:check
       out  nl  ~  env  ~  ''  al  vr  |
-      (cov-report:check o cur acts)  ~
+      (cov-report:check o cur acts)  ~  pcl
     ==
   =/  tr=(unit trace)
     ?+  -.out  ~
