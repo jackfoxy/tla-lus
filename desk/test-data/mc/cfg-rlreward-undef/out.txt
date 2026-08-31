@@ -1,0 +1,2 @@
+Error: The rlreward NoSuchOp specified in the configuration file
+is not defined in the specification.

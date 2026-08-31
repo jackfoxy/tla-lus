@@ -732,6 +732,58 @@
   ?:  (gth arity.d.u.e 0)  `[2.228 (v-noarg role nm)]
   ~
 ::
+++  ck-snapshot-def
+  ::  the name check for `_PERIODIC` / `_RL_REWARD` / `_POSSIBLE`
+  ::  (R2.7.7.2). Same two rejections as `+ck-action` — 2229 when the name
+  ::  resolves to nothing, 2228 when the definition takes arguments — and
+  ::  deliberately NOT 2233.
+  ::
+  ::  `processRLReward`/`processPeriodic`/`processConfigPossible` look the name
+  ::  up in SpecProcessor's SNAPSHOT rather than in `defns`, precisely because
+  ::  "any constant expression in defns will have been evaluated into a Value"
+  ::  — so a constant-valued definition stays an OpDefNode and is ACCEPTED.
+  ::  Measured: `_RL_REWARD Konst` with `Konst == 1 = 1` runs to a normal
+  ::  verdict at the pin, where an INIT/NEXT-style check calls it a constant.
+  ::  `processRLReward` does carry a must-not-be-constant branch, and the
+  ::  snapshot lookup makes it unreachable; its own TODO says the message
+  ::  would be bogus anyway
+  |=  [dm=(map @t dentry) role=@t nm=@t]
+  ^-  (unit cfg-vdiag)
+  =/  e  (~(get by dm) nm)
+  ?~  e  `[2.229 (v-notdef role nm)]
+  ?:  ?=(%none -.u.e)  `[2.229 (v-notdef role nm)]
+  ?.  ?=(%def -.u.e)  ~
+  ?:  (gth arity.d.u.e 0)  `[2.228 (v-noarg role nm)]
+  ~
+::
+++  ck-keyword-names
+  ::  the `.cfg` keywords whose NAMES the pin resolves at spec processing,
+  ::  before a single state is computed (`SpecProcessor` lines 944-948, in
+  ::  this order). Shared by both paths, because the console never calls
+  ::  `+validate-config` at all and a caller there would otherwise see the
+  ::  R2.7.7.1 refusal for a config the pin rejects with its own diagnostic.
+  ::
+  ::  POSTCONDITION is NOT here, and that is measured rather than an omission:
+  ::  its names resolve in `Spec.getPostConditionSpecs`, which runs after
+  ::  exploration — the pin prints the state counts FIRST and only then fails
+  ::  (R2.7.7.0's `cfg-post-undef`). An early check could not reproduce that,
+  ::  so it belongs with the evaluation in R2.7.7.3
+  |=  [m=sem-module:sem-lib a=cfg-ast]
+  ^-  (unit cfg-vdiag)
+  =/  bd  (build-defns m a)
+  ?:  ?=(%| -.bd)  ~
+  =/  dm  p.bd
+  ::  in `SpecProcessor`'s order: rlreward, periodic, then _POSSIBLE
+  =/  rl  ?~(rlreward.a ~ (ck-snapshot-def dm 'rlreward' u.rlreward.a))
+  ?^  rl  rl
+  =/  pe  ?~(periodic.a ~ (ck-snapshot-def dm 'periodic' u.periodic.a))
+  ?^  pe  pe
+  =/  ps  possible.a
+  |-  ^-  (unit cfg-vdiag)
+  ?~  ps  ~
+  =/  r  (ck-snapshot-def dm 'possible' i.ps)
+  ?^(r r $(ps t.ps))
+::
 ++  ck-formula
   ::  INVARIANT/PROPERTY/SPECIFICATION resolution: unresolved -> 2229;
   ::  def arity>0 -> 2228 (bare = the one-parameter message); a
@@ -1150,6 +1202,10 @@
         chk-invariants  chk-spec-init-next
         chk-properties  chk-missing-init  chk-missing-next
         chk-view
+        ::  R2.7.7.2: LAST, matching `SpecProcessor`'s own order —
+        ::  processConfig first, then the constraints, then rlreward,
+        ::  periodic and _POSSIBLE (lines 944-948)
+        (ck-keyword-names m a)
       ==
     ?~  e  [%& ~]
     [%| u.e]

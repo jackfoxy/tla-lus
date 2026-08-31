@@ -2317,15 +2317,25 @@
   ::  R2.7.7.1: a `.cfg` keyword this engine parses but does not act on is
   ::  refused BY NAME here, before anything runs. Both paths parse the config
   ::  themselves, so the kernel repeats this check rather than sharing a call
-  ::  site -- the shape R2.7.5 used for the EC 2279 guard
-  =/  ukw  (unsupported-kw:config ca)
-  ?^  ukw  [%| u.ukw]
+  ::  site -- the shape R2.7.5 used for the EC 2279 guard.
+  ::
+  ::  R2.7.7.2: but a MALFORMED name is the pin's diagnostic, not ours, so the
+  ::  name check runs FIRST -- below, once the module is generated. The
+  ::  refusal moved with it
   ::  R2.7.5 annotated the mold: a bare `?~(.. ~ `x)` infers a union with no
   ::  `u` face, so `u.pp` was `-find.u.pp` until the `(unit @t)` named it
   =/  pp=(unit @t)  ?~(properties.ca ~ `i.properties.ca)
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
+  ::  R2.7.7.2: the `.cfg` keyword names the pin resolves at spec processing.
+  ::  The console never calls `+validate-config`, so without this a caller
+  ::  here sees R2.7.7.1's refusal for a config the pin rejects with its own
+  ::  diagnostic -- and the refusal is only right once the name resolves
+  =/  kwd  (ck-keyword-names:config u.mo ca)
+  ?^  kwd  [%| msg.u.kwd]
+  =/  ukw  (unsupported-kw:config ca)
+  ?^  ukw  [%| u.ukw]
   =/  defs  (defmap-of:ne u.mo)
   ::  resolve Init/Next (and fairness) from INIT/NEXT keys or a SPECIFICATION
   =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs (var-order tree))

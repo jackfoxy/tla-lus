@@ -11,7 +11,7 @@
   %-  malt
   ^-  (list [@t @t])
   :~  :-  'A'
-      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aInv2 == x /= 5\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+      '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x >= 0\0aInv2 == x /= 5\0aTwo(a) == a = 1\0aSpec == Init /\\ [][Next]_x\0a====\0a'
   ==
 ::
 ++  rs
@@ -134,4 +134,40 @@
   ::  system property); accepting the keyword silently is not
   =/  r  (ukw 'INIT Init\0aNEXT Next\0a_RL_REWARD Inv\0a')
   (starts r "unsupported: _RL_REWARD Inv")
+::
+++  test-cfg-keyword-name-undefined
+  ::  R2.7.7.2: `_PERIODIC` / `_RL_REWARD` / `_POSSIBLE` resolve their names at
+  ::  SPEC PROCESSING at the pin (`SpecProcessor` 944-948), before a state is
+  ::  computed, so a bad name is EC 2229 -- the pin's own diagnostic, not this
+  ::  port's "unsupported" refusal, which is why the name check runs first
+  ;:  weld
+    (expect-eq !>("REJECT 2.229") !>((summ (rs 'INIT Init\0aNEXT Next\0a_PERIODIC NoSuchOp\0a'))))
+    (expect-eq !>("REJECT 2.229") !>((summ (rs 'INIT Init\0aNEXT Next\0a_RL_REWARD NoSuchOp\0a'))))
+    (expect-eq !>("REJECT 2.229") !>((summ (rs 'INIT Init\0aNEXT Next\0a_POSSIBLE NoSuchOp\0a'))))
+  ==
+::
+++  test-cfg-keyword-name-takes-argument
+  ::  EC 2228, the second of the two rejections these keywords can raise
+  (expect-eq !>("REJECT 2.228") !>((summ (rs 'INIT Init\0aNEXT Next\0a_PERIODIC Two\0a'))))
+::
+++  test-cfg-keyword-name-resolvable-is-accepted
+  ::  a name that RESOLVES passes validation -- the run is then refused by
+  ::  R2.7.7.1 on the engine paths, which is a different check in a different
+  ::  place. Assembly itself must not reject it
+  =/  r  (rs 'INIT Init\0aNEXT Next\0a_PERIODIC Inv\0a')
+  (expect-eq !>(&) !>(?=(%& -.r)))
+::
+++  test-cfg-keyword-name-constant-is-accepted
+  ::  MEASURED, and the reason `+ck-snapshot-def` deliberately omits EC 2233:
+  ::  these keywords resolve against SpecProcessor's SNAPSHOT, where a
+  ::  constant-valued definition is still an OpDefNode. `_RL_REWARD Konst`
+  ::  with `Konst == 1 = 1` runs to a normal verdict at the pin
+  =/  src
+    %-  malt
+    ^-  (list [@t @t])
+    :~  :-  'A'
+        '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aKonst == 1 = 1\0a====\0a'
+    ==
+  =/  r  (run-spec-of:config 'A' src 'INIT Init\0aNEXT Next\0a_RL_REWARD Konst\0a')
+  (expect-eq !>(&) !>(?=(%& -.r)))
 --

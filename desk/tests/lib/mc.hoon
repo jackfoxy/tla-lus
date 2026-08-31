@@ -70,6 +70,57 @@
     '---- MODULE spec ----\0aVARIABLE i\0aInit == i = 1\0aNext == UNCHANGED i\0aSpec == Init /\\ [][Next]_i\0aInv == i = 2\0aAlias == [ i |-> i, foo |-> "bar", j |-> i = i\' ]\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANTS Inv\0aALIAS Alias\0a'
 ::
+++  test-mc-cfg-periodic-arg
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: TLC requires periodic not to take any argument, but one was given: Two'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.2: `_PERIODIC` naming an operator that does not exist. tlc2\0a\\* resolves the name at SPEC PROCESSING (SpecProcessor lines 944-948), before\0a\\* a single state is computed -- unlike POSTCONDITION, which resolves after\0a\\* exploration.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aTwo(a) == a = 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0a_PERIODIC Two\0a'
+::
+++  test-mc-cfg-periodic-undef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: The periodic NoSuchOp specified in the configuration file'
+        'is not defined in the specification.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.2: `_PERIODIC` naming an operator that does not exist. tlc2\0a\\* resolves the name at SPEC PROCESSING (SpecProcessor lines 944-948), before\0a\\* a single state is computed -- unlike POSTCONDITION, which resolves after\0a\\* exploration.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aTwo(a) == a = 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0a_PERIODIC NoSuchOp\0a'
+::
+++  test-mc-cfg-possible-undef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: The possible NoSuchOp specified in the configuration file'
+        'is not defined in the specification.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.2: `_PERIODIC` naming an operator that does not exist. tlc2\0a\\* resolves the name at SPEC PROCESSING (SpecProcessor lines 944-948), before\0a\\* a single state is computed -- unlike POSTCONDITION, which resolves after\0a\\* exploration.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aTwo(a) == a = 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0a_POSSIBLE NoSuchOp\0a'
+::
+++  test-mc-cfg-rlreward-undef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: The rlreward NoSuchOp specified in the configuration file'
+        'is not defined in the specification.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.2: `_PERIODIC` naming an operator that does not exist. tlc2\0a\\* resolves the name at SPEC PROCESSING (SpecProcessor lines 944-948), before\0a\\* a single state is computed -- unlike POSTCONDITION, which resolves after\0a\\* exploration.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aTwo(a) == a = 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0a_RL_REWARD NoSuchOp\0a'
+::
 ++  test-mc-cyc
   %+  expect-eq
     !>  ^-  wain
