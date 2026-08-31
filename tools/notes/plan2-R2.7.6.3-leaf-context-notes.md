@@ -81,10 +81,20 @@ message), which is the port's analogue of tlc2's `LNState.eval` letting
 
 ## Cross-shard breakage, caught by running the whole liveness set
 
-Widening `le-state` broke the **build** of `tests/lib/temporal` and
-`tests/lib/tableau`, which construct probe leaves as `[%state <node>]`
-literally. Neither is a shard this unit touched. R1.8.8's lesson holds: the
-shards a unit runs must include everyone who constructs the mold it changed.
+Widening `le-state` broke the **build** of three shards that construct probe
+leaves as `[%state <node>]` literally: `tests/lib/temporal`,
+`tests/lib/tableau` and `tests/lib/liveness-accept`. None is a shard this unit
+touched, and the first two were caught by running the liveness set while the
+THIRD surfaced only in the user's full suite — because my first sweep grepped
+the two files I already knew about instead of the tree.
+
+**The correct move on a mold change is an exhaustive grep for its
+constructors, done once**: `grep -rn "\[%state " --include=*.hoon .` over the
+whole desk lists all of them, and after the fix the only literals left are the
+two in `+leaf`/`+leaf-ctx` that are supposed to be there. R1.8.8's lesson has a
+sharper form here: the shards a unit runs must include everyone who
+CONSTRUCTS the mold it changed, and the way to find them is the grep, not
+memory.
 
 ## Evidence
 
