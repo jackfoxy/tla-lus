@@ -1763,12 +1763,16 @@
     ::  is long gone by the time this renders
     ::  (no `%error` guard: `out` is already narrowed here, and the test
     ::  mint-vains)
+    =/  pst  (out-stats:check out)
     =/  pcl=wain
-      =/  st  (out-stats:check out)
-      %^  post-cond-lines:check  pcs  defs.o
-      :_  modn
-      %+  with-run:ne  env
-      [| 0 `[depth.st distinct.st queued.st gen.st]]
+      %:  post-cond-lines:check
+        pcs
+        defs.o
+        %+  with-run:ne  env
+        [| 0 `[depth.pst distinct.pst queued.pst gen.pst]]
+        modn
+        rs.cur
+      ==
     %:  render-outcome:check
       out  nl  ~  env  ~  ''  al  vr  |
       (cov-report:check o cur acts)  ~  pcl

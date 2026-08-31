@@ -93,6 +93,13 @@
 +$  rst
   $:  ::  the `TLCSet` register store (R2.7.4.3)
       regs=(map @ud value:v)
+      ::  the NAMED half of the same store (R2.7.7.4a). tlc2 keys it on a
+      ::  string beginning `s:` (`TLCGetSet.NAMED_REGISTER_PREFIX`), and
+      ::  MEASURED, any other string is still the positional argument error:
+      ::  `TLCSet("plain", 7)` raises `The first argument of TLCSet should be a
+      ::  nonnegative integer`. The two halves coexist -- `TLCSet(3, 42)` and
+      ::  `TLCSet("s:c", ..)` in one action leave both readable
+      named=(map @t value:v)
       ::  `java.util.Random` state for Randomization/RandomElement
       ::  (R2.7.4.4/.5), the same seed `+next-int-bound:rg` advances
       es=@
@@ -110,7 +117,7 @@
 ::  whatever `=^` binds, so `p.r` on the bound result stops resolving
 +$  sout  [sres rst]
 +$  eout  [eres rst]
-++  empty-rst  ^-(rst [~ 0 0])
+++  empty-rst  ^-(rst [~ ~ 0 0])
 ::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
 ::  and coarse category, message, source location, operator/evaluation stack,
 ::  and whether a checker may recover. Per-site emission (replacing the bare
@@ -1301,7 +1308,7 @@
   ?.  ?=([* ~] args.n)  [[%| 0 'TLCGet expects one argument.'] rs]
   =^  k  rs  (eval-rs i.args.n e rs)
   ?:  ?=(%| -.k)  [k rs]
-  [(tlc-get:so ~[p.k] run.e regs.rs) rs]
+  [(tlc-get:so ~[p.k] run.e regs.rs named.rs) rs]
 ::
 ++  eval-random-element
   ::  TLC!RandomElement(S) — one uniform draw from a FINITE set, ADVANCING
@@ -1526,8 +1533,10 @@
   ?.  ?=([* * ~] args.n)  [[%| 0 'TLCSet expects two arguments.'] rs]
   =^  as  rs  (eval-args-rs args.n e rs)
   ?:  ?=(%| -.as)  [as rs]
-  =^  r  regs.rs  (tlc-set:so p.as regs.rs)
-  [r rs]
+  =/  sr  (tlc-set:so p.as regs.rs named.rs)
+  =.  regs.rs   regs.sr
+  =.  named.rs  named.sr
+  [r.sr rs]
 ::
 ++  eval-tlc-get-or-default
   ::  TLCExt!TLCGetOrDefault(i, d) — the register READ that answers `d` on an
@@ -1538,7 +1547,7 @@
     [[%| 0 'TLCGetOrDefault expects two arguments.'] rs]
   =^  as  rs  (eval-args-rs args.n e rs)
   ?:  ?=(%| -.as)  [as rs]
-  [(tlc-get-or-default:so p.as regs.rs) rs]
+  [(tlc-get-or-default:so p.as regs.rs named.rs) rs]
 ::
 ++  eval-tlc-get-and-set
   ::  TLCExt!TLCGetAndSet(key, Op(_,_), val, defaultVal) — read-modify-write,
@@ -1567,7 +1576,7 @@
   ?:  ?=(%| -.kv)  [kv rs]
   =^  dv  rs  (eval-rs defn e rs)
   ?:  ?=(%| -.dv)  [dv rs]
-  =/  old  (tlc-get-or-default:so ~[p.kv p.dv] regs.rs)
+  =/  old  (tlc-get-or-default:so ~[p.kv p.dv] regs.rs named.rs)
   ?:  ?=(%| -.old)  [old rs]
   =^  vv  rs  (eval-rs valn e rs)
   ?:  ?=(%| -.vv)  [vv rs]
@@ -1575,8 +1584,12 @@
   ?~  od  [[%| (op-arg-error 'TLCGetAndSet' 'operator' opn)] rs]
   =^  nv  rs  (apply-def-rs u.od ~[p.old p.vv] e rs)
   ?:  ?=(%| -.nv)  [nv rs]
-  =^  sr  regs.rs  (tlc-set:so ~[p.kv p.nv] regs.rs)
-  ?:  ?=(%| -.sr)  [sr rs]
+  ::  R2.7.7.4a: `TLCGetAndSet` inherits the named half for free -- its key
+  ::  is whatever `TLCGet`/`TLCSet` accept, so a named one now works here too
+  =/  sw  (tlc-set:so ~[p.kv p.nv] regs.rs named.rs)
+  ?:  ?=(%| -.r.sw)  [r.sw rs]
+  =.  regs.rs   regs.sw
+  =.  named.rs  named.sw
   [[%& p.old] rs]
 ::
 ++  eval-sort-seq

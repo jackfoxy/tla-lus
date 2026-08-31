@@ -1420,15 +1420,19 @@
   ::  temporal violation where TLC reports `Deadlock reached` over the same
   ::  state count (R1.6.6). `+bfs-step` stops at the first deadlock, so the
   ::  graph is complete exactly when the outcome is not one.
+  ::  R2.7.7.4a: the final CARRIER rides out too, so a POSTCONDITION on this
+  ::  path reads the registers the search wrote -- same reason as the safety
+  ::  path, where the cursor was already in scope
   |=  [is=(list state) o=bfs-opts]
-  ^-  [g=graph capped=? out=outcome]
+  ^-  [g=graph capped=? out=outcome rs=rst:ne]
   =/  cur  (bfs-init is)
-  |-  ^-  [g=graph capped=? out=outcome]
+  |-  ^-  [g=graph capped=? out=outcome rs=rst:ne]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    :+  [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
-      ?=(%limited -.out.r)
-    out.r
+    :^    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+        ?=(%limited -.out.r)
+      out.r
+    rs.cur.r
   $(cur cur.r)
 ::
 ::  +|  Seeded Simulation (bounded, reproducible, resumable)
@@ -2667,7 +2671,13 @@
   ::  `pc.getPred().toString()`, an ExprNode, whose toString is its location).
   ::  `e` must already carry the run statistics -- a postcondition typically
   ::  reads them through `TLCGet`
-  |=  [pcs=(list @t) defs=(map @t sem-def:sem-lib) e=eenv:ne modn=@t]
+  ::  R2.7.7.4a: the CARRIER matters here. A postcondition reads what the run
+  ::  wrote -- that is the whole of `_Possible`'s design, and measured, a
+  ::  postcondition reading `TLCGet("s:c")` after a `TLCSet("s:c", ..)` in the
+  ::  next-state relation sees the count. Evaluating with a fresh `rst` answers
+  ::  `TLCGet(s:c) was undefined.` instead, so the run's FINAL carrier is
+  ::  passed in
+  |=  [pcs=(list @t) defs=(map @t sem-def:sem-lib) e=eenv:ne modn=@t rs=rst:ne]
   ^-  wain
   ?~  pcs  ~
   =/  d  (~(get by defs) i.pcs)
@@ -2678,12 +2688,14 @@
   ?~  d  (unexpected-exception (v-notdef:config 'post condition' i.pcs))
   ?~  body.u.d  (unexpected-exception (v-notdef:config 'post condition' i.pcs))
   =/  loc  (loc-str:config modn (sem-span:config u.body.u.d))
-  =/  r  (pred-bool:ne u.body.u.d ~ ~ e)
-  ?:  ?=(%| -.r)
-    (err-lines (ec-body:diag 2.405 ~[i.pcs loc msg.p.r]))
-  ?.  p.r
+  =/  r  (pred-bool-rs:ne u.body.u.d ~ ~ e rs)
+  ?:  ?=(%| -.-.r)
+    (err-lines (ec-body:diag 2.405 ~[i.pcs loc msg.p.-.r]))
+  ?.  p.-.r
     (err-lines (ec-body:diag 2.404 ~[i.pcs loc]))
-  $(pcs t.pcs)
+  ::  a postcondition's own writes are visible to the NEXT one, as they are to
+  ::  a later conjunct of one (R2.7.4.3's measured rule)
+  $(pcs t.pcs, rs +.r)
 ::
 ++  unexpected-exception
   ::  tlc2's wrapper for a throw it has no handler for (`TLC.process`'s catch,
@@ -4292,13 +4304,17 @@
         ==
       ::  R2.7.7.3: the postconditions run here too -- measured, they run
       ::  after a VIOLATION as well as on a clean run
+      =/  bst  (out-stats out.bg)
       =/  pcl=wain
         ?:  ?=(%error -.out.bg)  ~
-        %^  post-cond-lines  pcs.c  defs.c
-        :_  modn
-        =/  st  (out-stats out.bg)
-        %+  with-run:ne  (make-env:ne defs.c consts.c vars.c)
-        [| 0 `[depth.st distinct.st queued.st gen.st]]
+        %:  post-cond-lines
+          pcs.c
+          defs.c
+          %+  with-run:ne  (make-env:ne defs.c consts.c vars.c)
+          [| 0 `[depth.bst distinct.bst queued.bst gen.bst]]
+          modn
+          rs.bg
+        ==
       %-  render-outcome
       :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
@@ -4492,13 +4508,16 @@
   ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
   ::  what `TLCGet("distinct")` inside one reads, and reading them before the
   ::  search would answer with the counters standing at zero
+  =/  st  (out-stats out.r)
   =/  pcl=wain
     ?:  ?=(%error -.out.r)  ~
-    %^  post-cond-lines  pcs.c  defs.c
-    :_  modn
-    =/  st  (out-stats out.r)
-    %+  with-run:ne  env
-    [| 0 `[depth.st distinct.st queued.st gen.st]]
+    %:  post-cond-lines
+      pcs.c
+      defs.c
+      (with-run:ne env [| 0 `[depth.st distinct.st queued.st gen.st]])
+      modn
+      rs.cur.r
+    ==
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
       (cov-report o cur.r actions)  ~  pcl

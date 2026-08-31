@@ -1228,6 +1228,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0 /\\ TLCSet(0, 100)\0aNext == /\\ x < 4\0a        /\\ TLCSet(0, TLCGet(0) + 1)\0a        /\\ x\' = TLCGet(0) - 100\0aInv == x < 10\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-mc-tlcset-named
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.7.4a: NAMED registers. tlc2 keys them on a string beginning `s:`\0a\\* (TLCGetSet.NAMED_REGISTER_PREFIX); the integer store coexists. The counter\0a\\* is bumped from the next-state relation, so it counts EVALUATIONS, and the\0a\\* postcondition reads it three ways: directly, through TLCGetOrDefault, and\0a\\* through the per-worker aggregate TLCGet("all:named").\0aEXTENDS Naturals, Sequences, TLC, TLCExt\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 2 /\\ TLCSet("s:c", TLCGetOrDefault("s:c", 0) + 1) /\\ TLCSet(3, 42)\0aPost == /\\ TLCGet("s:c") = 2\0a        /\\ TLCGetOrDefault("s:c", 0) = 2\0a        /\\ TLCGetOrDefault("s:nope", 5) = 5\0a        /\\ TLCGet(3) = 42\0a        /\\ TLCGet("all:named") = ("s:c" :> <<2>>)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0aPOSTCONDITION Post\0a'
+::
 ++  test-mc-tlcset-same-eval
   %+  expect-eq
     !>  ^-  wain

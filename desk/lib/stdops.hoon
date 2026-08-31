@@ -937,7 +937,9 @@
   ::  `level` is the exception that needs no checker: `TLCGetStringValue` tests
   ::  `EvalControl.isConst/isInit` FIRST and returns `INIT_LEVEL - 1` = 0 before
   ::  it ever touches `mainChecker`
-  |=  [as=(list value:v) run=(unit tlc-run) regs=(map @ud value:v)]
+  |=  $:  as=(list value:v)  run=(unit tlc-run)
+          regs=(map @ud value:v)  named=(map @t value:v)
+      ==
   ^-  eres
   ?.  ?=([* ~] as)  [%| 0 'TLCGet expects one argument.']
   ?:  ?=(%int -.i.as)
@@ -957,6 +959,21 @@
     [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
   ?.  ?=(%str -.i.as)
     [%| (one-arg-error 'TLCGet' 'nonnegative integer' i.as)]
+  ::  R2.7.7.4a: a NAMED register read. Measured at the pin, an unset one is
+  ::  EC 2145 with the key UNQUOTED: `TLCGet(s:nope) was undefined.`
+  ?:  (named-key p.i.as)
+    =/  hit  (~(get by named) p.i.as)
+    ?~  hit
+      [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
+    [%& u.hit]
+  ::  the per-worker aggregate: a RECORD keyed by register name whose values
+  ::  are SEQUENCES, one element per worker (`("s:c" :> <<2>>)` measured).
+  ::  This engine is single-worker by design, so every sequence has length 1
+  ?:  =('all:named' p.i.as)
+    :-  %&
+    :-  %fcn
+    %+  turn  ~(tap by named)
+    |=([k=@t v=value:v] [[%str k] [%seq ~[v]]])
   ?.  (~(has in tlc-get-keys) p.i.as)
     [%| 2.145 (rap 3 ~['TLCGet(' p.i.as ') was undefined.'])]
   ::  level is answered with or without a checker
@@ -992,6 +1009,14 @@
   ?.  ?=([* ~] as)  [%| 0 'TLCNoOp expects one argument.']
   [%& i.as]
 ::
+++  named-key
+  ::  a NAMED register key: tlc2's `TLCGetSet.NAMED_REGISTER_PREFIX` is the
+  ::  literal `s:`, and measured, nothing else counts -- `TLCSet("plain", 7)`
+  ::  is the positional argument error at the pin, not a named write
+  |=  k=@t
+  ^-  ?
+  =('s:' (end [3 2] k))
+::
 ++  tlc-set
   ::  TLC!TLCSet(i, v) — the run-scoped, worker-local REGISTER STORE
   ::  (`IdThread.setLocalValue`), read back by `TLCGet(i)` and
@@ -1011,34 +1036,43 @@
   ::  The index must be a nonnegative integer; the pin guards `idx >= 0` and
   ::  otherwise raises the argument error, which is the same shape `TLCGet`
   ::  uses. A non-integer index is that error too
-  |=  [as=(list value:v) regs=(map @ud value:v)]
-  ^-  [eres (map @ud value:v)]
-  ?.  ?=([* * ~] as)  [[%| 0 'TLCSet expects two arguments.'] regs]
+  ::  R2.7.7.4a: a string key beginning `s:` is a NAMED register
+  ::  (`TLCGetSet.NAMED_REGISTER_PREFIX`), written into the second half of the
+  ::  store. Measured, the prefix is the whole rule: `TLCSet("plain", 7)` is
+  ::  still the positional argument error at the pin
+  |=  [as=(list value:v) regs=(map @ud value:v) named=(map @t value:v)]
+  ^-  [r=eres regs=(map @ud value:v) named=(map @t value:v)]
+  ?.  ?=([* * ~] as)  [[%| 0 'TLCSet expects two arguments.'] regs named]
   ::  the STRING keys are not register indices at all: `"exit"` stops the
   ::  checker and `"pause"` blocks the search on stdin. Both are real tlc2
   ::  capabilities, so neither may be reported as a bad argument -- they are
   ::  refused BY NAME, which is what separates "this port has not built it"
   ::  from "your spec is wrong" (R2.1)
   ?:  ?&(?=(%str -.i.as) =('exit' p.i.as))
-    :_  regs
-    :-  %|
-    :-  0
-    %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("exit"); it '
-    ~['stops the checker mid-run, which this engine has no control channel for']
+    :+  :-  %|
+        :-  0
+        %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("exit"); it '
+        ~['stops the checker mid-run, which this engine has no control channel for']
+      regs
+    named
   ?:  ?&(?=(%str -.i.as) =('pause' p.i.as))
-    :_  regs
-    :-  %|
-    :-  0
-    %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("pause"); it '
-    ~['suspends the search until stdin is read, and no reproducible run may block on a console']
+    :+  :-  %|
+        :-  0
+        %^  rap  3  'unsupported StandardModule operator: TLC!TLCSet("pause"); it '
+        ~['suspends the search until stdin is read, and no reproducible run may block on a console']
+      regs
+    named
   ::  anything else is the pin's own POSITIONAL argument error -- measured,
   ::  `TLCGetSet.TLCSet` throws TLC_MODULE_ARGUMENT_ERROR with
   ::  `{"first", "TLCSet", "nonnegative integer", …}`
+  ::  the NAMED register write
+  ?:  ?&(?=(%str -.i.as) (named-key p.i.as))
+    [[%& %bool &] regs (~(put by named) p.i.as i.t.as)]
   ?.  ?=(%int -.i.as)
-    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs]
+    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs named]
   ?.  (syn:si p.i.as)
-    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs]
-  [[%& %bool &] (~(put by regs) (abs:si p.i.as) i.t.as)]
+    [[%| (arg-error 2.169 1 'TLCSet' 'nonnegative integer' | i.as)] regs named]
+  [[%& %bool &] (~(put by regs) (abs:si p.i.as) i.t.as) named]
 ::
 ++  random-element-error
   ::  the pin's message when the argument is not a finite set
@@ -1086,9 +1120,14 @@
   ::  is neither an integer nor a named-register string falls through to
   ::  `return defVal` -- so an unusable key is the DEFAULT, not an error. The
   ::  named-register form (`"s:..."`) is a separate surface this does not claim
-  |=  [as=(list value:v) regs=(map @ud value:v)]
+  |=  [as=(list value:v) regs=(map @ud value:v) named=(map @t value:v)]
   ^-  eres
   ?.  ?=([* * ~] as)  [%| 0 'TLCGetOrDefault expects two arguments.']
+  ::  R2.7.7.4a: the named half. An unset named key is still the DEFAULT here,
+  ::  where `TLCGet` raises EC 2145 -- measured both ways
+  ?:  ?&(?=(%str -.i.as) (named-key p.i.as))
+    =/  hit  (~(get by named) p.i.as)
+    ?~(hit [%& i.t.as] [%& u.hit])
   ?.  ?=(%int -.i.as)  [%& i.t.as]
   ?.  (syn:si p.i.as)  [%& i.t.as]
   =/  hit  (~(get by regs) (abs:si p.i.as))
