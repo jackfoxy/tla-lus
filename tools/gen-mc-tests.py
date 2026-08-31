@@ -63,6 +63,25 @@ SKIPS = {
         "simpler one: no post-error block is involved, this is an ordinary "
         "counting-safety property (`AtMost(4)`). Verdict and all three counts "
         "already match. Target for R2.7.11 (`tlc-live-lasso`)."),
+    #  R2.7.7.0 measured the `.cfg`-keyword silence end to end. Both goldens
+    #  are the pin's; both arms return when the capability lands.
+    "cfg-post-false": (
+        "R2.7.7.0: the POSTCONDITION is FALSE after exploration. The pin "
+        "completes the search and then fails --- `Error: Postcondition Post "
+        "at <loc> is false.` --- and the port reports `Model checking "
+        "completed. No error has been found.` **A run reported `ok` where "
+        "tlc2 reports a failure**, which is R2's `no option is accepted and "
+        "ignored` invariant broken in the direction that matters. Target for "
+        "R2.7.7.3 (evaluation); R2.7.7.1's typed rejection makes it a refusal "
+        "rather than a false `ok` in the meantime."),
+    "cfg-post-undef": (
+        "R2.7.7.0: the POSTCONDITION names an operator that does not exist. "
+        "Measured, and it CORRECTS this plan's own claim that the name check "
+        "happens `before a single state is computed`: the pin prints the "
+        "state counts FIRST and only then throws --- `getPostConditionSpecs` "
+        "resolves the name when the postconditions are FETCHED, after "
+        "exploration, not at spec processing. The port runs to a clean "
+        "verdict. Target for R2.7.7.2 (validation)."),
 }
 
 
