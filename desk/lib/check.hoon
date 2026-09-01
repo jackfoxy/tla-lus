@@ -3117,6 +3117,9 @@
           ::  context for the EC 2257/2259 stuttering hint (R1.8.1.3)
           sname=(unit @t)  sloc=sspan:sem-lib  fair=(list sem:sem-lib)
           aname=@t                      ::  root action name (`sctx`'s)
+          ::  R2.7.14: the POSTCONDITION lines, built by the caller (which has
+          ::  the run's final carrier and statistics) and rendered in tlc2's slot
+          pcl=wain
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
   ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
@@ -3136,6 +3139,7 @@
       (stutter-gate o.hit sname sloc fair modn)
       aname
       (box-free-tf o.hit)
+      pcl
   ==
 ::
 ++  live-render
@@ -3157,10 +3161,20 @@
           ::  Stuttering`, no `Back to state` -- whenever the violated
           ::  property's TABLEAU FORMULA carries no `[]`; see `+box-free-tf`
           noclose=?
+          ::  R2.7.14: the POSTCONDITION lines. R2.7.7.3 wired postconditions
+          ::  into the CLEAN and the SAFETY-ERROR reports and left the TEMPORAL
+          ::  one out; measured at the pin, a POSTCONDITION runs after a
+          ::  temporal violation too, and its line sits between the EC
+          ::  2257/2259 hint and the counts. `~` when every postcondition holds
+          pcl=wain
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
   ?~  l
+    ::  a CLEAN temporal run: a failing postcondition REPLACES `Model checking
+    ::  completed.` rather than being appended to it -- the same rule R2.7.7.3
+    ::  measured on the safety path, since the error IS the run's outcome
+    ?^  pcl  (weld pcl footer)
     ['Model checking completed. No error has been found.' footer]
   =/  actions  (get-actions nsb aname defs env)
   =/  np       (lent prefix.u.l)
@@ -3188,6 +3202,10 @@
     ::  and only after a STUTTERING closer (R1.8.1.3) -- so a suppressed closer
     ::  suppresses the hint with it: there is no stuttering to explain
     ?:(|(noclose !stut) ~ gate)
+    ::  R2.7.14: measured order is counter-example, closer, hint, POSTCONDITION,
+    ::  counts -- `Warning: The stuttering counterexample above ...` then
+    ::  `Error: Postcondition <name> at <loc> is false.` then the statistics
+    pcl
     footer
   ==
 ::
@@ -3353,6 +3371,9 @@
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
         props.c
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
+        ::  the `live-message-lines` differential renders the lasso alone; the
+        ::  POSTCONDITION block belongs to the production report (R2.7.14)
+        ~
     ==
   ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
   ::  path (`+check-in`), so the differential wrapper carries it too -- else
@@ -4450,12 +4471,28 @@
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
           ~  post  pcl
       ==
+    ::  R2.7.14: the POSTCONDITION runs here too. Measured at the pin, a
+    ::  temporal violation is followed by `Error: Postcondition <name> at
+    ::  <loc> is false.` before the counts -- R2.7.7.3 wired the clean and
+    ::  safety-error paths and this one was simply absent, so a false
+    ::  postcondition on a spec with a temporal PROPERTY printed nothing at all
+    =/  lst  [depth.g.bg distinct.g.bg 0 gen.g.bg]
+    =/  pcl=wain
+      %:  post-cond-lines
+        pcs.c
+        defs.c
+        (with-run:ne (make-env:ne defs.c consts.c vars.c) [| 0 `lst])
+        modn
+        rs.bg
+        poss.c
+      ==
     =/  r
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
           props.c
           gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
+          pcl
       ==
     report.r
   ::  safety: an INVARIANT

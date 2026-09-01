@@ -163,6 +163,12 @@
           phase=?(%build %check)
           oss=(list oos:tp)
           pname=@t
+          ::  R2.7.14: the POSTCONDITION names. The comment at the `%inv`
+          ::  branch below used to say the liveness path "keeps them on its own
+          ::  kont" -- it did not; the `%live` kont had no such field and the
+          ::  temporal report evaluated no postcondition at all, which is the
+          ::  defect R2.7.14 measured at the pin
+          pcs=(list @t)
           ::  R2.7.12: the IMPLIED TEMPORALS, carried so the sliced report can
           ::  do the same POST-HOC ATTRIBUTION the console path does -- which
           ::  property a counter-example violates is decided against the lasso,
@@ -1638,7 +1644,8 @@
       ==
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  p.osr  u.pp  (implied-temporals:check properties.rs defs)
+      :*  %live  %build  p.osr  u.pp  postconditions.rs
+          (implied-temporals:check properties.rs defs)
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
           sname  sloc  fair  aname
@@ -1842,6 +1849,20 @@
   =/  st      stats.j
   =/  states  (states-of:check seen.cur.kk)
   =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+  ::  R2.7.14: the POSTCONDITION lines, in tlc2's slot (between the EC
+  ::  2257/2259 hint and the counts). The run's FINAL carrier and statistics,
+  ::  for the same reason R2.7.7.4a threaded them on the safety path -- a
+  ::  postcondition typically reads `TLCGet("distinct")`
+  =/  pcl=wain
+    %:  post-cond-lines:check
+      pcs.kk
+      defs.o.kk
+      %+  with-run:ne  env
+      [| 0 `[depth.st distinct.st queued.st generated.st]]
+      modn.kk
+      rs.cur.kk
+      poss.o.kk
+    ==
   ::  no OrderOfSolution left to try → no temporal violation
   ?~  otodo.kk
     =/  report
@@ -1852,7 +1873,7 @@
       ::  sites cannot drift (R1.8.3)
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
           props.kk
-          generated.st  distinct.st  depth.st  ~  aname.kk  |
+          generated.st  distinct.st  depth.st  ~  aname.kk  |  pcl
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1893,6 +1914,7 @@
         aname.kk
         ::  R2.7.5: same OOS, same test as the console path
         (box-free-tf:check ~[o])
+        pcl
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))

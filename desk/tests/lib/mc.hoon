@@ -966,6 +966,63 @@
     '---- MODULE spec ----\0a\\* R2.7.6.2 probe: `live-witness-nested-many` with the nested eventualities\0a\\* reached through RECURSIVE OPERATOR EXPANSION instead of written literally\0a\\* -- the one structural difference left between the passing probes and\0a\\* upstream\'s Github1389ViolatedC.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 9) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
+++  test-mc-pc-live-gate
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        'Warning: The stuttering counterexample above may be caused by the absence of a fairness constraint in the behavior specification Spec defined at line 11, col 1 to line 11, col 26 of module spec. To rule out such counterexamples, conjoin a suitable fairness constraint to Spec (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).'
+        'Error: Postcondition Post at line 13, col 9 to line 13, col 32 of module spec is false.'
+        '8 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14: the ORDER, measured. A stuttering counter-example under a\0a\\* SPECIFICATION with no fairness prints the EC 2259 hint, and the\0a\\* POSTCONDITION line comes AFTER that hint and BEFORE the counts:\0a\\*   counter-example / closer / hint / postcondition / statistics.\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aSpec == Init /\\ [][Next]_x\0aLive == <>[](x = 3)\0aPost == TLCGet("distinct") = 999\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Live\0aPOSTCONDITION Post\0a'
+::
+++  test-mc-pc-live-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Postcondition Post at line 11, col 9 to line 11, col 32 of module spec is false.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14: on a CLEAN temporal run a failing POSTCONDITION REPLACES\0a\\* `Model checking completed. No error has been found.` rather than being\0a\\* appended to it -- the same rule R2.7.7.3 measured on the safety path,\0a\\* since the error IS the run\'s outcome.\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aLive == <>(x = 0)\0aPost == TLCGet("distinct") = 999\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY Live\0aPOSTCONDITION Post\0a'
+::
+++  test-mc-pc-live-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        'Error: Postcondition Post at line 12, col 9 to line 12, col 32 of module spec is false.'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14: a POSTCONDITION runs after a TEMPORAL violation too. R2.7.7.3\0a\\* wired postconditions into the clean and the safety-error reports and left\0a\\* this path out entirely, so a false postcondition on a spec with a temporal\0a\\* PROPERTY printed nothing at all. The line sits between the counter-example\0a\\* and the counts.\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aLive == <>(x = 1)\0aPost == TLCGet("distinct") = 999\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY Live\0aPOSTCONDITION Post\0a'
+::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. R2.7.7.5: `_PERIODIC` is evaluated by tlc2's PERIODIC-WORK THREAD on a
 ::  WALL-CLOCK timer, not by the search. Measured: on this spec the timer

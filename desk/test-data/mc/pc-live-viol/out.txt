@@ -1,0 +1,8 @@
+Error: Temporal property Live was violated.
+Error: The following behavior constitutes a counter-example:
+State 1: <Initial predicate>
+x = 0
+State 2: Stuttering
+Error: Postcondition Post at line 12, col 9 to line 12, col 32 of module spec is false.
+2 states generated, 1 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 1.
