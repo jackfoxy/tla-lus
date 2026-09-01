@@ -110,6 +110,10 @@ CLASSIFY = {
     # say so or it contradicts what lib/stdops actually does.
     ("TLCExt", "AssertEq"):    ("body", "no Java override; evaluates its TLA+ definition (PrintT/Assert, both implemented)"),
     ("TLCExt", "AssertError"): ("required", "catches the argument's evaluation failure and compares the message (R2.6.3)"),
+    #  R2.7.10 ported the three surfaces the `later:` bucket held.
+    ("TLCExt", "TLCFP"):             ("required", "the value's FP64 downcast, `(int) fp` -- reproducible under `-fp 0`, the pin's own precondition (R2.7.10)"),
+    ("TLCExt", "TLCModelValue"):     ("required", "the port's model value IS its name, so nothing is interned (R2.7.10)"),
+    ("TLCExt", "TLCEvalDefinition"): ("required", "resolves the name in the root module's defs and evaluates it; an @Evaluation override (R2.7.10)"),
     ("TLCExt", "TLCCache"):    ("required", "memoization of a pure expression is the identity; the pin returns exactly the expression's value (R2.6.3)"),
     ("TLCExt", "TLCDefer"):    ("required", "TRUE without evaluating: `execCallable` is run by the Simulation/Exploration workers, NOT by ModelChecker, so under BFS the deferred expression never runs (R2.6.3)"),
     ("TLCExt", "TLCNoOp"):     ("required", "the identity function (`return val`) (R2.6.3)"),
@@ -187,9 +191,10 @@ R2_CLASSIFY = {
     ("TLCExt", "PickSuccessor"):  "out:debugger surface; interactive successor choice",
     ("TLCExt", "Trace"):          "out:trace-explorer surface (needs the current behavior prefix)",
     ("TLCExt", "ToTrace"):        "out:trace-explorer surface (lasso ordinal of a liveness counterexample)",
-    ("TLCExt", "TLCEvalDefinition"): "later:evaluates a definition BY NAME in the current scope; needs no engine state the port lacks, but no R2 subunit owns it",
-    ("TLCExt", "TLCFP"):             "later:state fingerprint read; lib/fingerprint already computes it, but no R2 subunit owns it",
-    ("TLCExt", "TLCModelValue"):     "later:interns a model value; the port has model values, but no R2 subunit owns it",
+    #  R2.7.10 ported all three: the `later:` bucket is empty.
+    ("TLCExt", "TLCEvalDefinition"): "in:R2.7.10 -- resolves the name in the root module's defs (the port's `ops` table IS tlc2's `getOpDef`) and evaluates it; an `@Evaluation` override, so it sits on the node-op path",
+    ("TLCExt", "TLCFP"):             "in:R2.7.10 -- `FP64.Hash(fp)` is `(int) fp`, so the low 32 bits SIGNED of the port's own `+fp-value`; reproducible under `-fp 0` only, which is the pin's property (an unseeded run picks a different polynomial)",
+    ("TLCExt", "TLCModelValue"):     "in:R2.7.10 -- the port's model value IS its name (`tlc-value-model`), so there is nothing to intern",
 }
 
 

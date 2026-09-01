@@ -172,5 +172,9 @@
   ::  R2.7.4.3 is the FIRST DECREMENT: TLCSet left the registry for the
   ::  node-op table, because writing the run-scoped register store needs the
   ::  carrier `rst` that a plain `(list value)` row cannot reach. 38 -> 37.
-  (expect-eq !>(37) !>(~(wyt by registry:so)))
+  ::  R2.7.10 adds TLCExt!TLCFP and TLCExt!TLCModelValue -- two of the three
+  ::  surfaces the inventory carried as `later:`; the third,
+  ::  TLCEvalDefinition, is an `@Evaluation` override and joins the node-op
+  ::  table instead. 37 -> 39.
+  (expect-eq !>(39) !>(~(wyt by registry:so)))
 --

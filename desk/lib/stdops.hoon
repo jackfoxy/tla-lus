@@ -1,6 +1,7 @@
 /-  *tla-lus
 /=  v   /lib/value
 /=  sd  /lib/stdmods
+/=  fpl  /lib/fingerprint
 ::  StandardModule override registry (PORT-COMPLETION-PLAN-2 unit 6C, C1.1).
 ::
 ::  tlc2 binds a Java method to a StandardModule operator by the operator's
@@ -153,6 +154,11 @@
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
     [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
+    ::  R2.7.10: the two plain value operators of the three `later:` surfaces.
+    ::  `TLCEvalDefinition` is the third and is an `@Evaluation` override, so
+    ::  it lives on the node-op path beside `TLCGet`
+    [['TLCExt' 'TLCFP' 1] [| 0 |=(a=(list value:v) (tlc-fp a))]]
+    [['TLCExt' 'TLCModelValue' 1] [| 0 |=(a=(list value:v) (tlc-model-value a))]]
   ==
 ::
 ::  FiniteSets!Cardinality and !IsFiniteSet are `node-op`s, not rows: their
@@ -382,6 +388,9 @@
   ?:  =(k ['TLCExt' 'AssertError' 2])      `[%assert-error & 0]
   ?:  =(k ['TLCExt' 'TLCCache' 2])         `[%tlc-cache & 0]
   ?:  =(k ['TLCExt' 'TLCDefer' 1])         `[%tlc-defer & 0]
+  ::  R2.7.10: an `@Evaluation` override that resolves a definition BY NAME in
+  ::  the ROOT module and evaluates it, so it needs the node and the env
+  ?:  =(k ['TLCExt' 'TLCEvalDefinition' 1])  `[%tlc-eval-def & 0]
   ~
 ::
 ++  op-meta
@@ -999,6 +1008,41 @@
       %generated  generated.u.cs
     ==
   [%& %int (sun:si n)]
+::
+++  tlc-fp
+  ::  TLCExt!TLCFP(v) — the value's FP64 fingerprint, downcast (R2.7.10).
+  ::  `FP64.Hash(long fp)` is literally `(int) fp`, so the answer is the LOW 32
+  ::  BITS AS A SIGNED int, and the port's `+fp-value` is the same FP64 over
+  ::  the same canonical byte encoding.
+  ::
+  ::  Reproducible under `-fp 0` ONLY, and that is the pin's own property, not
+  ::  a port limitation: `FP64.New()` takes its polynomial from the `-fp`
+  ::  index, so an unseeded run answers differently every time -- measured,
+  ::  `TLCFP(3)` gave 661005754 and then 1287323929 across two runs of the same
+  ::  jar, and -244908333 twice under `-fp 0`. The same precondition
+  ::  R2.7.4.4's RNG carries
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'TLCFP expects one argument.']
+  =/  fp  (fp-value:fpl i.as)
+  ::  the low 32 bits, read as a two's-complement signed integer
+  =/  lo  (mod fp (bex 32))
+  :-  %&
+  :-  %int
+  ?:  (gte lo (bex 31))  (dif:si (sun:si lo) (sun:si (bex 32)))
+  (sun:si lo)
+::
+++  tlc-model-value
+  ::  TLCExt!TLCModelValue(s) — `ModelValue.add(name)` (R2.7.10). tlc2 INTERNS
+  ::  it; the port's model value IS its name (`tlc-value-model`'s approved
+  ::  difference), so there is nothing to intern and the answer is the value
+  ::  itself. A non-string argument is the pin's one-argument error
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'TLCModelValue expects one argument.']
+  ?.  ?=(%str -.i.as)
+    [%| (one-arg-error 'ModelValue' 'string' i.as)]
+  [%& %model p.i.as]
 ::
 ++  tlc-no-op
   ::  TLCExt!TLCNoOp(v) == v. `tlcNoOp` is `return val;` -- the pin uses it to

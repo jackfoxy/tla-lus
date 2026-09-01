@@ -1280,6 +1280,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC, TLCExt\0aVARIABLE x\0aInit == x = TLCGetOrDefault(5, 0)\0aNext == /\\ x < 3\0a        /\\ TLCSet(5, 1)\0a        /\\ x\' = x + TLCGetOrDefault(5, 99)\0aInv == x >= 0\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-mc-tlcext-later
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.10: the three TLCExt surfaces the inventory carried as `later:` --\0a\\* TLCFP (a value\'s FP64, downcast to a signed 32-bit int), TLCEvalDefinition\0a\\* (evaluate a definition by name in the root module) and TLCModelValue.\0a\\* TLCFP is reproducible under `-fp 0` only, which is the pin\'s property: an\0a\\* unseeded run picks a different polynomial and answers differently every run.\0aEXTENDS Integers, TLC, TLCExt\0aVARIABLE x\0aFoo == 41 + 1\0aInit == x = 0\0aNext == UNCHANGED x\0aPost == /\\ TLCFP(3) = -244908333\0a        /\\ TLCFP("ab") = 1031263210\0a        /\\ TLCFP({1, 2}) = 2120042859\0a        /\\ TLCEvalDefinition("Foo") = 42\0a        /\\ TLCModelValue("mv1") = TLCModelValue("mv1")\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPOSTCONDITION Post\0a'
+::
 ++  test-mc-tlcext-ops
   %+  expect-eq
     !>  ^-  wain

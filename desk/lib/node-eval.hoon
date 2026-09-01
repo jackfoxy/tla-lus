@@ -1085,6 +1085,7 @@
   ?:  ?=(%tlc-set tag)        (eval-tlc-set n e rs)
   ?:  ?=(%tlc-get-or-default tag)  (eval-tlc-get-or-default n e rs)
   ?:  ?=(%tlc-get-and-set tag)     (eval-tlc-get-and-set n e rs)
+  ?:  ?=(%tlc-eval-def tag)        (eval-tlc-eval-def n e rs)
   ::  R2.7.4.4: the DRAW. It spends `es.rs`, so it carries for the same reason
   ?:  ?=(%random-element tag)      (eval-random-element n e rs)
   ::  R2.7.4.5: the `Randomization` module -- all three DRAW
@@ -1297,6 +1298,30 @@
     %^  rap  3  'unsupported StandardModule operator: TLCExt!TLCDefer in '
     ~['simulation; the deferred expression needs a post-step hook this engine has not built']
   [%& %bool &]
+::
+++  eval-tlc-eval-def
+  ::  TLCExt!TLCEvalDefinition(name) — resolve `name` in the ROOT module's
+  ::  definitions and evaluate it (R2.7.10). tlc2 takes the root `ModuleNode`
+  ::  and `getOpDef(name)`; the port's `ops.e` IS that table, so the lookup is
+  ::  the same one every user-operator application already makes.
+  ::
+  ::  A non-string argument, and a name that resolves to nothing, are both the
+  ::  pin's one-argument error -- `TLC_MODULE_ONE_ARGUMENT_ERROR` naming
+  ::  `TLCEvalDefinition`
+  |=  [n=sem-apply:sm e=eenv rs=rst]
+  ^-  eout
+  ?.  ?=([* ~] args.n)
+    [[%| 0 'TLCEvalDefinition expects one argument.'] rs]
+  =^  k  rs  (eval-rs i.args.n e rs)
+  ?:  ?=(%| -.k)  [k rs]
+  ?.  ?=(%str -.p.k)
+    [[%| (one-arg-error:so 'TLCEvalDefinition' 'string' p.k)] rs]
+  =/  d  (~(get by ops.e) p.p.k)
+  ?~  d
+    [[%| (one-arg-error:so 'TLCEvalDefinition' 'string' p.k)] rs]
+  ?~  body.u.d
+    [[%| (one-arg-error:so 'TLCEvalDefinition' 'string' p.k)] rs]
+  (eval-rs u.body.u.d e rs)
 ::
 ++  eval-tlc-get
   ::  TLC!TLCGet — also an `@Evaluation` override in the pin, so it receives
