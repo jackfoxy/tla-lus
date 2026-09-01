@@ -90,6 +90,19 @@ APPROVED = {
         "expansions and `+user-op` PROPAGATES that rejection rather than "
         "swallowing it -- a Hoon runaway is an uncatchable hang, not a "
         "throwable, the same trade `live-graph-cap` makes"),
+    "terse-subset": (
+        ["Error: Invariant Inv is violated by the initial state:",
+         "x = {{}, {1}, {2}, {3}, {1, 2}, {1, 3}, {2, 3}, {1, 2, 3}}"],
+        "R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a "
+        "state is printed -- measured, `SUBSET (1..3)` and `(1..4) \\X (1..2)` "
+        "stay unexpanded while a set FILTER is expanded anyway, so it is "
+        "per-Value-class, not a global switch. Reproducing it needs each lazy "
+        "class to keep its SOURCE DESCRIPTOR (tlc2's `SubsetValue` holds its "
+        "base set and prints `SUBSET <base>`); R2.7.2 gave `%set` a class TAG, "
+        "which is necessary and not sufficient -- the elements are already "
+        "materialized by then. The port renders the expanded form always, "
+        "which is a RENDERING difference with no effect on verdict or counts, "
+        "and the arm pins both sides"),
     "periodic-fast": (
         ["Error: unsupported: _PERIODIC Falsehood; tlc2 evaluates it inside "
          "the search loop and ENDS the run when it is false, which no "

@@ -1226,6 +1226,32 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a state
+::  is printed -- measured, `SUBSET (1..3)` and `(1..4) \X (1..2)` stay
+::  unexpanded while a set FILTER is expanded anyway, so it is
+::  per-Value-class, not a global switch. Reproducing it needs each lazy
+::  class to keep its SOURCE DESCRIPTOR (tlc2's `SubsetValue` holds its base
+::  set and prints `SUBSET <base>`); R2.7.2 gave `%set` a class TAG, which
+::  is necessary and not sufficient -- the elements are already materialized
+::  by then. The port renders the expanded form always, which is a RENDERING
+::  difference with no effect on verdict or counts, and the arm pins both
+::  sides
+::  the pin (out.txt): Error: Invariant Inv is violated by the initial state: / x = SUBSET
+::  (1..3)
+++  test-mc-terse-subset
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = {{}, {1}, {2}, {3}, {1, 2}, {1, 3}, {2, 3}, {1, 2, 3}}'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a state is\0a\\* printed. Measured at the pin: `SUBSET (1..3)` and `(1..4) \\X (1..2)` stay\0a\\* unexpanded, while a set FILTER `{y \\in 1..4 : y > 1}` is expanded anyway --\0a\\* it is per-Value-class, not a global switch.\0aEXTENDS Naturals, FiniteSets\0aVARIABLE x\0aInit == x = SUBSET (1..3)\0aNext == UNCHANGED x\0aInv == Cardinality(x) = 99\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-mc-tlcext-getandset
   %+  expect-eq
     !>  ^-  wain
