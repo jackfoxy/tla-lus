@@ -306,6 +306,15 @@
   $%  [%invariant name=@t initial=?]
       [%deadlock ~]
       [%property name=@t initial=?]
+      ::  R2.7.13: an IMPLIED ACTION violation, tlc2's
+      ::  TLC_ACTION_PROPERTY_VIOLATED_BEHAVIOR (EC 2112) -- a `[][A]_v`
+      ::  PROPERTY whose A fails on some transition. It had been folded into
+      ::  `[%property name %.n]`, which already carried EC 2116 (a temporal
+      ::  property violated by a behavior), so one wire shape meant two of
+      ::  tlc2's three property codes and a caller could not tell a broken
+      ::  step from a broken behavior. R2.7.1 split 2107/2110 for invariants
+      ::  and named this as wanting its own variant; this is that variant
+      [%action name=@t]
       [%liveness name=@t]
       [%assumption name=@t]
   ==

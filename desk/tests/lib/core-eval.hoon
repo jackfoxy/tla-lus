@@ -115,6 +115,34 @@
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers\0aF == [i \\in 1..3 |-> i]\0aExF == [F EXCEPT ![2] = 99]\0aExAt == [F EXCEPT ![2] = @ + 100]\0aR == [a |-> 1, b |-> [c |-> 2]]\0aExR == [R EXCEPT !.a = 5]\0aExNest == [R EXCEPT !.b.c = 42]\0aT == <<1, 2, 3>>\0aExT == [T EXCEPT ![3] = 30]\0aExMulti == [F EXCEPT ![1] = 7, ![3] = 8]\0a====\0a'  '\0a'
   ~
 ::
+++  test-lazyclass
+  ::  CapL: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  ::  CupL: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  ::  DifL: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FCupL: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FFns: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FPred: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FProd: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FRcds: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  FSub: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
+  ::  Fns: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  ::  Rcds: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  ::  UniL: R2.7.13: a binary set operator computes EAGERLY only when both operands are Reducible; with a lazy operand tlc2 keeps SetCupValue / SetCapValue / SetDiffValue / UnionValue, and `[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. R2.7.2 mapped all of these to SetEnumValue, which was true of every golden it had. The VALUE agrees exactly. `tlc-eval-node`
+  %+  expect-eq
+    !>  ^-  (list tape)
+    :~  "CupR SetEnumValue \{1, 2, 3, 4}"
+        "FCupR FcnRcdValue <<1, 2, 3, 4>>"
+        "FEnum FcnRcdValue <<1, 2, 3>>"
+        "FRng FcnRcdValue <<10, 20, 30>>"
+        "Pred SetPredValue \{<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}"
+        "Prod SetOfTuplesValue \{<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}"
+        "Rng IntervalValue 1..3"
+        "Sub SubsetValue \{\{}, \{1}, \{2}, \{1, 2}}"
+    ==
+  !>
+  %^  project-defs:check  '---- MODULE A ----\0a\\* R2.7.13 measured the residue R2.7.2 left on `tlc-eval-node` (the FUNCTION\0a\\* representation class) and found it larger than recorded. tlc2\'s rule is in\0a\\* Tool.java\'s OPCODE_fc/nrfs/rfs: a function constructor evaluates every\0a\\* domain, and `isFcnRcd` is true iff EVERY domain value `instanceof\0a\\* Reducible`. `Reducible` has exactly TWO implementors -- IntervalValue and\0a\\* SetEnumValue -- so any other domain class leaves a FcnLambdaValue.\0a\\*\0a\\* The same predicate governs the BINARY set operators: `\\cup`/`\\cap`/`\\`\0a\\* compute eagerly only when both operands are Reducible, else they build a\0a\\* lazy SetCupValue / SetCapValue / SetDiffValue. R2.7.2 recorded them as\0a\\* unconditionally SetEnumValue, which was true of every golden it had.\0aEXTENDS Integers\0aRng  == 1..3\0aProd == (1..2) \\X (1..2)\0aSub  == SUBSET (1..2)\0aPred == {x \\in Prod : TRUE}\0aFns  == [(1..2) -> (1..2)]\0aRcds == [a: 1..2]\0a\\* binary operators: Reducible operands force, lazy operands do not\0aCupR == Rng \\cup {4}\0aCupL == Prod \\cup {<<9, 9>>}\0aCapL == Prod \\cap Prod\0aDifL == Prod \\ {<<1, 1>>}\0aUniL == UNION {Prod}\0a\\* function classes, by domain class\0aFRng  == [i \\in Rng |-> i * 10]\0aFEnum == [x \\in {1, 2, 3} |-> x]\0aFPred == [x \\in Pred |-> 1]\0aFProd == [<<i, j>> \\in Prod |-> i * 10 + j]\0aFSub  == [x \\in Sub |-> 1]\0aFFns  == [x \\in Fns |-> 1]\0aFRcds == [x \\in Rcds |-> 1]\0aFCupR == [x \\in CupR |-> x]\0aFCupL == [x \\in CupL |-> 1]\0a====\0a'  ''
+  ~['CapL' 'CupL' 'DifL' 'FCupL' 'FFns' 'FPred' 'FProd' 'FRcds' 'FSub' 'Fns' 'Rcds' 'UniL']
+::
 ++  test-lookup
   %+  expect-eq
     !>  ^-  (list tape)
@@ -280,7 +308,7 @@
   ~['Pr' 'PrNest' 'PrT']
 ::
 ++  test-tupbind
-  ::  FcnT: tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, SetOfTuplesValue for `A \X B`, SetPredValue for a filter whose base set is itself lazy -- and the port normalizes all of them to one eager `%set`, so only the class column differs; the elements and their rendering agree exactly. The class is NOT a property of the operator either: `{x \in 1..6 : P}` is a SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue, so reproducing it would mean modelling tlc2's lazy-value class hierarchy, which this port deliberately does not. Enumeration here IS lazy (`sexp`/`ecur`) -- it is the representation class that is absent. Laziness also PROPAGATES from the base set, which is why `[<<i, j>> \in (A \X B) |-> e]` is a FcnLambdaValue at the pin while `[i \in 1..3 |-> e]` is a FcnRcdValue: same constructor, but the first is built over a lazy domain. R1.3.8
+  ::  FcnT: R2.7.13: tlc2's function class is decided by the DOMAIN -- FcnRcdValue iff every domain value is Reducible (exactly IntervalValue or SetEnumValue), else FcnLambdaValue. The port has no function representation class and answers FcnRcdValue always. The VALUE agrees exactly. `tlc-eval-node`
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "AllT BoolValue FALSE"

@@ -2024,11 +2024,14 @@
       %inv       [%violated [%invariant name.out initial.out] st]
       ::  an implied INIT can only fail on an initial state, by construction
       %prop      [%violated [%property name.out %.y] st]
-      ::  RESIDUE, named rather than hidden: an implied ACTION violation is
-      ::  tlc2's EC 2112, a THIRD code this wire still folds into `%property`.
-      ::  R2.7.1's scope is the 2107/2110 invariant split; the action-property
-      ::  code wants its own row rather than a silent third meaning here
-      %action    [%violated [%property name.out %.n] st]
+      ::  R2.7.13: an implied ACTION violation is tlc2's EC 2112 and now has
+      ::  its own wire variant. It used to be `[%property name %.n]`, which
+      ::  ALSO carries EC 2116 (a temporal property violated by a behavior),
+      ::  so the two were indistinguishable on the wire. DFID is the only
+      ::  engine that reaches this: `+check`'s console path renders the
+      ::  diagnostic without a typed result, and neither `+run-check` nor the
+      ::  job kernel routes an implied action at all (`tlc-safety-assume`)
+      %action    [%violated [%action name.out] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
   =/  env  (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
