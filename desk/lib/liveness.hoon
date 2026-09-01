@@ -350,6 +350,70 @@
     %even     ~|(%tlc-live-cannot-eval-formula !!)
   ==
 ::
+++  eval-on-lasso
+  ::  R2.7.12: `LiveExprNode.evalOnLasso` -- a live-expression evaluated over a
+  ::  finished counter-example, the direct recursive evaluator tlc2 uses for
+  ::  POST-HOC PROPERTY ATTRIBUTION (`Liveness.findViolatedProperties`).
+  ::
+  ::  This is not the tableau. The tableau answers "does SOME behaviour violate
+  ::  the conjunction of the properties"; once a lasso exists, tlc2 asks each
+  ::  declared PROPERTY separately whether THIS lasso satisfies it, and names
+  ::  the ones it does not. That is why the reported name can be a property
+  ::  other than the first, and why more than one name can be reported.
+  ::
+  ::  `sts` is the trace over distinct STATES, `cyc` the 0-based index where the
+  ::  cycle begins (`cyclePos`), and the successor of the last state is
+  ::  `sts[cyc]` -- the lasso closes there whether the class is stuttering (the
+  ::  cycle is the last state alone) or back-to-state.
+  |=  [x=live-expr sts=(list state:ne) cyc=@ud pos=@ud env=eenv:ne]
+  ^-  ?
+  =/  len  (lent sts)
+  ?-  -.x
+    %bool   b.x
+    %neg    !(eval-on-lasso b.x sts cyc pos env)
+    %conj   (levy cs.x |=(y=live-expr (eval-on-lasso y sts cyc pos env)))
+    %disj   (lien ds.x |=(y=live-expr (eval-on-lasso y sts cyc pos env)))
+  ::
+      %state
+    ::  `LNState.eval(tool, states.get(pos), Empty)`. An unevaluable leaf bails
+    ::  rather than answering, the invariant R2.7.6.3 established
+    =/  r  (pred-bool:ne p.x (snag pos sts) ~ (leaf-env x env))
+    ?:  ?=(%& -.r)  p.r
+    ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
+  ::
+  ::  `LNStateEnabled extends LNState`, so it evaluates at `sts[pos]` too
+    %enabled  (enabled-eval box.x sub.x p.x (snag pos sts) env)
+  ::
+      %act
+    ::  `LNAction.eval(s1, s2)` with s2 the successor -- `sts[cyc]` at the end
+    =/  s0  (snag pos sts)
+    =/  s1  (snag ?:((lth +(pos) len) +(pos) cyc) sts)
+    (act-eval box.x sub.x a.x s0 s1 env)
+  ::
+  ::  `astToLive` rewrites `()` away, so tlc2 asserts here; the body is ported
+  ::  as written so a shape that does reach it behaves rather than bails
+    %next  (eval-on-lasso b.x sts cyc ?:((lth +(pos) len) +(pos) cyc) env)
+  ::
+      %all
+    ::  tlc2 walks `pos..cyc-1` (skipped when `pos >= cyc`) and then the whole
+    ::  cycle `cyc..len-1`, because the cycle repeats forever. The union of the
+    ::  two ranges is `min(pos, cyc)..len-1` in both cases, so one loop is the
+    ::  same set of positions
+    =/  i  (min pos cyc)
+    |-  ^-  ?
+    ?:  (gte i len)  &
+    ?.  (eval-on-lasso b.x sts cyc i env)  |
+    $(i +(i))
+  ::
+      %even
+    ::  the same range, existentially
+    =/  i  (min pos cyc)
+    |-  ^-  ?
+    ?:  (gte i len)  |
+    ?:  (eval-on-lasso b.x sts cyc i env)  &
+    $(i +(i))
+  ==
+::
 ++  sub-val
   ::  a subscript state-expression evaluated at a state (its value, or ~ on
   ::  an evaluation error)

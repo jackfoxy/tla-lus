@@ -163,6 +163,11 @@
           phase=?(%build %check)
           oss=(list oos:tp)
           pname=@t
+          ::  R2.7.12: the IMPLIED TEMPORALS, carried so the sliced report can
+          ::  do the same POST-HOC ATTRIBUTION the console path does -- which
+          ::  property a counter-example violates is decided against the lasso,
+          ::  not by taking the first `PROPERTY`. `pname` stays as the fallback
+          props=(list [name=@t body=sem:semantic])
           modn=@t
           act=next-act
           ::  the whole-Next label, carried since R2.3.4: an INVARIANT
@@ -1633,7 +1638,8 @@
       ==
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  p.osr  u.pp  modn  act  nl
+      :*  %live  %build  p.osr  u.pp  (implied-temporals:check properties.rs defs)
+          modn  act  nl
           o  (bfs-init:check is)  ~  ~
           sname  sloc  fair  aname
       ==
@@ -1845,6 +1851,7 @@
       ::  is empty by construction; `aname` is carried anyway so the two call
       ::  sites cannot drift (R1.8.3)
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
+          props.kk
           generated.st  distinct.st  depth.st  ~  aname.kk  |
       ==
     (finish-arts j [%ok st] report ~ pre)
@@ -1880,6 +1887,7 @@
     ::  the whole list -- tlc2 tests `this.oos`, so a spec whose first violated
     ::  property has empty PEMs prints no hint even when a later one would
     :*  l  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
+        props.kk
         generated.st  distinct.st  depth.st
         (stutter-gate:check ~[o] sname.kk sloc.kk fair.kk modn.kk)
         aname.kk
@@ -1889,7 +1897,12 @@
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
   =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '' ~) `loop.u.l]
-  (finish-arts j [%violated [%property pname.kk %.n] st] report `typed pre)
+  ::  R2.7.12: the TYPED result names the same property the report does. The
+  ::  wire carries ONE name where the console can now print several, so it
+  ::  takes the first attributed one; `pname` remains the fallback
+  =/  vps  (violated-props:check props.kk u.l states env modn.kk)
+  =/  vnm  ?~(vps pname.kk i.vps)
+  (finish-arts j [%violated [%property vnm %.n] st] report `typed pre)
 ::
 ::  +|  Stage: %simulate
 ::

@@ -656,8 +656,24 @@ noted):
 - **Symmetry + a temporal property** — typed-rejected with the pinned 2279 text
   where TLC warns and continues (unit 8.7.2 approved-difference; full
   warn-and-continue needs liveness under model-value symmetry).
-- **Multi-property violated-property name** — the first `PROPERTY` name (the oos
-  carries no source-property name); correct for the corpus.
+- **Multi-property violated-property name** — CLOSED by R2.7.12. The name is
+  decided POST HOC against the finished counter-example
+  (`Liveness.findViolatedProperties`): each implied temporal is evaluated over
+  the lasso and the ones it fails are named, so the reported property need not
+  be the first declared one, and MORE THAN ONE can be reported —
+  `Temporal properties P1 and P2 were violated.` for two,
+  `P1, P2, and P3 were violated.` for three or more. Pinned by the `mc` cases
+  `prop-attrib`, `prop-plural`, `prop-plural3`. The earlier note here
+  ("the oos carries no source-property name") described a real limit of the
+  decomposition and a false constraint on the answer: tlc2's `oos` carries no
+  such name either.
+- **A `[]P` box-state `PROPERTY` FOLLOWED by a temporal one is a MISSED
+  VIOLATION** (measured R2.7.12, owned by `tlc-safety-assume`, frozen as the
+  `mc` case `prop-box-then-live`). `SpecProcessor.processConfigProps` routes
+  EVERY property — box-state to the invariant vector, level-1 to the implied
+  inits, `[][A]_v` to the implied actions, the rest to the liveness engine —
+  and the port decides the route from the FIRST property alone, so the second
+  is never checked. The pin reports the violation; the port completes clean.
 
 ## Unit P2-8.1 — Temporal-property normalization
 

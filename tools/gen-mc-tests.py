@@ -42,11 +42,21 @@ DROP = re.compile(
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
 SKIPS: dict = {
-    #  R2.7.11a emptied this map: `live-after-inv` and `gh1389-counting` were
-    #  both frozen on LASSO MINIMALITY, and both now match the pin. The
-    #  mechanism kept -- a frozen golden with the arm withheld gives the next
-    #  increment a target, and leaving the case out of the corpus entirely
-    #  would lose the measurement.
+    #  R2.7.11a emptied this map; R2.7.12 refilled it with one entry. A frozen
+    #  golden with the arm withheld gives the next increment a target, and
+    #  leaving the case out of the corpus entirely would lose the measurement.
+    "prop-box-then-live": (
+        "R2.7.12: MEASURED and NOT fixed -- a MISSED VIOLATION, not a "
+        "rendering difference. `SpecProcessor.processConfigProps` routes "
+        "EVERY `PROPERTY` (a `[]P` box-state to the invariant vector, a "
+        "level-1 predicate to the implied inits, a `[][A]_v` to the implied "
+        "actions, the rest to the liveness engine); the port decides the "
+        "route from the FIRST property alone, so a box-state property "
+        "followed by a genuine temporal one runs the safety engine and never "
+        "checks the second. The pin reports `P2`; the port completes clean. "
+        "Found while measuring R2.7.12's own clause, and it belongs to "
+        "`tlc-safety-assume`, which claimed this routing at R1.8.1.1 -- that "
+        "row is DEMOTED `parity` -> `partial` on this evidence."),
 }
 
 

@@ -1955,6 +1955,12 @@
       anames=(list @t)
       ddl=?                                   ::  check deadlock (cfg flag)
       pp=(unit @t)                           ::  property name (liveness)
+      ::  R2.7.12: the IMPLIED TEMPORALS -- every PROPERTY that reaches the
+      ::  liveness engine, with its body, in declaration order (tlc2's
+      ::  `Tool.getImpliedTemporals()`). `pp` is the FIRST property's name and
+      ::  is only a fallback now: which property a counter-example violates is
+      ::  decided POST-HOC against the lasso, over this list
+      props=(list [name=@t body=sem:sem-lib])
       fair=(list sem:sem-lib)                ::  fairness conjuncts (WF_/SF_/
                                              ::  []temporal) from a SPECIFICATION
                                              ::  decomposition (SpecProcessor
@@ -2500,6 +2506,13 @@
     ?|  (lte (sem-lvl:sem-lib u.ppb) 1)
         ?=(^ (implied-action-inner u.ppb))
     ==
+  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTIES that reach the
+  ::  liveness engine, which is what post-hoc attribution asks about. The three
+  ::  exclusions are `processConfigProps`': a `[]P` box-state goes to the
+  ::  INVARIANT vector, a level<=1 predicate is an IMPLIED INIT and a `[][A]_v`
+  ::  an IMPLIED ACTION. Same three tests `+check`'s routing uses, applied to
+  ::  EVERY property rather than to the first
+  =/  itemporals  (implied-temporals properties.ca defs)
   =/  or=(each (list oos:tp) aerr:tp)
     ?:  |(?=(~ pp) non-temporal)  [%& ~]
     (build-live-oss ca defs consts vars fair modn)
@@ -2515,7 +2528,8 @@
   ::  the ALIAS body, resolved like any other config target (R2.3.2)
   =/  alb=(unit sem:sem-lib)  ?~(alias.ca ~ (sem-body defs u.alias.ca))
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
-      invs  cons  acons  cnames  anames  ddl  pp  fair  spec.ca  sloc  tree
+      invs  cons  acons  cnames  anames  ddl  pp  itemporals
+      fair  spec.ca  sloc  tree
       vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
       ::  `-view` is a REQUEST option; `check:check` takes none, so the console
@@ -3029,6 +3043,65 @@
     marker
   ==
 ::
+++  violated-props
+  ::  R2.7.12: `Liveness.findViolatedProperties` -- POST-HOC PROPERTY
+  ::  ATTRIBUTION. The lasso is already built and already sound; this asks each
+  ::  IMPLIED TEMPORAL separately whether THIS behaviour satisfies it, and
+  ::  returns the names of those it does not, in declaration order.
+  ::
+  ::  The port reported the FIRST `PROPERTY` instead, which is right only when
+  ::  the first property is the violated one. Measured at the pin on a two-
+  ::  property spec whose first property HOLDS: tlc2 names the second.
+  ::
+  ::  A property whose live-expression cannot be built is SKIPPED, not
+  ::  reported -- tlc2 catches there and degrades to a smaller set rather than
+  ::  crashing, since the counter-example is already valid.
+  |=  $:  props=(list [name=@t body=sem:sem-lib])
+          l=lasso:lv  states=(map @t state:ne)
+          env=eenv:ne  modn=@t
+      ==
+  ^-  (list @t)
+  =/  sts=(list state:ne)  (turn prefix.l |=(fp=@t (~(got by states) fp)))
+  ?~  sts  ~
+  ::  `cyclePos` is `states.size() - 1` at the moment the cycle is appended --
+  ::  the 0-based index of the state the cycle returns to. `loop` is that
+  ::  index 1-based, for a stuttering closer (the last state) and for a
+  ::  back-to-state one alike
+  =/  cyc  ?:(=(0 loop.l) (dec (lent sts)) (dec loop.l))
+  =|  out=(list @t)
+  |-  ^-  (list @t)
+  ?~  props  (flop out)
+  =/  lr  (ast:tp body.i.props [modn 0] env)
+  ?:  ?=(%| -.lr)  $(props t.props)
+  ?:  (eval-on-lasso:lv p.lr sts cyc 0 env)  $(props t.props)
+  ?:  (lien out |=(n=@t =(n name.i.props)))  $(props t.props)
+  $(props t.props, out [name.i.props out])
+::
+++  violated-header
+  ::  R2.7.12: MP's `TLC_TEMPORAL_PROPERTY_VIOLATED` template, which has a
+  ::  PLURAL form the port never emitted -- `Temporal properties A and B were
+  ::  violated.` for two, `A, B, and C were violated.` for three or more. An
+  ::  empty attribution falls back to `pname`, the first PROPERTY, which is
+  ::  what this printed unconditionally before
+  |=  [ns=(list @t) pname=@t]
+  ^-  @t
+  ?~  ns
+    (crip "Error: Temporal property {(trip pname)} was violated.")
+  ?~  t.ns
+    (crip "Error: Temporal property {(trip i.ns)} was violated.")
+  =/  n  (lent ns)
+  =/  body=tape
+    =/  i=@ud  1
+    =/  l=(list @t)  ns
+    |-  ^-  tape
+    ?~  l  ""
+    =/  sep=tape
+      ?:  =(i 1)  ""
+      ?:  =(i n)  ?:(=(n 2) " and " ", and ")
+      ", "
+    :(weld sep (trip i.l) $(l t.l, i +(i)))
+  (crip "Error: Temporal properties {body} were violated.")
+::
 ++  live-report
   ::  the TLC console diagnostic for a temporal run from an ALREADY-BUILT graph
   ::  (unit 8.8.1): shared by the `live-message-lines` differential and the job
@@ -3038,6 +3111,8 @@
   |=  $:  oss=(list oos:tp)  states=(map @t state:ne)  inits=(list @t)
           nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
+          ::  R2.7.12: the implied temporals, for post-hoc attribution
+          props=(list [name=@t body=sem:sem-lib])
           gen=@ud  distinct=@ud  depth=@ud
           ::  context for the EC 2257/2259 stuttering hint (R1.8.1.3)
           sname=(unit @t)  sloc=sspan:sem-lib  fair=(list sem:sem-lib)
@@ -3056,7 +3131,8 @@
     ?^(r [r ~[i.os]] $(os t.os))
   :-  l.hit
   %-  live-render
-  :*  l.hit  states  nsb  env  order  modn  defs  pname  gen  distinct  depth
+  :*  l.hit  states  nsb  env  order  modn  defs  pname  props
+      gen  distinct  depth
       (stutter-gate o.hit sname sloc fair modn)
       aname
       (box-free-tf o.hit)
@@ -3071,6 +3147,8 @@
   |=  $:  l=(unit lasso:lv)  states=(map @t state:ne)
           nsb=sem:sem-lib  env=eenv:ne  order=(list @t)  modn=@t
           defs=(map @t sem-def:sem-lib)  pname=@t
+          ::  R2.7.12: the implied temporals, for post-hoc attribution
+          props=(list [name=@t body=sem:sem-lib])
           gen=@ud  distinct=@ud  depth=@ud
           gate=wain                     ::  EC 2257/2259 hint (R1.8.1.3)
           aname=@t                      ::  root action name (`sctx`'s)
@@ -3102,7 +3180,7 @@
       (edge-action-label (~(got by states) last-fp) loop-fp actions env order modn)
     ~[(crip "Back to state {(a-tape loop.u.l)}: {(trip label)}")]
   ;:  weld
-    ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
+    ~[(violated-header (violated-props props u.l states env modn) pname)]
     ~['Error: The following behavior constitutes a counter-example:']
     body
     ?:(noclose ~ closer)
@@ -3164,7 +3242,7 @@
   |=  $:  out=outcome  oss=(list oos:tp)  states=(map @t state:ne)
           inits=(list @t)  nsb=sem:sem-lib  env=eenv:ne
           order=(list @t)  modn=@t  defs=(map @t sem-def:sem-lib)
-          pname=@t  aname=@t
+          pname=@t  props=(list [name=@t body=sem:sem-lib])  aname=@t
       ==
   ^-  wain
   ?.  ?=(?(%inv %deadlock) -.out)  ~
@@ -3181,7 +3259,7 @@
   ?~  l.hit  ~
   ?.  (box-free-tf o.hit)  ~
   ;:  weld
-    ~[(crip "Error: Temporal property {(trip pname)} was violated.")]
+    ~[(violated-header (violated-props props u.l.hit states env modn) pname)]
     ~['Error: The following behavior constitutes a counter-example:']
     %-  live-prefix-lines
     :*  prefix.u.l.hit  states  (get-actions nsb aname defs env)
@@ -3273,6 +3351,7 @@
   =/  r
     %-  live-report
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
+        props.c
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
     ==
   ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
@@ -4350,7 +4429,7 @@
         %-  post-error-live
         :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
             (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
-            u.pp.c  aname.c
+            u.pp.c  props.c  aname.c
         ==
       ::  R2.7.7.3: the postconditions run here too -- measured, they run
       ::  after a VIOLATION as well as on a clean run
@@ -4375,11 +4454,32 @@
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
+          props.c
           gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
       ==
     report.r
   ::  safety: an INVARIANT
   (safety-run c cvg seed)
+::
+++  implied-temporals
+  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTIES that reach the
+  ::  liveness engine, with their bodies, in declaration order. The three
+  ::  exclusions are `SpecProcessor.processConfigProps`': a `[]P` box-state
+  ::  goes to the INVARIANT vector, a level<=1 predicate is an IMPLIED INIT and
+  ::  a `[][A]_v` an IMPLIED ACTION. Same three tests `+check`'s routing uses,
+  ::  applied to EVERY property rather than to the first.
+  ::
+  ::  This is what post-hoc attribution asks about (`+violated-props`), so both
+  ::  the console and the job kernel build it here rather than each their own
+  |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
+  ^-  (list [name=@t body=sem:sem-lib])
+  ?~  props  ~
+  =/  b  (sem-body defs i.props)
+  ?~  b  $(props t.props)
+  ?^  (box-state-inner:tp u.b)  $(props t.props)
+  ?:  (lte (sem-lvl:sem-lib u.b) 1)  $(props t.props)
+  ?^  (implied-action-inner u.b)  $(props t.props)
+  [[i.props u.b] $(props t.props)]
 ::
 ++  implied-action-inner
   ::  the A of a `[][A]_v` implied-action property — a box over a square-action

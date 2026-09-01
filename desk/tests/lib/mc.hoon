@@ -1043,6 +1043,64 @@
     '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0aTemporal == []<>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Temporal\0a'
 ::
+++  test-mc-prop-attrib
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property P2 was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 11, col 13 to line 11, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 11, col 13 to line 11, col 31 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '8 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.12: POST-HOC PROPERTY ATTRIBUTION. Two PROPERTIES; the FIRST one\0a\\* HOLDS on the counter-example and the SECOND is the violated one, so the\0a\\* reported name cannot come from the property list\'s head. tlc2 names it by\0a\\* evaluating each declared property over the finished lasso\0a\\* (Liveness.findViolatedProperties / LiveExprNode.evalOnLasso).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aP1 == []<>(x < 9)\0aP2 == <>(x = 3)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
+::
+++  test-mc-prop-plural
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal properties P1 and P2 were violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.12: the PLURAL form of TLC_TEMPORAL_PROPERTY_VIOLATED. Both\0a\\* PROPERTIES fail on the same lasso (the only behavior stutters at x = 0),\0a\\* so tlc2 reports BOTH: "Temporal properties P1 and P2 were violated."\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aP1 == <>(x = 1)\0aP2 == <>(x = 2)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
+::
+++  test-mc-prop-plural3
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal properties P1, P2, and P3 were violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.12: the three-or-more plural form, which uses a DIFFERENT separator\0a\\* from the two-name one -- "P1, P2, and P3 were violated." against\0a\\* "P1 and P2 were violated." (MP.java\'s TLC_TEMPORAL_PROPERTY_VIOLATED).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aP1 == <>(x = 1)\0aP2 == <>(x = 2)\0aP3 == <>(x = 3)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0aPROPERTY P3\0a'
+::
 ++  test-mc-rnd-exists
   %+  expect-eq
     !>  ^-  wain
