@@ -41,28 +41,12 @@ DROP = re.compile(
 #  `gen-core-eval-tests.py` uses for its `SKIPS`. A frozen golden gives the
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
-SKIPS = {
-    "live-after-inv": (
-        "R2.7.5: the post-error temporal block is CORRECT here (right "
-        "property, right shape, appended in the right place) but its "
-        "counter-example runs one state too long --- the pin stops at State 3, "
-        "where `[](x = 0 => [](x # 2))`'s promise is fulfilled, and the port "
-        "continues to State 4 because the graph has that state. That is LASSO "
-        "MINIMALITY in `+oos-lasso` (`tlc-live-lasso`, currently `parity`), "
-        "not the post-error rule: `live-after-deadlock` passes because there "
-        "the witness ends at the last state anyway, and no existing liveness "
-        "case has a graph that extends PAST its witness. Frozen so the fix "
-        "has a target."),
-    #  R2.7.6.2 measured three targets by narrowing upstream's
-    #  `Github1389ViolatedC` down to a 13-line reproducer. All five goldens
-    #  below are the pin's; the arms are withheld until the fixes land.
-    "gh1389-counting": (
-        "R2.7.6.2: LASSO MINIMALITY, the same defect `live-after-inv` was "
-        "frozen for --- the trace is right through State 10 and the port adds "
-        "State 11 (`x = FALSE`) where the pin stops. A SECOND instance, and a "
-        "simpler one: no post-error block is involved, this is an ordinary "
-        "counting-safety property (`AtMost(4)`). Verdict and all three counts "
-        "already match. Target for R2.7.11 (`tlc-live-lasso`)."),
+SKIPS: dict = {
+    #  R2.7.11a emptied this map: `live-after-inv` and `gh1389-counting` were
+    #  both frozen on LASSO MINIMALITY, and both now match the pin. The
+    #  mechanism kept -- a frozen golden with the arm withheld gives the next
+    #  increment a target, and leaving the case out of the corpus entirely
+    #  would lose the measurement.
 }
 
 

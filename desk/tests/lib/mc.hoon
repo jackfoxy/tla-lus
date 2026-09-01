@@ -252,6 +252,41 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aFalsy == FALSE\0aSpec == Falsy /\\ Init /\\ [][Next]_x\0a====\0a'
   'SPECIFICATION Spec\0a'
 ::
+++  test-mc-gh1389-counting
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property CountAtMostFour was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = FALSE'
+        'State 2: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = TRUE'
+        'State 3: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = FALSE'
+        'State 4: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = TRUE'
+        'State 5: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = FALSE'
+        'State 6: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = TRUE'
+        'State 7: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = FALSE'
+        'State 8: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = TRUE'
+        'State 9: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = FALSE'
+        'State 10: <Next line 24, col 9 to line 24, col 22 of module spec>'
+        'x = TRUE'
+        '5 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '--------------------------- MODULE spec ---------------------------\0a\\* Regression test for https://github.com/tlaplus/tlaplus/issues/1389\0a\\* exercising the "counting safety property" use case -- the primary\0a\\* motivation for permitting RECURSIVE operators at temporal level.\0a\\*\0a\\* Bound the number of times an event may occur.  The canonical example\0a\\* here is "x is TRUE in at most n disjoint intervals", equivalently \0a\\* "x becomes TRUE at most n times":\0a\\*\0a\\*   AtMost(0) == []~x                              \\* never TRUE\0a\\*   AtMost(1) == [](x => [](~x => []~x))           \\* TRUE in at most 1 interval\0a\\*   AtMost(2) == [](x => [](~x => [](x => [](~x => []~x))))\0a\\*   ...\0a\0aEXTENDS Naturals, FiniteSets, TLCExt\0a\0aVARIABLE x\0a\0aRECURSIVE AtMost(_)\0aAtMost(n) == IF n = 0 THEN []~x\0a                      ELSE [](x => [](~x => AtMost(n - 1)))\0a\0aInit == x = FALSE\0aNext == x\' \\in BOOLEAN\0aSpec == Init /\\ [][Next]_x\0a\0aCountAtMostFour == AtMost(4)\0a\0a------------------------------------------------------------------\0a\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a    IN\0a    /\\ Cardinality(S) = 10\0a    /\\ Cardinality(A) = 9\0a    /\\ \\A i \\in 1..10 :\0a         \\E s \\in S :\0a            /\\ s[1] = i\0a            /\\ s[2].x = (i % 2 = 0)\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a==================================================================\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTIES\0a    CountAtMostFour\0a'
+::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. NOT a cap case, measured: the recursion is guarded by a STATE variable,
 ::  so the expansion fails on its first attempt and never recurses --
@@ -760,6 +795,37 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == \\/ x = 0 /\\ x\' = 1\0a        \\/ x = 0 /\\ x\' = 5\0a        \\/ x = 1 /\\ x\' = 2\0a        \\/ x = 2 /\\ x\' = 3\0aSpec == Init /\\ [][Step]_x\0aNoTwo == [](x = 1 => [](x # 2))\0a====\0a'
   'SPECIFICATION Spec\0aPROPERTY NoTwo\0a'
+::
+++  test-mc-live-after-inv
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 3'
+        'Error: Temporal property P2 was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Step line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aStep == x < 5 /\\ x\' = x + 1\0aSpec == Init /\\ [][Step]_x\0aInv == x < 3\0aP2 == [](x = 0 => [](x # 2))\0a====\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY P2\0a'
 ::
 ++  test-mc-live-box
   %+  expect-eq

@@ -865,6 +865,65 @@
   =/  lp  (labeled-product o states inits nsb env order)
   (lasso-of-product o lp)
 ::
+++  box-free-tf
+  ::  R2.7.5: does the OrderOfSolution being reported have a BOX-FREE tableau
+  ::  formula? That is the measured discriminator for whether tlc2 prints a
+  ::  closer on the counter-example at all.
+  ::
+  ::  The counterexample for a violated property is a behavior satisfying the
+  ::  NEGATED property, which is the `tf`. When that formula carries no `[]`,
+  ::  the witness is pure reachability -- a finite path, with no obligation
+  ::  left to discharge in the limit -- so there is no cycle doing any work and
+  ::  tlc2 ends the trace at its last prefix state. When it does carry one, the
+  ::  suffix matters and tlc2 closes with `Stuttering` or `Back to state`.
+  ::
+  ::  Measured on one 4-state spec, every property violated, `LivenessStruct`
+  ::  beside `tlc2.TLC`:
+  ::
+  ::    property                    tf                    box?  closer?
+  ::    [](x=1 => [](x#3))          <>(A /\ <>~B)         no    NO
+  ::    <>(x=9)                     []~P                  yes   yes
+  ::    (x=1) ~> (x=9)              <>(A /\ []~B)         yes   yes
+  ::    []<>(x=9)                   <>[]~P                yes   yes
+  ::    <>[](x=9)                   []<>~P                yes   yes
+  ::    [](x=1 => <>(x=9))          <>(A /\ []~B)         yes   yes
+  ::
+  ::  NB this is `has-box` on the TABLEAU FORMULA, not on the PROMISES.
+  ::  `+stutter-gate` asks it of the promises (tlc2's
+  ::  `containsBoxInPromise`), and that does NOT separate these: `<>(x = 9)`
+  ::  has ZERO promises, so a promise-keyed test says nothing about it. An
+  ::  earlier attempt at R2.7.5 used the promise test and mis-classified every
+  ::  `<>` property -- recorded so it is not tried a third time.
+  ::
+  ::  A pure-fairness OrderOfSolution has no `tf` at all; it keeps the closer,
+  ::  which is the behaviour every existing corpus case already pins.
+  ::
+  ::  R2.7.6.0: **the tf alone is not the whole obligation, and `Github710e`
+  ::  is the case that shows it.** `<>(x = 1 /\ <>(x = 2)) => <>[](x < 2)`
+  ::  negates to `<>(A /\ <>B) /\ []<>(x >= 2)`, and the decomposition puts
+  ::  the `[]<>` half into a PEM CONDITION rather than into `tf` -- so the tf
+  ::  is box-free while the witness still needs an infinite suffix. Measured
+  ::  at the pin: `CHECK_DEADLOCK FALSE` prints `State 4: Stuttering` and the
+  ::  fairness warning, and with deadlock checking ON the second report block
+  ::  is NOT printed. The tf-only test said the opposite on both.
+  ::
+  ::  So the predicate is "a FINITE PREFIX discharges everything": the tf
+  ::  carries no `[]`, no promise carries one, and every PEM is itself
+  ::  condition-free -- the same `isEmpty` notion `+stutter-gate`'s `quiet`
+  ::  already uses (no `<>[]A`, no `[]<>S`, no `[]<>A`). This flips exactly
+  ::  the box-free-tf-with-a-live-PEM shape; none of R2.7.5's six measured
+  ::  properties had it, which is why one spec's worth of measurement missed
+  ::  it and the frozen tier-2 census caught it.
+  |=  os=(list oos:tp)
+  ^-  ?
+  ?~  os  |
+  ?~  tf.i.os  |
+  ?.  !(has-box u.tf.i.os)  |
+  ?:  (lien promises.i.os has-box)  |
+  %+  levy  pems.i.os
+  |=  m=pem:tp
+  &(=(~ ea-action.m) =(~ ae-state.m) =(~ ae-action.m))
+::
 ++  lasso-of-product
   ::  the lasso (if any) for one OrderOfSolution over an ALREADY-BUILT product
   ::  (unit 8.8.2a): the bounded SCC/acceptance/lasso post-step the job kernel
@@ -877,28 +936,53 @@
   =/  init-set  (silt inits.lp)
   =/  verts     (turn ~(tap by nodes.lp) |=([k=pg-key *] k))
   =/  pms       pems.o
+  ::  R2.7.11a: which accepting stutter TLC reports depends on WHAT KIND of
+  ::  witness the OrderOfSolution needs, and `+box-free-tf` is exactly that
+  ::  question -- does a FINITE PREFIX discharge everything?
+  =/  finite    (box-free-tf ~[o])
   |-  ^-  (unit lasso)
   ?~  pms  ~
   =/  adj   (adj-of edges.lp ea-action.i.pms)
   =/  sccs  (tarjan verts adj)
-  ::  a stuttering counterexample is preferred over a back-to-state one; among
-  ::  the accepting stutter SCCs TLC reports the one its DFS finishes first (the
-  ::  deepest reachable stutter), so collect every stutter lasso and keep the
-  ::  one with the longest prefix, falling back to the first back-to-state cycle.
+  ::  a stuttering counterexample is preferred over a back-to-state one, so
+  ::  collect every accepting stutter lasso and pick among them, falling back
+  ::  to the first back-to-state cycle. Which one is picked is keyed on
+  ::  `finite` -- see the note at the selection below.
   =/  here
     =|  stutters=(list lasso)
     =/  bt=(unit lasso)  ~
     |-  ^-  (unit lasso)
     ?~  sccs
-      ::  keep the accepting stutter with the longest prefix (the deepest
-      ::  reachable stutter, which TLC's DFS finishes first); else back-to-state
+      ::  R2.7.11a: the two directions, and the predicate that separates them.
+      ::
+      ::  When the tableau formula still carries an obligation in the limit
+      ::  (`finite` FALSE), the witness is a genuine lasso: the cycle does the
+      ::  work, and tlc2's DFS reports the stutter it finishes first -- the
+      ::  DEEPEST reachable one. `wf-absent-viol` (`<>(x = 3)`, tf `[](x # 3)`)
+      ::  stutters at the sink `x = 2` with LOOP 3, not at `x = 0`.
+      ::
+      ::  When a finite prefix discharges everything (`finite` TRUE), there is
+      ::  no cycle doing work -- `+live-render` prints no closer at all -- and
+      ::  the counter-example is pure reachability, so tlc2 ends it at the
+      ::  FIRST state that discharges the obligation: the SHORTEST prefix.
+      ::  `gh1389-counting` (`AtMost(4)`, tf a 5-deep nest of `<>`) needs
+      ::  `x = TRUE` five times and stops on the fifth, State 10; the port's
+      ::  State 11 (`x = FALSE`) is a genuinely accepting node one step past
+      ::  it, so this was never an acceptance bug.
+      ::
+      ::  Two length heuristics were each fitted to one case before this
+      ::  (R2.7.5 longest, R2.7.11's reverted shortest probe) and neither can
+      ::  hold both sides: the rule is not a length rule, it is a question
+      ::  about the obligation that a length then answers.
       ?~  stutters  bt
       :-  ~
       =/  best  i.stutters
       =/  more  t.stutters
       |-  ^-  lasso
       ?~  more  best
-      =?  best  (gth (lent prefix.i.more) (lent prefix.best))  i.more
+      =/  a  (lent prefix.i.more)
+      =/  b  (lent prefix.best)
+      =?  best  ?:(finite (lth a b) (gth a b))  i.more
       $(more t.more)
     ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
       $(sccs t.sccs)

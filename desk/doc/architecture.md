@@ -120,8 +120,12 @@ violated-property` / `EC 2116` / the four `STAT` lines (`generated`/`distinct`/
 the `var = value` bindings, per-transition `getActions` labels) closed by the
 `STATE n -1` marker. Stutter-node selection matches TLC's DFS (unit 8.6.2): the
 trace is over distinct **states**, so a same-fingerprint stutter step collapses
-(`+dedup-consec`), and among the accepting stutter SCCs `+oos-lasso` reports the
-deepest (`+deepest-lasso`, the one TLC finishes first). As of unit 8.8 the job
+(`+dedup-consec`), and among the accepting stutter SCCs `+oos-lasso` reports
+either the deepest or the shallowest, keyed on `+box-free-tf` (R2.7.11a): a
+surviving obligation makes the witness a genuine lasso whose cycle does the
+work, so TLC reports the deepest (the one its DFS finishes first), while an
+obligation a FINITE PREFIX discharges makes the witness pure reachability, so
+TLC ends it at the first discharging state — the shortest prefix. As of unit 8.8 the job
 kernel's %liveness stage runs this engine in production (`do-config`→`do-explore`
 →`do-scan`, via `live-report`/`live-render`) with the product build sliced through
 a bounded resumable `+pcursor` and the SCC search an explicit-stack `+scursor`

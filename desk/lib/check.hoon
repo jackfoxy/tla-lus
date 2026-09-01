@@ -3190,63 +3190,10 @@
   ==
 ::
 ++  box-free-tf
-  ::  R2.7.5: does the OrderOfSolution being reported have a BOX-FREE tableau
-  ::  formula? That is the measured discriminator for whether tlc2 prints a
-  ::  closer on the counter-example at all.
-  ::
-  ::  The counterexample for a violated property is a behavior satisfying the
-  ::  NEGATED property, which is the `tf`. When that formula carries no `[]`,
-  ::  the witness is pure reachability -- a finite path, with no obligation
-  ::  left to discharge in the limit -- so there is no cycle doing any work and
-  ::  tlc2 ends the trace at its last prefix state. When it does carry one, the
-  ::  suffix matters and tlc2 closes with `Stuttering` or `Back to state`.
-  ::
-  ::  Measured on one 4-state spec, every property violated, `LivenessStruct`
-  ::  beside `tlc2.TLC`:
-  ::
-  ::    property                    tf                    box?  closer?
-  ::    [](x=1 => [](x#3))          <>(A /\ <>~B)         no    NO
-  ::    <>(x=9)                     []~P                  yes   yes
-  ::    (x=1) ~> (x=9)              <>(A /\ []~B)         yes   yes
-  ::    []<>(x=9)                   <>[]~P                yes   yes
-  ::    <>[](x=9)                   []<>~P                yes   yes
-  ::    [](x=1 => <>(x=9))          <>(A /\ []~B)         yes   yes
-  ::
-  ::  NB this is `has-box:tp` on the TABLEAU FORMULA, not on the PROMISES.
-  ::  `+stutter-gate` asks it of the promises (tlc2's
-  ::  `containsBoxInPromise`), and that does NOT separate these: `<>(x = 9)`
-  ::  has ZERO promises, so a promise-keyed test says nothing about it. An
-  ::  earlier attempt at R2.7.5 used the promise test and mis-classified every
-  ::  `<>` property -- recorded so it is not tried a third time.
-  ::
-  ::  A pure-fairness OrderOfSolution has no `tf` at all; it keeps the closer,
-  ::  which is the behaviour every existing corpus case already pins.
-  ::
-  ::  R2.7.6.0: **the tf alone is not the whole obligation, and `Github710e`
-  ::  is the case that shows it.** `<>(x = 1 /\ <>(x = 2)) => <>[](x < 2)`
-  ::  negates to `<>(A /\ <>B) /\ []<>(x >= 2)`, and the decomposition puts
-  ::  the `[]<>` half into a PEM CONDITION rather than into `tf` -- so the tf
-  ::  is box-free while the witness still needs an infinite suffix. Measured
-  ::  at the pin: `CHECK_DEADLOCK FALSE` prints `State 4: Stuttering` and the
-  ::  fairness warning, and with deadlock checking ON the second report block
-  ::  is NOT printed. The tf-only test said the opposite on both.
-  ::
-  ::  So the predicate is "a FINITE PREFIX discharges everything": the tf
-  ::  carries no `[]`, no promise carries one, and every PEM is itself
-  ::  condition-free -- the same `isEmpty` notion `+stutter-gate`'s `quiet`
-  ::  already uses (no `<>[]A`, no `[]<>S`, no `[]<>A`). This flips exactly
-  ::  the box-free-tf-with-a-live-PEM shape; none of R2.7.5's six measured
-  ::  properties had it, which is why one spec's worth of measurement missed
-  ::  it and the frozen tier-2 census caught it.
-  |=  os=(list oos:tp)
-  ^-  ?
-  ?~  os  |
-  ?~  tf.i.os  |
-  ?.  !(has-box:tp u.tf.i.os)  |
-  ?:  (lien promises.i.os has-box:tp)  |
-  %+  levy  pems.i.os
-  |=  m=pem:tp
-  &(=(~ ea-action.m) =(~ ae-state.m) =(~ ae-action.m))
+  ::  R2.7.11a: moved to `+box-free-tf:lv` -- `+lasso-of-product`
+  ::  needs the same predicate to choose which accepting stutter to
+  ::  report, and liveness.hoon cannot depend on check.hoon.
+  box-free-tf:lv
 ::
 ++  stutter-gate
   ::  the hint tlc2 appends AFTER a STUTTERING counterexample (EC 2257 / 2259,
