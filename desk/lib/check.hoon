@@ -4675,8 +4675,34 @@
   ::  clean does the liveness engine report. That is `ModelChecker.doNext`
   ::  returning on a violation, generalized from INVARIANT to every
   ::  safety-side bin
-  ?^  iinits.c
-    (implied-init-run c name.i.iinits.c body.i.iinits.c)
+  ::  R2.7.15c: the IMPLIED INITS, all of them. tlc2 checks a level<=1 PROPERTY
+  ::  only while computing the INITIAL STATES (`Tool.getImpliedInits`), which is
+  ::  why this cannot be folded into the invariant vector -- an invariant is
+  ::  checked at every state, and folding would report violations at states
+  ::  tlc2 never tests. The EC 2255 state-level warning is emitted for EVERY one
+  ::  of them, in config order, whether or not it holds; measured at the pin
+  ::  (`prop-init-second`), where the FAILING implied init is declared SECOND
+  =/  iwarn  (turn iinits.c |=([n=@t *] (state-level-warn n)))
+  =/  ilines=(unit wain)
+    ?~  iinits.c  ~
+    =/  b
+      %-  first-bad-init
+      [is.c invs.c iinits.c (make-env:ne defs.c consts.c vars.c)]
+    ?~  b  ~
+    ::  an evaluation error is the RUN's typed failure, not a violation: fall
+    ::  through and let the search raise it where every other check does
+    ?:  ?=(%| -.u.b)  ~
+    :-  ~
+    %:  init-viol-lines
+      p.u.b  order.c  alias.c  vrend.c  (make-env:ne defs.c consts.c vars.c)
+    ==
+  ?^  ilines  (weld iwarn u.ilines)
+  ::  the implied inits held (or there were none), so the run carries on into
+  ::  the rest of the routing exactly as tlc2 does -- which is the second half
+  ::  of this fix: the old code went straight to `+safety-run` from here, so a
+  ::  box-state property, an implied action or a temporal property declared
+  ::  BESIDE an implied init was never checked at all (`prop-init-live`)
+  %+  weld  iwarn
   ?:  ?|(?=(^ binvs.c) ?=(^ iacts.c))
     ::  a safety-side property is declared, so the SAFETY pass owns the verdict
     ::  unless it completes clean. When it does AND a temporal property is also
@@ -4822,51 +4848,73 @@
     "for additional details."
   ==
 ::
-++  implied-init-run
-  ::  an IMPLIED INIT: tlc2 checks a level-1 PROPERTY against each initial state
-  ::  while computing them, so a violation aborts there — the diagnostic names
-  ::  the offending state and NO state-graph counts follow (measured at the pin).
-  ::  If it holds, the ordinary safety search proceeds (R1.8.1.1/.2)
-  |=  [c=sctx pname=@t body=sem:sem-lib]
+++  first-bad-init
+  ::  R2.7.15c: `ModelChecker.doInit`, and it is STATE-MAJOR -- for each
+  ::  initial state every INVARIANT (EC 2107, `:1187`) and only then every
+  ::  IMPLIED INIT (EC 2108, `:1199`), so an INVARIANT false on the same
+  ::  initial state wins. Measured at the pin by `inv-prop-init`.
+  ::
+  ::  Shared by all three engines, which is the point of the arm: the console
+  ::  renders both codes from it, while `+run-check` and the job kernel act on
+  ::  the `%prop` half only and leave the `%inv` half to their own search,
+  ::  which reaches the same state and reports it with its own counts.
+  ::
+  ::  An evaluation error comes back `%|` and is NOT read as a violation --
+  ::  `+first-violated`'s rule. Every caller falls through to the engine, which
+  ::  raises it as the run's own typed failure rather than naming a property
+  |=  $:  is=(list state)
+          invs=(list [name=@t body=sem:sem-lib])
+          iinits=(list [name=@t body=sem:sem-lib])
+          e=eenv:ne
+      ==
+  ^-  (unit (each [kind=?(%inv %prop) name=@t st=state] @t))
+  ?~  is  ~
+  =/  iv  (first-violated invs i.is e)
+  ?^  iv
+    ?:  ?=(%| -.u.iv)  `[%| p.u.iv]
+    `[%& %inv p.u.iv i.is]
+  =/  ip  (first-violated iinits i.is e)
+  ?~  ip  $(is t.is)
+  ?:  ?=(%| -.u.ip)  `[%| p.u.ip]
+  `[%& %prop p.u.ip i.is]
+::
+++  init-viol-lines
+  ::  the console lines for an initial-state violation: the offending state and
+  ::  NO state-graph counts, because tlc2 aborts while computing the initial
+  ::  states and never reports any (measured, R1.8.1.1). EC 2107 for an
+  ::  INVARIANT, EC 2108 for an IMPLIED INIT -- and EC 2108 is built from
+  ::  `evalAlias(curState, curState)` exactly as EC 2107 is
+  ::  (`ModelChecker.java:1199`), so an ALIAS renders this state too (R2.3.2)
+  ::  the arguments are EXPLICIT rather than an `sctx` because the job kernel
+  ::  calls this too and never builds one (R2.7.15c)
+  |=  $:  bad=[kind=?(%inv %prop) name=@t st=state]
+          order=(list @t)
+          al=(unit sem:sem-lib)
+          vr=(unit sem:sem-lib)
+          e=eenv:ne
+      ==
   ^-  wain
-  =/  env  (make-env:ne defs.c consts.c vars.c)
-  ::  tlc2 always warns that a state-level PROPERTY is only checked in the
-  ::  initial state (EC 2255 TLC_LIVE_FORMULA_STATE_LEVEL) — before the verdict,
-  ::  and whether or not the property holds
-  =/  warn  (state-level-warn pname)
-  ::  R2.3.4: `ModelChecker.doInit` is STATE-MAJOR -- for each initial state it
-  ::  checks every INVARIANT (EC 2107, `:1187`) and only then every implied
-  ::  init (EC 2108, `:1199`). So an INVARIANT false on the same initial state
-  ::  wins, and the port must look for one FIRST rather than reaching it later
-  ::  through `+safety-run`. Measured at the pin: `INVARIANT FalseInv` with
-  ::  `PROPERTY FalseProp`, both false at `x = 0`, names FalseInv
-  =/  bad
-    =/  sts  is.c
-    |-  ^-  (unit [kind=?(%inv %prop) name=@t st=state])
-    ?~  sts  ~
-    =/  iv
-      =/  vs  invs.c
-      |-  ^-  (unit @t)
-      ?~  vs  ~
-      =/  r  (pred-bool:ne body.i.vs i.sts ~ env)
-      ?:  ?&(?=(%& -.r) p.r)  $(vs t.vs)
-      `name.i.vs
-    ?^  iv  `[%inv u.iv i.sts]
-    =/  r  (pred-bool:ne body i.sts ~ env)
-    ?:  ?&(?=(%& -.r) p.r)  $(sts t.sts)
-    `[%prop pname i.sts]
-  ?~  bad  [warn (safety-run c | 0)]
-  ::  EC 2108 is built from `evalAlias(curState, curState)` exactly as EC 2107
-  ::  is (`ModelChecker.java:1199`), so an ALIAS renders this state too
   =/  shown=[order=(list @t) st=state]
-    ?~  alias.c  [order.c st.u.bad]
-    (alias-state u.alias.c env st.u.bad st.u.bad)
+    ?~  al  [order st.bad]
+    (alias-state u.al e st.bad st.bad)
   =/  head=@t
-    ?:  ?=(%inv kind.u.bad)
-      (crip "Error: Invariant {(trip name.u.bad)} is violated by the initial state:")
-    (crip "Error: Property {(trip name.u.bad)} is violated by the initial state:")
-  :+  warn  head
-  (render-state order.shown st.shown vrend.c env ~)
+    ?:  ?=(%inv kind.bad)
+      (crip "Error: Invariant {(trip name.bad)} is violated by the initial state:")
+    (crip "Error: Property {(trip name.bad)} is violated by the initial state:")
+  :-  head
+  (render-state order.shown st.shown vr e ~)
+::
+::  R2.7.15c RETIRED `+implied-init-run`.
+::
+::  It took ONE name and ONE body -- the HEAD of the implied-init bin --
+::  emitted one EC 2255 warning, checked one property, and on a clean
+::  answer went straight to `+safety-run`. Both halves were wrong:
+::  tlc2 warns about and checks EVERY state-level PROPERTY (measured,
+::  `prop-init-second`), and a run whose implied inits hold carries on
+::  into the WHOLE of the rest of the routing, not into a bare safety
+::  search (`prop-init-live`). The check is `+first-bad-init` now, the
+::  rendering `+init-viol-lines`, and the routing lives in `+check-in`
+::  where the other three bins are routed.
 ::
 ::  R2.7.15a RETIRED `+implied-action-run` and `+first-bad-step`.
 ::
@@ -5184,9 +5232,21 @@
   ::  a temporal property: a pure []P box-state is a state invariant (checked by
   ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine
   ::  R2.7.15a: the same binning the console path uses, over EVERY property.
-  ::  This engine renders nothing, so an implied INIT has no distinct wire
-  ::  shape of its own -- it arrives as `%inv` with `initial=&`, which is what
-  ::  `+explore-outcome` already produces for the safety search
+  ::  R2.7.15c: and that now includes the IMPLIED INITS, which this engine used
+  ::  to compute and drop. They are checked HERE rather than folded into the
+  ::  invariant vector because tlc2 checks them only while computing the
+  ::  initial states; the wire shape is `%property` with `initial=&`, the
+  ::  variant R2.7.1 added for exactly this code (EC 2108), and the statistics
+  ::  are ZERO because a run that aborts during initial-state computation
+  ::  reports none -- the same thing the console prints, which is no counts
+  ::  at all. An `%inv` answer is left to the search below: it reaches the same
+  ::  initial state and reports it with the counters it actually accumulated
+  =/  ib=(unit (each [kind=?(%inv %prop) name=@t st=state] @t))
+    ?~  iinits.c  ~
+    %-  first-bad-init
+    [is.c invs.c iinits.c (make-env:ne defs.c consts.c vars.c)]
+  ?:  ?=([~ %& %prop *] ib)
+    [[%violated [%property name.p.u.ib &] *run-stats] *run-stats]
   =/  o=bfs-opts
     :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c  vars.c  order.c
         perms.c  defs.c  consts.c  ddl.c  cap  0  view.c  0  |  ~  *cov-opts  0

@@ -886,6 +886,52 @@
     !>(`violation`[%invariant 'Inv' %.y])
   !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) violation.u.result.j *violation))
 ::
+::  R2.7.15c: an IMPLIED INIT on the KERNEL. The kernel used to compute the
+::  bin and drop it, so this spec completed `%ok` where the console reported
+::  EC 2108. `finish-arts` prepends `swarn` to the report, and the EC 2255
+::  state-level warning rides that channel, so the artifact is the console's
+::  output byte for byte -- the same discipline
+::  `test-dfid-kernel-report-matches-console` applies to DFID
+++  imp-init-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x \in {0, 3}
+  Next == x' = x
+  Spec == Init /\ [][Next]_x
+  ImpInit == x = 0
+  ====
+  '''
+++  imp-init-cfg  'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
+::
+++  test-implied-init-kernel
+  =/  r  (run-all (init:job-lib (check-req imp-init-spec imp-init-cfg) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    ::  no state-graph statistics: the run aborts while computing the initial
+    ::  states, and tlc2 prints none
+    %+  expect-eq
+      !>(`[%violated [%property 'ImpInit' %.y] *run-stats])
+    !>(result.j)
+    ::  the offending initial state, as the wire trace
+    %+  expect-eq  !>(1)
+    !>  ^-  @ud
+    =/  ta  (~(get by artifacts.j) %trace)
+    ?.  ?&(?=(^ ta) ?=(%trace -.u.ta))  0
+    ?.  ?=(%safety -.trace.u.ta)  0
+    (lent states.trace.u.ta)
+  ==
+::
+++  test-implied-init-kernel-report-matches-console
+  =/  r  (run-all (init:job-lib (check-req imp-init-spec imp-init-cfg) t0) 1.024)
+  =/  j  +.r
+  =/  ra  (~(get by artifacts.j) %report)
+  %+  expect-eq
+    !>(`@t`(rap 3 (join '\0a' (check:check imp-init-spec imp-init-cfg))))
+  !>(?:(?&(?=(^ ra) ?=(%text -.u.ra)) text.u.ra ''))
+::
 ++  test-dfid-plan
   %+  expect-eq
     !>(`(list stage)`~[%parse %config %dfid])

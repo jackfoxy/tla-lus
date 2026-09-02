@@ -1284,6 +1284,40 @@
     '---- MODULE spec ----\0a\\* R2.7.15: `processConfigProps` routes EVERY property. A `[]P` box-state\0a\\* PROPERTY joins the INVARIANT vector and a genuine temporal one goes to the\0a\\* liveness engine, in the SAME run -- and the safety violation pre-empts the\0a\\* temporal verdict exactly as an INVARIANT does (R2.3.4). Note the box-state\0a\\* property is reported as an `Invariant`, not as a `Temporal property`.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aBoxBad  == [](x < 2)\0aLive    == <>(x = 9)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY BoxBad\0aPROPERTY Live\0a'
 ::
+++  test-mc-prop-init-live
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula InitOk is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula InitOk holds in all states of every behavior, use INVARIANT InitOk instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula InitOk changes it into a temporal formula, asserting that InitOk holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: Stuttering'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15c: an implied init that HOLDS, declared beside a genuine temporal\0a\\* property that FAILS. tlc2 warns, checks the implied init while computing the\0a\\* initial states, and carries on into the liveness engine.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aInitOk == x = 0\0aLive   == <>(x = 9)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aPROPERTY Live\0a'
+::
+++  test-mc-prop-init-second
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula InitOk is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula InitOk holds in all states of every behavior, use INVARIANT InitOk instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula InitOk changes it into a temporal formula, asserting that InitOk holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Warning: The formula InitBad is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula InitBad holds in all states of every behavior, use INVARIANT InitBad instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula InitBad changes it into a temporal formula, asserting that InitBad holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Property InitBad is violated by the initial state:'
+        'x = 0'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15c: TWO implied inits. The one that FAILS is declared SECOND, so a\0a\\* head-of-list router warns once, checks once, and completes clean.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInitOk  == x >= 0\0aInitBad == x = 5\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aPROPERTY InitBad\0a'
+::
 ++  test-mc-prop-init-viol
   %+  expect-eq
     !>  ^-  wain

@@ -1599,17 +1599,48 @@
     =.  cont.j
       (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j])
     (more j pre)
+  ::  R2.7.15c: the IMPLIED INITS, which this kernel used to compute and drop.
+  ::  tlc2 checks a level<=1 PROPERTY only while computing the INITIAL STATES
+  ::  (`Tool.getImpliedInits`), so it cannot join the invariant vector -- an
+  ::  invariant is checked at every state, and folding would report violations
+  ::  at states tlc2 never tests. The EC 2255 state-level warning is emitted
+  ::  for EVERY one, in config order, whether or not it holds, and it rides
+  ::  `swarn` because it prints BEFORE the verdict (the DFID branch above
+  ::  already does this, through `+dfid-opts-of`'s `warn`)
+  ::
+  ::  This sits AFTER the %dfid and %simulate branches on purpose: DFID checks
+  ::  its own implied inits state-major in `+dfid-cursor-init`, so reaching it
+  ::  from here would check them twice
+  =.  swarn.j
+    (weld swarn.j (turn iinits.bins |=([n=@t *] (state-level-warn:check n))))
+  =/  ib=(unit (each [kind=?(%inv %prop) name=@t st=state:check] @t))
+    ?~  iinits.bins  ~
+    %-  first-bad-init:check
+    [is invs iinits.bins (make-env:ne defs consts vars)]
+  ::  an `%inv` answer is left to the search: it reaches the same initial state
+  ::  and reports EC 2107 with the counters it actually accumulated. An
+  ::  evaluation error (`%|`) is likewise the search's own typed failure
+  ?:  ?=([~ %& %prop *] ib)
+    =/  env   (make-env:ne defs consts vars)
+    =/  acts  (get-actions:check nsb aname defs env)
+    =/  mn    ?~(act '' ?~(at.u.act '' src.u.at.u.act))
+    ::  no state-graph statistics: the run aborts during initial-state
+    ::  computation and tlc2 prints none, which is what the console shows too
+    %:  finish-arts
+      j
+      [%violated [%property name.p.u.ib &] *run-stats]
+      %-  wain-text
+      %:  init-viol-lines:check
+        p.u.ib  order  alb  vrb  env
+      ==
+      `[%safety (trace-states ~[st.p.u.ib] act acts env order mn alb) ~]
+      pre
+    ==
   ::  R2.7.15a: routed over EVERY property by `+bin-properties`, not on the
   ::  head of the list. The box-state ones ride the safety search's INVARIANT
   ::  vector and the implied actions ride it as a per-transition check (both
   ::  wired below, where the opts are built); the LIVENESS stage is planned
   ::  only when a genuine temporal property was declared.
-  ::
-  ::  RESIDUE, named rather than hidden: an IMPLIED INIT (`iinits.bins`) is
-  ::  still not checked on this path. The console's `+implied-init-run` owns
-  ::  that diagnostic and the kernel never had it -- a pre-existing gap this
-  ::  unit narrows the others around rather than closing, since it needs a
-  ::  distinct message and an abort during initial-state computation
   ?^  temps.bins
     ::  the lasso trace is rendered by the %liveness stage, which takes no
     ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused

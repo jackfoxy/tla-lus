@@ -84,6 +84,63 @@
   =/  r  (run ddl-mod ^-(@t (crip "INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a")))
   (expect-eq !>(%.y) !>(?=([%ok *] r)))
 ::
+::  +|  Implied INIT on the wire (R2.7.15c)
+::
+::  a level<=1 PROPERTY is an IMPLIED INIT: tlc2 checks it while COMPUTING the
+::  initial states and aborts there, printing no state-graph counts. This engine
+::  renders nothing, so the diagnostic arrives as `[%property name %.y]` — the
+::  `initial` flag R2.7.1 added for EC 2108 — with ZERO statistics. `+run-check`
+::  used to compute the bin and drop it, completing `%ok`
+++  test-implied-init-violated
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aInitBad == x = 5\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aPROPERTY InitBad\0a"))
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'InitBad' %.y]
+  !>  ?:  ?=([%violated [%property *] *] r)
+        [%.y name.violation.r initial.violation.r]
+      [%.n '' %.n]
+::
+::  the FAILING implied init is declared SECOND, so a router that tests the head
+::  of the bin completes clean. Measured at the pin (`mc` case prop-init-second)
+++  test-implied-init-second
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aInitOk == x >= 0\0aInitBad == x = 5\0a")
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aPROPERTY InitBad\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'InitBad']
+  !>  ?:(?=([%violated [%property *] *] r) [%.y name.violation.r] [%.n ''])
+::
+::  an INVARIANT false on the SAME initial state wins: `doInit` is state-major
+::  and checks EC 2107 before EC 2108
+++  test-implied-init-invariant-wins
+  =/  m
+    %-  mod
+    "Init == x = 0\0aNext == x' = x + 1\0aPos == x > 0\0aInitBad == x = 5\0a"
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aINVARIANT Pos\0aPROPERTY InitBad\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'Pos' %.y]
+  !>  ?:  ?=([%violated [%invariant *] *] r)
+        [%.y name.violation.r initial.violation.r]
+      [%.n '' %.n]
+::
+::  an implied init that HOLDS does not end the run: the ordinary safety search
+::  follows it, exactly as tlc2 carries on after `doInit`
+++  test-implied-init-holds
+  =/  m  (mod "Init == x = 0\0aNext == x < 3 /\\ x' = x + 1\0aInitOk == x = 0\0a")
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aCHECK_DEADLOCK FALSE\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y `@ud`4]
+  !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
+::
 ::  +|  Evaluation error during an invariant check
 ::
 ::  an invariant that raises an evaluation error (division by zero) is a typed
