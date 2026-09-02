@@ -1177,6 +1177,49 @@
     '---- MODULE spec ----\0a\\* R2.7.12: POST-HOC PROPERTY ATTRIBUTION. Two PROPERTIES; the FIRST one\0a\\* HOLDS on the counter-example and the SECOND is the violated one, so the\0a\\* reported name cannot come from the property list\'s head. tlc2 names it by\0a\\* evaluating each declared property over the finished lasso\0a\\* (Liveness.findViolatedProperties / LiveExprNode.evalOnLasso).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aP1 == []<>(x < 9)\0aP2 == <>(x = 3)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
 ::
+++  test-mc-prop-box-last
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant BoxBad is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 2'
+        '5 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15: the same two properties in the OPPOSITE order. tlc2\'s routing is\0a\\* order-independent -- each property is binned on its own shape -- so the\0a\\* verdict is identical to `prop-box-viol`. The port routed on the HEAD of the\0a\\* list, which made these two cases disagree.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aLive   == <>(x = 9)\0aBoxBad == [](x < 2)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY Live\0aPROPERTY BoxBad\0a'
+::
+++  test-mc-prop-box-then-live
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property P2 was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 12, col 13 to line 12, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 12, col 13 to line 12, col 31 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '8 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.12 measured this and did NOT fix it. A []P box-state PROPERTY\0a\\* FOLLOWED by a genuine temporal one: SpecProcessor.processConfigProps\0a\\* routes EVERY property (box-state to the invariant vector, level-1 to the\0a\\* implied inits, [][A]_v to the implied actions, the rest to the liveness\0a\\* engine), and the port routes on the FIRST property alone -- so P2 is\0a\\* never checked and the port completes clean where tlc2 reports P2.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aP1 == [](x < 9)\0aP2 == <>(x = 3)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
+::
 ++  test-mc-prop-box-viol
   %+  expect-eq
     !>  ^-  wain

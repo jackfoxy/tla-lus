@@ -1488,6 +1488,13 @@
   ?:  ?=(%| -.pr)  (finish j [%failed p.pr] pre)
   =/  perms  p.pr
   =/  invs   (resolve-invs:check defs invariants.rs)
+  ::  R2.7.15a: EVERY declared PROPERTY binned on its own shape
+  ::  (`SpecProcessor.processConfigProps`), so the kernel routes the whole list
+  ::  rather than testing the head. The box-state ones join the INVARIANT
+  ::  vector AFTER the config's own -- `processConfigInvariants()` fills it
+  ::  first (R2.3.4) -- and the implied actions ride the search
+  =/  bins   (bin-properties:check properties.rs defs)
+  =/  iacts  iacts.bins
   =/  cons   (resolve-bodies:check defs constraints.rs)
   =/  acons  (resolve-bodies:check defs action-constraints.rs)
   ::  R2.7.4.2b: the carrier-keeping variant, for the INIT coverage counts --
@@ -1592,34 +1599,18 @@
     =.  cont.j
       (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j])
     (more j pre)
-  ?^  pp
-    =/  psb  (sem-body:check defs u.pp)
-    ?~  psb
-      (finish j [%failed (rap 3 ~['no definition for PROPERTY ' u.pp])] pre)
-    ::  a pure []P box-state property is a state invariant P, which TLC checks
-    ::  via the safety search (processConfigProps) — reuse the invariant engine,
-    ::  terminating in %explore before the planned %liveness stage (unit 8.9)
-    =/  binner  (box-state-inner:tp u.psb)
-    ?^  binner
-      ::  box-state terminates in %explore, so drop the planned (never-run)
-      ::  %liveness stage from the plan and its total
-      =?  j  (lien pending.j |=(s=stage =(%liveness s)))
-        %=  j
-          pending   (skip pending.j |=(s=stage =(%liveness s)))
-          progress  [done.progress.j (dec total.progress.j)]
-        ==
-      ::  R2.3.4: the config's own INVARIANTs are checked alongside the
-      ::  box-state property, and BEFORE it -- `processConfigInvariants()`
-      ::  fills `invVec` first and `processConfigProps` appends to it
-      =/  o=bfs-opts:check
-        :*  nsb  (weld invs ~[[u.pp u.binner]])  cons  acons  poss  vars  order
-            perms  defs
-            consts  ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
-            vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
-            0
-        ==
-      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb pcs vrb])
-      (more j pre)
+  ::  R2.7.15a: routed over EVERY property by `+bin-properties`, not on the
+  ::  head of the list. The box-state ones ride the safety search's INVARIANT
+  ::  vector and the implied actions ride it as a per-transition check (both
+  ::  wired below, where the opts are built); the LIVENESS stage is planned
+  ::  only when a genuine temporal property was declared.
+  ::
+  ::  RESIDUE, named rather than hidden: an IMPLIED INIT (`iinits.bins`) is
+  ::  still not checked on this path. The console's `+implied-init-run` owns
+  ::  that diagnostic and the kernel never had it -- a pre-existing gap this
+  ::  unit narrows the others around rather than closing, since it needs a
+  ::  distinct message and an abort during initial-state computation
+  ?^  temps.bins
     ::  the lasso trace is rendered by the %liveness stage, which takes no
     ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
     ::  narrowly, matching the console path's guard (R2.3.2)
@@ -1627,7 +1618,7 @@
       %^  finish  j
         [%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
       pre
-    ::  a genuine temporal property runs the 8.2–8.6 engine in the %liveness
+    ::  a genuine temporal property runs the 8.2-8.6 engine in the %liveness
     ::  stage; a %clay run could not know it needs that stage until its config
     ::  is read, so the plan grows here, honestly, with its total
     =?  j  !(lien pending.j |=(s=stage =(%liveness s)))
@@ -1635,31 +1626,40 @@
         pending   (snoc pending.j %liveness)
         progress  [done.progress.j +(total.progress.j)]
       ==
-    ::  normalize the property into the 8.1 OrderOfSolution form (no fairness in
-    ::  %init-next mode); a non-boolean/unsupported leaf is a typed rejection
-    ::  under a SPECIFICATION the fairness conjuncts are part of the
-    ::  normalization, exactly as the console path does it (R1.8.3); in
-    ::  INIT/NEXT mode `fair` is empty and this is the old call
-    =/  osr  (oss-of:check ~[u.psb] modn fair (make-env:ne defs consts vars))
+    ::  R2.7.15a: normalize EVERY temporal property, not just the head --
+    ::  `+oss-of` has always taken a list and the caller passed a singleton
+    =/  osr
+      %:  oss-of:check
+        (turn temps.bins |=([* b=sem:semantic] b))
+        modn  fair  (make-env:ne defs consts vars)
+      ==
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     ::  R2.3.4: the temporal graph build carries the config's INVARIANTs, so an
-    ::  INVARIANT alongside a PROPERTY is CHECKED rather than refused. A
-    ::  violation is the state search's own verdict and pre-empts the liveness
-    ::  report, exactly as it does on the console path
+    ::  INVARIANT alongside a PROPERTY is CHECKED rather than refused. R2.7.15a
+    ::  adds the box-state properties and the implied actions to the same
+    ::  build, so a spec declaring both kinds gets both checked in ONE run
     =/  o=bfs-opts:check
-      :*  nsb  invs  ~  ~  ~  vars  order  ~  defs  consts  |
+      :*  nsb  (weld invs binvs.bins)  ~  ~  ~  vars  order  ~  defs  consts  |
           max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
-          *cov-opts:check  0
+          *cov-opts:check  0  iacts
       ==
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  p.osr  u.pp  pcs
-          (implied-temporals:check properties.rs defs)
+      :*  %live  %build  p.osr  ?~(pp '' u.pp)  pcs
+          temps.bins
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
           sname  sloc  fair  aname
       ==
     (more j pre)
+  ::  no temporal property: a safety run, and the box-state properties are part
+  ::  of it. Drop the planned (never-run) %liveness stage from the plan
+  =?  j  (lien pending.j |=(s=stage =(%liveness s)))
+    %=  j
+      pending   (skip pending.j |=(s=stage =(%liveness s)))
+      progress  [done.progress.j (dec total.progress.j)]
+    ==
+
   ::  safety search: all invariants (ordered), state/action constraints, and
   ::  the effective deadlock flag (CLI flag AND the cfg CHECK_DEADLOCK flag,
   ::  matching TLC's `deadlock && getCheckDeadlock()`)
@@ -1668,13 +1668,15 @@
   ::  passing it in removes the per-slice rebuild R2.7.4.2a's timing measured
   =/  acts  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
   =/  o=bfs-opts:check
-    :*  nsb  invs  cons  acons  poss  vars  order  perms  defs  consts
+    :*  nsb  (weld invs binvs.bins)  cons  acons  poss  vars  order  perms  defs  consts
         ?&(deadlock.mode deadlock.rs)  max-states.lims  max-depth.lims
         vwb  max-set-size.lims  continue.opts.op.request.j  acts  cvo
         ::  R2.7.4.4: tlc2's `-seed`, which seeds `RandomEnumerableValues` for
         ::  BFS as well as simulation. `mode` is already narrowed to
         ::  `%exhaustive` here -- the dfid and simulate branches returned above
         seed.mode
+        ::  R2.7.15a: the IMPLIED ACTIONS, checked on every transition
+        iacts
     ==
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
@@ -1765,6 +1767,7 @@
       %ok        [gen.out distinct.out queued.out depth.out od]
       %limited   [gen.out distinct.out queued.out depth.out od]
       %inv       [gen.out distinct.out queued.out depth.out od]
+      %action    [gen.out distinct.out queued.out depth.out od]
       %deadlock  [gen.out distinct.out queued.out depth.out od]
     ==
   =.  stats.j  st
@@ -1773,6 +1776,8 @@
       %ok        [%ok st]
       %limited   [%limited what.out st]
       %inv       [%violated [%invariant name.out initial.out] st]
+      ::  R2.7.15a: EC 2112, the wire variant R2.7.13 added
+      %action    [%violated [%action name.out] st]
       %deadlock  [%violated [%deadlock ~] st]
     ==
   ::  per-action attribution for the wire trace: the getActions leaves plus the
@@ -1814,6 +1819,7 @@
   =/  tr=(unit trace)
     ?+  -.out  ~
       %inv       `[%safety (trace-states trace.out act acts env order.o modn al) ~]
+      %action    `[%safety (trace-states trace.out act acts env order.o modn al) ~]
       %deadlock  `[%safety (trace-states trace.out act acts env order.o modn al) ~]
     ==
   ::  `-continue` (R2.4.2): a completed run that passed violations carries them

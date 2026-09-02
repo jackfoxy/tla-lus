@@ -203,6 +203,13 @@
   ::  reporting violations, because that line is about the SEARCH completing
   $%  [%ok gen=@ud distinct=@ud queued=@ud depth=@ud viols=(list [name=@t trace=(list state)])]
       [%inv gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t initial=?]
+      ::  R2.7.15a: an IMPLIED ACTION violation -- tlc2's EC 2112. Its own
+      ::  variant rather than `%inv` because the report line differs
+      ::  (`Error: Action property <name> is violated.`) and the wire has
+      ::  carried the distinction since R2.7.13's `[%action name]`. No
+      ::  `initial` flag: `[][A]_v` is checked on a TRANSITION, so there is
+      ::  always a predecessor
+      [%action gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t]
       [%deadlock gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state)]
       [%limited what=?(%states %depth) gen=@ud distinct=@ud queued=@ud depth=@ud]
       ::  a typed evaluation failure during the search (WU6.9)
@@ -264,6 +271,21 @@
       ::  BFS banner. The per-predecessor reseed is `fingerPrint ^ seed`, so a
       ::  reproducing run is pinned to `-fp 0` as well (R2.6.2)
       seed=@ud
+      ::  R2.7.15a: IMPLIED ACTIONS -- the `A` of each `[][A]_v` PROPERTY,
+      ::  checked on EVERY TRANSITION. tlc2 checks them inside the search
+      ::  (`Tool.getImpliedActions`), so a violation stops it and the counts
+      ::  reported are the ones standing at that moment. The port used to build
+      ::  the whole reachability graph and then scan it (`+implied-action-run`,
+      ::  retired with this), which got the verdict and trace right and the
+      ::  COUNTS wrong -- 5/4/depth 4 against the pin's 2/2/2 on
+      ::  `prop-act-viol`. `implied-act-viol` could not see it: its violation is
+      ::  on the LAST transition, where a completed graph and a stopped one
+      ::  agree.
+      ::
+      ::  Beside `acons` and not folded into it: an action CONSTRAINT prunes
+      ::  the transition, an implied action REPORTS it. Same hook, opposite
+      ::  answer to a false predicate
+      iacts=(list [name=@t body=sem:sem-lib])
   ==
 ::
 +$  cov-opts
@@ -699,7 +721,34 @@
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
-    (register-in o cur st d pred e)
+    ::  R2.7.15a: the IMPLIED ACTIONS, at the same hook and with the opposite
+    ::  answer to a false predicate -- an action CONSTRAINT prunes the
+    ::  transition, an implied action REPORTS it and stops the search. The
+    ::  counts are therefore the ones standing HERE, which is the whole point:
+    ::  `+implied-action-run` reported a completed graph's instead
+    ::  ORDER MATTERS, and it is tlc2's: the INVARIANTS first (inside
+    ::  `+register-in`, and only for a NEW state), then the IMPLIED ACTIONS on
+    ::  EVERY transition -- tlc2's own comment says "We need to do it even if
+    ::  succState is not new". **A transition breaking BOTH names the
+    ::  invariant** (measured, `inv-prop-action`: `INVARIANT Zero` and
+    ::  `PROPERTY NoStep` both false on 0->1, and the pin names `Zero`), which
+    ::  is why the check runs AFTER registration rather than before it. The
+    ::  counts follow from the same order: the successor is already registered,
+    ::  so `prop-act-viol` reports 2 distinct at depth 2, not 1 at depth 1.
+    ::
+    ::  `+first-bad-action` is DFID's, unchanged: R2.5 already ported this
+    ::  check for that engine (`Tool.isValid(impliedAction, cur, succ)`), and
+    ::  one implementation keeps the two engines from drifting
+    =/  ri  (register-in o cur st d pred e)
+    ?^  out.ri  ri
+    =/  ia  (first-bad-action iacts.o u.prev st e)
+    ?~  ia  ri
+    ?:  ?=(%| -.u.ia)  [`[%error p.u.ia] cur.ri]
+    :_  cur.ri
+    :-  ~
+    :*  %action  gen.cur.ri  distinct.cur.ri  (lent queue.cur.ri)  depth.cur.ri
+        (weld (trace-to seen.cur.ri pred) ~[st])  p.u.ia
+    ==
   (register-in o cur st d pred e)
 ::
 ++  check-pruned
@@ -1961,6 +2010,14 @@
       ::  is only a fallback now: which property a counter-example violates is
       ::  decided POST-HOC against the lasso, over this list
       props=(list [name=@t body=sem:sem-lib])
+      ::  R2.7.15a: the other three bins `+bin-properties` fills, so every
+      ::  engine routes the WHOLE list instead of testing `pp`. `binvs` are
+      ::  the `[]P` box-state properties, appended to the INVARIANT vector
+      ::  after the config's own; `iinits` the level<=1 implied inits;
+      ::  `iacts` the `[][A]_v` implied actions, checked on every transition
+      binvs=(list [name=@t body=sem:sem-lib])
+      iinits=(list [name=@t body=sem:sem-lib])
+      iacts=(list [name=@t body=sem:sem-lib])
       fair=(list sem:sem-lib)                ::  fairness conjuncts (WF_/SF_/
                                              ::  []temporal) from a SPECIFICATION
                                              ::  decomposition (SpecProcessor
@@ -2512,7 +2569,11 @@
   ::  INVARIANT vector, a level<=1 predicate is an IMPLIED INIT and a `[][A]_v`
   ::  an IMPLIED ACTION. Same three tests `+check`'s routing uses, applied to
   ::  EVERY property rather than to the first
-  =/  itemporals  (implied-temporals properties.ca defs)
+  ::  R2.7.15a: EVERY property binned on its own shape, so the routing is
+  ::  order-independent. `+implied-temporals` remains the liveness bin's own
+  ::  accessor (the job kernel and R2.7.12's attribution both call it)
+  =/  bins  (bin-properties properties.ca defs)
+  =/  itemporals  temps.bins
   =/  or=(each (list oos:tp) aerr:tp)
     ?:  |(?=(~ pp) non-temporal)  [%& ~]
     (build-live-oss ca defs consts vars fair modn)
@@ -2529,6 +2590,7 @@
   =/  alb=(unit sem:sem-lib)  ?~(alias.ca ~ (sem-body defs u.alias.ca))
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  cnames  anames  ddl  pp  itemporals
+      binvs.bins  iinits.bins  iacts.bins
       fair  spec.ca  sloc  tree
       vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
@@ -2734,6 +2796,7 @@
   ?-  -.o
     %ok        [gen.o distinct.o queued.o depth.o]
     %inv       [gen.o distinct.o queued.o depth.o]
+    %action    [gen.o distinct.o queued.o depth.o]
     %deadlock  [gen.o distinct.o queued.o depth.o]
     %limited   [gen.o distinct.o queued.o depth.o]
     %error     [0 0 0 0]
@@ -2924,7 +2987,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -2967,7 +3030,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3005,7 +3068,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3023,7 +3086,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3426,7 +3489,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -4546,132 +4609,85 @@
   ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
   ::  through the safety terminal output; every other form runs the 8.2–8.6
   ::  engine and renders tlc2.TLC's temporal console diagnostic (unit 8.9)
-  ?^  pp.c
-    =/  psb  (sem-body defs.c u.pp.c)
-    ?~  psb  ~['No property def']
-    ::  R1.8.1.1: route the PROPERTY the way SpecProcessor.processConfigProps
-    ::  does. `[]P` with a state-level P is a box invariant (8.9, below); a
-    ::  LEVEL-1 predicate is an IMPLIED INIT, checked while computing initial
-    ::  states; `[][A]_v` is an IMPLIED ACTION, checked on every transition;
-    ::  anything else is a temporal property for the liveness engine
-    =/  binner  (box-state-inner:tp u.psb)
-    ?:  &(?=(~ binner) (lte (sem-lvl:sem-lib u.psb) 1))
-      (implied-init-run c u.pp.c u.psb)
-    =/  iact  (implied-action-inner u.psb)
-    ?:  &(?=(~ binner) ?=(^ iact))
-      (implied-action-run c u.pp.c u.iact)
-    ?^  binner
-      ::  R2.3.4: the config's own INVARIANTs are checked ALONGSIDE the
-      ::  box-state property, and BEFORE it. `processConfigInvariants()` runs
-      ::  first and fills `invVec` from the config's INVARIANT list; a `[]P`
-      ::  with a state-level P is appended to that SAME vector by
-      ::  `processConfigProps` (`SpecProcessor.java:1552`). Measured at the pin:
-      ::  with `INVARIANT Tight` and `PROPERTY BoxTight` both false at the same
-      ::  state, tlc2 names `Tight` -- the config's, not the property's. This
-      ::  branch used to pass ONLY the property, silently dropping the config's
-      =/  o=bfs-opts
-        :*  nsb.c  (weld invs.c ~[[u.pp.c u.binner]])  cons.c  acons.c  poss.c
-            vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
-            ~  *cov-opts  0
-        ==
-      =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
-      =/  env      (make-env:ne defs.c consts.c vars.c)
-      =/  modn     (module-name-of tree.c)
-      (render-outcome out:(explore is.c o) nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
-    ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
-    ::  includes the fairness conjuncts `decompose-spec` extracted from the
-    ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
-    ::  silently discarded every WF_/SF_ the SPEC declared, so a fair spec had a
-    ::  stuttering counterexample and EVERY liveness property reported violated.
-    ::  `live-verdict-lines` used `oss.c` and got these same specs right, which
-    ::  is why the differential passed while production did not.
-    ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
-    ::  on a large/looping state space; a capped build renders %limited.
-    ::  It also PRUNES with the model CONSTRAINT / ACTION_CONSTRAINT, as every
-    ::  liveness graph build here does: tlc2 drops a constrained state before it
-    ::  is enqueued, so liveness runs over the constrained graph, and a spec
-    ::  whose state space is finite only under its constraint (test-model's
-    ::  `LivenessConstraintWarning`: `history' = history \o <<pc>>` bounded by
-    ::  `Len(history) < 3`) grew without bound here until R1.8.1.4 passed them.
-    ::  DEADLOCK CHECKING IS ON here (R1.6.6). tlc2 reaches a deadlock in the
-    ::  state search and aborts the run, so the final liveness check never runs:
-    ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
-    ::  violation the port used to report over the same state count.
-    ::  ALIAS is LIVE on every SAFETY path (R2.3.2) -- including the implied
-    ::  init / implied action / box-state branches above, which all render
-    ::  through `+render-outcome`. It is REFUSED here, on the genuine temporal
-    ::  path: tlc2 aliases the lasso trace too (`LiveWorker.java:876-972`), but
-    ::  `+live-report` renders its prefix and cycle itself and takes no alias,
-    ::  so accepting one would print an UNALIASED trace -- exactly the silent
-    ::  wrong trace R1.8.6's blanket rejection existed to prevent. Narrowed,
-    ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
-    ?^  alias.c
-      ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
-    ::  R2.3.4: the graph build carries the config's INVARIANTs. It used to
-    ::  pass `~`, so an INVARIANT alongside a temporal PROPERTY was simply not
-    ::  checked -- which is why the kernel refused the combination rather than
-    ::  running it. `+bfs-step` already checks `invs` and stops at the first
-    ::  violation, so no new checking machinery was needed here, only the list
+  ::  R2.7.15a: EVERY property is binned by `+bin-properties` at `+search-ctx`,
+  ::  so this routes the WHOLE list. tlc2's order of precedence, measured:
+  ::  an IMPLIED INIT aborts during initial-state computation and prints no
+  ::  state-graph counts, so it comes first; then the SAFETY pass, which
+  ::  carries the config's INVARIANTs, the box-state properties appended after
+  ::  them (`processConfigInvariants()` fills `invVec` first, R2.3.4) and the
+  ::  implied actions as a per-transition check; and only if that completes
+  ::  clean does the liveness engine report. That is `ModelChecker.doNext`
+  ::  returning on a violation, generalized from INVARIANT to every
+  ::  safety-side bin
+  ?^  iinits.c
+    (implied-init-run c name.i.iinits.c body.i.iinits.c)
+  ?:  ?|(?=(^ binvs.c) ?=(^ iacts.c))
+    ::  a safety-side property is declared, so the SAFETY pass owns the verdict
+    ::  unless it completes clean. When it does AND a temporal property is also
+    ::  declared, the run continues into the liveness engine below -- which is
+    ::  the case `prop-act-ok` and `prop-box-then-live` pin and the port used
+    ::  to miss entirely
     =/  o=bfs-opts
-      [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0]
-    =/  bg    (build-graph-out is.c o)
-    =/  modn  (module-name-of tree.c)
-    ?:  capped.bg
-      :-  'Model checking stopped: state limit reached.'
-      (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
-    ::  an INVARIANT violation, a deadlock, or a typed evaluation failure is
-    ::  the state search's own verdict and pre-empts the liveness report,
-    ::  exactly as it pre-empts tlc2's final check: `ModelChecker.doNext`
-    ::  returns on the violation and `modelCheck` never reaches the temporal
-    ::  pass. Measured at the pin -- `INVARIANT Tight` + `PROPERTY Live` prints
-    ::  the safety trace and counts, and NO temporal verdict (R2.3.4)
-    ?:  ?=(?(%inv %deadlock %error) -.out.bg)
-      ::  R2.7.5: the safety verdict still comes first, but it no longer ENDS
-      ::  the report -- `+post-error-live` appends tlc2's second block when the
-      ::  queue was empty at the error and the property is box-free. `~`
-      ::  otherwise, which is R1.6.6's behaviour unchanged
-      =/  post=wain
-        %-  post-error-live
-        :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-            (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
-            u.pp.c  props.c  aname.c
-        ==
-      ::  R2.7.7.3: the postconditions run here too -- measured, they run
-      ::  after a VIOLATION as well as on a clean run
-      =/  bst  (out-stats out.bg)
-      =/  pcl=wain
-        ?:  ?=(%error -.out.bg)  ~
-        %:  post-cond-lines
-          pcs.c
-          defs.c
-          %+  with-run:ne  (make-env:ne defs.c consts.c vars.c)
-          [| 0 `[depth.bst distinct.bst queued.bst gen.bst]]
-          modn
-          rs.bg
-          poss.c
-        ==
-      %-  render-outcome
-      :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
-          ~  post  pcl
+      :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c
+          vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
+          ~  *cov-opts  0  iacts.c
       ==
-    ::  R2.7.14a: the POSTCONDITION runs here too -- measured at the pin, a
-    ::  temporal violation is followed by `Error: Postcondition <name> at
-    ::  <loc> is false.` before the counts. R2.7.7.3 wired the clean and
-    ::  safety-error paths and this one was simply absent. R2.7.14b moved the
-    ::  BUILD into `+live-report`, which is where the lasso `CounterExample`
-    ::  binds to already exists
-    =/  r
-      %-  live-report
-      :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
-          props.c
-          gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
-          pcs.c  rs.bg  poss.c
+    =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
+    =/  env      (make-env:ne defs.c consts.c vars.c)
+    =/  modn     (module-name-of tree.c)
+    =/  er       (explore is.c o)
+    ?.  ?=(%ok -.out.er)
+      (render-outcome out.er nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
+    ::  clean: fall through to the liveness engine if a temporal property was
+    ::  declared too, else report the safety completion
+    ?~  props.c
+      (render-outcome out.er nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
+    (live-run c)
+  ?~  props.c
+    (safety-run c cvg seed)
+  (live-run c)
+::
+++  bin-properties
+  ::  R2.7.15a: `SpecProcessor.processConfigProps` -- EVERY declared PROPERTY
+  ::  binned on its OWN shape, which is what makes the routing
+  ::  ORDER-INDEPENDENT. Measured: `prop-box-viol` and `prop-box-last` declare
+  ::  the same two properties in opposite orders and the pin gives the same
+  ::  verdict, while the port -- which routed on the HEAD of the list -- gave
+  ::  two different ones.
+  ::
+  ::  The four bins, in tlc2's own order of preference:
+  ::
+  ::    `[]P` with a state-level P  -> the INVARIANT vector (and it is reported
+  ::                                   as an `Invariant`, not as a temporal
+  ::                                   property -- measured)
+  ::    level <= 1                  -> an IMPLIED INIT, checked while computing
+  ::                                   the initial states, and warned about
+  ::    `[][A]_v`                   -> an IMPLIED ACTION, checked on every
+  ::                                   transition
+  ::    anything else               -> the liveness engine
+  ::
+  ::  A name with no definition is DROPPED here, as `+implied-temporals` and
+  ::  `+resolve-invs` already drop theirs -- the config validator owns that
+  ::  diagnostic and reports it before any of this runs
+  |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
+  ^-  $:  binvs=(list [name=@t body=sem:sem-lib])
+          iinits=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib])
+          temps=(list [name=@t body=sem:sem-lib])
       ==
-    report.r
-  ::  safety: an INVARIANT
-  (safety-run c cvg seed)
+  ?~  props  [~ ~ ~ ~]
+  =/  rest  $(props t.props)
+  =/  b  (sem-body defs i.props)
+  ?~  b  rest
+  =/  binner  (box-state-inner:tp u.b)
+  ?^  binner
+    rest(binvs [[i.props u.binner] binvs.rest])
+  ?:  (lte (sem-lvl:sem-lib u.b) 1)
+    rest(iinits [[i.props u.b] iinits.rest])
+  =/  iact  (implied-action-inner u.b)
+  ?^  iact
+    rest(iacts [[i.props u.iact] iacts.rest])
+  rest(temps [[i.props u.b] temps.rest])
 ::
 ++  implied-temporals
   ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTIES that reach the
@@ -4773,71 +4789,15 @@
   :+  warn  head
   (render-state order.shown st.shown vrend.c env ~)
 ::
-++  implied-action-run
-  ::  an IMPLIED ACTION: tlc2 checks `[][A]_v`'s A on every transition, so a
-  ::  violation reports `Action property <name> is violated.` followed by the
-  ::  behavior up to and including the offending step, then the usual counts
-  ::  (measured at the pin — the console shows the whole prefix, not a two-state
-  ::  trace). Implemented by giving the BFS the action as a checked predicate
-  ::  rather than a filter (R1.8.1.1/.2)
-  |=  [c=sctx pname=@t body=sem:sem-lib]
-  ^-  wain
-  =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c 0 0 view.c 0 | ~ *cov-opts 0]
-  =/  env      (make-env:ne defs.c consts.c vars.c)
-  =/  actions  (get-actions nsb.c aname.c defs.c env)
-  =/  modn     (module-name-of tree.c)
-  ::  build the whole reachability graph, then scan every transition for the
-  ::  first state whose successor breaks A. The trace is the behavior reaching
-  ::  that state plus the offending successor
-  =/  bg  (build-graph-out is.c o)
-  =/  g   g.bg
-  =/  viol  (first-bad-step g nsb.c env body)
-  ::  R2.3.4: this branch has always carried the config's INVARIANTs, so with
-  ::  the combination now allowed both can be violated in one run. Measured at
-  ::  the pin: on the SAME transition the INVARIANT wins (`INVARIANT Zero` +
-  ::  `PROPERTY NoStep`, both false on 0->1, names `Zero`), while an action
-  ::  violation reached EARLIER wins over a later invariant one (`Tight` fails
-  ::  at x=2, `NoStep` on the first step, names `NoStep`). So the SHORTER
-  ::  behavior reports, ties going to the invariant.
-  ::  RESIDUAL, recorded rather than hidden: at equal depth but different queue
-  ::  position tlc2's order is its BFS order, and `+first-bad-step` scans the
-  ::  fingerprint map, not the queue -- a pre-existing approximation this unit
-  ::  narrows (ties now resolve as tlc2 resolves them) without removing
-  ?:  ?&  ?=(%inv -.out.bg)
-          ?|(?=(~ viol) (lte (lent trace.out.bg) (lent u.viol)))
-      ==
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
-  ?~  viol
-    (render-outcome out.bg nl.c actions env order.c modn alias.c vrend.c | ~ ~ ~)
-  ;:  weld
-    ~[(crip "Error: Action property {(trip pname)} is violated.")]
-    ~['Error: The behavior up to this point is:']
-    (render-trace u.viol nl.c actions env order.c modn alias.c vrend.c |)
-    (counts-lines gen.g distinct.g 0 depth.g)
-  ==
+::  R2.7.15a RETIRED `+implied-action-run` and `+first-bad-step`.
 ::
-++  first-bad-step
-  ::  the first behavior (in BFS order) whose LAST step violates `body` as an
-  ::  action predicate — the implied-action counterexample (R1.8.1.1/.2)
-  |=  [g=graph nsb=sem:sem-lib env=eenv:ne body=sem:sem-lib]
-  ^-  (unit (list state))
-  =/  fps  ~(tap in ~(key by seen.g))
-  |-  ^-  (unit (list state))
-  ?~  fps  ~
-  =/  vis  (~(get by seen.g) i.fps)
-  ?~  vis  $(fps t.fps)
-  =/  nr  (next-states:ne st.u.vis nsb env)
-  ?:  ?=(%| -.nr)  $(fps t.fps)
-  =/  succ  p.nr
-  =/  hit
-    |-  ^-  (unit state)
-    ?~  succ  ~
-    =/  r  (pred-bool:ne body st.u.vis i.succ env)
-    ?:  ?&(?=(%& -.r) p.r)  $(succ t.succ)
-    `i.succ
-  ?~  hit  $(fps t.fps)
-  `(snoc (trace-to seen.g i.fps) u.hit)
+::  They built the WHOLE reachability graph and then scanned it for the
+::  first bad step, which got the verdict and the trace right and the
+::  COUNTS wrong -- a completed search's, where tlc2 stops at the
+::  violation. Implied actions are now a per-transition check on
+::  `bfs-opts.iacts`, beside the action CONSTRAINTS and at the same hook,
+::  which is where tlc2 has them; `+first-bad-action` (R2.5's, shared
+::  with DFID) is the predicate.
 ::
 ++  cov-of
   ::  the coverage inputs a `sctx` already carries: the module name for the
@@ -4848,6 +4808,110 @@
   :*  on  (module-name-of tree.c)  iname.c  [(lent is.c) irej.c]
       cnames.c  anames.c
   ==
+::
+++  live-run
+  ::  R2.7.15a: the LIVENESS path, extracted from `+check` unchanged so the
+  ::  routing above can reach it from two places -- directly, and after a
+  ::  safety pass that completed clean (a spec declaring BOTH a box-state or
+  ::  implied-action property AND a temporal one, which the port used to
+  ::  route to one bin and never check the other)
+  |=  c=sctx
+  ^-  wain
+  ::  `pp` is only the FALLBACK name now (R2.7.12): which property a
+  ::  counter-example violates is decided post-hoc over `props`
+  =/  pname  ?~(pp.c '' u.pp.c)
+  ::  R1.8.1.1: use the OrderOfSolutions `search-ctx` already built, which
+  ::  includes the fairness conjuncts `decompose-spec` extracted from the
+  ::  SPECIFICATION. Rebuilding it here with `~` for fairness — as this did —
+  ::  silently discarded every WF_/SF_ the SPEC declared, so a fair spec had a
+  ::  stuttering counterexample and EVERY liveness property reported violated.
+  ::  `live-verdict-lines` used `oss.c` and got these same specs right, which
+  ::  is why the differential passed while production did not.
+  ::  the temporal graph build is bounded (R1.5.5) so `check:check` never hangs
+  ::  on a large/looping state space; a capped build renders %limited.
+  ::  It also PRUNES with the model CONSTRAINT / ACTION_CONSTRAINT, as every
+  ::  liveness graph build here does: tlc2 drops a constrained state before it
+  ::  is enqueued, so liveness runs over the constrained graph, and a spec
+  ::  whose state space is finite only under its constraint (test-model's
+  ::  `LivenessConstraintWarning`: `history' = history \o <<pc>>` bounded by
+  ::  `Len(history) < 3`) grew without bound here until R1.8.1.4 passed them.
+  ::  DEADLOCK CHECKING IS ON here (R1.6.6). tlc2 reaches a deadlock in the
+  ::  state search and aborts the run, so the final liveness check never runs:
+  ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
+  ::  violation the port used to report over the same state count.
+  ::  ALIAS is LIVE on every SAFETY path (R2.3.2) -- including the implied
+  ::  init / implied action / box-state branches above, which all render
+  ::  through `+render-outcome`. It is REFUSED here, on the genuine temporal
+  ::  path: tlc2 aliases the lasso trace too (`LiveWorker.java:876-972`), but
+  ::  `+live-report` renders its prefix and cycle itself and takes no alias,
+  ::  so accepting one would print an UNALIASED trace -- exactly the silent
+  ::  wrong trace R1.8.6's blanket rejection existed to prevent. Narrowed,
+  ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
+  ?^  alias.c
+    ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
+  ::  R2.3.4: the graph build carries the config's INVARIANTs. It used to
+  ::  pass `~`, so an INVARIANT alongside a temporal PROPERTY was simply not
+  ::  checked -- which is why the kernel refused the combination rather than
+  ::  running it. `+bfs-step` already checks `invs` and stops at the first
+  ::  violation, so no new checking machinery was needed here, only the list
+  =/  o=bfs-opts
+    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  bg    (build-graph-out is.c o)
+  =/  modn  (module-name-of tree.c)
+  ?:  capped.bg
+    :-  'Model checking stopped: state limit reached.'
+    (counts-lines gen.g.bg distinct.g.bg 0 depth.g.bg)
+  ::  an INVARIANT violation, a deadlock, or a typed evaluation failure is
+  ::  the state search's own verdict and pre-empts the liveness report,
+  ::  exactly as it pre-empts tlc2's final check: `ModelChecker.doNext`
+  ::  returns on the violation and `modelCheck` never reaches the temporal
+  ::  pass. Measured at the pin -- `INVARIANT Tight` + `PROPERTY Live` prints
+  ::  the safety trace and counts, and NO temporal verdict (R2.3.4)
+  ?:  ?=(?(%inv %deadlock %error) -.out.bg)
+    ::  R2.7.5: the safety verdict still comes first, but it no longer ENDS
+    ::  the report -- `+post-error-live` appends tlc2's second block when the
+    ::  queue was empty at the error and the property is box-free. `~`
+    ::  otherwise, which is R1.6.6's behaviour unchanged
+    =/  post=wain
+      %-  post-error-live
+      :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
+          (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
+          pname  props.c  aname.c
+      ==
+    ::  R2.7.7.3: the postconditions run here too -- measured, they run
+    ::  after a VIOLATION as well as on a clean run
+    =/  bst  (out-stats out.bg)
+    =/  pcl=wain
+      ?:  ?=(%error -.out.bg)  ~
+      %:  post-cond-lines
+        pcs.c
+        defs.c
+        %+  with-run:ne  (make-env:ne defs.c consts.c vars.c)
+        [| 0 `[depth.bst distinct.bst queued.bst gen.bst]]
+        modn
+        rs.bg
+        poss.c
+      ==
+    %-  render-outcome
+    :*  out.bg  nl.c  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
+        (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
+        ~  post  pcl
+    ==
+  ::  R2.7.14a: the POSTCONDITION runs here too -- measured at the pin, a
+  ::  temporal violation is followed by `Error: Postcondition <name> at
+  ::  <loc> is false.` before the counts. R2.7.7.3 wired the clean and
+  ::  safety-error paths and this one was simply absent. R2.7.14b moved the
+  ::  BUILD into `+live-report`, which is where the lasso `CounterExample`
+  ::  binds to already exists
+  =/  r
+    %-  live-report
+    :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
+        (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  pname
+        props.c
+        gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
+        pcs.c  rs.bg  poss.c
+    ==
+  report.r
 ::
 ++  safety-run
   ::  the plain safety search and its terminal lines. Factored out (R1.8.1.1)
@@ -4865,7 +4929,7 @@
   ::  (R2.7.4.2b) -- this path needs it for the trace labels anyway
   =/  o=bfs-opts
     :*  nsb.c  invs.c  cons.c  acons.c  poss.c  vars.c  order.c  perms.c  defs.c
-        consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed
+        consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed  ~
     ==
   =/  r  (explore-full-regs is.c irs.c o)
   ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
@@ -4994,6 +5058,22 @@
       (counts-lines gen.res distinct.res queued.res depth.res)
     ==
   ::
+      ::  R2.7.15a: EC 2112. Same block shape as an invariant behaviour
+      ::  violation -- headline, `The behavior up to this point is:`, the
+      ::  trace, the counts -- with tlc2's wording for an implied action, and
+      ::  the counts are the ones standing WHERE THE SEARCH STOPPED
+      ::  (`prop-act-viol`: 2/2/2, not the completed graph's 5/4/4)
+      %action
+    ;:  weld
+      ~[(crip "Error: Action property {(trip name.res)} is violated.")]
+      ~['Error: The behavior up to this point is:']
+      (render-trace trace.res nl actions e order modn al vw dif)
+      post
+      pcl
+      ?~(cov ~ cov-refusal)
+      (counts-lines gen.res distinct.res queued.res depth.res)
+    ==
+  ::
       %deadlock
     ;:  weld
       ~['Error: Deadlock reached.']
@@ -5024,35 +5104,38 @@
   ?^  ae  [[%failed msg.u.ae] *run-stats]
   ::  a temporal property: a pure []P box-state is a state invariant (checked by
   ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine
-  ?^  pp.c
-    =/  psb  (sem-body defs.c u.pp.c)
-    ?~  psb  [[%failed 'no property definition'] *run-stats]
-    =/  binner  (box-state-inner:tp u.psb)
-    ?~  binner
-      =/  osr  (oss-of ~[u.psb] (module-name-of tree.c) ~ (make-env:ne defs.c consts.c vars.c))
-      ?:  ?=(%| -.osr)  [[%failed msg.p.osr] *run-stats]
-      ::  the temporal graph build is bounded by `cap` (R1.5.5): a capped build
-      ::  yields %limited rather than a lasso verdict on a partial graph
-      =/  o=bfs-opts  [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0]
-      =/  bg  (build-graph-cap is.c o)
-      ::  the liveness graph build samples no out-degree (no BFS frontier)
-      =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
-      ?:  capped.bg  [[%limited %states st] st]
-      =/  l
-        %-  find-lasso:lv
-        :*  p.osr  (states-of seen.g.bg)  inits.g.bg  nsb.c
-            (make-env:ne defs.c consts.c vars.c)  order.c
-        ==
-      ?~(l [[%ok st] st] [[%violated [%property u.pp.c %.n] st] st])
-    ::  box-state P as a safety invariant
-    =/  o=bfs-opts
-      [nsb.c ~[[u.pp.c u.binner]] cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
-    =/  er  (explore is.c o)
-    (explore-outcome out.er od.er)
-  ::  safety (invariant)
-  =/  o=bfs-opts  [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
+  ::  R2.7.15a: the same binning the console path uses, over EVERY property.
+  ::  This engine renders nothing, so an implied INIT has no distinct wire
+  ::  shape of its own -- it arrives as `%inv` with `initial=&`, which is what
+  ::  `+explore-outcome` already produces for the safety search
+  =/  o=bfs-opts
+    :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c  vars.c  order.c
+        perms.c  defs.c  consts.c  ddl.c  cap  0  view.c  0  |  ~  *cov-opts  0
+        iacts.c
+    ==
   =/  er  (explore is.c o)
-  (explore-outcome out.er od.er)
+  ?.  ?=(%ok -.out.er)  (explore-outcome out.er od.er)
+  ?~  props.c  (explore-outcome out.er od.er)
+  ::  the safety pass completed clean and a temporal property is declared, so
+  ::  the liveness engine reports. The temporal graph build is bounded by `cap`
+  ::  (R1.5.5): a capped build yields %limited rather than a lasso verdict on a
+  ::  partial graph
+  =/  lo=bfs-opts
+    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  bg  (build-graph-cap is.c lo)
+  ::  the liveness graph build samples no out-degree (no BFS frontier)
+  =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
+  ?:  capped.bg  [[%limited %states st] st]
+  =/  l
+    %-  find-lasso:lv
+    :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
+        (make-env:ne defs.c consts.c vars.c)  order.c
+    ==
+  ?~  l  [[%ok st] st]
+  ::  R2.7.12: the name is the post-hoc attribution's, `pp` only a fallback
+  =/  vps  (violated-props props.c u.l (states-of seen.g.bg) (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
+  =/  vnm  ?^(vps i.vps ?~(pp.c '' u.pp.c))
+  [[%violated [%property vnm %.n] st] st]
 ::
 ++  explore-outcome
   ::  a safety outcome as the wire result + run-stats (shared by run-check's
@@ -5063,6 +5146,8 @@
       %ok        =/  st  [gen.res distinct.res queued.res depth.res od]  [[%ok st] st]
       %limited   =/  st  [gen.res distinct.res queued.res depth.res od]  [[%limited what.res st] st]
       %inv       =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%invariant name.res initial.res] st] st]
+      ::  R2.7.15a: EC 2112 on the wire, the variant R2.7.13 added
+      %action    =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%action name.res] st] st]
       %deadlock  =/  st  [gen.res distinct.res queued.res depth.res od]  [[%violated [%deadlock ~] st] st]
       %error     [[%failed msg.res] *run-stats]
   ==
@@ -5077,7 +5162,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
 --

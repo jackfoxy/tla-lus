@@ -42,44 +42,34 @@ DROP = re.compile(
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
 SKIPS: dict = {
-    #  R2.7.15 MEASURED the multi-PROPERTY routing across the whole matrix and
-    #  froze what is still red. All four entries are ONE row's --
-    #  `tlc-safety-assume` -- and one fix closes them together.
-    "prop-box-then-live": (
-        "R2.7.12/R2.7.15: `SpecProcessor.processConfigProps` routes EVERY "
-        "`PROPERTY` (a `[]P` box-state to the invariant vector, a level<=1 "
-        "predicate to the implied inits, a `[][A]_v` to the implied actions, "
-        "the rest to the liveness engine); the port decides the route from "
-        "the FIRST property alone. Box-state first, temporal second: the pin "
-        "reports `P2` and the port completes clean -- a MISSED VIOLATION."),
-    "prop-box-last": (
-        "R2.7.15: the same two properties as `prop-box-viol`, in the opposite "
-        "order. tlc2's routing is order-INDEPENDENT, so both verdicts are "
-        "`Invariant BoxBad is violated.`; the port routes on the head, so "
-        "with the temporal one first the box-state property never reaches "
-        "the invariant vector. `prop-box-viol` passes only because its "
-        "box-state property happens to be declared first."),
-    "prop-act-ok": (
-        "R2.7.15: an IMPLIED ACTION that HOLDS, declared first, with a "
-        "violated temporal property after it. The port routes to "
-        "`+implied-action-run` and never checks the temporal one, so it "
-        "completes clean where the pin reports `Live`. Same defect as "
-        "`prop-box-then-live` through the implied-action bin."),
+    #  R2.7.15a fixed three of the five routing defects and froze the two its
+    #  own corpus then exposed. Both are in the IMPLIED-ACTION bin and both are
+    #  PRE-EXISTING -- `+implied-action-run` had them too; no case could show
+    #  either until this unit's matrix arrived.
     "prop-act-viol": (
-        "R2.7.15 found a THIRD defect here, which the row did not name and no "
-        "existing case could see. The port gets the action-property VERDICT "
-        "and TRACE right and the COUNTS wrong: it reports 5 generated / 4 "
-        "distinct / depth 4 where the pin reports 2 / 2 / 2. "
-        "`+implied-action-run` builds the WHOLE reachability graph and then "
-        "scans it for the first bad step, so the counts are a completed "
-        "search's; tlc2 checks `[][A]_v` DURING the search and stops at the "
-        "violation. Its own comment says *'giving the BFS the action as a "
-        "checked predicate rather than a filter'* -- intent, not code, the "
-        "third such comment this release. `implied-act-viol` could not catch "
-        "it because its violation is on the LAST transition, where a "
-        "completed graph and a stopped one agree. The fix is the same one "
-        "the routing needs: implied actions become a per-transition check "
-        "beside `acons`, which is where tlc2 has them."),
+        "R2.7.15a: verdict, trace and counts are now right except the QUEUE -- "
+        "the port reports `1 states left on queue` where the pin reports 0. "
+        "`+register-in`'s invariant check runs BEFORE the enqueue ('a "
+        "violating state is counted but never enqueued'), and the implied "
+        "action check was added AFTER `+register-in` returns, so the "
+        "successor is already on the queue. The fix is to move the check "
+        "INSIDE `+register-in`, between the invariant check and the enqueue, "
+        "which needs `prev` threaded in. The ORDER is already right: an "
+        "invariant and an implied action false on the same transition name "
+        "the invariant (`inv-prop-action`, green)."),
+    "prop-act-ok": (
+        "R2.7.15a exposed a FOURTH defect, and it is PRE-EXISTING: "
+        "`[][A]_v` is checked as `A` alone, not as the SQUARE action "
+        "`A \/ UNCHANGED v`, so a STUTTERING step reports a violation tlc2 "
+        "permits. `+implied-action-inner` returns `$SquareAct`'s first "
+        "argument and drops the subscript, and both the retired "
+        "`+first-bad-step` and DFID's `+first-bad-action` consume it that "
+        "way -- so the same bug is latent in the DFID engine. No corpus case "
+        "could show it: every existing implied-action spec has a next-state "
+        "relation with no stuttering step. The fix carries the subscript "
+        "beside the body (`[name body sub]`) in both `bfs-opts.iacts` and "
+        "`dfid-opts.iacts`, and answers FALSE only when `A` fails AND the "
+        "subscript CHANGED."),
 }
 
 
