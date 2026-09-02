@@ -1543,7 +1543,7 @@
       %-  dfid-opts-of:check
       :*  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
           invs  cons  acons  vars  order  defs  consts
-          pp  psb  ?&(deadlock.mode deadlock.rs)
+          properties.rs  ?&(deadlock.mode deadlock.rs)
           max-set-size.lims  depth.mode
       ==
     ?:  ?=(%| -.su)  (finish j [%failed p.su] pre)

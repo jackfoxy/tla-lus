@@ -27,6 +27,23 @@
   ?:  =("/\\ " (scag 3 t))  &
   ?=(^ (find " = " t))
 ::
+++  test-dfid-act-stutter
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Finished computing initial states: 1 states generated, with 1 of them distinct.'
+        'Starting level 2: 1 states generated, 1 distinct states found.'
+        'Starting level 3: 3 states generated, 2 distinct states found.'
+        'Starting level 4: 7 states generated, 3 distinct states found.'
+        '13 states generated, 4 distinct states found.'
+    ==
+  !>
+  %-  trim
+  %^  dfid-check:check
+    '---- MODULE spec ----\0a\\* R2.7.15b: an IMPLIED ACTION over a next-state relation WITH a stuttering\0a\\* step. `[][A]_v` is `A \\/ UNCHANGED v`, so the `x\' = x` disjunct satisfies\0a\\* it however `A` reads -- checking `A` alone reported a violation tlc2 does\0a\\* not, on THIS engine as well as the BFS one. Every pre-existing\0a\\* implied-action case has a next-state relation with no stuttering step,\0a\\* which is why the bug was invisible in both.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aActOk == [][x\' = x + 1]_x\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY ActOk\0a'
+  4
+::
 ++  test-dfid-action-order-early
   %+  expect-eq
     !>  ^-  wain

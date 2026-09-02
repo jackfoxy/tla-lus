@@ -285,7 +285,7 @@
       ::  Beside `acons` and not folded into it: an action CONSTRAINT prunes
       ::  the transition, an implied action REPORTS it. Same hook, opposite
       ::  answer to a false predicate
-      iacts=(list [name=@t body=sem:sem-lib])
+      iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
   ==
 ::
 +$  cov-opts
@@ -680,13 +680,30 @@
   ::  cur -> nxt; ~ = all hold, [%& name] = violated, [%| msg] = an evaluation
   ::  error. The shape `+first-violated` has, over a transition rather than a
   ::  state -- `Tool.isValid(impliedAction, curState, succState)`
-  |=  [ias=(list [name=@t body=sem:sem-lib]) cur=state nxt=state e=eenv:ne]
+  ::  R2.7.15b: the SQUARE action, not the bare one. `[A]_v` is
+  ::  `A \/ UNCHANGED v`, so a step that leaves the subscript alone satisfies
+  ::  it whatever `A` says -- checking `A` by itself reported a violation on
+  ::  every stuttering step, on this engine and on DFID alike
+  |=  [ias=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)]) cur=state nxt=state e=eenv:ne]
   ^-  (unit (each @t @t))
   ?~  ias  ~
   =/  r  (pred-bool:ne body.i.ias cur nxt e)
   ?:  ?=(%| -.r)  `[%| msg.p.r]
-  ?.  p.r  `[%& name.i.ias]
-  $(ias t.ias)
+  ?:  p.r  $(ias t.ias)
+  ::  `A` failed, so the step violates `[A]_v` only if the SUBSCRIPT CHANGED.
+  ::  An unevaluable subscript is the run's own typed error, as an unevaluable
+  ::  `A` is -- it is not read as "unchanged"
+  ::  no subscript in the graph: fall back to reporting on `A` alone, which is
+  ::  what every consumer did before R2.7.15b. Recorded rather than guessed --
+  ::  comparing the WHOLE STATE instead would report violations tlc2 does not
+  ::  whenever `v` is a strict subset of the variables
+  ?~  sub.i.ias  `[%& name.i.ias]
+  =/  s0  (eval:ne u.sub.i.ias e(s0 cur, s1 nxt, primed |))
+  ?:  ?=(%| -.s0)  `[%| msg.p.s0]
+  =/  s1  (eval:ne u.sub.i.ias e(s0 cur, s1 nxt, primed &))
+  ?:  ?=(%| -.s1)  `[%| msg.p.s1]
+  ?:  =(p.s0 p.s1)  $(ias t.ias)
+  `[%& name.i.ias]
 ::
 ++  register
   ::  admit one generated state at depth `d`. TLC order: a state pruned by a
@@ -726,30 +743,10 @@
     ::  transition, an implied action REPORTS it and stops the search. The
     ::  counts are therefore the ones standing HERE, which is the whole point:
     ::  `+implied-action-run` reported a completed graph's instead
-    ::  ORDER MATTERS, and it is tlc2's: the INVARIANTS first (inside
-    ::  `+register-in`, and only for a NEW state), then the IMPLIED ACTIONS on
-    ::  EVERY transition -- tlc2's own comment says "We need to do it even if
-    ::  succState is not new". **A transition breaking BOTH names the
-    ::  invariant** (measured, `inv-prop-action`: `INVARIANT Zero` and
-    ::  `PROPERTY NoStep` both false on 0->1, and the pin names `Zero`), which
-    ::  is why the check runs AFTER registration rather than before it. The
-    ::  counts follow from the same order: the successor is already registered,
-    ::  so `prop-act-viol` reports 2 distinct at depth 2, not 1 at depth 1.
-    ::
-    ::  `+first-bad-action` is DFID's, unchanged: R2.5 already ported this
-    ::  check for that engine (`Tool.isValid(impliedAction, cur, succ)`), and
-    ::  one implementation keeps the two engines from drifting
-    =/  ri  (register-in o cur st d pred e)
-    ?^  out.ri  ri
-    =/  ia  (first-bad-action iacts.o u.prev st e)
-    ?~  ia  ri
-    ?:  ?=(%| -.u.ia)  [`[%error p.u.ia] cur.ri]
-    :_  cur.ri
-    :-  ~
-    :*  %action  gen.cur.ri  distinct.cur.ri  (lent queue.cur.ri)  depth.cur.ri
-        (weld (trace-to seen.cur.ri pred) ~[st])  p.u.ia
-    ==
-  (register-in o cur st d pred e)
+    ::  the IMPLIED ACTIONS are checked inside `+register-in`, after the
+    ::  invariants and before the enqueue -- see the note there
+    (register-in o cur st d pred e prev)
+  (register-in o cur st d pred e prev)
 ::
 ++  check-pruned
   ::  a CONSTRAINT-pruned state: check its invariants (declaration order) but do
@@ -770,8 +767,13 @@
   ==
 ::
 ++  register-in
-  ::  the in-model path: dedup, depth bound, enqueue, ordered invariant check
-  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t e=eenv:ne]
+  ::  the in-model path: dedup, depth bound, ordered invariant check, the
+  ::  IMPLIED ACTIONS (R2.7.15b -- both before the enqueue), then enqueue.
+  ::  `prev` is the PREDECESSOR STATE, `~` for an initial state: an implied
+  ::  action is a predicate over a transition and there is none into an
+  ::  initial state, which is why tlc2 checks them in `doNext` and not in
+  ::  `getInitStates`
+  |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t e=eenv:ne prev=(unit state)]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   ::  the state's identity is its symmetry-orbit representative (7.5); with no
   ::  symmetry group `canon` is `st` and `fp` is the plain FP64 state fingerprint
@@ -786,7 +788,25 @@
     =/  vr  (eval:ne u.view.o e(s0 cst, s1 cst, primed |))
     ?:  ?=(%| -.vr)  (@t fp.ob)
     (@t (view-fp:fp p.vr))
-  ?:  (~(has by seen.cur) fp)  [~ cur]
+  ::  R2.7.15b: the IMPLIED ACTIONS are checked on EVERY TRANSITION, whether or
+  ::  not the successor is new -- tlc2's DFID comment says so in as many words
+  ::  ("We need to do it even if succState is not new"), and `implied-act-viol`
+  ::  is the case that proves it: `Next == x' = (x + 1) %% 4` violates
+  ::  `[][x' = x + 1]_x` on the 3 -> 0 step, and state 0 was seen at depth 1.
+  ::  Checking only new successors reported nothing at all.
+  =/  ia0  ?~(prev ~ (first-bad-action iacts.o u.prev st (env-of o)))
+  ?:  (~(has by seen.cur) fp)
+    ::  a REVISITED successor: nothing is counted or enqueued, so the statistics
+    ::  are the ones standing before it, and the trace runs through THIS
+    ::  predecessor rather than the one that first discovered the state
+    ?~  ia0  [~ cur]
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  cont.o  [~ cur]
+    :_  cur
+    :-  ~
+    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+        (weld (trace-to seen.cur pred) ~[st])  p.u.ia0
+    ==
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
     [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
   ::  TLC order (doNext): the state is counted distinct and its invariants are
@@ -821,6 +841,24 @@
     :-  ~
     :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
         (trace-to seen.cur fp)  p.u.iv  =('' pred)
+    ==
+  ::  R2.7.15b: the IMPLIED ACTIONS, here and not at the caller. ORDER is
+  ::  tlc2's -- invariants first and only for a NEW state, then the implied
+  ::  actions on every transition -- and the POSITION matters as much: the
+  ::  check sits BEFORE the enqueue, exactly where the invariant check does,
+  ::  so a violating successor is counted but never queued. Running it at the
+  ::  caller (R2.7.15a's first attempt) reported `1 states left on queue`
+  ::  where the pin reports 0
+  ?^  ia0
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  cont.o
+      =.  queue.cur  (snoc queue.cur fp)
+      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      [~ cur]
+    :_  cur
+    :-  ~
+    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+        (trace-to seen.cur fp)  p.u.ia0
     ==
   =.  queue.cur  (snoc queue.cur fp)
   =?  inits.cur  =('' pred)  (snoc inits.cur fp)
@@ -2017,7 +2055,12 @@
       ::  `iacts` the `[][A]_v` implied actions, checked on every transition
       binvs=(list [name=@t body=sem:sem-lib])
       iinits=(list [name=@t body=sem:sem-lib])
-      iacts=(list [name=@t body=sem:sem-lib])
+      iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
+      ::  R2.7.15b: the raw `PROPERTY` names in CONFIG ORDER. The four bins
+      ::  above are derived from it and cannot reconstruct it -- a consumer
+      ::  that re-bins (DFID) needs the original order, because the EC 2255
+      ::  state-level warnings are emitted in it
+      pnames=(list @t)
       fair=(list sem:sem-lib)                ::  fairness conjuncts (WF_/SF_/
                                              ::  []temporal) from a SPECIFICATION
                                              ::  decomposition (SpecProcessor
@@ -2575,8 +2618,16 @@
   =/  bins  (bin-properties properties.ca defs)
   =/  itemporals  temps.bins
   =/  or=(each (list oos:tp) aerr:tp)
-    ?:  |(?=(~ pp) non-temporal)  [%& ~]
-    (build-live-oss ca defs consts vars fair modn)
+    ::  R2.7.15b: from the TEMPORAL BIN, not the head of the property list.
+    ::  This used to answer `~` whenever the FIRST property was not genuinely
+    ::  temporal, so a spec declaring an implied action first and a temporal
+    ::  property second built no `oss` at all -- and the liveness engine had
+    ::  nothing to report even once R2.7.15a routed the run to it
+    ?~  temps.bins  [%& ~]
+    %:  oss-of
+      (turn temps.bins |=([* b=sem:sem-lib] b))
+      modn  fair  (make-env:ne defs consts vars)
+    ==
   ?:  ?=(%| -.or)  [%| msg.p.or]
   =/  sloc=sspan:sem-lib
     ?~  spec.ca  ~
@@ -2590,7 +2641,7 @@
   =/  alb=(unit sem:sem-lib)  ?~(alias.ca ~ (sem-body defs u.alias.ca))
   :*  p.ir  defs  consts  vars  order  perms  assumes.u.mo  nsb
       invs  cons  acons  cnames  anames  ddl  pp  itemporals
-      binvs.bins  iinits.bins  iacts.bins
+      binvs.bins  iinits.bins  iacts.bins  properties.ca
       fair  spec.ca  sloc  tree
       vwb  alb  aname
       ?~(nb '' (next-span-label aname u.nb modn))
@@ -3547,7 +3598,7 @@
       ::  IMPLIED ACTIONS (`[][A]_v`): checked per TRANSITION inside `doNext`,
       ::  right after the invariants. The BFS path scans a finished graph
       ::  instead, which DFID never has -- so this one is done tlc2's own way
-      iacts=(list [name=@t body=sem:sem-lib])
+      iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
       ::  an IMPLIED INIT (a level-1 PROPERTY): checked per initial state
       iinits=(list [name=@t body=sem:sem-lib])
       cons=(list sem:sem-lib)                  ::  CONSTRAINT
@@ -3947,7 +3998,10 @@
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           vars=(set @t)  order=(list @t)
           defs=(map @t sem-def:sem-lib)  consts=(map @t value)
-          pp=(unit @t)  psb=(unit sem:sem-lib)
+          ::  R2.7.15b: the PROPERTY NAMES, all of them. This used to take the
+          ::  head of the list and its body, so DFID routed on the first
+          ::  property exactly as `+check` did before R2.7.15a
+          props=(list @t)
           deadlock=?  setmax=@ud  maxd=@ud
       ==
   ^-  (each [o=dfid-opts warn=wain] @t)
@@ -3955,17 +4009,19 @@
     :*  acts  invs  ~  ~  cons  acons  vars  order
         defs  consts  deadlock  setmax  maxd
     ==
-  ?~  pp   [%& base ~]
-  ?~  psb  [%& base ~]
-  ::  `[]P` over a state-level P is appended to the config's own INVARIANT
-  ::  vector by `processConfigProps`, so it is checked alongside them
-  =/  binner  (box-state-inner:tp u.psb)
-  ?^  binner  [%& base(invs (weld invs ~[[u.pp u.binner]])) ~]
-  ?:  (lte (sem-lvl:sem-lib u.psb) 1)
-    [%& base(iinits ~[[u.pp u.psb]]) ~[(state-level-warn u.pp)]]
-  =/  iact  (implied-action-inner u.psb)
-  ?^  iact  [%& base(iacts ~[[u.pp u.iact]]) ~]
-  [%| dfid-refusal]
+  ::  R2.7.15b: the same binning every other engine uses. A GENUINE temporal
+  ::  property is what makes DFID refuse (upstream issue 548 -- `checkLiveness`
+  ::  is set only by the branch that reaches the liveness engine); the other
+  ::  three bins are ordinary checks DFID performs like any other
+  =/  bins  (bin-properties props defs)
+  ?^  temps.bins  [%| dfid-refusal]
+  :-  %&
+  :_  (turn iinits.bins |=([n=@t *] (state-level-warn n)))
+  %=  base
+    invs    (weld invs binvs.bins)
+    iinits  iinits.bins
+    iacts   iacts.bins
+  ==
 ::
 ++  dfid-setup
   ::  `+dfid-opts-of` over a resolved `sctx`, for the console path
@@ -3975,7 +4031,7 @@
   %-  dfid-opts-of
   :*  (get-actions nsb.c aname.c defs.c e)
       invs.c  cons.c  acons.c  vars.c  order.c  defs.c  consts.c
-      pp.c  ?~(pp.c ~ (sem-body defs.c u.pp.c))
+      pnames.c
       ddl.c  setmax  maxd
   ==
 ::
@@ -4672,7 +4728,7 @@
   |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
   ^-  $:  binvs=(list [name=@t body=sem:sem-lib])
           iinits=(list [name=@t body=sem:sem-lib])
-          iacts=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           temps=(list [name=@t body=sem:sem-lib])
       ==
   ?~  props  [~ ~ ~ ~]
@@ -4684,9 +4740,9 @@
     rest(binvs [[i.props u.binner] binvs.rest])
   ?:  (lte (sem-lvl:sem-lib u.b) 1)
     rest(iinits [[i.props u.b] iinits.rest])
-  =/  iact  (implied-action-inner u.b)
+  =/  iact  (implied-action-parts u.b)
   ?^  iact
-    rest(iacts [[i.props u.iact] iacts.rest])
+    rest(iacts [[i.props body.u.iact sub.u.iact] iacts.rest])
   rest(temps [[i.props u.b] temps.rest])
 ::
 ++  implied-temporals
@@ -4708,6 +4764,29 @@
   ?:  (lte (sem-lvl:sem-lib u.b) 1)  $(props t.props)
   ?^  (implied-action-inner u.b)  $(props t.props)
   [[i.props u.b] $(props t.props)]
+::
+++  implied-action-parts
+  ::  R2.7.15b: BOTH halves of a `[][A]_v` implied action -- the action AND its
+  ::  SUBSCRIPT. `+implied-action-inner` returns only `A`, and every consumer
+  ::  (the retired `+first-bad-step`, DFID's `+first-bad-action`) checked `A`
+  ::  alone, which reports a violation on a STUTTERING step that tlc2 permits:
+  ::  `[A]_v` is `A \/ UNCHANGED v`, so a step leaving `v` alone satisfies it
+  ::  whatever `A` says. Measured at the pin on `[][x' = x + 1]_x` with a
+  ::  `x' = x` disjunct in Next -- BFS and DFID both complete clean, and the
+  ::  port reported `Action property ActOk is violated.` on both
+  ::  The SUBSCRIPT is OPTIONAL in the graph. `+decompose-spec` guards it the
+  ::  same way (`?~(t.args.arg ~ (subscript-vars ...))`), so a `[A]_v` whose
+  ::  `v` did not survive generation is a shape this side already sees
+  |=  s=sem:sem-lib
+  ^-  (unit [body=sem:sem-lib sub=(unit sem:sem-lib)])
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('[]' name.op.s)  ~
+  ?~  args.s  ~
+  =/  a  i.args.s
+  ?.  ?=(%apply -.a)  ~
+  ?.  =('$SquareAct' name.op.a)  ~
+  ?~  args.a  ~
+  `[i.args.a ?~(t.args.a ~ `i.t.args.a)]
 ::
 ++  implied-action-inner
   ::  the A of a `[][A]_v` implied-action property — a box over a square-action

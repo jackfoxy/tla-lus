@@ -14,7 +14,7 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-modres-tests.py` | 13 | pass | Module resolution graphs | `desk/tests/lib/modres.hoon` |
 | `gen-sem-tests.py` | 108 | pass | Semantic graph + levels | `desk/tests/lib/sem.hoon` |
 | `gen-eval-tests.py` | 37 | pass | Constant evaluation (TLC REPL) | `desk/tests/lib/eval.hoon` |
-| `gen-mc-tests.py` | 98 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
+| `gen-mc-tests.py` | 100 | pass | Safety + liveness model checking | `desk/tests/lib/mc.hoon` |
 | `gen-stdmods.py` | 20 | pass | Vendored StandardModules | `desk/lib/stdmods.hoon` |
 | `gen-pcal-tests.py` | 2 | oracle-only | PlusCal translation goldens | `(PlusCal excluded from PLAN-2 scope — R1.0; goldens kept, translator not ported)` |
 | `gen-cfg-tests.py` | 34 | pass | TLC .cfg parse (ModelConfig) | `desk/tests/lib/cfg.hoon` |
@@ -30,9 +30,9 @@ them yet; those cases prove nothing about parity until a comparator lands.
 | `gen-sim-tests.py` | 82 | pass | Seeded simulation traces (tlc2.tool.SimulationWorker) | `desk/tests/lib/sim-diff.hoon (unit 9.2): lib/check simulate reproduces `tlc2.TLC -simulate -workers 1 -seed S` behavior byte-for-byte over a supported-fragment corpus` |
 | `gen-sim-live-tests.py` | 10 | pass | Temporal property in simulation (LiveCheck.checkTrace) | `desk/tests/lib/sim-live.hoon (unit 9.3a): lib/check simulate checks a PROPERTY per behavior and reaches the same verdict + trace count as `tlc2.TLC -simulate PROPERTY`` |
 | `gen-sim-stats-tests.py` | 11 | pass | Simulation statistics (SimulationWorkerStatistics) | `desk/tests/lib/sim-stats.hoon (unit 9.3b): lib/check simulate reports the same states-generated and trace-length mean/var/sd as `tlc2.TLC -simulate`` |
-| `gen-dfid-tests.py` | 22 | pass | Depth-first iterative deepening (tlc2.tool.DFIDModelChecker) | `desk/tests/lib/dfid.hoon (R2.5): lib/check dfid-check reproduces `tlc2.TLC -workers 1 -dfid N` -- verdict, every EC 2205 level line and both EC 2204/2208 counts -- over 22 cases. The COUNTEREXAMPLE is an approved difference (DFID descends at random from a clock-seeded generator `-seed` does not reach), and the generator MEASURES which cases that actually affects: it runs the jar 8x per case and drops the trace only where it varied. 2 of 22; the other 20 compare their trace byte-for-byte` |
+| `gen-dfid-tests.py` | 23 | pass | Depth-first iterative deepening (tlc2.tool.DFIDModelChecker) | `desk/tests/lib/dfid.hoon (R2.5): lib/check dfid-check reproduces `tlc2.TLC -workers 1 -dfid N` -- verdict, every EC 2205 level line and both EC 2204/2208 counts -- over 22 cases. The COUNTEREXAMPLE is an approved difference (DFID descends at random from a clock-seeded generator `-seed` does not reach), and the generator MEASURES which cases that actually affects: it runs the jar 8x per case and drops the trace only where it varied. 2 of 22; the other 20 compare their trace byte-for-byte` |
 | `gen-generate-tests.py` | 18 | pass | Probabilistic simulation (Tool.probabilistic / -generate) | `desk/tests/lib/generate-diff.hoon (R2.4.6): lib/check generate-spec reproduces `tlc2.TLC -generate -workers 1 -seed S` behavior AND states-generated over the three probabilistic opcodes (bounded exists, `x' \in S`, disjunction), each placed BELOW the action-decomposition boundary because that is the only place the flag is observable` |
 
-Compared cases: **1256**.  Oracle-only cases: **22**.
+Compared cases: **1259**.  Oracle-only cases: **22**.
 
 The oracle-baseline suite (`desk/test-data/oracle/regen.sh`) adds 14 end-to-end golden cases outside this table.

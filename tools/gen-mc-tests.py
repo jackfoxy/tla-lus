@@ -42,34 +42,9 @@ DROP = re.compile(
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
 SKIPS: dict = {
-    #  R2.7.15a fixed three of the five routing defects and froze the two its
-    #  own corpus then exposed. Both are in the IMPLIED-ACTION bin and both are
-    #  PRE-EXISTING -- `+implied-action-run` had them too; no case could show
-    #  either until this unit's matrix arrived.
-    "prop-act-viol": (
-        "R2.7.15a: verdict, trace and counts are now right except the QUEUE -- "
-        "the port reports `1 states left on queue` where the pin reports 0. "
-        "`+register-in`'s invariant check runs BEFORE the enqueue ('a "
-        "violating state is counted but never enqueued'), and the implied "
-        "action check was added AFTER `+register-in` returns, so the "
-        "successor is already on the queue. The fix is to move the check "
-        "INSIDE `+register-in`, between the invariant check and the enqueue, "
-        "which needs `prev` threaded in. The ORDER is already right: an "
-        "invariant and an implied action false on the same transition name "
-        "the invariant (`inv-prop-action`, green)."),
-    "prop-act-ok": (
-        "R2.7.15a exposed a FOURTH defect, and it is PRE-EXISTING: "
-        "`[][A]_v` is checked as `A` alone, not as the SQUARE action "
-        "`A \/ UNCHANGED v`, so a STUTTERING step reports a violation tlc2 "
-        "permits. `+implied-action-inner` returns `$SquareAct`'s first "
-        "argument and drops the subscript, and both the retired "
-        "`+first-bad-step` and DFID's `+first-bad-action` consume it that "
-        "way -- so the same bug is latent in the DFID engine. No corpus case "
-        "could show it: every existing implied-action spec has a next-state "
-        "relation with no stuttering step. The fix carries the subscript "
-        "beside the body (`[name body sub]`) in both `bfs-opts.iacts` and "
-        "`dfid-opts.iacts`, and answers FALSE only when `A` fails AND the "
-        "subscript CHANGED."),
+    #  R2.7.15b emptied this map: both entries were the implied-action bin --
+    #  the square action and the queue count -- and one unit closed them. The
+    #  mechanism stays for the next increment that needs it.
 }
 
 

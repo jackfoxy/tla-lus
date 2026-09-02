@@ -1155,6 +1155,49 @@
     '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0aTemporal == []<>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Temporal\0a'
 ::
+++  test-mc-prop-act-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 2'
+        'State 4: <Next line 10, col 13 to line 10, col 31 of module spec>'
+        'x = 3'
+        'State 5: Stuttering'
+        '8 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15: an IMPLIED ACTION `[][A]_v` that HOLDS, declared FIRST, with a\0a\\* violated temporal property after it. The port routed on the head of the\0a\\* list, so the temporal property was never checked and the run completed\0a\\* clean where tlc2 reports it.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aActOk == [][x\' = x + 1]_x\0aLive  == <>(x = 9)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY ActOk\0aPROPERTY Live\0a'
+::
+++  test-mc-prop-act-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Action property ActBad is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 8, col 9 to line 8, col 24 of module spec>'
+        'x = 2'
+        '2 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15: an IMPLIED ACTION that is VIOLATED alongside a violated temporal\0a\\* property -- the action-property error (EC 2112) pre-empts the temporal\0a\\* verdict, the same precedence a box-state property has.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 2) % 8\0aActBad == [][x\' = x + 1]_x\0aLive   == <>(x = 9)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY ActBad\0aPROPERTY Live\0a'
+::
 ++  test-mc-prop-attrib
   %+  expect-eq
     !>  ^-  wain
