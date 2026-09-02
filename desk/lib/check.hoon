@@ -2739,6 +2739,43 @@
     %error     [0 0 0 0]
   ==
 ::
+++  cli-postconditions
+  ::  R2.7.14b: `-postCondition mod!op` as postcondition NAMES, to be appended
+  ::  to the config's own. tlc2 puts both in one `POST_CONDITIONS` list and
+  ::  `Spec.getPostConditionSpecs` resolves them together, so this is a second
+  ::  ENTRY POINT into R2.7.7.3's machinery, not a second mechanism -- which is
+  ::  also why the CLI ones run AFTER the `.cfg` ones, in the order given.
+  ::
+  ::  The module half is checked against the definition's ORIGIN, the same
+  ::  field `+eval-user` keys its StandardModule override lookup on. A name
+  ::  that resolves in a DIFFERENT module is passed through unchanged so
+  ::  `+post-cond-lines` reports it exactly as it reports an unknown one --
+  ::  tlc2's unexpected-exception wrapper, measured by `cfg-post-undef`. There
+  ::  is no separate diagnostic for "right name, wrong module" at the pin.
+  ::  A name that resolves in a DIFFERENT module is REFUSED here rather than
+  ::  evaluated. The port's `defs` is keyed by bare name, so evaluating it
+  ::  would silently honour `Other!Post` by running the root module's `Post` --
+  ::  accepting an option and doing something else, which is the one thing R2.1
+  ::  forbids. tlc2 would not find it at all; a refusal naming the mismatch is
+  ::  the port's analogue, and unlike a guessed diagnostic it is reproducible.
+  |=  [xs=(list [module=@t op=@t]) defs=(map @t sem-def:sem-lib)]
+  ^-  (each (list @t) @t)
+  ?~  xs  [%& ~]
+  =/  x  i.xs
+  =/  d  (~(get by defs) op.x)
+  ?:  ?&  ?=(^ d)
+          !=(origin.u.d module.x)
+      ==
+    :-  %|
+    %-  crip
+    ;:  weld
+      "unsupported: -postCondition "  (trip module.x)  "!"  (trip op.x)
+      " names a module other than "  (trip origin.u.d)  ", where "
+      (trip op.x)  " is defined"
+    ==
+  =/  r  $(xs t.xs)
+  ?:(?=(%| -.r) r [%& [op.x p.r]])
+::
 ++  post-cond-lines
   ::  POSTCONDITION, evaluated AFTER state-space exploration (R2.7.7.3), the
   ::  way `Tool.checkPostConditionWithContext` does. Measured at the pin:
@@ -3117,9 +3154,12 @@
           ::  context for the EC 2257/2259 stuttering hint (R1.8.1.3)
           sname=(unit @t)  sloc=sspan:sem-lib  fair=(list sem:sem-lib)
           aname=@t                      ::  root action name (`sctx`'s)
-          ::  R2.7.14: the POSTCONDITION lines, built by the caller (which has
-          ::  the run's final carrier and statistics) and rendered in tlc2's slot
-          pcl=wain
+          ::  R2.7.14a/b: what the POSTCONDITION block needs. The LINES cannot
+          ::  be built by the caller any more, because R2.7.14b binds
+          ::  `TLCExt!CounterExample` to the lasso and the lasso is found HERE
+          ::  -- handing the caller one would mean building the product twice
+          pcs=(list @t)  rs=rst:ne
+          poss=(list [name=@t body=sem:sem-lib lvl=@ud])
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
   ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
@@ -3132,6 +3172,32 @@
     ?~  os  [~ ~]
     =/  r  (oos-lasso:lv i.os states inits nsb env order)
     ?^(r [r ~[i.os]] $(os t.os))
+  ::  R2.7.14b: the counter-example as a VALUE, bound for the POSTCONDITION
+  ::  and for nothing else -- tlc2 conses it onto an otherwise empty Context
+  ::  for exactly that call. `loop` is 0 when the counter-example carries no
+  ::  closer, which is `+box-free-tf`: that is the LiveCheck call site, and its
+  ::  CounterExample gets no closing edge
+  =/  cev=(unit value)
+    ?~  l.hit  ~
+    :-  ~
+    %:  counter-example-value
+      (turn prefix.u.l.hit |=(fp=@t (~(got by states) fp)))
+      order
+      (get-actions nsb aname defs env)
+      env
+      modn
+      ?:((box-free-tf o.hit) 0 loop.u.l.hit)
+    ==
+  =/  pcl=wain
+    %:  post-cond-lines
+      pcs
+      defs
+      %-  ?~(cev same |=(x=eenv:ne (with-ce:ne x u.cev)))
+      (with-run:ne env [| 0 `[depth distinct 0 gen]])
+      modn
+      rs
+      poss
+    ==
   :-  l.hit
   %-  live-render
   :*  l.hit  states  nsb  env  order  modn  defs  pname  props
@@ -3371,9 +3437,9 @@
     :*  oss.c  states  inits.g  nsb.c  env  order.c  modn  defs.c  pname
         props.c
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
-        ::  the `live-message-lines` differential renders the lasso alone; the
-        ::  POSTCONDITION block belongs to the production report (R2.7.14)
-        ~
+        ::  the `live-message-lines` differential renders the lasso alone, so
+        ::  it declares no postconditions (R2.7.14)
+        ~  empty-rst:ne  ~
     ==
   ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
   ::  path (`+check-in`), so the differential wrapper carries it too -- else
@@ -4257,6 +4323,124 @@
     `[name.i.actions ?~(sp ~ `[modn u.sp])]
   $(actions t.actions)
 ::
+++  ce-state-rec
+  ::  R2.7.14b: `TLCStateInfo.toRecordValue()` -- a trace state as a RECORD of
+  ::  its variable bindings, in declaration order (`+normalize` sorts by field
+  ::  name, which is what value equality here depends on)
+  |=  [order=(list @t) st=state]
+  ^-  value
+  %-  normalize:vl
+  :-  %rec
+  %+  murn  order
+  |=  v=@t
+  ^-  (unit vfield:vl)
+  =/  x  (~(get by st) v)
+  ?~(x ~ `[v u.x])
+::
+++  ce-loc-rec
+  ::  the `location` field of an action record: `RecordValue(Location)` --
+  ::  beginLine / beginColumn / endLine / endColumn / module
+  |=  at=(unit loc)
+  ^-  value
+  ?~  at  (normalize:vl [%rec ~])
+  =*  sp  span.u.at
+  %-  normalize:vl
+  :-  %rec
+  :~  ['beginLine' [%int (new:si & line.from.sp)]]
+      ['beginColumn' [%int (new:si & col.from.sp)]]
+      ['endLine' [%int (new:si & line.to.sp)]]
+      ['endColumn' [%int (new:si & col.to.sp)]]
+      ['module' [%str src.u.at]]
+  ==
+::
+++  ce-action-rec
+  ::  `RecordValue(Action)` -- `[name |-> .., location |-> ..]`. tlc2 adds
+  ::  `context`/`parameters` when the action TAKES parameters; no corpus case
+  ::  has one, so those two fields are UNMEASURED and deliberately absent
+  ::  rather than guessed (the `_LAZYSET` discipline)
+  |=  a=(unit [name=@t at=(unit loc)])
+  ^-  value
+  ?~  a  (normalize:vl [%rec ~[['name' [%str '']] ['location' (ce-loc-rec ~)]]])
+  %-  normalize:vl
+  :-  %rec
+  :~  ['name' [%str name.u.a]]
+      ['location' (ce-loc-rec at.u.a)]
+  ==
+::
+++  counter-example-value
+  ::  R2.7.14b: `TLCExt!CounterExample` -- the counter-example the run just
+  ::  produced, as tlc2's `CounterExample` RecordValue:
+  ::
+  ::    [ state  |-> { <<n, [vars]>> : n \in 1..Len(trace) },
+  ::      action |-> { <<from, actionRec, to>> } ]
+  ::
+  ::  `loop` is tlc2's `loopOrdinal`, 1-based: **0 means no closing edge**.
+  ::  That is not a detail — it is the difference between the two liveness
+  ::  call sites, and both corpus fixtures depend on it:
+  ::
+  ::    LiveCheck   `new CounterExample(states)`                 loopOrdinal 0
+  ::                the safety-LIKE violation ("treat it as a lasso where the
+  ::                last state stutters forever") -- `gh1389-counting`, whose
+  ::                POSTCONDITION asserts 10 states and **9** actions
+  ::    LiveWorker  `new CounterExample(states, action, stateNumber)`
+  ::                the genuine lasso, closing edge appended -- `gh1389-violc`,
+  ::                whose POSTCONDITION asserts 2 states and **2** actions and
+  ::                names both endpoints of the back edge
+  ::
+  ::  The port already computes that discriminator: a counter-example with NO
+  ::  closer is exactly `+box-free-tf`'s, which is R2.7.11a's rule seen from
+  ::  the other side. A safety trace passes `loop` 0 for the same reason.
+  |=  $:  sts=(list state)  order=(list @t)
+          actions=(list act)  e=eenv:ne  modn=@t
+          loop=@ud
+      ==
+  ^-  value
+  =/  n  (lent sts)
+  ::  the numbered state tuples, `<<i, rec>>`
+  =/  tups=(list value)
+    =/  i=@ud  1
+    =/  l  sts
+    |-  ^-  (list value)
+    ?~  l  ~
+    [[%seq ~[[%int (new:si & i)] (ce-state-rec order i.l)]] $(l t.l, i +(i))]
+  ::  the forward edges: state i -> state i+1, labelled with the action that
+  ::  generated i+1 (`+edge-action`, the same resolution the trace labels use)
+  =/  fwd=(list value)
+    =/  i=@ud  1
+    =/  l  sts
+    |-  ^-  (list value)
+    ?~  l  ~
+    ?~  t.l  ~
+    =/  a
+      %:  edge-action
+        i.l  (@t (state-fp:fp order i.t.l))  actions  e  order  modn
+      ==
+    :-  :-  %seq
+        :~  (snag (dec i) tups)
+            (ce-action-rec a)
+            (snag i tups)
+        ==
+    $(l t.l, i +(i))
+  ::  the closing edge, when the lasso has one: last -> sts[loop]
+  =/  back=(list value)
+    ?:  |(=(0 loop) =(0 n))  ~
+    =/  last  (rear sts)
+    =/  a
+      %:  edge-action
+        last  (@t (state-fp:fp order (snag (dec loop) sts)))  actions  e  order  modn
+      ==
+    :_  ~
+    :-  %seq
+    :~  (snag (dec n) tups)
+        (ce-action-rec a)
+        (snag (dec loop) tups)
+    ==
+  %-  normalize:vl
+  :-  %rec
+  :~  ['action' (normalize:vl [%set %set-enum (weld fwd back)])]
+      ['state' (normalize:vl [%set %set-enum tups])]
+  ==
+::
 ++  fp-hex
   ::  a state fingerprint as TLC prints it: "0x" + lowercase hex, no separators
   |=  fp=@t
@@ -4471,28 +4655,19 @@
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  alias.c  vrend.c  |
           ~  post  pcl
       ==
-    ::  R2.7.14: the POSTCONDITION runs here too. Measured at the pin, a
+    ::  R2.7.14a: the POSTCONDITION runs here too -- measured at the pin, a
     ::  temporal violation is followed by `Error: Postcondition <name> at
-    ::  <loc> is false.` before the counts -- R2.7.7.3 wired the clean and
-    ::  safety-error paths and this one was simply absent, so a false
-    ::  postcondition on a spec with a temporal PROPERTY printed nothing at all
-    =/  lst  [depth.g.bg distinct.g.bg 0 gen.g.bg]
-    =/  pcl=wain
-      %:  post-cond-lines
-        pcs.c
-        defs.c
-        (with-run:ne (make-env:ne defs.c consts.c vars.c) [| 0 `lst])
-        modn
-        rs.bg
-        poss.c
-      ==
+    ::  <loc> is false.` before the counts. R2.7.7.3 wired the clean and
+    ::  safety-error paths and this one was simply absent. R2.7.14b moved the
+    ::  BUILD into `+live-report`, which is where the lasso `CounterExample`
+    ::  binds to already exists
     =/  r
       %-  live-report
       :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  u.pp.c
           props.c
           gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
-          pcl
+          pcs.c  rs.bg  poss.c
       ==
     report.r
   ::  safety: an INVARIANT

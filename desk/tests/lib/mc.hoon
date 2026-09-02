@@ -70,6 +70,61 @@
     '---- MODULE spec ----\0aVARIABLE i\0aInit == i = 1\0aNext == UNCHANGED i\0aSpec == Init /\\ [][Next]_i\0aInv == i = 2\0aAlias == [ i |-> i, foo |-> "bar", j |-> i = i\' ]\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANTS Inv\0aALIAS Alias\0a'
 ::
+++  test-mc-ce-empty
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14b: a CLEAN run evaluates `TLCExt!CounterExample` to `new\0a\\* CounterExample()` -- an EMPTY record -- because the value is consed onto\0a\\* the Context only on a violation path. `CounterExample.state = {}` is the\0a\\* test _JsonTrace and _DotTrace use to detect "no violation", so it is the\0a\\* one this case pins.\0aEXTENDS Naturals, FiniteSets, TLCExt\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aInv  == x \\in 0..1\0aPostCondition ==\0a    /\\ CounterExample.state = {}\0a    /\\ CounterExample.action = {}\0a    /\\ Cardinality(CounterExample.state) = 0\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aPOSTCONDITION PostCondition\0a'
+::
+++  test-mc-ce-lasso
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 14, col 9 to line 14, col 18 of module spec>'
+        'x = 1'
+        'Back to state 1: <Next line 14, col 9 to line 14, col 18 of module spec>'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14b: the CLOSING EDGE. A deterministic two-state back-to-state lasso,\0a\\* so the counter-example graph is exactly 2 states and 2 actions -- one\0a\\* forward edge and one edge closing the lasso -- and both endpoints are\0a\\* pinned by state NUMBER. `gh1389-violc` pins the same shape, but its witness\0a\\* varies at the pin; this one does not.\0a\\*\0a\\* Endpoints are compared as `a[1][1]` rather than against a record literal\0a\\* on purpose: a record field named after a declared VARIABLE draws six lines\0a\\* of SANY lint per occurrence, which would bury the assertion in the golden.\0aEXTENDS Naturals, FiniteSets, TLCExt\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aLive == <>[](x = 1)\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a    IN\0a    /\\ Cardinality(S) = 2\0a    /\\ Cardinality(A) = 2\0a    /\\ \\A s \\in S : s[1] \\in 1..2 /\\ s[2].x = (s[1] - 1)\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a    /\\ \\E a \\in A : a[1][1] = 1 /\\ a[3][1] = 2\0a    /\\ \\E a \\in A : a[1][1] = 2 /\\ a[3][1] = 1\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Live\0aPOSTCONDITION PostCondition\0a'
+::
+++  test-mc-ce-lasso-false
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Live was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 19, col 9 to line 19, col 18 of module spec>'
+        'x = 1'
+        'Back to state 1: <Next line 19, col 9 to line 19, col 18 of module spec>'
+        'Error: Postcondition PostCondition at line 23, col 5 to line 31, col 46 of module spec is false.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.14b: THE OTHER DIRECTION -- identical to `ce-lasso` but asserting\0a\\* three actions where there are two, so the postcondition must FAIL. A\0a\\* silent pass proves nothing unless a deliberate break is pinned beside it\0a\\* (the both-directions discipline R2.7.6.1\'s APPROVED map established).\0a\\*\0a\\* A deterministic two-state back-to-state lasso,\0a\\* so the counter-example graph is exactly 2 states and 2 actions -- one\0a\\* forward edge and one edge closing the lasso -- and both endpoints are\0a\\* pinned by state NUMBER. `gh1389-violc` pins the same shape, but its witness\0a\\* varies at the pin; this one does not.\0a\\*\0a\\* Endpoints are compared as `a[1][1]` rather than against a record literal\0a\\* on purpose: a record field named after a declared VARIABLE draws six lines\0a\\* of SANY lint per occurrence, which would bury the assertion in the golden.\0aEXTENDS Naturals, FiniteSets, TLCExt\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aLive == <>[](x = 1)\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a    IN\0a    /\\ Cardinality(S) = 2\0a    /\\ Cardinality(A) = 3\0a    /\\ \\A s \\in S : s[1] \\in 1..2 /\\ s[2].x = (s[1] - 1)\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a    /\\ \\E a \\in A : a[1][1] = 1 /\\ a[3][1] = 2\0a    /\\ \\E a \\in A : a[1][1] = 2 /\\ a[3][1] = 1\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Live\0aPOSTCONDITION PostCondition\0a'
+::
 ++  test-mc-cfg-periodic-arg
   %+  expect-eq
     !>  ^-  wain
@@ -285,7 +340,7 @@
   %-  trim
   %+  check:check
     '--------------------------- MODULE spec ---------------------------\0a\\* Regression test for https://github.com/tlaplus/tlaplus/issues/1389\0a\\* exercising the "counting safety property" use case -- the primary\0a\\* motivation for permitting RECURSIVE operators at temporal level.\0a\\*\0a\\* Bound the number of times an event may occur.  The canonical example\0a\\* here is "x is TRUE in at most n disjoint intervals", equivalently \0a\\* "x becomes TRUE at most n times":\0a\\*\0a\\*   AtMost(0) == []~x                              \\* never TRUE\0a\\*   AtMost(1) == [](x => [](~x => []~x))           \\* TRUE in at most 1 interval\0a\\*   AtMost(2) == [](x => [](~x => [](x => [](~x => []~x))))\0a\\*   ...\0a\0aEXTENDS Naturals, FiniteSets, TLCExt\0a\0aVARIABLE x\0a\0aRECURSIVE AtMost(_)\0aAtMost(n) == IF n = 0 THEN []~x\0a                      ELSE [](x => [](~x => AtMost(n - 1)))\0a\0aInit == x = FALSE\0aNext == x\' \\in BOOLEAN\0aSpec == Init /\\ [][Next]_x\0a\0aCountAtMostFour == AtMost(4)\0a\0a------------------------------------------------------------------\0a\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a    IN\0a    /\\ Cardinality(S) = 10\0a    /\\ Cardinality(A) = 9\0a    /\\ \\A i \\in 1..10 :\0a         \\E s \\in S :\0a            /\\ s[1] = i\0a            /\\ s[2].x = (i % 2 = 0)\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a==================================================================\0a'
-  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTIES\0a    CountAtMostFour\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTIES\0a    CountAtMostFour\0aPOSTCONDITION PostCondition\0a'
 ::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. NOT a cap case, measured: the recursion is guarded by a STATE variable,
@@ -399,7 +454,7 @@
   %-  trim
   %+  check:check
     '--------------------------- MODULE spec ---------------------------\0aEXTENDS Naturals, FiniteSets, TLCExt\0a\0aVARIABLE x\0a\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 99) ELSE <>(Reach(n - 1))\0a\0aInit == x = 0\0aNext == x\' \\in 0..99\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0a\0aPropViolated == Reach(3)\0a\0a\\* Postcondition asserting the shape of the counterexample.  WF_x(Next)\0a\\* forces the lasso to actually move x rather than stutter, so TLC finds a\0a\\* two-state cycle x = 0 -> x = v -> back to x = 0 for some v.  The\0a\\* specific value v depends on state-space exploration order; v must be\0a\\* in 1..98 because\0a\\*   - v # 0:  WF_x(Next) requires a non-stuttering step, so x must change,\0a\\*   - v # 99: the lasso violates <>(x = 99), so no state on it has x = 99.\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a        \\* x-value of the non-initial state on the lasso (varies; in 1..98).\0a        s2v == LET t == CHOOSE t \\in S : t[1] = 2 IN t[2].x\0a    IN\0a    /\\ Cardinality(S) = 2\0a    /\\ Cardinality(A) = 2\0a    /\\ <<1, [x |-> 0]>> \\in S\0a    /\\ <<2, [x |-> s2v]>> \\in S\0a    /\\ s2v \\in 1..98\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a    /\\ \\E a \\in A : a[1] = <<1, [x |-> 0]>> /\\ a[3] = <<2, [x |-> s2v]>>\0a    /\\ \\E a \\in A : a[1] = <<2, [x |-> s2v]>> /\\ a[3] = <<1, [x |-> 0]>>\0a==================================================================\0a'
-  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0a'
+  'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY PropViolated\0aPOSTCONDITION PostCondition\0a'
 ::
 ++  test-mc-gh710e
   %+  expect-eq

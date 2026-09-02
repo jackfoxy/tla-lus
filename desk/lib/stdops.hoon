@@ -391,6 +391,12 @@
   ::  R2.7.10: an `@Evaluation` override that resolves a definition BY NAME in
   ::  the ROOT module and evaluates it, so it needs the node and the env
   ?:  =(k ['TLCExt' 'TLCEvalDefinition' 1])  `[%tlc-eval-def & 0]
+  ::  R2.7.14b: `TLCExt!CounterExample` is arity-0 and its vendored body is the
+  ::  placeholder `TRUE`, so evaluating the definition is meaningless -- the pin
+  ::  has an `@Evaluation` override that reads the value out of the evaluation
+  ::  Context. It takes no arguments and needs only the env, which is why it is
+  ::  a node-op rather than a registry gate
+  ?:  =(k ['TLCExt' 'CounterExample' 0])   `[%counter-example & 1]
   ~
 ::
 ++  op-meta

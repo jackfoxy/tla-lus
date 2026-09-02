@@ -1409,6 +1409,15 @@
       [%failed 'unsupported: -view without a VIEW in the config (nothing to render)']
     pre
   =/  vrb=(unit sem:semantic)  ?:(view.opts.op.request.j vwb ~)
+  ::  R2.7.14b: `-postCondition mod!op` appends to the config's POSTCONDITION
+  ::  list, in the order given, exactly as tlc2 appends both to one
+  ::  `POST_CONDITIONS`. A module half naming somewhere other than where the
+  ::  operator lives is refused at CONFIG time -- honouring it would run the
+  ::  root module's operator instead, which is accepting an option and doing
+  ::  something else
+  =/  xpc  (cli-postconditions:check postconditions.opts.op.request.j defs)
+  ?:  ?=(%| -.xpc)  (finish j [%failed p.xpc] pre)
+  =/  pcs=(list @t)  (weld postconditions.rs p.xpc)
   =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
   ?:  &(?=(^ iv) ?=(~ ivb))
     %^  finish  j
@@ -1609,7 +1618,7 @@
             vwb  max-set-size.lims  continue.opts.op.request.j  ~  *cov-opts:check
             0
         ==
-      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb postconditions.rs vrb])
+      =.  cont.j  (save-kont [%bfs nl act aname o (bfs-init:check is) alb pcs vrb])
       (more j pre)
     ::  the lasso trace is rendered by the %liveness stage, which takes no
     ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
@@ -1644,7 +1653,7 @@
       ==
     =.  cont.j
       %-  save-kont
-      :*  %live  %build  p.osr  u.pp  postconditions.rs
+      :*  %live  %build  p.osr  u.pp  pcs
           (implied-temporals:check properties.rs defs)
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
@@ -1670,7 +1679,7 @@
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
   =.  cont.j
-    (save-kont [%bfs nl act aname o (bfs-init-regs:check is +.isc) alb postconditions.rs vrb])
+    (save-kont [%bfs nl act aname o (bfs-init-regs:check is +.isc) alb pcs vrb])
   (more j pre)
 ::
 ::  +|  Stage: %explore
@@ -1849,14 +1858,24 @@
   =/  st      stats.j
   =/  states  (states-of:check seen.cur.kk)
   =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
-  ::  R2.7.14: the POSTCONDITION lines, in tlc2's slot (between the EC
+  ::  R2.7.14a/b: the POSTCONDITION lines, in tlc2's slot (between the EC
   ::  2257/2259 hint and the counts). The run's FINAL carrier and statistics,
   ::  for the same reason R2.7.7.4a threaded them on the safety path -- a
-  ::  postcondition typically reads `TLCGet("distinct")`
-  =/  pcl=wain
+  ::  postcondition typically reads `TLCGet("distinct")`.
+  ::
+  ::  A gate rather than a value, because `TLCExt!CounterExample` binds to the
+  ::  LASSO and the lasso is not known until the product search finishes: the
+  ::  pass branch calls it with `~`, the violation branch with the counter-
+  ::  example it just built. The console path does the same inside
+  ::  `+live-report`, and `test-kernel-report-equals-console-*` is what keeps
+  ::  the two honest
+  =/  pcl-of
+    |=  cev=(unit value:check)
+    ^-  wain
     %:  post-cond-lines:check
       pcs.kk
       defs.o.kk
+      %-  ?~(cev same |=(x=eenv:ne (with-ce:ne x u.cev)))
       %+  with-run:ne  env
       [| 0 `[depth.st distinct.st queued.st generated.st]]
       modn.kk
@@ -1873,7 +1892,7 @@
       ::  sites cannot drift (R1.8.3)
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
           props.kk
-          generated.st  distinct.st  depth.st  ~  aname.kk  |  pcl
+          generated.st  distinct.st  depth.st  ~  aname.kk  |  (pcl-of ~)
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -1914,7 +1933,19 @@
         aname.kk
         ::  R2.7.5: same OOS, same test as the console path
         (box-free-tf:check ~[o])
-        pcl
+        ::  R2.7.14b: the counter-example as a VALUE, `loop` 0 when the report
+        ::  carries no closer -- the LiveCheck call site, which appends no
+        ::  closing edge
+        %-  pcl-of
+        :-  ~
+        %:  counter-example-value:check
+          (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
+          order.o.kk
+          (get-actions:check next.o.kk aname.kk defs.o.kk env)
+          env
+          modn.kk
+          ?:((box-free-tf:check ~[o]) 0 loop.u.l)
+        ==
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))

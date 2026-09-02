@@ -109,6 +109,7 @@ CLASSIFY = {
     # every TLCExt surface `excluded`; these five are not, and `class` has to
     # say so or it contradicts what lib/stdops actually does.
     ("TLCExt", "AssertEq"):    ("body", "no Java override; evaluates its TLA+ definition (PrintT/Assert, both implemented)"),
+    ("TLCExt", "CounterExample"): ("required", "R2.7.14b: the counter-example the run just produced, as the record `[state |-> {<<n, [vars]>>}, action |-> {<<from, actionRec, to>>}]`. tlc2's `@Evaluation` override reads it out of the evaluation Context; the port reads a `ce` slot on `eenv`, bound only in the scope of a POSTCONDITION, falling back to the EMPTY record on a clean run exactly as `new CounterExample()` does. The two upstream `Github1389` fixtures assert its shape, including the closing edge a genuine lasso carries and the safety-like violation does not"),
     ("TLCExt", "AssertError"): ("required", "catches the argument's evaluation failure and compares the message (R2.6.3)"),
     #  R2.7.10 ported the three surfaces the `later:` bucket held.
     ("TLCExt", "TLCFP"):             ("required", "the value's FP64 downcast, `(int) fp` -- reproducible under `-fp 0`, the pin's own precondition (R2.7.10)"),
@@ -187,7 +188,7 @@ R2_CLASSIFY = {
     ("TLCExt", "TLCGetOrDefault"): "R2.7.4",
     ("TLCExt", "TLCGetAndSet"):    "R2.7.4",
     # the trace-explorer / debugger half, which stays out
-    ("TLCExt", "CounterExample"): "out:trace-explorer surface (needs a counterexample the evaluator does not hold)",
+    ("TLCExt", "CounterExample"): "in:R2.7.14b (a `ce` slot on `eenv`; the two upstream Github1389 POSTCONDITIONs assert its shape)",
     ("TLCExt", "PickSuccessor"):  "out:debugger surface; interactive successor choice",
     ("TLCExt", "Trace"):          "out:trace-explorer surface (needs the current behavior prefix)",
     ("TLCExt", "ToTrace"):        "out:trace-explorer surface (lasso ordinal of a liveness counterexample)",

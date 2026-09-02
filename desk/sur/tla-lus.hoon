@@ -200,6 +200,19 @@
       ::  a caller who wants one is refused by name rather than served a number
       ::  that does nothing (R2.1)
       coverage=?
+      ::  tlc2's `-postCondition mod!op` (R2.7.14b): evaluate `op` in module
+      ::  `mod` after state-space exploration, in ADDITION to any the `.cfg`
+      ::  declares. tlc2 appends both to one `POST_CONDITIONS` list and
+      ::  `Spec.getPostConditionSpecs` resolves them together, so this is a
+      ::  second entry point into R2.7.7.3's machinery rather than a second
+      ::  mechanism.
+      ::
+      ::  A LIST, because the flag may be given more than once, and a PAIR
+      ::  rather than the `mod!op` text because the port has no reason to
+      ::  re-parse what it already has structured -- tlc2 splits on `!` and
+      ::  rejects an empty half or a dot in either, which is CLI-argument
+      ::  hygiene, not a property of the postcondition
+      postconditions=(list [module=@t op=@t])
       mode=check-mode
   ==
 +$  op

@@ -70,6 +70,20 @@
       ::  rebuilds them per expansion rather than once per run
       ::  (the mold lives in lib/stdops, which cannot import this file)
       run=(unit tlc-run:so)
+      ::  R2.7.14b: `TLCExt!CounterExample` -- the counter-example the run just
+      ::  produced, as a VALUE. tlc2 carries it in the evaluation `Context`
+      ::  (`Tool.checkPostConditionWithCounterExample` does
+      ::  `Context.Empty.cons(getCounterExampleDef(), value)`) and the
+      ::  `@Evaluation` override reads it back with `c.lookup(...)`. The port's
+      ::  `Context` analogue for run-scoped facts is this env, the same slot
+      ::  `run` uses.
+      ::
+      ::  `~` is NOT "no counter-example": it is "not in the scope of a
+      ::  POSTCONDITION at all". Measured at the pin, a CLEAN run evaluates
+      ::  `new CounterExample()` -- an EMPTY record -- so `+eval-counter-example`
+      ::  answers with the empty one either way, and `CounterExample.state = {}`
+      ::  stays the idiom `_JsonTrace`/`_DotTrace` use to detect "no violation"
+      ce=(unit value:v)
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -1095,6 +1109,10 @@
   ?:  ?=(%assert-error tag)   (eval-assert-error n e rs)
   ?:  ?=(%tlc-cache tag)      (eval-tlc-cache n e rs)
   ?:  ?=(%tlc-defer tag)      [(eval-tlc-defer n e) rs]
+  ::  R2.7.14b: reads the counter-example out of the env, the port's analogue
+  ::  of tlc2's `c.lookup(tool.getCounterExampleDef())`, and falls back to the
+  ::  EMPTY record exactly as `TLCExt.error` returns `new CounterExample()`
+  ?:  ?=(%counter-example tag)  [[%& ?~(ce.e empty-counter-example u.ce.e)] rs]
   ?.  ?=(%select-seq tag)  [[%| 0 'unsupported operator-argument override.'] rs]
   ?.  ?=([* * ~] args.n)
     [[%| 0 'SelectSeq expects two arguments.'] rs]
@@ -2199,7 +2217,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -2253,7 +2271,25 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~]
+  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~]
+::
+++  empty-counter-example
+  ::  `new CounterExample()` -- the value a run with no violation evaluates
+  ::  `TLCExt!CounterExample` to. Both fields are the EMPTY SET, which is the
+  ::  test `_JsonTrace` and `_DotTrace` use (`CounterExample.state = {}`)
+  ^-  value:v
+  :-  %rec
+  :~  ['action' [%set %set-enum ~]]
+      ['state' [%set %set-enum ~]]
+  ==
+::
+++  with-ce
+  ::  R2.7.14b: the counter-example value applied to a prebuilt env, for the
+  ::  duration of POSTCONDITION evaluation only -- tlc2 conses it onto an
+  ::  otherwise EMPTY Context for exactly that call and nothing else sees it
+  |=  [e=eenv v=value:v]
+  ^-  eenv
+  e(ce `v)
 ::
 ++  with-setmax
   ::  the run's `max-set-size` applied to a prebuilt env (R2.4.1). A separate

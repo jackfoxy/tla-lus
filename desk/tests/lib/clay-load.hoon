@@ -127,7 +127,7 @@
 ++  clay-req
   |=  [root=module-name cfg=(unit path) roots=(list path)]
   ^-  request
-  :*  [%check [| | | | ~ | [%exhaustive & 0]]]
+  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
       lim  ~  ~
   ==
@@ -135,7 +135,7 @@
 ++  inline-req
   |=  [root=module-name mods=(list [module-name @t]) cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~]
 ::
 ::  +|  Harness
 ::

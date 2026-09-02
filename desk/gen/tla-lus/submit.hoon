@@ -13,7 +13,7 @@
   ?-  kind
     %translate  [%translate [%none | &]]
     %analyze    [%analyze [& & & &]]
-    %check      [%check [& | | | ~ | [%exhaustive & 0]]]
+    %check      [%check [& | | | ~ | ~ [%exhaustive & 0]]]
   ==
 =/  demo-text  '---- MODULE Demo ----\0a====\0a'
 :^    %submit

@@ -33,7 +33,7 @@
   ^-  request
   ::  `check-opts` is [translate view difftrace continue cfg mode]; the middle
   ::  three landed in R2.4.2/R2.4.3 and this literal never grew them
-  :*  [%check [& | | | `'MC.cfg' | [%simulate 42 5 100 |]]]
+  :*  [%check [& | | | `'MC.cfg' | ~ [%simulate 42 5 100 |]]]
       :*  %clay
           ~zod
           %specs
