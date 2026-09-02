@@ -1177,6 +1177,41 @@
     '---- MODULE spec ----\0a\\* R2.7.12: POST-HOC PROPERTY ATTRIBUTION. Two PROPERTIES; the FIRST one\0a\\* HOLDS on the counter-example and the SECOND is the violated one, so the\0a\\* reported name cannot come from the property list\'s head. tlc2 names it by\0a\\* evaluating each declared property over the finished lasso\0a\\* (Liveness.findViolatedProperties / LiveExprNode.evalOnLasso).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aP1 == []<>(x < 9)\0aP2 == <>(x = 3)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0a'
 ::
+++  test-mc-prop-box-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant BoxBad is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 11, col 13 to line 11, col 31 of module spec>'
+        'x = 1'
+        'State 3: <Next line 11, col 13 to line 11, col 31 of module spec>'
+        'x = 2'
+        '5 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15: `processConfigProps` routes EVERY property. A `[]P` box-state\0a\\* PROPERTY joins the INVARIANT vector and a genuine temporal one goes to the\0a\\* liveness engine, in the SAME run -- and the safety violation pre-empts the\0a\\* temporal verdict exactly as an INVARIANT does (R2.3.4). Note the box-state\0a\\* property is reported as an `Invariant`, not as a `Temporal property`.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aBoxBad  == [](x < 2)\0aLive    == <>(x = 9)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY BoxBad\0aPROPERTY Live\0a'
+::
+++  test-mc-prop-init-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula InitBad is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula InitBad holds in all states of every behavior, use INVARIANT InitBad instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula InitBad changes it into a temporal formula, asserting that InitBad holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Property InitBad is violated by the initial state:'
+        'x = 0'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R2.7.15: a level-1 PROPERTY is an IMPLIED INIT, checked while computing the\0a\\* initial states -- so it pre-empts everything, including the temporal\0a\\* property declared beside it, and prints NO state-graph counts.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aInitBad == x = 5\0aLive    == <>(x = 9)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY InitBad\0aPROPERTY Live\0a'
+::
 ++  test-mc-prop-plural
   %+  expect-eq
     !>  ^-  wain

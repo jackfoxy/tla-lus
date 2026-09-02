@@ -42,21 +42,44 @@ DROP = re.compile(
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
 SKIPS: dict = {
-    #  R2.7.11a emptied this map; R2.7.12 refilled it with one entry. A frozen
-    #  golden with the arm withheld gives the next increment a target, and
-    #  leaving the case out of the corpus entirely would lose the measurement.
+    #  R2.7.15 MEASURED the multi-PROPERTY routing across the whole matrix and
+    #  froze what is still red. All four entries are ONE row's --
+    #  `tlc-safety-assume` -- and one fix closes them together.
     "prop-box-then-live": (
-        "R2.7.12: MEASURED and NOT fixed -- a MISSED VIOLATION, not a "
-        "rendering difference. `SpecProcessor.processConfigProps` routes "
-        "EVERY `PROPERTY` (a `[]P` box-state to the invariant vector, a "
-        "level-1 predicate to the implied inits, a `[][A]_v` to the implied "
-        "actions, the rest to the liveness engine); the port decides the "
-        "route from the FIRST property alone, so a box-state property "
-        "followed by a genuine temporal one runs the safety engine and never "
-        "checks the second. The pin reports `P2`; the port completes clean. "
-        "Found while measuring R2.7.12's own clause, and it belongs to "
-        "`tlc-safety-assume`, which claimed this routing at R1.8.1.1 -- that "
-        "row is DEMOTED `parity` -> `partial` on this evidence."),
+        "R2.7.12/R2.7.15: `SpecProcessor.processConfigProps` routes EVERY "
+        "`PROPERTY` (a `[]P` box-state to the invariant vector, a level<=1 "
+        "predicate to the implied inits, a `[][A]_v` to the implied actions, "
+        "the rest to the liveness engine); the port decides the route from "
+        "the FIRST property alone. Box-state first, temporal second: the pin "
+        "reports `P2` and the port completes clean -- a MISSED VIOLATION."),
+    "prop-box-last": (
+        "R2.7.15: the same two properties as `prop-box-viol`, in the opposite "
+        "order. tlc2's routing is order-INDEPENDENT, so both verdicts are "
+        "`Invariant BoxBad is violated.`; the port routes on the head, so "
+        "with the temporal one first the box-state property never reaches "
+        "the invariant vector. `prop-box-viol` passes only because its "
+        "box-state property happens to be declared first."),
+    "prop-act-ok": (
+        "R2.7.15: an IMPLIED ACTION that HOLDS, declared first, with a "
+        "violated temporal property after it. The port routes to "
+        "`+implied-action-run` and never checks the temporal one, so it "
+        "completes clean where the pin reports `Live`. Same defect as "
+        "`prop-box-then-live` through the implied-action bin."),
+    "prop-act-viol": (
+        "R2.7.15 found a THIRD defect here, which the row did not name and no "
+        "existing case could see. The port gets the action-property VERDICT "
+        "and TRACE right and the COUNTS wrong: it reports 5 generated / 4 "
+        "distinct / depth 4 where the pin reports 2 / 2 / 2. "
+        "`+implied-action-run` builds the WHOLE reachability graph and then "
+        "scans it for the first bad step, so the counts are a completed "
+        "search's; tlc2 checks `[][A]_v` DURING the search and stops at the "
+        "violation. Its own comment says *'giving the BFS the action as a "
+        "checked predicate rather than a filter'* -- intent, not code, the "
+        "third such comment this release. `implied-act-viol` could not catch "
+        "it because its violation is on the LAST transition, where a "
+        "completed graph and a stopped one agree. The fix is the same one "
+        "the routing needs: implied actions become a per-transition check "
+        "beside `acons`, which is where tlc2 has them."),
 }
 
 
