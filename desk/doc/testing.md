@@ -172,6 +172,45 @@ two-spec residue, not a stale workaround. And each state's **bindings are
 sorted** on both sides, because tlc2 prints them in `java.util.Hashtable` bucket
 order — an approved difference argued in `compatibility.md`.
 
+**Examples TLC batch (R2.8.2b).** `test-tlc-examples-batch` is the same
+comparator pointed at the other corpus: **4 in-scope `tlaplus-Examples` specs**
+through `check:check`, picked by `tools/tier2-select.py` — take the
+`check`-class specs that exercise a LEDGER-ROW FAMILY the checker-exercised
+corpus does not, cheapest-first, until the nightly budget is reached. It is the
+first time any examples spec other than `HourClock` and `TCommit` has been run
+through the Hoon checker, and **3 of the 4 diverge**:
+
+- `AsynchronousInterface/Channel` — record sets (`[val: Data, rdy: {0,1}, …]`);
+  **agrees** (ok / 12 distinct / depth 2).
+- `SimpleMath/SimpleMath` — a config with **no behaviour spec**. tlc2 runs an
+  ASSUME-only module as an ordinary BFS with zero initial states (`0/0/0`, depth
+  0); `+resolve-targets` refuses, and refuses *before* `+check-assumes`, so the
+  port does not check the assumptions either. → `cfg-runspec`.
+- `CigaretteSmokers` — a **LAMBDA as an operator-valued argument**
+  (`ChooseOne(Ingredients, LAMBDA x : smokers[x].smoking)`); `+resolve-oparg`
+  resolves op-args by NAME only. → `tlc-eval-node`.
+- `SimplifiedFastPaxos/Paxos` — a **multi-binder existential in action
+  position** (`\E a \in Replicas, m \in p1aMessages : …`). Selected for
+  SYMMETRY, being the only in-scope examples spec with an uncommented `SYMMETRY`
+  line, so the measurement is that the port never reaches symmetry on it.
+  → `tlc-eval-action`.
+
+All three are REFUSALS, not wrong answers, and all three were invisible to the
+452-spec SANY batches and the 23-spec test-model checker batches — a front-end
+that accepts a spec says nothing about whether the checker runs it. They cost
+the ledger three rows (134 rows, **131 terminal / 3 owed**). The arm costs
+**31.7 s** against the ~7.5 min `test-sany-batch`; the rule ran out of candidates
+well before the budget did, which is how R2.8.2b's row said it would close.
+
+**The selection rule itself was the unit's first finding.** R2.8.2a shipped it
+answering *"add nothing"*; it was wrong in four ways, all under-reporting —
+it credited two specs to the checker that only the ORACLE CAPTURE runs, matched
+`SYMMETRY` inside a commented-out `.cfg` line, scored specs on sibling modules'
+configs, and never checked that a candidate had a config at all. Corrected, the
+checker set is 26 (not 27) and seven row-families were unexercised, not four —
+`ASSUME` among them, with no supplier at all. See
+`tools/notes/plan2-R2.8.2b-examples-coverage-notes.md`.
+
 **Subdir batch (R1.1.6–R1.1.9, completed R1.1.R2).**
 `desk/tests/lib/tier2-sub.hoon` runs **every in-scope test-model subdir spec
 whose module closure resolves — all 310** — through `+sany-verdict` in chunked
@@ -208,6 +247,10 @@ R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
   divergences; R1.1.R2 added the last 15 subdir specs).
 - **TLC safety comparator** — a curated set + a 14-spec batch through the Hoon
   checker vs TLC; the divergences pin the evaluation residues (R1.5).
+- **TLC examples comparator (R2.8.2b)** — a 4-spec `tlaplus-Examples` batch
+  through the Hoon checker vs TLC, selected by `tools/tier2-select.py`; 1 agrees
+  and 3 are censused refusals (`cfg-runspec`, `tlc-eval-node`,
+  `tlc-eval-action`).
 
 Deliberately deferred (each with a concrete unblock condition), tracked in
 `port-map.md`:
@@ -217,7 +260,8 @@ Deliberately deferred (each with a concrete unblock condition), tracked in
   wall and there isn't one, so the cap simply moved to 70 000.
 - ~~**A TLC liveness batch**~~ — **DONE**: wired by R1.8.1.4, taken to 9/9 by
   R1.6, compared on the full trace by R1.1.R1 (8/9, one censused entry), and
-  back to **9/9** once R2.7.5 closed `Github710d`; census empty.
+  back to **9/9** once R2.7.5 closed `Github710d`; the liveness census is empty
+  (the three entries `divergences.txt` now carries are R2.8.2b's examples batch).
 - ~~**Trace + coverage comparison**~~ — **DONE (R1.1.R1)**; its `Tool.getActions`
   dependency landed in R1.5.4. Coverage counters are an approved difference.
 - ~~**Tier-3 performance models**~~ — **not deferred, DESCOPED (R1.1.R3)**: a

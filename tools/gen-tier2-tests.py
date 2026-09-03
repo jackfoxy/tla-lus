@@ -401,6 +401,71 @@ TLC_BATCH_REASONS = {
 TLC_LIVENESS_DIVERGENCES = []
 # grouped cause, keyed by module
 TLC_LIVENESS_REASONS = {}
+# R2.8.2b: the `tlaplus-Examples` TLC batch. R2.8.2 owed "more examples specs
+# in the comparator shards" and R2.8.2a owed it a SELECTION RULE
+# (`tools/tier2-select.py`); this is the rule applied. Membership is the rule's
+# answer under the nightly budget: an in-scope (`check`-class) examples spec
+# with a config of its own that exercises a LEDGER-ROW FAMILY the 26
+# checker-exercised specs do not, cheapest-first. Same comparator and same
+# census discipline as the two test-model batches -- one mule-isolated arm, the
+# whole projection compared, divergences FROZEN by name so a new one cannot
+# appear silently.
+#
+# `Channel` brings record sets (`[val: Data, rdy: {0,1}, ack: {0,1}]`,
+# `tlc-eval-node`) and is the only one that AGREES. The other three are the
+# rule's real yield: ASSUME had no checker-exercised supplier at all, and every
+# spec that brings it -- or SYMMETRY -- is refused by the port.
+# Ordered cheapest-first by MEASURED port cost, which is the rule's own
+# tie-break and not the file size it used as a proxy: 2.1 / 3.0 / 5.7 / 19.7 s.
+TLC_EXAMPLES_BATCH = [
+    (EXAMPLES / "specifications/SpecifyingSystems/AsynchronousInterface",
+     "Channel", "Channel.cfg"),                        # safety ok, 12 states
+    (EXAMPLES / "specifications/SpecifyingSystems/SimpleMath",
+     "SimpleMath", "SimpleMath.cfg"),                  # ASSUME-only, 0 states
+    (EXAMPLES / "specifications/CigaretteSmokers",
+     "CigaretteSmokers", "CigaretteSmokers.cfg"),      # safety ok, 6 states
+    (EXAMPLES / "specifications/SimplifiedFastPaxos",
+     "Paxos", "Paxos.cfg"),                            # safety ok, 1207 states
+]
+
+# Frozen from the ship run, in TLC_EXAMPLES_BATCH order. All three are
+# REFUSALS -- the port answers a typed error where tlc2 answers a verdict --
+# and not one was reachable from any spec the corpus already ran.
+TLC_EXAMPLES_DIVERGENCES = [
+    "SimpleMath -> Error: no INIT/NEXT or SPECIFICATION in config",
+    "CigaretteSmokers -> Error: unsupported operator-valued argument.",
+    "Paxos -> Error: an action existential over multiple binders is unsupported.",
+]
+TLC_EXAMPLES_REASONS = {
+    "CigaretteSmokers":
+        "LAMBDA as an operator-valued argument: `ChooseOne(Ingredients, "
+        "LAMBDA x : smokers[x].smoking)`. +resolve-oparg (node-eval.hoon:1748) "
+        "resolves an op-arg by NAME only, so an anonymous $OpArg is ~. R1.3.1 "
+        "put LAMBDA op-args in the semantic graph; the evaluator half stayed "
+        "open and was tracked by no row. Minimal reproducer: Pick(S, P(_)) == "
+        "CHOOSE y \\in S : P(y), Init == x = Pick({1,2,3}, LAMBDA n : n > 2) "
+        "-- tlc2 answers ok/1 distinct. Charged to tlc-eval-node.",
+    "Paxos":
+        "a multi-binder existential in ACTION position: `\\E a \\in Replicas, "
+        "m \\in p1aMessages : ...` in every one of its four actions. "
+        "+solve-exists (node-eval.hoon:2091, 2530) takes one binder. The rule "
+        "picked this spec for SYMMETRY -- it is the ONLY in-scope examples spec "
+        "with an uncommented SYMMETRY line -- and the measurement is that the "
+        "port never reaches symmetry on it. R1.4.1b recorded that the CONSTANT "
+        "multi-binder \\E/\\A evaluate and `only the action paths are open`; "
+        "R1.4.3 closed the constructors and nothing tracked the action path "
+        "after. Charged to tlc-eval-action.",
+    "SimpleMath":
+        "a config with NO behaviour spec. tlc2 runs an ASSUME-only module as "
+        "an ordinary BFS with zero initial states and reports `Model checking "
+        "completed` / 0 distinct / depth 0 -- the documented idiom for using "
+        "TLC to evaluate expressions (SimpleMath, PrintValues). +resolve-targets "
+        "(check.hoon:2449) requires INIT+NEXT or SPECIFICATION and aborts at "
+        "line 2520, BEFORE +check-assumes at 4276, so the port never checks the "
+        "assumptions at all. Charged to cfg-runspec.",
+}
+
+
 # `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE
 # (no verdict in 480 s where TLC answers in 1.8 s over 5 distinct states). Root
 # cause found and fixed in R1.8.1.4 rather than censused: every liveness graph
@@ -852,6 +917,32 @@ def write_sany_shard():
         lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
                      f"'{hcord(cfg_text)}']")
     lines += ["  =="]
+    # the EXAMPLES TLC batch (R2.8.2b) — same comparator, other corpus
+    if TLC_EXAMPLES_DIVERGENCES:
+        eexpect = ["    :~  " + "  ".join(f"'{d}'"
+                                          for d in TLC_EXAMPLES_DIVERGENCES),
+                   "    =="]
+    else:
+        eexpect = ["    ~"]
+    lines += [
+        "::",
+        "++  test-tlc-examples-batch",
+        "  %+  expect-eq",
+        "    !>  ^-  (list @t)",
+        *eexpect,
+        "  !>",
+        "  %-  tlc-batch-run",
+        "  ^-  (list [@t (list @t) @t @t])",
+        "  :~",
+    ]
+    for sdir, module, cfg in TLC_EXAMPLES_BATCH:
+        proj = tlc_projection(module, Path(sdir), cfg)
+        spec_text = read(Path(sdir) / f"{module}.tla")
+        cfg_text = read(Path(sdir) / cfg)
+        exp = "~[" + " ".join(f"'{hcord(l)}'" for l in proj) + "]"
+        lines.append(f"      ['{module}' {exp} '{hcord(spec_text)}' "
+                     f"'{hcord(cfg_text)}']")
+    lines += ["  =="]
     lines.append("--")
     (REPO / "desk/tests/lib/tier2.hoon").write_text("\n".join(lines) + "\n")
     print(f"  sany shard: {len(SANY_CURATED)} cases -> tests/lib/tier2.hoon")
@@ -903,6 +994,17 @@ def write_sany_shard():
     for d in TLC_LIVENESS_DIVERGENCES:
         mod = d.split(" -> ")[0]
         dl.append(f"tlc-liveness-batch\t{d}\t{TLC_LIVENESS_REASONS.get(mod, '')}")
+    nex = len(TLC_EXAMPLES_BATCH)
+    dl += [
+        "",
+        f"# tlc-examples-batch (R2.8.2b): {nex} in-scope tlaplus-Examples specs "
+        "through check:check, picked by tools/tier2-select.py;",
+        f"# {len(TLC_EXAMPLES_DIVERGENCES)} disagree with TLC "
+        f"({nex - len(TLC_EXAMPLES_DIVERGENCES)}/{nex} agree):",
+    ]
+    for d in TLC_EXAMPLES_DIVERGENCES:
+        mod = d.split(" -> ")[0]
+        dl.append(f"tlc-examples-batch\t{d}\t{TLC_EXAMPLES_REASONS.get(mod, '')}")
     nsub = len(sany_subdir_specs())
     dl += [
         "",

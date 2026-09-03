@@ -1,33 +1,49 @@
 #!/usr/bin/env python3
-"""R2.8.2a's OUTPUT: the spec SELECTION RULE that R2.8.2b consumes.
+"""The tier-2 spec SELECTION RULE: which specs would bring coverage the
+current comparator corpus does not have.
 
-R2.8.2b used to say "more `tlaplus-Examples` specs", with no count and no
-rule, which made it the only unbounded row left in the plan. R2.8.2a owes it a
-rule instead, and the rule has to be derived from the CENSUS -- the regenerated
-inventory is the only thing that knows which specs the current corpus already
-runs through the Hoon CHECKER.
+R2.8.2a wrote the first version of this and R2.8.2b, which CONSUMES it, found
+it wrong in four ways -- all of them in the direction of reporting LESS work
+than there is, which is how "the answer is add nothing" survived a review:
 
-The rule, stated once:
+  1. The CHECKED SET was wrong.  It credited `CigaretteSmokers` and
+     `SimpleAllocator` as checker-exercised because they appear in the
+     generator's `CURATED` list -- but `CURATED` is an ORACLE CAPTURE (a
+     pinned `.txt` of Java's output); the specs the Hoon CHECKER actually runs
+     are `TLC_CURATED`, which held only `DieHard`, `HourClock` and `TCommit`.
+     It also dropped `DieHard` for the same reason.  Crediting two specs that
+     never reach `check:check` hid three features.
+  2. It matched features inside COMMENTS.  `SimpleAllocator.cfg` carries
+     `\\** SYMMETRY Symmetry`, commented out with the warning that symmetry
+     breaks its liveness properties -- and that comment was the only evidence
+     of SYMMETRY coverage anywhere in the corpus.
+  3. Its config fallback globbed `*.cfg` and took the FIRST, so a spec with no
+     config of its own was scored on a SIBLING'S config.
+  4. It never asked whether a candidate has a config at all.  A spec TLC
+     cannot be pointed at is not a comparator candidate.
 
-    Take the in-scope (`check`-class) `tlaplus-Examples` specs that exercise a
-    LEDGER-ROW FAMILY the currently-checked corpus does not, most-new-first and
-    cheapest-first within that, until the nightly budget is reached.
+The rule itself, stated once and unchanged:
 
-"Currently checked" means the Hoon CHECKER, not SANY: the 452-spec SANY batches
-exercise the front end and say nothing about `check:check`. The checked set is
-`TLC_BATCH` + `TLC_LIVENESS_BATCH` + the curated examples, read out of
-`gen-tier2-tests.py` so this script cannot drift from it.
+    Take the in-scope (`check`-class) specs that exercise a LEDGER-ROW FAMILY
+    the currently-checked corpus does not, most-new-first and cheapest-first
+    within that, until the nightly budget is reached.
 
-A feature is a PROXY for a ledger row, not the row itself, and the config
-keywords (SYMMETRY / CONSTRAINT / VIEW / ALIAS) live in the `.cfg` rather than
-the module -- scanning only the `.tla` silently reports them as unexercised,
-which this script got wrong on its first pass.
+"Currently checked" means the Hoon CHECKER, not SANY: the 452-spec SANY
+batches exercise the front end and say nothing about `check:check`.  The three
+checked lists are read out of `gen-tier2-tests.py` by IMPORTING it, so this
+script cannot drift from them the way a regex over the source could.
 
-  tools/tier2-select.py            print the rule's current answer
-  tools/tier2-select.py --table    also print every candidate's features
+A feature is a PROXY for a ledger row, not the row itself.
+
+  tools/tier2-select.py             the rule's current answer
+  tools/tier2-select.py --table     also every in-scope spec and its features
+  tools/tier2-select.py --corpus X  `examples` (default, R2.8.2's scope),
+                                    `test-model`, or `both`
 """
 import argparse
+import importlib.util
 import re
+import sys
 from pathlib import Path
 
 REPO = Path("/mnt/mars/gitrepos/tla-lus")
@@ -59,75 +75,158 @@ FEATS = {
     "fcnset":     (r"->\s*\w+\s*\]",               "tlc-eval-node/fcns"),
 }
 
-CURATED_EXAMPLES = (("HourClock", "SpecifyingSystems/HourClock"),
-                    ("TCommit", "transaction_commit"),
-                    ("CigaretteSmokers", "CigaretteSmokers"),
-                    ("SimpleAllocator", "allocator"))
+
+def gen():
+    """The generator itself, imported -- the checked lists are read from the
+    objects, not scraped out of the source."""
+    sys.dont_write_bytecode = True        # tools/__pycache__ is tracked
+    s = importlib.util.spec_from_file_location("gen_tier2", GEN)
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    return m
+
+
+def strip_comments(t: str) -> str:
+    """TLA+ comments out, both forms, `(* *)` nesting.  A commented-out
+    `SYMMETRY` line is not coverage -- and in this corpus exactly one spec
+    carries one, which was enough to hide the whole `tlc-symmetry` gap."""
+    out, i, depth, n = [], 0, 0, len(t)
+    while i < n:
+        if t.startswith("(*", i):
+            depth += 1
+            i += 2
+        elif depth and t.startswith("*)", i):
+            depth -= 1
+            i += 2
+        elif depth:
+            i += 1
+        elif t.startswith("\\*", i):
+            j = t.find("\n", i)
+            i = n if j < 0 else j
+        else:
+            out.append(t[i])
+            i += 1
+    return "".join(out)
+
+
+def cfg_of(tla: Path):
+    """A spec's OWN config, or the `MC` wrapper's.  Never a sibling's: the
+    first version globbed `*.cfg` and scored specs on configs belonging to
+    other modules in the same directory."""
+    for c in (tla.with_suffix(".cfg"), tla.parent / f"MC{tla.stem}.cfg"):
+        if c.exists():
+            return c
+    return None
+
+
+def spec_text(tla: Path) -> str:
+    """Module plus its config, comments stripped.  SYMMETRY / CONSTRAINT /
+    VIEW / ALIAS are CONFIG keywords and never appear in a module."""
+    t = strip_comments(tla.read_text(errors="ignore"))
+    c = cfg_of(tla)
+    return t + "\n" + strip_comments(c.read_text(errors="ignore")) if c else t
 
 
 def feats(t: str) -> set:
     return {k for k, (rx, _) in FEATS.items() if re.search(rx, t)}
 
 
-def spec_text(tla: Path) -> str:
-    """The module PLUS its config. SYMMETRY / CONSTRAINT / VIEW / ALIAS are
-    CONFIG keywords and never appear in the module, so a `.tla`-only scan
-    reports them unexercised when they are not."""
-    t = tla.read_text(errors="ignore")
-    for pat in (tla.stem + ".cfg", "MC*.cfg", "*.cfg"):
-        got = sorted(tla.parent.glob(pat))
-        if got:
-            return t + "\n" + got[0].read_text(errors="ignore")
-    return t
+def checked_specs(g) -> list:
+    """Every spec that reaches `check:check`: the three batches plus the
+    curated TLC comparator set.  NOT `CURATED`, which only captures Java's
+    output -- crediting it is how the first version of this rule reported
+    coverage the checker never had.
+
+    A CENSUSED spec counts as exercised: the corpus reaches the row and the
+    frozen divergence is the measurement.  Otherwise the rule would keep
+    proposing the specs R2.8.2b already added."""
+    out = [(m, TM / f"{m}.tla") for m in
+           sorted(set(g.TLC_BATCH) | set(g.TLC_LIVENESS_BATCH))]
+    out += [(mod, Path(sdir) / f"{mod}.tla")
+            for _, sdir, mod, _ in g.TLC_CURATED]
+    out += [(mod, Path(sdir) / f"{mod}.tla")
+            for sdir, mod, _ in getattr(g, "TLC_EXAMPLES_BATCH", ())]
+    return [(m, p) for m, p in out if p.exists()]
 
 
-def batch(name: str) -> list:
-    m = re.search(rf"^{name} = \[(.*?)\]", GEN.read_text(), re.S | re.M)
-    return re.findall(r'"([A-Za-z0-9_]+)"', m.group(1)) if m else []
+def censused(g) -> set:
+    """Modules whose comparison is a FROZEN DIVERGENCE rather than agreement.
+    They still count as exercised -- the corpus reaches the row and the
+    divergence is the measurement -- but a feature reached ONLY through one is
+    reported apart, because a refusal can fire BEFORE the machinery the feature
+    names.  `Paxos` is the live example: it was selected for SYMMETRY and the
+    port refuses it on a multi-binder action existential, so `tlc-symmetry` is
+    not tested by it in any sense a reader should count."""
+    out = set()
+    for name in ("TLC_BATCH_DIVERGENCES", "TLC_LIVENESS_DIVERGENCES",
+                 "TLC_EXAMPLES_DIVERGENCES"):
+        for d in getattr(g, name, ()):
+            out.add(d.split(" -> ")[0])
+    return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--table", action="store_true")
+    ap.add_argument("--corpus", default="examples",
+                    choices=("examples", "test-model", "both"))
     a = ap.parse_args()
+    g = gen()
 
-    checked, have = [], set()
-    for m in sorted(set(batch("TLC_BATCH")) | set(batch("TLC_LIVENESS_BATCH"))):
-        p = TM / f"{m}.tla"
-        if p.exists():
-            have |= feats(spec_text(p))
-            checked.append(m)
-    for mod, sub in CURATED_EXAMPLES:
-        p = EX / "specifications" / sub / f"{mod}.tla"
-        if p.exists():
-            have |= feats(spec_text(p))
-            checked.append(mod)
-
+    checked = checked_specs(g)
+    cens = censused(g)
+    have, agreed = set(), set()
+    for n, p in checked:
+        f = feats(spec_text(p))
+        have |= f
+        if n not in cens:
+            agreed |= f
     missing = sorted(set(FEATS) - have)
-    print(f"specs currently run through the Hoon CHECKER: {len(checked)}")
-    print(f"  exercised: {', '.join(sorted(have))}")
+    only_cens = sorted(have - agreed)
+
+    print(f"specs currently run through the Hoon CHECKER: {len(checked)}"
+          f"  ({len(cens & {n for n, _ in checked})} censused)")
+    print(f"  {', '.join(n for n, _ in checked)}")
+    print(f"  exercised, AGREEING: {', '.join(sorted(agreed))}")
+    if only_cens:
+        print(f"  reached ONLY by a censused divergence: {', '.join(only_cens)}"
+              f"  <- the port refuses; not coverage")
     print(f"  NOT exercised: {', '.join(missing) or '(none)'}")
     print(f"  -> ledger rows: "
           f"{', '.join(sorted({FEATS[f][1] for f in missing})) or '(none)'}\n")
 
-    pool, cands = [], []
+    names = {n for n, _ in checked}
+    want = {"examples", "test-model"} if a.corpus == "both" else {a.corpus}
+    pool, cands, nocfg = [], [], 0
     for line in INV.read_text().splitlines():
         if line.startswith("#") or not line.strip():
             continue
         c = line.split("\t")
-        if len(c) < 3 or c[0] != "examples" or c[2] != "check":
+        if len(c) < 3 or c[2] != "check" or c[0] not in want:
             continue
-        f = EX / c[1]
-        if not f.exists():
+        f = (EX if c[0] == "examples" else TM) / c[1]
+        if not f.exists() or Path(c[1]).stem in names:
             continue
+        cfg = cfg_of(f)
         fs = feats(spec_text(f))
-        pool.append((c[1], fs))
+        pool.append((c[0], c[1], fs, bool(cfg)))
         new = fs & set(missing)
-        if new:
-            cands.append((len(new), sorted(new), c[1], f.stat().st_size))
+        if not new:
+            continue
+        if cfg is None:
+            nocfg += 1                    # TLC cannot be pointed at it
+            continue
+        live = bool(re.search(r"^\s*PROPERT(?:Y|IES)\b", strip_comments(
+            cfg.read_text(errors="ignore")), re.M))
+        cands.append((len(new), sorted(new), c[0], c[1],
+                      f.stat().st_size, "liveness" if live else "safety"))
 
-    print(f"in-scope (`check`-class) examples specs in the census: {len(pool)}")
-    cands.sort(key=lambda r: (-r[0], r[3]))
+    print(f"in-scope (`check`-class) specs in the census "
+          f"[{'+'.join(sorted(want))}]: {len(pool)}")
+    if nocfg:
+        print(f"  {nocfg} would bring a row but have NO config of their own "
+              f"-- not comparator candidates")
+    cands.sort(key=lambda r: (-r[0], r[4]))
     if not cands:
         print("candidates that bring an unexercised row: NONE\n")
         print("THE RULE'S ANSWER IS 'ADD NOTHING'. Per R2.8.2b's own terms --")
@@ -135,12 +234,14 @@ def main() -> None:
         print("coverage* -- that is the answer, and .2b closes on it.")
     else:
         print(f"candidates: {len(cands)}, in selection order\n")
-        for n, new, path, sz in cands:
-            print(f"  {n}  {path:<58}{sz//1024:>4}KB  {','.join(new)}")
+        for n, new, corp, path, sz, kind in cands:
+            print(f"  {n}  {path:<56}{sz // 1024:>4}KB  {kind:<8} "
+                  f"{','.join(new)}")
     if a.table:
-        print("\nevery in-scope examples spec and what it exercises:")
-        for path, fs in sorted(pool):
-            print(f"  {path:<62}{','.join(sorted(fs))}")
+        print("\nevery in-scope spec and what it exercises:")
+        for corp, path, fs, hascfg in sorted(pool):
+            print(f"  {path:<62}{'cfg' if hascfg else '   '} "
+                  f"{','.join(sorted(fs))}")
 
 
 if __name__ == "__main__":
