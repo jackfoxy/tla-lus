@@ -1,0 +1,1 @@
+1106 ms median of 15 runs (R2.8.1a: 5 warm + 5 fresh-boot + 5 post-rebuild)

@@ -1,0 +1,43 @@
+{
+ "runtime": "vere 4.6, --loom 32",
+ "measured": "2026-09-02",
+ "source": "R2.8.1a: 5 warm + 5 fresh-boot + 5 post-rebuild runs, pooled",
+ "note": "Timings only. The deterministic WORK profile of each workload lives beside its spec in desk/test-data/perf/<w>/profile.txt and is asserted by the generated shard; a change there is an ordinary test failure. This store exists so tools/tier3-report.py can say how far a run drifted, and NOTHING gates on it -- R2.8.1a measured the median workload at 15.6% run-to-run on a fresh boot, over its own +/-15% bar, so tier 3 ships report-only.",
+ "workloads": {
+  "enum": {
+   "n": 15,
+   "median_ms": 1908.7,
+   "min_ms": 1792.1,
+   "max_ms": 2226.8,
+   "spread_pct": 16.7
+  },
+  "eval": {
+   "n": 15,
+   "median_ms": 1876.0,
+   "min_ms": 1792.8,
+   "max_ms": 1991.2,
+   "spread_pct": 6.1
+  },
+  "fp": {
+   "n": 15,
+   "median_ms": 2677.4,
+   "min_ms": 2619.1,
+   "max_ms": 2834.7,
+   "spread_pct": 5.9
+  },
+  "live": {
+   "n": 15,
+   "median_ms": 1106.0,
+   "min_ms": 1040.4,
+   "max_ms": 1192.6,
+   "spread_pct": 7.8
+  },
+  "queue": {
+   "n": 15,
+   "median_ms": 2135.7,
+   "min_ms": 2068.8,
+   "max_ms": 2271.1,
+   "spread_pct": 6.3
+  }
+ }
+}

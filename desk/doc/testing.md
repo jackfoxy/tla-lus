@@ -284,7 +284,41 @@ deliberate, documented normalization; the dropped alias-rendered initial state
 was an accident nobody had written down. When a differential passes, it is worth
 knowing which of the two it is.
 
-## Tier 3 — a performance harness, and deliberately not part of R1
+## Tier 3 — a performance REPORT (R2), and why it is not a gate
+
+**R2 brought tier 3 back into scope and it now exists, report-only.** The
+R1-era reasoning below is kept because it is the record of why tier 3 was not
+in R1, and because R2 re-measured its central claim rather than inheriting it.
+
+What R2 built:
+
+* **R2.8.1a — the noise, measured before any threshold was chosen.** Five
+  workloads, five runs each, on three legs (warm pier / fresh boot / across a
+  rebuild). Run-to-run spread of the median workload: 5.3% warm, **15.6%** on
+  a fresh boot, 7.3% post-rebuild; a rebuild moved every workload by less than
+  3%. Against the criterion fixed in advance (±15% run-to-run, ±25% rebuild)
+  that is a **FAIL on run-to-run**, so the decision is **report-only**.
+* **R2.8.1b — the workload set.** `desk/test-data/perf/<w>/` → generated into
+  `tests/lib/perf.hoon` by `tools/gen-perf-tests.py`. Each workload asserts
+  its DETERMINISTIC WORK (generated / distinct / queued / depth / out-degree);
+  a wall-clock number is never byte-reproducible, so the work is what the set
+  reports and the timing is read outside the ship.
+* **R2.8.1c — the baseline store and the report.**
+  `desk/test-data/perf/baseline.json` (keyed by pinned runtime) and
+  `tools/tier3-report.py`, which prints each workload against its baseline and
+  **exits nonzero only when the shard itself fails** — that is a changed work
+  profile, an ordinary test failure, not a performance signal.
+
+**`release-gate.sh` gets NO tier-3 clause**, deliberately. R2.8.1a's own
+criterion decided it: a threshold a single ordinary run can cross is the flaky
+gate R1.1.R3 named below, and *a threshold nobody trusts is worse than a
+number everybody reads*. Two measured findings also contradict what the R1-era
+text below assumes: **pier age does not inflate these workloads** (a fresh boot
+ran 0.3–3.9% *slower* than the warm pier, not faster), and a rebuild is not a
+variance source at all.
+
+### The R1-era decision, kept as the record
+
 
 Tier 3 was scoped as "broader `tlaplus-Examples` coverage and bounded
 performance models (queue / evaluator / enumeration / fingerprinting / safety /
@@ -325,8 +359,10 @@ rather than by capability. The performance half wants a spec-shaped workload set
 a stored baseline per pinned runtime, and a threshold wide enough to survive
 ordinary variance. Neither is scheduled here.
 
-**Where it lives now.** Future work, tracked in `R1-release-work-breakdown.md`,
-not as an R1 deferral. Nothing in tiers 1 and 2 depends on it.
+**Where it lived then.** Future work, tracked in
+`R1-release-work-breakdown.md`, not as an R1 deferral. Nothing in tiers 1 and 2
+depends on it — and nothing does now either: the R2 report is read, not
+enforced.
 
 ## Fuzzing
 
