@@ -1,21 +1,42 @@
 EVAL
 CapL SetCapValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+CapOne SetEnumValue {1, 2}
+CapTwo SetCapValue {1, 2}
+CupEmpIL SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+CupEmpL SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+CupEmpR SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
 CupL SetCupValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>, <<9, 9>>}
+CupOne SetCupValue {1, 2, 3}
 CupR SetEnumValue {1, 2, 3, 4}
 DifL SetDiffValue {<<1, 2>>, <<2, 1>>, <<2, 2>>}
+DifLaz SetDiffValue {}
+DifRed SetEnumValue {3}
+Emp SetEnumValue {}
+EmpI IntervalValue {}
 FCupL FcnLambdaValue (<<1, 1>> :> 1 @@ <<1, 2>> :> 1 @@ <<2, 1>> :> 1 @@ <<2, 2>> :> 1 @@ <<9, 9>> :> 1)
 FCupR FcnRcdValue <<1, 2, 3, 4>>
+FEmpD FcnRcdValue <<>>
 FEnum FcnRcdValue <<1, 2, 3>>
 FFns FcnLambdaValue (<<1, 1>> :> 1 @@ <<1, 2>> :> 1 @@ <<2, 1>> :> 1 @@ <<2, 2>> :> 1)
+FMixFst FcnLambdaValue (<<<<1, 1>>, 5>> :> 5 @@ <<<<1, 2>>, 5>> :> 5 @@ <<<<2, 1>>, 5>> :> 5 @@ <<<<2, 2>>, 5>> :> 5)
+FMixed FcnLambdaValue (<<1, {}>> :> 1 @@ <<2, {}>> :> 2)
+FMulti FcnRcdValue (<<1, 5>> :> 1 @@ <<2, 5>> :> 2)
 FPred FcnLambdaValue (<<1, 1>> :> 1 @@ <<1, 2>> :> 1 @@ <<2, 1>> :> 1 @@ <<2, 2>> :> 1)
 FProd FcnLambdaValue (<<1, 1>> :> 11 @@ <<1, 2>> :> 12 @@ <<2, 1>> :> 21 @@ <<2, 2>> :> 22)
 FRcds FcnLambdaValue ([a |-> 1] :> 1 @@ [a |-> 2] :> 1)
 FRng FcnRcdValue <<10, 20, 30>>
 FSub FcnLambdaValue ({} :> 1 @@ {1} :> 1 @@ {2} :> 1 @@ {1, 2} :> 1)
 Fns SetOfFcnsValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+FnsLazy SetOfFcnsValue {<<1, 1>>}
+Lazy UnionValue {1, 2}
 Pred SetPredValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+PredLazy SetPredValue {1, 2}
 Prod SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+RcdLazy SetOfRcdsValue {[a |-> 1], [a |-> 2]}
 Rcds SetOfRcdsValue {[a |-> 1], [a |-> 2]}
 Rng IntervalValue 1..3
 Sub SubsetValue {{}, {1}, {2}, {1, 2}}
+SubLazy SubsetValue {{}, {1}, {2}, {1, 2}}
+UniEnum SetEnumValue {1, 2, 3}
+UniIntv UnionValue {1, 2, 3, 4}
 UniL UnionValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}

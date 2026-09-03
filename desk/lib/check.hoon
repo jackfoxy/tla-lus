@@ -2741,12 +2741,20 @@
     ::  R2.7.2: the class a set was BUILT as, which the port used to lose when
     ::  a lazy construction was forced. `%set-enum` is an ordinary set literal
     %set
-      ::  only the three classes the pin was measured to emit; every other
-      ::  construction forces to a plain SetEnumValue there
+      ::  R2.7.16 added the other six. R2.7.2 emitted only three because only
+      ::  three appeared in the goldens it had -- every other construction
+      ::  forced to a plain SetEnumValue there, which was true of that corpus
+      ::  and not of the language (`ev-lazyclass`, R2.7.13)
       ?+  cls.x  "SetEnumValue"
         %subset    "SubsetValue"
         %prod      "SetOfTuplesValue"
         %set-pred  "SetPredValue"
+        %set-cup   "SetCupValue"
+        %set-cap   "SetCapValue"
+        %set-diff  "SetDiffValue"
+        %union     "UnionValue"
+        %fcns      "SetOfFcnsValue"
+        %rcds      "SetOfRcdsValue"
       ==
     %seq    "TupleValue"
     %rec    "RecordValue"
@@ -2762,14 +2770,56 @@
   ::  the pin: `R1[n \in 1..3] == ...` is FcnLambdaValue and renders <<1, 2, 6>>,
   ::  `NR1 == [n \in 1..3 |-> n]` is FcnRcdValue and renders <<1, 2, 3>> — same
   ::  rendering, different class — so the class cannot be read off the value
-  |=  [b=sem:sem-lib x=value]
+  ::  R2.7.16: and the FUNCTION class is the second such case, for the same
+  ::  reason. `Tool.java`'s function constructor (OPCODE_fc / nrfs / rfs)
+  ::  evaluates every DOMAIN and sets `isFcnRcd` iff every one of them is
+  ::  `Reducible`; only then does it normalize to a FcnRcdValue. The port's
+  ::  `%fcn` keeps its pairs and not its domains' classes, so the decision is
+  ::  read off the EXPRESSION here rather than off the value -- no `vfcn`
+  ::  mold change, which is the same shape the `$RecursiveFcnSpec` case
+  ::  already had. `e` is the env the definition was evaluated under; the
+  ::  domains are re-evaluated in it, which is affordable because this arm is
+  ::  reached only by `+project-defs` (a diagnostic projection), never by the
+  ::  search. Every domain is evaluated in the SAME context in tlc2
+  ::  (`dvals[i] = this.eval(domains[i], c, ...)`), so re-evaluating each one
+  ::  against `e` is its rule, not an approximation
+  |=  [b=sem:sem-lib x=value e=eenv:ne]
   ^-  tape
   ?:  ?&  ?=(%apply -.b)
           =('$RecursiveFcnSpec' name.op.b)
           ?=(?(%fcn %seq) -.x)
       ==
+    ::  a RECURSIVE spec forces `isFcnRcd = false` outright, whatever its
+    ::  domains are, so this test stays FIRST
     "FcnLambdaValue"
-  (kind-name x)
+  ?.  ?&(?=(%fcn -.x) (lambda-form:ne b))  (kind-name x)
+  ?:((fcn-doms-reducible b e) "FcnRcdValue" "FcnLambdaValue")
+::
+++  fcn-doms-reducible
+  ::  `isFcnRcd`: EVERY domain of a function constructor is `Reducible`.
+  ::  Measured at the pin -- `[i \in 1..2, j \in {1, 2} |-> i + j]` is a
+  ::  FcnRcdValue and `[i \in 1..2, j \in ((1..2) \X (1..2)) |-> i]` a
+  ::  FcnLambdaValue, so it is every domain and not the first. An EMPTY
+  ::  domain is Reducible like any other (`[x \in {} |-> 1]` is FcnRcdValue)
+  ::  A domain that fails to evaluate is not read as Reducible: the value it
+  ::  is being asked about does not exist, and the caller has already
+  ::  reported the failure through its own channel
+  |=  [b=sem:sem-lib e=eenv:ne]
+  ^-  ?
+  ?.  ?=(%apply -.b)  |
+  ::  an EXPLICIT loop, not `levy`: the binder carries a `sem`, and a wet gate
+  ::  over it nest-fails with the two `sem` identities the trace prints
+  ::  (`rng=#3` against `rng=^#3.#sem`) -- the zuse-408 trap `+finish-bfs`
+  ::  records for `turn` over the recursive `state` mold, same cause
+  =/  bs  (flatten-bound:ne bound.b)
+  ::  no binders at all is not a constructor
+  ?:  =(~ bs)  |
+  |-  ^-  ?
+  ?~  bs  &
+  =/  r  (eval:ne rng.i.bs e)
+  ?.  ?=(%& -.r)  |
+  ?.  (reducible:vl p.r)  |
+  $(bs t.bs)
 ::
 ++  project-defs
   ::  every arity-0 definition of a module, sorted by name and evaluated once
@@ -2802,7 +2852,7 @@
   ?~  body.u.d  :(weld (trip nm) " ! no body")
   =/  r  (eval:ne u.body.u.d e)
   ?:  ?=(%& -.r)
-    :(weld (trip nm) " " (kind-of u.body.u.d p.r) " " (render:vl p.r))
+    :(weld (trip nm) " " (kind-of u.body.u.d p.r e) " " (render:vl p.r))
   ::  code 0 means "no TLC error code", which is what a TLCRuntimeException
   ::  carries; the oracle projection prints no `EC…` for those, so neither do
   ::  we (R1.4.5)

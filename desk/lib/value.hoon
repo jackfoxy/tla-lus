@@ -1076,6 +1076,48 @@
     [%& (bex (lent es.c))]
   ==
 ::
+++  reducible
+  ::  R2.7.16: tlc2's `Reducible`, and it is the WHOLE of the representation
+  ::  rule. The interface has exactly TWO implementors in the entire tree --
+  ::  `IntervalValue` and `SetEnumValue` -- and every class decision in
+  ::  `Tool.java`'s set operators, in `SetEnumValue`/`IntervalValue`'s own
+  ::  `cup`/`cap`/`diff`, and in the function constructor's `isFcnRcd` is this
+  ::  predicate applied to an operand and nothing else.
+  ::
+  ::  In port terms that is an `%intv`, or a `%set` whose class is `%set-enum`
+  ::  -- which is why `+sexp-class` answering `%set-enum` has to MEAN
+  ::  "Reducible" rather than merely "printed as SetEnumValue"
+  |=  v=value
+  ^-  ?
+  ?+  -.v  |
+    %intv  &
+    %set   =(%set-enum cls.v)
+  ==
+::
+++  empty-val
+  ::  an empty set-like value. `SetEnumValue.cup` and `IntervalValue.cup` both
+  ::  open `if (size == 0) return set;`, so an empty Reducible operand of
+  ::  `\cup` makes the result the OTHER OPERAND ITSELF (R2.7.16)
+  |=  v=value
+  ^-  ?
+  ?+  -.v  |
+    %set   ?=(~ p.v)
+    %intv  (slth hi.v lo.v)
+  ==
+::
+++  union-eager
+  ::  `UnionValue.union`: UNION S combines into a SetEnumValue only when S is
+  ::  a SetEnumValue AND every element of S is a SetEnumValue. Measured, and
+  ::  the asymmetry is real: the test is `instanceof SetEnumValue`, NOT
+  ::  `instanceof Reducible`, so `UNION {1..2, 3..4}` -- whose elements are
+  ::  INTERVALS, which are Reducible -- is a UnionValue at the pin while
+  ::  `UNION {{1, 2}, {3}}` is a SetEnumValue
+  |=  s=value
+  ^-  ?
+  ?.  ?=(%set -.s)  |
+  ?.  =(%set-enum cls.s)  |
+  (levy p.s |=(e=value ?:(?=(%set -.e) =(%set-enum cls.e) |)))
+::
 ++  sexp-class
   ::  the tlc2 VALUE CLASS a lazy construction denotes (R2.7.2). This is the
   ::  class `EvalDump` prints and the one the port used to lose at `+force`.
@@ -1085,29 +1127,38 @@
   ::  class is not a property of the operator. `{x \in 1..6 : P}` is a
   ::  SetEnumValue at the pin while `{x \in (A \X B) : P}` is a SetPredValue --
   ::  same filter, different base
-  ::  MEASURED, not assumed. Across every `eval-core` golden the pin emits
-  ::  exactly three non-enum set classes -- SubsetValue (1), SetOfTuplesValue
-  ::  (3) and SetPredValue (2) -- and nothing else. `\cup`, `\cap`, `\` and
-  ::  UNION all print SetEnumValue there, so tlc2 FORCES them and mapping them
-  ::  to a lazy class would over-report. The first attempt did exactly that and
-  ::  the corpus caught it: `EvSet SetCupValue` against the pin's SetEnumValue.
+  ::
+  ::  R2.7.16 makes this RECURSIVE on the operands' classes, which is what
+  ::  R2.7.2 left unmeasured and R2.7.13 measured. Every rule below was read
+  ::  off `Tool.java` AND confirmed against the pin, per operator, because the
+  ::  three binary operators do NOT share one rule:
+  ::
+  ::    `\cup`   eager iff BOTH operands are Reducible -- `Tool` forces through
+  ::             either one, but `SetEnumValue.cup`/`IntervalValue.cup` fall
+  ::             back to a SetCupValue unless the OTHER is Reducible too
+  ::    `\cap`   eager iff EITHER is (both `cap`s only need `member` on the
+  ::             other side, so one Reducible operand is enough)
+  ::    `\`      eager iff the LEFT is (`Tool` tests `arg1` alone)
+  ::    UNION    `+union-eager`, which is a strictly narrower test
+  ::
+  ::  The unconditionally-lazy ones stay unconditional, measured over lazy
+  ::  operands too: SUBSET, `\X`, `[D -> R]` and `[a: S]` keep their class
+  ::  whatever they are built from
   |=  x=sexp
   ^-  @tas
   ?-  -.x
     %set     ?:(?=(%set -.s.x) cls.s.x %set-enum)
     %subset  %subset
     %prod    %prod
-    ::  measured eager at the pin -- these force to a plain SetEnumValue
-    %cup     %set-enum
-    %cap     %set-enum
-    %diff    %set-enum
-    %union   %set-enum
-    ::  UNMEASURED: no golden covers `[D -> R]` or `[a: S, ...]`, so they keep
-    ::  the status quo rather than a guessed class. tlc2 has SetOfFcnsValue /
-    ::  SetOfRcdsValue; whether they survive to a printed class is not known
-    ::  here, and inventing it would be the same error the `%cup` attempt made
-    %fcns    %set-enum
-    %rcds    %set-enum
+    %cup     ?:(&((reducible a.x) (reducible b.x)) %set-enum %set-cup)
+    %cap     ?:(|((reducible a.x) (reducible b.x)) %set-enum %set-cap)
+    %diff    ?:((reducible a.x) %set-enum %set-diff)
+    %union   ?:((union-eager s.x) %set-enum %union)
+    ::  R2.7.2 left these UNMEASURED rather than guess a class. Measured now,
+    ::  and they are their own classes unconditionally -- `[(1..2) -> (1..2)]`
+    ::  is a SetOfFcnsValue at the pin even though both operands are Reducible
+    %fcns    %fcns
+    %rcds    %rcds
     ::  the infinite UserValues never reach `+force` (enumeration refuses
     ::  first), so these are unreachable rather than meaningful
     %nats    %set-enum
@@ -1124,6 +1175,17 @@
   ::  actually reaches, and it names the BOUND rather than the actual size
   |=  [x=sexp lim=@ud]
   ^-  (each value eval-err)
+  ::  R2.7.16: `\cup` with an EMPTY Reducible operand returns the OTHER
+  ::  OPERAND ITSELF -- both `SetEnumValue.cup` and `IntervalValue.cup` open
+  ::  `if (size == 0) return set;` -- so the result keeps that operand's own
+  ::  class, including IntervalValue, which no forced `%set` could carry.
+  ::  `Tool` tests `arg1` first, so the order here is its order. Measured:
+  ::  `{} \cup ((1..2) \X (1..2))` and `(1..0) \cup ((1..2) \X (1..2))` are
+  ::  both SetOfTuplesValue at the pin, as are the two with the operands
+  ::  swapped. This is the one place a class is not decided by `+sexp-class`,
+  ::  because no forcing happens at all
+  ?:  ?&(?=(%cup -.x) (reducible a.x) (empty-val a.x))  [%& b.x]
+  ?:  ?&(?=(%cup -.x) (reducible b.x) (empty-val b.x))  [%& a.x]
   =/  cap  ?:(=(0 lim) max-card lim)
   =/  rc  (enum x)
   ?:  ?=(%| -.rc)  rc

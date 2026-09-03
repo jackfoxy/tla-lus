@@ -54,59 +54,26 @@ _LAZYSET = ("tlc2 has a class per LAZY set form -- SubsetValue for `SUBSET S`, "
             "a FcnRcdValue: same constructor, but the first is built over a lazy "
             "domain. R1.3.8")
 
-#  R2.7.13 MEASURED the residue R2.7.2 left on `tlc-eval-node` and found the
-#  rule -- and found the residue LARGER than recorded. tlc2's decision is one
-#  line of `Tool.java` (OPCODE_fc / nrfs / rfs):
+#  R2.7.13 MEASURED the residue R2.7.2 left on `tlc-eval-node`; R2.7.16 CLOSED
+#  it, so the thirteen entries that stood here are gone and `ev-lazyclass`
+#  compares in full. The rule, for the record, is one predicate --- tlc2's
+#  `Reducible`, which has exactly TWO implementors in the whole tree
+#  (IntervalValue, SetEnumValue) --- applied per operator, and the operators do
+#  NOT share one rule:
 #
-#      isFcnRcd = every evaluated domain value `instanceof Reducible`
-#      if (opcode == OPCODE_rfs) isFcnRcd = false          // RECURSIVE spec
-#      if (isFcnRcd && !keepLazy) return fval.toFcnRcd();  // FcnRcdValue
-#      return fval;                                        // FcnLambdaValue
+#      [d1 |-> e]  FcnRcdValue iff EVERY domain is Reducible; a RECURSIVE
+#                  spec forces FcnLambdaValue outright
+#      \cup        eager iff BOTH operands are Reducible; an EMPTY Reducible
+#                  operand returns the OTHER OPERAND ITSELF, class and all
+#      \cap        eager iff EITHER is
+#      \           eager iff the LEFT is
+#      UNION       eager iff a SetEnumValue OF SetEnumValues --- strictly
+#                  narrower than Reducible, so an INTERVAL element does not
+#                  combine
+#      {x \in S:P} eager iff S is Reducible
+#      SUBSET \X [D -> R] [a: S]   never; their class is unconditional
 #
-#  `Reducible` has exactly TWO implementors in the whole tree, IntervalValue
-#  and SetEnumValue, so the class is decided by the DOMAIN's class and nothing
-#  else. The port already computes a set class (`cls`, R2.7.2) but has no
-#  function class at all, so it answers FcnRcdValue always.
-#
-#  The same predicate governs the BINARY set operators. R2.7.2 recorded
-#  `\cup` / `\cap` / `\` / UNION as unconditionally SetEnumValue -- true of
-#  every golden it had, because every operand in them was Reducible. With a
-#  LAZY operand tlc2 builds SetCupValue / SetCapValue / SetDiffValue /
-#  UnionValue instead, and `[D -> R]` / `[a: S]` (which R2.7.2 explicitly left
-#  UNMEASURED rather than guess) are SetOfFcnsValue / SetOfRcdsValue.
-#
-#  Twelve definitions in `ev-lazyclass` show it. Every VALUE agrees; only the
-#  class column differs. `tlc-eval-node` is DEMOTED `parity` -> `partial` on
-#  this evidence and the goldens are frozen so the fix has a target.
-_FCNCLASS = ("R2.7.13: tlc2's function class is decided by the DOMAIN -- "
-             "FcnRcdValue iff every domain value is Reducible (exactly "
-             "IntervalValue or SetEnumValue), else FcnLambdaValue. The port "
-             "has no function representation class and answers FcnRcdValue "
-             "always. The VALUE agrees exactly. `tlc-eval-node`")
-_SETCLASS = ("R2.7.13: a binary set operator computes EAGERLY only when both "
-             "operands are Reducible; with a lazy operand tlc2 keeps "
-             "SetCupValue / SetCapValue / SetDiffValue / UnionValue, and "
-             "`[D -> R]` / `[a: S]` are SetOfFcnsValue / SetOfRcdsValue. "
-             "R2.7.2 mapped all of these to SetEnumValue, which was true of "
-             "every golden it had. The VALUE agrees exactly. `tlc-eval-node`")
-
-SKIPS = {
-    ("ev-tupbind", "FcnT"): _FCNCLASS,
-    #  the function class, by domain class
-    ("ev-lazyclass", "FProd"): _FCNCLASS,
-    ("ev-lazyclass", "FSub"): _FCNCLASS,
-    ("ev-lazyclass", "FPred"): _FCNCLASS,
-    ("ev-lazyclass", "FFns"): _FCNCLASS,
-    ("ev-lazyclass", "FRcds"): _FCNCLASS,
-    ("ev-lazyclass", "FCupL"): _FCNCLASS,
-    #  the set class, where an operand is lazy
-    ("ev-lazyclass", "CupL"): _SETCLASS,
-    ("ev-lazyclass", "CapL"): _SETCLASS,
-    ("ev-lazyclass", "DifL"): _SETCLASS,
-    ("ev-lazyclass", "UniL"): _SETCLASS,
-    ("ev-lazyclass", "Fns"): _SETCLASS,
-    ("ev-lazyclass", "Rcds"): _SETCLASS,
-}
+SKIPS: dict = {}
 
 #  R1.4.1b added four cases that exist to REACH the sites lib/node-eval names
 #  as unsupported --- the nine original cases reached none of them. Every
