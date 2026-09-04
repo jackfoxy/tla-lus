@@ -1021,6 +1021,55 @@
     '---- MODULE spec ----\0a\\* R2.7.6.2 probe: `live-witness-nested-many` with the nested eventualities\0a\\* reached through RECURSIVE OPERATOR EXPANSION instead of written literally\0a\\* -- the one structural difference left between the passing probes and\0a\\* upstream\'s Github1389ViolatedC.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 9) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
+++  test-mc-multibind
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ x = 0'
+        '/\\ y = 0'
+        'State 2: <Next line 12, col 11 to line 13, col 19 of module spec>'
+        '/\\ x = 2'
+        '/\\ y = 3'
+        '7 states generated, 7 distinct states found, 5 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0a\0aInit == x = 0 /\\ y = 0\0a\0a\\* a multi-binder existential in ACTION position: tlc2 runs one\0a\\* ContextEnumerator over both bound groups, the leading binder varying\0a\\* fastest, so the successor ORDER (and with it the queue count and which\0a\\* violation is reported first) depends on the odometer direction\0aNext == \\E i \\in 1..2, j \\in 1..3 :\0a          /\\ x\' = i\0a          /\\ y\' = j\0a\0aSpec == Init /\\ [][Next]_<<x, y>>\0a\0aInv == x + y < 5\0a=====================\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+++  test-mc-nospec-assume
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '0 states generated, 0 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 0.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets\0a\0aCONSTANT N\0a\0a\\* a module with no VARIABLES and a config with no behaviour spec: TLC\0a\\* checks the assumptions and completes over zero initial states. The\0a\\* documented idiom for using TLC to evaluate expressions\0aASSUME N \\in Nat\0aASSUME Cardinality({1, 2, 3}) = 3\0aASSUME \\A i \\in 1..N : i * i >= i\0a=====================\0a'
+  'CONSTANT N = 4\0a'
+::
+++  test-mc-oparg-lambda
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '2 states generated, 1 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a\0a\\* an operator argument supplied by a LAMBDA rather than by name: SANY\0a\\* synthesizes an OpDefNode and points an OpArgNode at it, so there is no\0a\\* name to resolve\0aPick(S, P(_)) == CHOOSE y \\in S : P(y)\0a\0aInit == x = Pick({1, 2, 3}, LAMBDA n : n > 2)\0aNext == UNCHANGED x\0aSpec == Init /\\ [][Next]_x\0a\0aInv == x = 3\0a=====================\0a'
+  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
 ++  test-mc-pc-live-gate
   %+  expect-eq
     !>  ^-  wain

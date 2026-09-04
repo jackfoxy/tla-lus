@@ -111,8 +111,18 @@
   "ERR: The first argument of SortSeq should be a natural number, but instead it is:\0a\{1, 2}"
 ::
 ++  test-sort-seq-not-boolean
+  ::  R3.0b: the pin names the VALUE the comparator RETURNED, not the operator
+  ::  -- measured at the pin on `Bad(x, y) == x` over `<<1, 2>>`, which answers
+  ::  `2`. This arm asserted a `<Operator>` placeholder that was only ever
+  ::  right while a LAMBDA could not be applied at all, and it is hand-written,
+  ::  so no golden could catch it (R1.8.8's lesson, again).
+  ::
+  ::  NOT a general rule, and the sibling was measured before assuming one:
+  ::  `SelectSeq` with a non-boolean-returning operator DOES print
+  ::  `<Operator NotBool>` at the pin (tests/lib/seqs), so the two differ in
+  ::  tlc2's own implementations and `+op-arg-error` stays right there
   %+  tlc  'SortSeq(<<1, 2>>, Bad)'
-  "ERR: The second argument of SortSeq should be a boolean function, but instead it is:\0a<Operator>"
+  "ERR: The second argument of SortSeq should be a boolean function, but instead it is:\0a2"
 ::
 ::  +|  Permutations (one implementation, shared with SYMMETRY)
 ::

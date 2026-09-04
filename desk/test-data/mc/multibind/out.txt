@@ -1,0 +1,10 @@
+Error: Invariant Inv is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ x = 0
+/\ y = 0
+State 2: <Next line 12, col 11 to line 13, col 19 of module spec>
+/\ x = 2
+/\ y = 3
+7 states generated, 7 distinct states found, 5 states left on queue.
+The depth of the complete state graph search is 2.

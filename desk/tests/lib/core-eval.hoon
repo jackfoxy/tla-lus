@@ -209,17 +209,17 @@
   ~['ExTup' 'G' 'H']
 ::
 ++  test-oparg
-  ::  A3: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
-  ::  A4: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
-  ::  Sel: LAMBDA is not in the WU3 semantic graph (unit-3 residue, the same skip stdops-diff carries for Sel/SelNone) --- NOT R1.4.3's evaluator work: an operator NAME argument already evaluates (A1/A2)
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "A1 IntValue 6"
         "A2 IntValue 7"
+        "A3 IntValue 14"
+        "A4 IntValue 7"
+        "Sel TupleValue <<2, 4>>"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Integers, Sequences\0aInc(n) == n + 1\0aApply(Op(_), x) == Op(x)\0aTwice(Op(_), x) == Op(Op(x))\0aFold(Op(_,_), a, b) == Op(a, b)\0aA1 == Apply(Inc, 5)\0aA2 == Twice(Inc, 5)\0aA3 == Apply(LAMBDA n : n * 2, 7)\0aA4 == Fold(LAMBDA a, b : a + b, 3, 4)\0aSel == SelectSeq(<<1, 2, 3, 4>>, LAMBDA n : n % 2 = 0)\0a====\0a'  ''
-  ~['A3' 'A4' 'Sel']
+  ~
 ::
 ++  test-primitives
   %+  expect-eq

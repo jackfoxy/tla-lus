@@ -2516,8 +2516,24 @@
   =/  ukw  (unsupported-kw:config ca)
   ?^  ukw  [%| u.ukw]
   =/  defs  (defmap-of:ne u.mo)
+  ::  R3.0a: a config that declares NO behaviour spec AT ALL -- neither an
+  ::  INIT/NEXT pair nor a SPECIFICATION -- is not an error. tlc2 runs it as an
+  ::  ordinary breadth-first search over ZERO initial states and reports
+  ::  `Model checking completed. No error has been found.` with `0 states
+  ::  generated, 0 distinct states found, 0 states left on queue.` at depth 0.
+  ::  That is the documented idiom for using TLC to EVALUATE EXPRESSIONS: the
+  ::  module is a list of ASSUMEs and checking them is the entire run
+  ::  (`SpecifyingSystems/SimpleMath`, `AsynchronousInterface/PrintValues`).
+  ::  The port refused it in `+resolve-targets`, and refused BEFORE
+  ::  `+check-assumes`, so it did not check the assumptions either -- the one
+  ::  thing such a module is for. An INIT without a NEXT (or the reverse) is
+  ::  still the config error `+resolve-targets` reports; only the total absence
+  ::  of a behaviour spec takes this path
+  =/  nospec  &(?=(~ init.ca) ?=(~ next.ca) ?=(~ spec.ca))
   ::  resolve Init/Next (and fairness) from INIT/NEXT keys or a SPECIFICATION
-  =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs (var-order tree))
+  =/  rt=(each [init=sem:sem-lib next=sem:sem-lib fair=(list sem:sem-lib) nname=(unit @t) warn=(list @t)] @t)
+    ?:  nospec  [%& [%nullodn ~] [%nullodn ~] ~ ~ ~]
+    (resolve-targets [init.ca next.ca spec.ca] defs (var-order tree))
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  isb   init.p.rt
   =/  nsb   next.p.rt
@@ -2577,7 +2593,11 @@
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
   =/  rs0=rst:ne  empty-rst:ne
-  =/  irc
+  =/  irc=sout:ne
+    ::  no behaviour spec: no initial-state solve to run, and the `%nullodn`
+    ::  bodies above are never evaluated because the search has nothing to
+    ::  expand from. R3.0a
+    ?:  nospec  [[%& ~] rs0(es (scramble:rng seed))]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
     rs0(es (scramble:rng seed))
   =/  ir   -.irc

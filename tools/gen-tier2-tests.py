@@ -411,12 +411,30 @@ TLC_LIVENESS_REASONS = {}
 # whole projection compared, divergences FROZEN by name so a new one cannot
 # appear silently.
 #
-# `Channel` brings record sets (`[val: Data, rdy: {0,1}, ack: {0,1}]`,
-# `tlc-eval-node`) and is the only one that AGREES. The other three are the
-# rule's real yield: ASSUME had no checker-exercised supplier at all, and every
-# spec that brings it -- or SYMMETRY -- is refused by the port.
-# Ordered cheapest-first by MEASURED port cost, which is the rule's own
-# tie-break and not the file size it used as a proxy: 2.1 / 3.0 / 5.7 / 19.7 s.
+# R3.0 CLOSED ALL THREE of the divergences this batch froze at R2.8.2b, and
+# the batch is now 3/3 agreeing:
+#   `Channel`          record sets -- agreed from the start
+#   `SimpleMath`       a config with NO behaviour spec (cfg-runspec, R3.0a)
+#   `CigaretteSmokers` a LAMBDA operator argument (tlc-eval-node, R3.0b)
+#
+# TWO specs are deliberately NOT here, and both were measured rather than
+# assumed:
+#
+# `SimplifiedFastPaxos/Paxos` -- the multi-binder action existential
+# (tlc-eval-action, R3.0c) -- is out on COST, not capability. The port no
+# longer refuses it: it explores. But where tlc2 answers in 4.2 s the port had
+# not finished in ~50 min, which is more than the whole tier-2 shard costs
+# today, so it cannot sit in a nightly batch. R3.0c's evidence is the `mc` case
+# `multibind` instead, which pins the same construct AND its enumeration ORDER
+# (the odometer runs the LEADING binder fastest, so the trace, the queue count
+# and which violation is reported first all depend on getting it right).
+#
+# `AsynchronousInterface/PrintValues` was expected to join `SimpleMath` as the
+# second no-behaviour-spec supplier once R3.0a landed. Measured, it brings a
+# DIFFERENT row: its assumptions are `Print(...)` calls, so it fails on
+# `TLC!Print`, which is `tlc-module-tlc`'s standing approved difference (this
+# engine has no output channel). Adding it would census an approved difference
+# under another row's name.
 TLC_EXAMPLES_BATCH = [
     (EXAMPLES / "specifications/SpecifyingSystems/AsynchronousInterface",
      "Channel", "Channel.cfg"),                        # safety ok, 12 states
@@ -424,46 +442,14 @@ TLC_EXAMPLES_BATCH = [
      "SimpleMath", "SimpleMath.cfg"),                  # ASSUME-only, 0 states
     (EXAMPLES / "specifications/CigaretteSmokers",
      "CigaretteSmokers", "CigaretteSmokers.cfg"),      # safety ok, 6 states
-    (EXAMPLES / "specifications/SimplifiedFastPaxos",
-     "Paxos", "Paxos.cfg"),                            # safety ok, 1207 states
 ]
 
-# Frozen from the ship run, in TLC_EXAMPLES_BATCH order. All three are
-# REFUSALS -- the port answers a typed error where tlc2 answers a verdict --
-# and not one was reachable from any spec the corpus already ran.
-TLC_EXAMPLES_DIVERGENCES = [
-    "SimpleMath -> Error: no INIT/NEXT or SPECIFICATION in config",
-    "CigaretteSmokers -> Error: unsupported operator-valued argument.",
-    "Paxos -> Error: an action existential over multiple binders is unsupported.",
-]
-TLC_EXAMPLES_REASONS = {
-    "CigaretteSmokers":
-        "LAMBDA as an operator-valued argument: `ChooseOne(Ingredients, "
-        "LAMBDA x : smokers[x].smoking)`. +resolve-oparg (node-eval.hoon:1748) "
-        "resolves an op-arg by NAME only, so an anonymous $OpArg is ~. R1.3.1 "
-        "put LAMBDA op-args in the semantic graph; the evaluator half stayed "
-        "open and was tracked by no row. Minimal reproducer: Pick(S, P(_)) == "
-        "CHOOSE y \\in S : P(y), Init == x = Pick({1,2,3}, LAMBDA n : n > 2) "
-        "-- tlc2 answers ok/1 distinct. Charged to tlc-eval-node.",
-    "Paxos":
-        "a multi-binder existential in ACTION position: `\\E a \\in Replicas, "
-        "m \\in p1aMessages : ...` in every one of its four actions. "
-        "+solve-exists (node-eval.hoon:2091, 2530) takes one binder. The rule "
-        "picked this spec for SYMMETRY -- it is the ONLY in-scope examples spec "
-        "with an uncommented SYMMETRY line -- and the measurement is that the "
-        "port never reaches symmetry on it. R1.4.1b recorded that the CONSTANT "
-        "multi-binder \\E/\\A evaluate and `only the action paths are open`; "
-        "R1.4.3 closed the constructors and nothing tracked the action path "
-        "after. Charged to tlc-eval-action.",
-    "SimpleMath":
-        "a config with NO behaviour spec. tlc2 runs an ASSUME-only module as "
-        "an ordinary BFS with zero initial states and reports `Model checking "
-        "completed` / 0 distinct / depth 0 -- the documented idiom for using "
-        "TLC to evaluate expressions (SimpleMath, PrintValues). +resolve-targets "
-        "(check.hoon:2449) requires INIT+NEXT or SPECIFICATION and aborts at "
-        "line 2520, BEFORE +check-assumes at 4276, so the port never checks the "
-        "assumptions at all. Charged to cfg-runspec.",
-}
+# Emptied by R3.0. Each entry named a REFUSAL -- the port answered a typed
+# error where tlc2 answered a verdict -- and each was charged to a ledger row
+# that then closed it. The mechanism stays: this batch is where an
+# `tlaplus-Examples` spec's divergence gets frozen by name.
+TLC_EXAMPLES_DIVERGENCES = []
+TLC_EXAMPLES_REASONS = {}
 
 
 # `LivenessConstraintWarning` was the tenth candidate and did not TERMINATE

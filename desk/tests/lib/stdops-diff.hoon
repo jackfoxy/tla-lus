@@ -28,7 +28,6 @@
   ~['BadArgPlus']
 ::
 ++  test-bags
-  ::  OfAll: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
   ::  Subs: SubBag's body needs recursive functions and multi-binder set constructors (unit-6.5 residue)
   %+  expect-eq
     !>  ^-  (list tape)
@@ -44,12 +43,13 @@
         "IsB BoolValue TRUE"
         "NotB BoolValue FALSE"
         "NotInB BoolValue FALSE"
+        "OfAll FcnRcdValue (2 :> 1 @@ 3 :> 1)"
         "SqSub BoolValue TRUE"
         "ToSet SetEnumValue \{1, 2}"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Bags, Integers\0aB == SetToBag({1, 2})\0aIsB == IsABag(B)\0aNotB == IsABag({1, 2})\0aCardB == BagCardinality(B)\0aInB == BagIn(1, B)\0aNotInB == BagIn(9, B)\0aCopies == CopiesIn(1, B)\0aCup == B \\oplus B\0aDiff == (B \\oplus B) \\ominus B\0aSqSub == B \\sqsubseteq (B \\oplus B)\0aToSet == BagToSet(B)\0aEmpty == EmptyBag\0aSubs == SubBag(B)\0aOfAll == BagOfAll(LAMBDA x : x + 1, B)\0aBUnion == BagUnion({B, B})\0aCopiesMissing == CopiesIn(9, B)\0a====\0a'  'CONSTANT Unused = 0\0a'
-  ~['OfAll' 'Subs']
+  ~['Subs']
 ::
 ::  st-big-literal: not compared — the pin fails the whole LOAD on a numeral above 2^31-1; here the expression that contains it fails (C1.2)
 ::
@@ -116,7 +116,6 @@
   ~['NatSet']
 ::
 ++  test-seq-errors
-  ::  SelNotBool: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
   ::  SeqNotSet: Seq(S) is a lazy descriptor here, not a UserValue (C1.3)
   %+  expect-eq
     !>  ^-  (list tape)
@@ -125,17 +124,16 @@
         "HeadEmpty ! EC2184 Attempted to apply Head to the empty sequence."
         "LenNotSeq ! EC2283 The argument of Len should be a sequence, but instead it is: \{1, 2}"
         "LenString IntValue 3"
+        "SelNotBool ! EC2169 The second argument of SelectSeq should be a boolean-valued operator, but instead it is: <Operator LAMBDA>"
         "SubOutHigh ! EC2183 The third argument of SubSeq must be in the domain of its first argument: <<1, 2>> , but instead it is 5"
         "SubOutLow ! EC2183 The second argument of SubSeq must be in the domain of its first argument: <<1, 2>> , but instead it is 0"
         "TailEmpty ! EC2184 Attempted to apply Tail to the empty sequence."
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Sequences, Integers\0aHeadEmpty == Head(<<>>)\0aTailEmpty == Tail(<<>>)\0aSubOutHigh == SubSeq(<<1, 2>>, 1, 5)\0aSubOutLow == SubSeq(<<1, 2>>, 0, 1)\0aLenNotSeq == Len({1, 2})\0aLenString == Len("abc")\0aAppendNotSeq == Append({1}, 2)\0aCatNotSeq == <<1>> \\o {2}\0aSelNotBool == SelectSeq(<<1, 2>>, LAMBDA x : x)\0aSeqNotSet == Seq(3)\0a====\0a'  'CONSTANT Unused = 0\0a'
-  ~['SelNotBool' 'SeqNotSet']
+  ~['SeqNotSet']
 ::
 ++  test-sequences
-  ::  Sel: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
-  ::  SelNone: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
   ::  SeqSet: Seq(S) is a lazy descriptor here, not a UserValue (C1.3)
   %+  expect-eq
     !>  ^-  (list tape)
@@ -148,6 +146,8 @@
         "L IntValue 3"
         "LEmpty IntValue 0"
         "S TupleValue <<1, 2, 3>>"
+        "Sel TupleValue <<2, 3>>"
+        "SelNone TupleValue <<>>"
         "SeqMem BoolValue TRUE"
         "SeqNotMem BoolValue FALSE"
         "Sub TupleValue <<2, 3>>"
@@ -156,15 +156,13 @@
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS Sequences, Integers\0aS == <<1, 2, 3>>\0aL == Len(S)\0aLEmpty == Len(<<>>)\0aH == Head(S)\0aT == Tail(S)\0aAp == Append(S, 4)\0aCat == S \\o <<9, 8>>\0aCatEmpty == <<>> \\o S\0aSub == SubSeq(S, 2, 3)\0aSubEmpty == SubSeq(S, 3, 2)\0aSel == SelectSeq(S, LAMBDA x : x > 1)\0aSelNone == SelectSeq(S, LAMBDA x : x > 9)\0aSeqMem == S \\in Seq(1..3)\0aSeqNotMem == <<4>> \\in Seq(1..3)\0aSeqSet == Seq({1})\0aFcnSeq == [i \\in 1..3 |-> i * i]\0aFcnLen == Len([i \\in 1..3 |-> i])\0a====\0a'  'CONSTANT Unused = 0\0a'
-  ~['Sel' 'SelNone' 'SeqSet']
+  ~['SeqSet']
 ::
 ::  st-string-order: not compared — family 5: the approved string-order difference, measured in intern-order.txt and fixed by tests/lib/strorder
 ::
 ++  test-tlc
   ::  Pr: Print writes to TLC's console; a typed rejection here (C1.5)
   ::  PrT: PrintT writes to TLC's console; a typed rejection here (C1.5)
-  ::  Sort: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
-  ::  SortEmpty: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "Comb FcnRcdValue <<\"a\", \"b\">>"
@@ -172,26 +170,28 @@
         "Ok BoolValue TRUE"
         "Perms SetEnumValue \{(a :> a @@ b :> b), (a :> b @@ b :> a)}"
         "Single FcnRcdValue <<\"a\">>"
+        "Sort TupleValue <<1, 2, 3>>"
+        "SortEmpty TupleValue <<>>"
         "Str StringValue \"42\""
         "StrSeq StringValue \"<<1, \\\"a\\\">>\""
         "StrSet StringValue \"\{1, 2}\""
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS TLC, Integers, Sequences\0aCONSTANT MS\0aSingle == 1 :> "a"\0aComb == (1 :> "a") @@ (2 :> "b")\0aCombLeft == (1 :> "a") @@ (1 :> "b")\0aStr == ToString(42)\0aStrSet == ToString({1, 2})\0aStrSeq == ToString(<<1, "a">>)\0aPerms == Permutations(MS)\0aSort == SortSeq(<<3, 1, 2>>, LAMBDA x, y : x < y)\0aSortEmpty == SortSeq(<<>>, LAMBDA x, y : x < y)\0aOk == Assert(TRUE, "never printed")\0aPr == Print("printed value", 7)\0aPrT == PrintT("printed alone")\0a====\0a'  'CONSTANT MS = {a, b}\0a'
-  ~['Pr' 'PrT' 'Sort' 'SortEmpty']
+  ~['Pr' 'PrT']
 ::
 ++  test-tlc-errors
   ::  AnyV: TLC!Any is excluded; a typed rejection here
-  ::  SortNotBool: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
-  ::  SortNotSeq: LAMBDA is not in the WU3 semantic graph (unit-3 residue)
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "AssertFalse ! EC2132 The first argument of Assert evaluated to FALSE; the second argument was: \"boom\""
         "CombNotFcn ! EC2169 The first argument of @@ should be a function, but instead it is: 1"
         "PermsNotSet ! EC2176 Applying Permutations to the following value, which is not a finite set: 3"
+        "SortNotBool ! EC2169 The second argument of SortSeq should be a boolean function, but instead it is: 2"
+        "SortNotSeq ! EC2169 The first argument of SortSeq should be a natural number, but instead it is: \{1, 2}"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS TLC, Integers, Sequences\0aAssertFalse == Assert(FALSE, "boom")\0aSortNotBool == SortSeq(<<1, 2>>, LAMBDA x, y : x)\0aSortNotSeq == SortSeq({1, 2}, LAMBDA x, y : x < y)\0aPermsNotSet == Permutations(3)\0aCombNotFcn == 1 @@ 2\0aAnyV == Any\0a====\0a'  'CONSTANT Unused = 0\0a'
-  ~['AnyV' 'SortNotBool' 'SortNotSeq']
+  ~['AnyV']
 ::
 --

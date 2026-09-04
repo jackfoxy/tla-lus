@@ -865,6 +865,37 @@
   ?~  vs  e
   $(gs t.gs, vs t.vs, e (bind-group e i.gs i.vs))
 ::
+++  bound-domains
+  ::  every binder group's domain, drained to elements and all evaluated in
+  ::  ONE env. `Tool.contexts` passes the SAME context `c` to each
+  ::  `eval(domains[i], ...)`, so the bounds of `\E i \in S, j \in T` are
+  ::  INDEPENDENT -- unlike a function constructor's, which +ctx-doms binds
+  ::  prefix-wise. Measured, not assumed. R3.0c
+  |=  [gs=(list bgroup) e=eenv]
+  ^-  (each (list (list value:v)) eval-err:v)
+  ?~  gs  [%& ~]
+  =/  sd  (eval-domain rng.i.gs e)
+  ?:  ?=(%| -.sd)  sd
+  =/  els  (drain-sexp p.sd)
+  ?:  ?=(%| -.els)  els
+  =/  rest  $(gs t.gs)
+  ?:  ?=(%| -.rest)  rest
+  [%& [p.els p.rest]]
+::
+++  bind-rows
+  ::  the odometer over drained domains, one value per group.
+  ::  `ContextEnumerator.nextElement` advances index 0 first and carries
+  ::  upward, so the LEADING binder varies FASTEST -- which is the order the
+  ::  successor stream is compared in, not just a set. R3.0c
+  |=  ds=(list (list value:v))
+  ^-  (list (list value:v))
+  ?~  ds  ~[~]
+  =/  rest  $(ds t.ds)
+  %-  zing
+  %+  turn  rest
+  |=  r=(list value:v)
+  (turn i.ds |=(w=value:v `(list value:v)`[w r]))
+::
 ++  ctx-doms
   ::  a cdom per binder group: evaluate its range with the prefix bound
   |=  [bs=(list bgroup) e=eenv]
@@ -1671,7 +1702,10 @@
   =/  r  (apply-def d ~[x i.rest] e)
   ?:  ?=(%| -.r)  r
   ?.  ?=(%bool -.p.r)
-    [%| 2.169 'The second argument of SortSeq should be a boolean function, but instead it is:\0a<Operator>']
+    ::  R3.0b: tlc2 reports the VALUE the comparator returned, not the operator
+    ::  -- `SortSeq(<<1, 2>>, LAMBDA x, y : x)` names `2`. The `<Operator>`
+    ::  placeholder was right only while a LAMBDA could not be applied at all
+    [%| (arg-error:so 2.169 2 'SortSeq' 'boolean function' | p.r)]
   ?.  p.p.r  [%& (weld (flop rest) [x head])]
   $(rest t.rest, head [i.rest head])
 ::
@@ -1745,12 +1779,39 @@
   ?.  =('$OpArg' name.op.n)  name.op.n
   ?~(ubound.n '' name.i.ubound.n)
 ::
+++  lambda-def
+  ::  the anonymous operator behind a LAMBDA operator argument. SANY builds a
+  ::  synthesized OpDefNode named LAMBDA and points the OpArgNode at it;
+  ::  `+lambda-of` (lib/semantic) encodes exactly that as the reserved `$OpArg`
+  ::  apply — parameters in `bound`, the generated body as the args TAIL — so
+  ::  the definition is BUILT here rather than looked up, which is why
+  ::  `+resolve-oparg`'s name lookup could never find it. R3.0b
+  |=  n=sem:sm
+  ^-  (unit sem-def:sm)
+  ?.  ?=(%apply -.n)  ~
+  ?.  =('$OpArg' name.op.n)  ~
+  ?~  ubound.n  ~
+  ?.  =('LAMBDA' name.i.ubound.n)  ~
+  ::  a named op-arg carries only the arity literal; a LAMBDA carries the
+  ::  body after it, and its parameters as the single bound group
+  ?.  ?=([* * ~] args.n)  ~
+  ?~  bound.n  ~
+  =/  ps=(list spar:sm)
+    %+  turn  vars.i.bound.n
+    |=(b=sbind:sm `spar:sm`[name.b 0 & at.b])
+  :-  ~
+  :*  %sdef  'LAMBDA'  (lent ps)  &  lvl.n  at.n  ps
+      `i.t.args.n  ''
+  ==
+::
 ++  resolve-oparg
-  ::  an operator passed as an argument: a bare reference to a known op
+  ::  an operator passed as an argument: a bare reference to a known op, or a
+  ::  LAMBDA, which has no name to resolve and is built instead
   |=  [n=sem:sm e=eenv]
   ^-  (unit sem-def:sm)
   =/  nm  (oparg-name n)
   ?:  =('' nm)  ~
+  ?:  =('LAMBDA' nm)  (lambda-def n)
   (~(get by ops.e) nm)
 ::
 ++  eval-letin
@@ -2083,25 +2144,24 @@
   (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e s)
 ::
 ++  solve-exists
-  ::  \E x \in S : A — branch over the domain in enumeration order
+  ::  \E x \in S : A — branch over the domain in enumeration order. SEVERAL
+  ::  binders are the PRODUCT of their domains: tlc2 runs one
+  ::  `ContextEnumerator` over every bound group (`Tool.getNextStates`,
+  ::  OPCODE_be), so `\E a \in A, m \in M : A` is not a different construct,
+  ::  only a longer odometer. R3.0c
   |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
   =/  bs  (flatten-bound bound.n)
-  ?.  ?=([* ~] bs)
-    [[%| 0 'an action existential over multiple binders is unsupported.'] s]
-  =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
-  ?:  ?=(%| -.sd)  [sd s]
-  =/  els  (drain-sexp p.sd)
-  ?:  ?=(%| -.els)  [els s]
+  =/  ds  (bound-domains bs (senv mode cur part e))
+  ?:  ?=(%| -.ds)  [ds s]
   =/  body  (snag 0 args.n)
   =|  out=(list state)
-  =/  xs  p.els
+  =/  rows  (bind-rows p.ds)
   |-  ^-  sout
-  ?~  xs  [[%& out] s]
-  =/  e2  (bind-group e i.bs i.xs)
-  =^  r  s  (solve body mode cur part e2 s)
+  ?~  rows  [[%& out] s]
+  =^  r  s  (solve body mode cur part (bind-vals e bs i.rows) s)
   ?:  ?=(%| -.r)  [r s]
-  $(xs t.xs, out (weld out p.r))
+  $(rows t.rows, out (weld out p.r))
 ::
 ++  solve-forall
   ::  \A x \in S : A — a bounded universal in action position is the
@@ -2112,21 +2172,16 @@
   |=  [n=sem-apply:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
   =/  bs  (flatten-bound bound.n)
-  ?.  ?=([* ~] bs)
-    [[%| 0 'an action universal over multiple binders is unsupported.'] s]
-  =/  sd  (eval-domain rng.i.bs (senv mode cur part e))
-  ?:  ?=(%| -.sd)  [sd s]
-  =/  els  (drain-sexp p.sd)
-  ?:  ?=(%| -.els)  [els s]
+  =/  ds  (bound-domains bs (senv mode cur part e))
+  ?:  ?=(%| -.ds)  [ds s]
   =/  body  (snag 0 args.n)
   =/  acc=(list state)  ~[part]
-  =/  xs  p.els
+  =/  rows  (bind-rows p.ds)
   |-  ^-  sout
-  ?~  xs  [[%& acc] s]
-  =/  e2  (bind-group e i.bs i.xs)
-  =^  step  s  (solve-each body mode cur acc e2 s)
+  ?~  rows  [[%& acc] s]
+  =^  step  s  (solve-each body mode cur acc (bind-vals e bs i.rows) s)
   ?:  ?=(%| -.step)  [step s]
-  $(xs t.xs, acc p.step)
+  $(rows t.rows, acc p.step)
 ::
 ++  solve-unchanged
   ::  UNCHANGED e assigns each named variable to its current value
@@ -2527,7 +2582,10 @@
   ?:  =(nm '$BoundedExists')
     =/  bs  (flatten-bound bound.n)
     ?.  ?=([* ~] bs)
-      [[%err 0 'an action existential over multiple binders is unsupported.'] p]
+      :_  p
+      :-  %err
+      :-  0
+      'unsupported: an action existential over multiple binders in PROBABILISTIC mode (-generate/-simulate). R3.0c ported the exhaustive path; this one needs the RANDOMIZED ContextEnumerator reset order in tlc2, which is unmeasured. See check-mode-generate.'
     =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
     ?:  ?=(%| -.sd)  [[%err p.sd] p]
     =/  el  (drain-sexp p.sd)
@@ -2548,7 +2606,10 @@
   ?:  =(nm '$BoundedForall')
     =/  bs  (flatten-bound bound.n)
     ?.  ?=([* ~] bs)
-      [[%err 0 'an action universal over multiple binders is unsupported.'] p]
+      :_  p
+      :-  %err
+      :-  0
+      'unsupported: an action universal over multiple binders in PROBABILISTIC mode (-generate/-simulate). R3.0c ported the exhaustive path; this one needs the RANDOMIZED ContextEnumerator reset order in tlc2, which is unmeasured. See check-mode-generate.'
     =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
     ?:  ?=(%| -.sd)  [[%err p.sd] p]
     =/  el  (drain-sexp p.sd)

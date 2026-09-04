@@ -172,44 +172,56 @@ two-spec residue, not a stale workaround. And each state's **bindings are
 sorted** on both sides, because tlc2 prints them in `java.util.Hashtable` bucket
 order — an approved difference argued in `compatibility.md`.
 
-**Examples TLC batch (R2.8.2b).** `test-tlc-examples-batch` is the same
-comparator pointed at the other corpus: **4 in-scope `tlaplus-Examples` specs**
-through `check:check`, picked by `tools/tier2-select.py` — take the
-`check`-class specs that exercise a LEDGER-ROW FAMILY the checker-exercised
-corpus does not, cheapest-first, until the nightly budget is reached. It is the
-first time any examples spec other than `HourClock` and `TCommit` has been run
-through the Hoon checker, and **3 of the 4 diverge**:
+**Examples TLC batch (R2.8.2b, closed out by R3.0).**
+`test-tlc-examples-batch` is the same comparator pointed at the other corpus:
+in-scope `tlaplus-Examples` specs through `check:check`, picked by
+`tools/tier2-select.py` — take the `check`-class specs that exercise a
+LEDGER-ROW FAMILY the checker-exercised corpus does not, cheapest-first, until
+the nightly budget is reached.
 
-- `AsynchronousInterface/Channel` — record sets (`[val: Data, rdy: {0,1}, …]`);
-  **agrees** (ok / 12 distinct / depth 2).
+It is the first time any examples spec other than `HourClock` and `TCommit` has
+been run through the Hoon checker, and **at R2.8.2b three of its four specs
+diverged** — every one a REFUSAL, the port answering a typed error where tlc2
+answers a verdict, and every one invisible to the 452-spec SANY batches and the
+23-spec test-model checker batches. A front-end that accepts a spec says
+nothing about whether the checker runs it.
+
+**R3.0 closed all three**, and the batch is now **3 specs, 3/3 agreeing**, with
+`TLC_EXAMPLES_DIVERGENCES` empty:
+
+- `AsynchronousInterface/Channel` — record sets
+  (`[val: Data, rdy: {0,1}, ack: {0,1}]`); agreed from the start.
 - `SimpleMath/SimpleMath` — a config with **no behaviour spec**. tlc2 runs an
-  ASSUME-only module as an ordinary BFS with zero initial states (`0/0/0`, depth
-  0); `+resolve-targets` refuses, and refuses *before* `+check-assumes`, so the
-  port does not check the assumptions either. → `cfg-runspec`.
+  ASSUME-only module as an ordinary BFS over zero initial states (`0/0/0`,
+  depth 0); `+resolve-targets` refused, and refused *before* `+check-assumes`,
+  so the port did not check the assumptions either. → `cfg-runspec`, **R3.0a**.
 - `CigaretteSmokers` — a **LAMBDA as an operator-valued argument**
   (`ChooseOne(Ingredients, LAMBDA x : smokers[x].smoking)`); `+resolve-oparg`
-  resolves op-args by NAME only. → `tlc-eval-node`.
-- `SimplifiedFastPaxos/Paxos` — a **multi-binder existential in action
-  position** (`\E a \in Replicas, m \in p1aMessages : …`). Selected for
-  SYMMETRY, being the only in-scope examples spec with an uncommented `SYMMETRY`
-  line, so the measurement is that the port never reaches symmetry on it.
-  → `tlc-eval-action`.
+  resolved op-args by NAME only, and a LAMBDA has none to resolve.
+  → `tlc-eval-node`, **R3.0b**.
 
-All three are REFUSALS, not wrong answers, and all three were invisible to the
-452-spec SANY batches and the 23-spec test-model checker batches — a front-end
-that accepts a spec says nothing about whether the checker runs it. They cost
-the ledger three rows (134 rows, **131 terminal / 3 owed**). The arm costs
-**31.7 s** against the ~7.5 min `test-sany-batch`; the rule ran out of candidates
-well before the budget did, which is how R2.8.2b's row said it would close.
+**Two specs are deliberately absent, and both are measurements rather than
+omissions.** `SimplifiedFastPaxos/Paxos` — the **multi-binder action
+existential** that R3.0c closed — is out on **cost**: the port no longer
+refuses it, it explores, but where tlc2 answers in 4.2 s the port had not
+finished in ~50 min, more than the whole tier-2 shard costs. R3.0c's evidence is
+the `mc` case `multibind`, which pins the same construct *and its enumeration
+order*. `AsynchronousInterface/PrintValues` was expected to join `SimpleMath`
+once R3.0a landed and does not: its assumptions are `Print(…)` calls, so it
+fails on `TLC!Print` — `tlc-module-tlc`'s standing approved difference, a
+different row.
 
-**The selection rule itself was the unit's first finding.** R2.8.2a shipped it
+**The selection rule itself was R2.8.2b's first finding.** R2.8.2a shipped it
 answering *"add nothing"*; it was wrong in four ways, all under-reporting —
 it credited two specs to the checker that only the ORACLE CAPTURE runs, matched
 `SYMMETRY` inside a commented-out `.cfg` line, scored specs on sibling modules'
 configs, and never checked that a candidate had a config at all. Corrected, the
 checker set is 26 (not 27) and seven row-families were unexercised, not four —
-`ASSUME` among them, with no supplier at all. See
-`tools/notes/plan2-R2.8.2b-examples-coverage-notes.md`.
+`ASSUME` among them, with no supplier at all. The tool now also checks its own
+feature→row table against the ledger's row names, which found **eleven of
+nineteen** entries naming rows that do not exist. See
+`tools/notes/plan2-R2.8.2b-examples-coverage-notes.md` and
+`tools/notes/plan2-R3.0-refusals-notes.md`.
 
 **Subdir batch (R1.1.6–R1.1.9, completed R1.1.R2).**
 `desk/tests/lib/tier2-sub.hoon` runs **every in-scope test-model subdir spec
@@ -247,10 +259,10 @@ R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
   divergences; R1.1.R2 added the last 15 subdir specs).
 - **TLC safety comparator** — a curated set + a 14-spec batch through the Hoon
   checker vs TLC; the divergences pin the evaluation residues (R1.5).
-- **TLC examples comparator (R2.8.2b)** — a 4-spec `tlaplus-Examples` batch
-  through the Hoon checker vs TLC, selected by `tools/tier2-select.py`; 1 agrees
-  and 3 are censused refusals (`cfg-runspec`, `tlc-eval-node`,
-  `tlc-eval-action`).
+- **TLC examples comparator (R2.8.2b, closed by R3.0)** — a `tlaplus-Examples`
+  batch through the Hoon checker vs TLC, selected by `tools/tier2-select.py`.
+  It censused three refusals on its first run and all three are now closed;
+  **3/3 agree**, census empty.
 
 Deliberately deferred (each with a concrete unblock condition), tracked in
 `port-map.md`:

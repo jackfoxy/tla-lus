@@ -54,26 +54,50 @@ TM = Path("/mnt/mars/gitrepos/tlaplus/tlatools/org.lamport.tlatools/test-model")
 
 #  feature -> the ledger-row family it stands in for
 FEATS = {
-    "symmetry":   (r"\bSYMMETRY\b",                "tlc-symmetry"),
+    "symmetry":   (r"\bSYMMETRY\b",                "tlc-safety-symmetry"),
     "view":       (r"\bVIEW\b",                    "cfg-view"),
     "alias":      (r"\bALIAS\b",                   "cfg-alias"),
-    "constraint": (r"\bCONSTRAINT\b",              "cfg-constraint"),
+    "constraint": (r"\bCONSTRAINT\b",              "tlc-safety-constraint"),
     "fairness":   (r"\b(?:WF_|SF_)",               "tlc-live-fairness"),
-    "temporal":   (r"(?:<>|\[\])",                 "tlc-liveness"),
-    "recursive":  (r"\bRECURSIVE\b",               "tlc-eval-recursive"),
-    "choose":     (r"\bCHOOSE\b",                  "tlc-eval-choose"),
-    "subset":     (r"\bSUBSET\b",                  "tlc-eval-lazyset"),
+    "temporal":   (r"(?:<>|\[\])",                 "tlc-live-normalize"),
+    "recursive":  (r"\bRECURSIVE\b",               "tlc-eval-node"),
+    "choose":     (r"\bCHOOSE\b",                  "tlc-binders"),
+    "subset":     (r"\bSUBSET\b",                  "tlc-enum"),
     "seq":        (r"EXTENDS[^\n]*\bSequences\b",  "tlc-module-sequences"),
     "bags":       (r"EXTENDS[^\n]*\bBags\b",       "tlc-module-bags"),
     "finitesets": (r"EXTENDS[^\n]*\bFiniteSets\b", "tlc-module-finitesets"),
-    "reals":      (r"EXTENDS[^\n]*\bReals\b",      "tlc-module-reals"),
-    "instance":   (r"\bINSTANCE\b",                "semantic-instance"),
+    "reals":      (r"EXTENDS[^\n]*\bReals\b",      "tlc-module-excluded"),
+    "instance":   (r"\bINSTANCE\b",                "semantic-graph"),
     "assume":     (r"\bASSUME\b",                  "tlc-safety-assume"),
-    "except":     (r"\bEXCEPT\b",                  "tlc-eval-except"),
+    "except":     (r"\bEXCEPT\b",                  "tlc-value-except"),
     "tlcops":     (r"EXTENDS[^\n]*\bTLC\b",        "tlc-module-tlc"),
-    "rcdset":     (r"\[\s*\w+\s*:",                "tlc-eval-node/rcds"),
-    "fcnset":     (r"->\s*\w+\s*\]",               "tlc-eval-node/fcns"),
+    "rcdset":     (r"\[\s*\w+\s*:",                "tlc-eval-node"),
+    "fcnset":     (r"->\s*\w+\s*\]",               "tlc-eval-node"),
 }
+
+
+LEDGER = REPO / "desk/doc/parity-manifest.md"
+
+
+def ledger_rows() -> dict:
+    """The ledger's own row names.  `FEATS` claims to map a feature to a LEDGER
+    ROW, and R2.8.2a's table named four the ledger does not have --
+    `tlc-symmetry` (it is `tlc-safety-symmetry`), `tlc-module-reals` (Reals
+    lives inside `tlc-module-excluded`), `semantic-instance` (a `port-map.md`
+    differential, not a ledger row) and slash forms like `tlc-eval-node/rcds`.
+    Adding this check found SIX MORE -- `cfg-constraint`, `tlc-eval-choose`,
+    `tlc-eval-except`, `tlc-eval-lazyset`, `tlc-eval-recursive`,
+    `tlc-liveness` -- so ELEVEN of nineteen entries named a row that does not
+    exist.  A claim about the ledger that the ledger was never asked about.
+    Checked rather than commented, so a rename fails loudly."""
+    out = {}
+    for ln in LEDGER.read_text().splitlines():
+        if ln.startswith("| ") and ln.count("|") > 5:
+            f = ln.split("|")
+            n = f[1].strip()
+            if n and n != "id" and not set(n) <= set("- "):
+                out[n] = f[5].strip()
+    return out
 
 
 def gen():
@@ -173,6 +197,12 @@ def main() -> None:
     a = ap.parse_args()
     g = gen()
 
+    rows = ledger_rows()
+    bogus = sorted({r for _, r in FEATS.values()} - set(rows))
+    if bogus:
+        print(f"WARNING: FEATS names {len(bogus)} row(s) the ledger does "
+              f"not have: {', '.join(bogus)}\n")
+
     checked = checked_specs(g)
     cens = censused(g)
     have, agreed = set(), set()
@@ -192,8 +222,12 @@ def main() -> None:
         print(f"  reached ONLY by a censused divergence: {', '.join(only_cens)}"
               f"  <- the port refuses; not coverage")
     print(f"  NOT exercised: {', '.join(missing) or '(none)'}")
-    print(f"  -> ledger rows: "
-          f"{', '.join(sorted({FEATS[f][1] for f in missing})) or '(none)'}\n")
+    #  a feature whose row is EXCLUDED is not coverage debt -- `Reals` is out
+    #  of scope by argument, so "no spec supplies it" is the intended state
+    mrows = sorted({FEATS[f][1] for f in missing})
+    print("  -> ledger rows: " + (", ".join(
+        f"{r} (**{rows[r]}**, not owed)" if rows.get(r) == "excluded" else r
+        for r in mrows) or "(none)") + "\n")
 
     names = {n for n, _ in checked}
     want = {"examples", "test-model"} if a.corpus == "both" else {a.corpus}

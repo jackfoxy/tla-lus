@@ -13,11 +13,8 @@
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
 # 0 disagree with TLC (9/9 agree):
 
-# tlc-examples-batch (R2.8.2b): 4 in-scope tlaplus-Examples specs through check:check, picked by tools/tier2-select.py;
-# 3 disagree with TLC (1/4 agree):
-tlc-examples-batch	SimpleMath -> Error: no INIT/NEXT or SPECIFICATION in config	a config with NO behaviour spec. tlc2 runs an ASSUME-only module as an ordinary BFS with zero initial states and reports `Model checking completed` / 0 distinct / depth 0 -- the documented idiom for using TLC to evaluate expressions (SimpleMath, PrintValues). +resolve-targets (check.hoon:2449) requires INIT+NEXT or SPECIFICATION and aborts at line 2520, BEFORE +check-assumes at 4276, so the port never checks the assumptions at all. Charged to cfg-runspec.
-tlc-examples-batch	CigaretteSmokers -> Error: unsupported operator-valued argument.	LAMBDA as an operator-valued argument: `ChooseOne(Ingredients, LAMBDA x : smokers[x].smoking)`. +resolve-oparg (node-eval.hoon:1748) resolves an op-arg by NAME only, so an anonymous $OpArg is ~. R1.3.1 put LAMBDA op-args in the semantic graph; the evaluator half stayed open and was tracked by no row. Minimal reproducer: Pick(S, P(_)) == CHOOSE y \in S : P(y), Init == x = Pick({1,2,3}, LAMBDA n : n > 2) -- tlc2 answers ok/1 distinct. Charged to tlc-eval-node.
-tlc-examples-batch	Paxos -> Error: an action existential over multiple binders is unsupported.	a multi-binder existential in ACTION position: `\E a \in Replicas, m \in p1aMessages : ...` in every one of its four actions. +solve-exists (node-eval.hoon:2091, 2530) takes one binder. The rule picked this spec for SYMMETRY -- it is the ONLY in-scope examples spec with an uncommented SYMMETRY line -- and the measurement is that the port never reaches symmetry on it. R1.4.1b recorded that the CONSTANT multi-binder \E/\A evaluate and `only the action paths are open`; R1.4.3 closed the constructors and nothing tracked the action path after. Charged to tlc-eval-action.
+# tlc-examples-batch (R2.8.2b): 3 in-scope tlaplus-Examples specs through check:check, picked by tools/tier2-select.py;
+# 0 disagree with TLC (3/3 agree):
 
 # subdir-batch (R1.1.6-.9, completed R1.1.R2): 310 in-scope test-model subdir specs -- EVERY one whose closure resolves -- through +sany-verdict;
 # 0 disagree with Java (310/310 agree):

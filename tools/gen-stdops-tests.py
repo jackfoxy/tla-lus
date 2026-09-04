@@ -527,24 +527,22 @@ def intern_evidence() -> int:
 # Definitions whose oracle projection this port deliberately does NOT match,
 # each with the reason. Anything NOT listed here must match byte for byte, so
 # a new divergence cannot appear silently.
+#  R3.0b RETIRED eight LAMBDA skips here (SelectSeq, BagOfAll, SortSeq and
+#  their error cases). Their reason -- "LAMBDA is not in the WU3 semantic
+#  graph (unit-3 residue)" -- had been false since R1.3.1 put it there; the
+#  EVALUATOR resolved an operator argument by NAME only, and `+lambda-def`
+#  (R3.0b) builds the definition instead. Grepping the bin for siblings after
+#  fixing the reported one is the standing lesson; this is what it found.
 SKIPS = {
     ("st-naturals", "NatSet"): "Nat is a lazy descriptor here, not a UserValue (C1.2)",
     ("st-integers", "IntSet"): "Int is a lazy descriptor here, not a UserValue (C1.2)",
     ("st-sequences", "SeqSet"): "Seq(S) is a lazy descriptor here, not a UserValue (C1.3)",
-    ("st-sequences", "Sel"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
-    ("st-sequences", "SelNone"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
     ("st-seq-errors", "SeqNotSet"): "Seq(S) is a lazy descriptor here, not a UserValue (C1.3)",
-    ("st-seq-errors", "SelNotBool"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
     ("st-arith-errors", "BadArgPlus"): "the pin's message names the Java method signature; normalized (C1.2)",
-    ("st-bags", "OfAll"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
     ("st-bags", "Subs"): "SubBag's body needs recursive functions and multi-binder set constructors (unit-6.5 residue)",
-    ("st-tlc", "Sort"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
-    ("st-tlc", "SortEmpty"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
     ("st-tlc", "Pr"): "Print writes to TLC's console; a typed rejection here (C1.5)",
     ("st-tlc", "PrT"): "PrintT writes to TLC's console; a typed rejection here (C1.5)",
     ("st-tlc-errors", "AnyV"): "TLC!Any is excluded; a typed rejection here",
-    ("st-tlc-errors", "SortNotBool"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
-    ("st-tlc-errors", "SortNotSeq"): "LAMBDA is not in the WU3 semantic graph (unit-3 residue)",
 }
 # whole cases the comparator does not drive
 SKIP_CASES = {
