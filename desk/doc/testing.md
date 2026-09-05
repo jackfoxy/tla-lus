@@ -334,11 +334,18 @@ So a close-out unit runs, in this order:
 | tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
 | gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 11 gates (runs tier 1 as its gate 2) |
-| release | `bash tools/release-gate.sh` | **fails by design for the whole of R2** — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
-| acceptance | `python3 tools/r1-acceptance.py --suite-log <captured suite output>` | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
+| release | `bash tools/release-gate.sh` | **PASSES as of 2026-09-05** (R3.0d closed the last owed row). It failed by design from R2.0 to then — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
+| acceptance | `python3 tools/r3-acceptance.py --suite-log <captured suite output>` (R3.3.2; `r1-acceptance.py` is R1's and stays red, by design) | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
 
 A gate that never runs is not a gate. It is a claim.
+
+**And a gate that fails on purpose stops being read — which R3.3.2 found the
+hard way.** `release-gate.sh` was red from R2.0 to R3.0d, and behind the one
+clause everybody knew about, two others had rotted unseen: a `TODO` token in a
+comment and **eleven refusals missing from `compatibility.md`'s table**. R1.8.8
+found that a gate nobody runs is not a gate; this is the sibling. Read a red
+gate's OTHER clauses, every time.
 
 **A gate that fails on purpose needs saying so, too.** R2.0 re-opened the parity
 ledger — R2 brings excluded capability into scope and withdraws approval from

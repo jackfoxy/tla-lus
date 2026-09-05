@@ -291,8 +291,16 @@
   ::  R3.2a: tuples, records and functions are ONE kind for ordering, or two
   ::  values that `+equal-norm` calls equal would sort apart -- an order that
   ::  is inconsistent with the equality it is used beside. `kind-rank` is left
-  ::  alone so nothing else moves; the unification happens here
-  ?:  ?&((fcn-like a) (fcn-like b))
+  ::  alone so nothing else moves; the unification happens here.
+  ::
+  ::  Only where the kinds actually DIFFER, though. `+fcn-pairs` MATERIALIZES a
+  ::  pair list, and `%seq` is the commonest composite there is -- taking this
+  ::  branch for every tuple-vs-tuple comparison built two lists where the
+  ::  `%seq` arm below does a direct `+list-lth`, and `+vlth` runs on every set
+  ::  sort and dedup. Same-kind pairs are equivalent either way (a tuple's
+  ::  domain is 1..n on both sides; a record's is its keys in `strlth` order),
+  ::  so the fast paths below stay exact
+  ?:  ?&(?!(=(-.a -.b)) (fcn-like a) (fcn-like b))
     (pair-lth (fcn-pairs a) (fcn-pairs b))
   =/  ra  (kind-rank a)
   =/  rb  (kind-rank b)

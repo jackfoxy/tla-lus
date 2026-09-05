@@ -34,13 +34,20 @@ release gate PASS, ship suite `ok=%.y`).
 > longer approves. Two rows are **new**: `cfg-view` and `cfg-alias`, which had
 > never had rows of their own.
 >
-> **So `tools/release-gate.sh` gate R1 FAILS and `tools/r1-acceptance.py` prints
-> `R1 NOT ACCEPTED` for the whole of R2. That is the intended state, not a
-> regression.** Read a red gate mid-R2 as "R2 in progress". R2.9 closes the
-> ledger again against `tools/r2-acceptance.py`.
+> **So `tools/release-gate.sh` gate R1 FAILED and `tools/r1-acceptance.py`
+> printed `R1 NOT ACCEPTED` for the whole of R2 and most of R3. That was the
+> intended state, not a regression.**
+>
+> **CLOSED AGAIN 2026-09-05, by R3.0d.** The ledger stands at **134 rows, 134
+> terminal, 0 owed**; `release-gate.sh` reports **PASS** on every clause; and
+> `tools/r3-acceptance.py --suite-log` prints **R3 ACCEPTED** on 5/5 clauses
+> (2179 suite arms, 0 failed). R2 never wrote an `r2-acceptance.py` — R2.8.2b
+> re-opened three rows on its last unit and handed them to R3, which closed
+> those and two more it found on the way.
 >
 > `r1-acceptance.py` must **not** be edited to pass. It stays as the record of
-> what R1 actually proved.
+> what R1 actually proved, and it still prints `R1 NOT ACCEPTED` — correctly,
+> because the ledger it asserts is not the one R3 closed.
 
 Counts are cited from the generated `evidence-counts.md`, never hand-written.
 
