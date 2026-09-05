@@ -133,13 +133,23 @@ def strip_comments(t: str) -> str:
     return "".join(out)
 
 
+TEMPLATE = re.compile(r"%[0-9]+%")
+
+
 def cfg_of(tla: Path):
     """A spec's OWN config, or the `MC` wrapper's.  Never a sibling's: the
     first version globbed `*.cfg` and scored specs on configs belonging to
-    other modules in the same directory."""
+    other modules in the same directory.
+
+    A config carrying `%1%`-style PLACEHOLDERS is a Java-unit-test TEMPLATE,
+    not a runnable config -- the pin answers `TLC threw an unexpected
+    exception`, so the spec cannot be a comparator case at all.  R3.2 found
+    this by proposing `Github432` (the corpus's only SYMMETRY candidate) and
+    running it; it is the only such config among the `check`-class specs, and
+    one is enough to hand a unit a candidate that cannot exist."""
     for c in (tla.with_suffix(".cfg"), tla.parent / f"MC{tla.stem}.cfg"):
         if c.exists():
-            return c
+            return None if TEMPLATE.search(c.read_text(errors="ignore")) else c
     return None
 
 
@@ -248,7 +258,7 @@ def main() -> None:
         if not new:
             continue
         if cfg is None:
-            nocfg += 1                    # TLC cannot be pointed at it
+            nocfg += 1                    # no config, or a `%1%` template
             continue
         live = bool(re.search(r"^\s*PROPERT(?:Y|IES)\b", strip_comments(
             cfg.read_text(errors="ignore")), re.M))
@@ -258,8 +268,9 @@ def main() -> None:
     print(f"in-scope (`check`-class) specs in the census "
           f"[{'+'.join(sorted(want))}]: {len(pool)}")
     if nocfg:
-        print(f"  {nocfg} would bring a row but have NO config of their own "
-              f"-- not comparator candidates")
+        print(f"  {nocfg} would bring a row but have no runnable config of "
+              f"their own (missing, or a `%1%` test template) -- not "
+              f"comparator candidates")
     cands.sort(key=lambda r: (-r[0], r[4]))
     if not cands:
         print("candidates that bring an unexercised row: NONE\n")

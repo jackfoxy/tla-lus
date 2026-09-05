@@ -2452,15 +2452,24 @@
   =/  d  (decompose-spec u.sb defs vars)
   ?^  err.d  [%| u.err.d]
   ?~  next.d  [%| 'the SPECIFICATION has no next-state relation']
-  =/  isb  (conjoin-inits inits.d (sem-span:config u.sb))
-  ?~  isb  [%| 'the SPECIFICATION has no initial predicate']
   =/  nsb  (resolve-ref u.next.d defs)
   ?~  nsb  [%| 'the next-state relation is undefined']
+  =/  isb  (conjoin-inits inits.d (sem-span:config u.sb))
   ::  the Next span label uses the operator name when the action is a
   ::  user-op reference (as in [][Next]_v)
   =/  nname=(unit @t)
     =/  n  u.next.d
     ?:(&(?=(%apply -.n) ?=(%user-op kind.op.n)) `name.op.n ~)
+  ::  R3.2: a SPECIFICATION with a next-state relation but NO INITIAL
+  ::  PREDICATE is not an error either. `BagsTest`'s `Spec == [][TRUE]_<<>>`
+  ::  is the shape -- a module of ASSUMEs with a dummy spec to make TLC run --
+  ::  and tlc2 answers it exactly as it answers a config with no behaviour spec
+  ::  at all: zero initial states, `Model checking completed`, 0/0/0, depth 0.
+  ::  The init is handed on as `%nullodn`, the same marker R3.0a's no-behaviour
+  ::  path uses, and `+search-ctx-seed` reads THAT rather than a second flag,
+  ::  so both shapes take one code path. R3.0a fixed the sibling at line 2449
+  ::  and did not sweep the bin; this is the sweep
+  ?~  isb  [%& [%nullodn ~] u.nsb fair.d nname warn.d]
   [%& u.isb u.nsb fair.d nname warn.d]
 ::
 ++  search-ctx
@@ -2536,6 +2545,11 @@
     (resolve-targets [init.ca next.ca spec.ca] defs (var-order tree))
   ?:  ?=(%| -.rt)  [%| p.rt]
   =/  isb   init.p.rt
+  ::  R3.0a/R3.2: nothing to solve -- either the config declares no behaviour
+  ::  spec at all, or its SPECIFICATION has no initial predicate. `%nullodn`
+  ::  is the marker for both, so the run has zero initial states and the search
+  ::  never expands
+  =/  noinit  ?=(%nullodn -.isb)
   =/  nsb   next.p.rt
   =/  fair  fair.p.rt
   =/  consts  (const-map cfg)
@@ -2597,7 +2611,7 @@
     ::  no behaviour spec: no initial-state solve to run, and the `%nullodn`
     ::  bodies above are never evaluated because the search has nothing to
     ::  expand from. R3.0a
-    ?:  nospec  [[%& ~] rs0(es (scramble:rng seed))]
+    ?:  noinit  [[%& ~] rs0(es (scramble:rng seed))]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
     rs0(es (scramble:rng seed))
   =/  ir   -.irc

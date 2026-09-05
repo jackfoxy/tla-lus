@@ -7,8 +7,9 @@
 # batch (R1.1.3): 142 flat single-file in-scope test-model specs run through +sany-verdict
 # in one mule-isolated arm; 0 disagree with Java (142/142 agree):
 
-# tlc-batch (R1.1.5): 14 clean single-file test-model safety specs run through check:check;
-# 0 disagree with TLC (14/14 agree):
+# tlc-batch (R1.1.5): 15 clean single-file test-model safety specs run through check:check;
+# 1 disagree with TLC (14/15 agree):
+tlc-batch	BagsTest -> Error: An assumption is false.	NOT a Bags defect: a RECORD does not compare equal to a FUNCTION. Exactly 6 of the 126 assumptions fail (82, 83, 93, 106, 124, 126) and they are exactly the ones whose EXPECTED VALUE is a record literal `[a |-> 3, ...]`; every tuple-shaped or `:>`-built expectation passes, including `BagOfAll(LAMBDA elem : TRUE, h) = TRUE :> 6` which takes a record as INPUT. Minimal reproducer (`mc` case `rec-fcn-eq`, frozen): `[a |-> 1] = ("a" :> 1)` is TRUE at the pin and FALSE here, as is `[x \in {"a"} |-> 1] = [a |-> 1]`, while `DOMAIN [a |-> 1] = {"a"}` agrees. Cause: `+fcn-like` (lib/value.hoon:93) is `?=(?(%fcn %seq) -.v)` -- it admits tuples but NOT `%rec`, so `+equal-norm` falls through to the `%rec`-only branch; `+fcn-pairs` has no `%rec` case either. In TLA+ a record IS a function from strings, and tlc2's RecordValue compares equal to FcnRcdValue. Charged to tlc-value-composite, DEMOTED here. Closing it also has to settle FINGERPRINTING: if the two become equal they must hash the same, or two equal states count as distinct -- a state-identity change, R2.3.1's class of risk, so it is its own unit.
 
 # tlc-liveness-batch (R1.8.1.4): 9 clean single-file test-model specs with a temporal PROPERTY through check:check;
 # 0 disagree with TLC (9/9 agree):
