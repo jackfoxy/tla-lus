@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RELEASE GATE (R1.9.3) — the real one.
+# RELEASE GATE (R1.9.3; tier-3 REPORT added by R3.3.2) — the real one.
 #
 # `scaffold-gate.sh` proves scaffold HYGIENE and says so in its own banner: pin,
 # golden reproducibility, no Java/GUI, provenance, kelvin, a migration
@@ -20,12 +20,29 @@
 #                               Gall reload
 #   R6  reproducible artifacts  the oracle baseline regenerates byte-identically
 #
-#   tools/release-gate.sh
+# and one thing it deliberately does NOT gate:
+#
+#   T3  tier-3 performance      REPORTED, never asserted. R2.8.1a measured the
+#                               run-to-run spread of the median workload at
+#                               15.6% on a fresh boot -- over its own +/-15%
+#                               bar -- so a threshold here would fail runs for
+#                               being on a busy machine. `a flaky gate is one
+#                               everyone learns to ignore` (R1.1.R3). The
+#                               numbers are printed, and reading them is the
+#                               point; promoting this to a clause needs a NEW
+#                               MEASUREMENT, not a new opinion.
+#
+#   tools/release-gate.sh              the gates
+#   tools/release-gate.sh --tier3      the gates, plus the tier-3 report (needs
+#                                      a running ship; still never fails)
 #
 # Passes when the scaffold gate passes, every R-gate below passes, and on the
 # ship  -test /=tla-lus=/tests ~  reports  ok=%.y  (which no shell can check —
 # it is named as the remaining gate, exactly as the scaffold gate does).
 set -uo pipefail
+
+TIER3=0
+for a in "$@"; do [ "$a" = "--tier3" ] && TIER3=1; done
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DESK="$REPO/desk"
@@ -113,12 +130,36 @@ else
   fail "oracle baseline drift — see /tmp/tla-regen.log"; tail -6 /tmp/tla-regen.log
 fi
 
+echo "===== tier 3: REPORT, not a gate ====="
+# R2.8.1a's decision, kept here rather than in a comment nobody runs: the
+# spread is wider than any bar worth setting, so this section prints numbers
+# and never touches FAIL. It needs a running ship, so it runs only on request.
+if [ "$TIER3" -eq 1 ]; then
+  if python3 "$REPO/tools/tier3-report.py" >/tmp/tla-tier3.log 2>&1; then
+    echo "  REPORT  tier-3 workloads (read, not gated):"
+    sed -n '1,20p' /tmp/tla-tier3.log | sed 's/^/          /'
+  else
+    # nonzero here means the WORKLOAD SHARD failed -- a deterministic work
+    # profile changed, which is an ordinary test failure, not a slow run.
+    # It is still not this gate's clause; the shard is the suite's job.
+    echo "  REPORT  tier-3 report could not run cleanly — see /tmp/tla-tier3.log"
+    tail -4 /tmp/tla-tier3.log | sed 's/^/          /'
+  fi
+else
+  echo "  REPORT  not run (pass --tier3; it needs a running ship)."
+  echo "          Report-only by R2.8.1a: median workload spread 15.6% on a"
+  echo "          fresh boot, over its own +/-15% bar. Do not promote this to"
+  echo "          a clause without re-measuring."
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "RELEASE GATE: PASS"
   echo "  scaffold hygiene + ledger closed + tiers 1-2 green + no stubs"
   echo "  + refusals documented + upgrade/restart + reproducible artifacts."
+  echo "  tier 3 is reported above, never gated (R2.8.1a)."
   echo "  remaining ship gate:  -test /=tla-lus=/tests ~   must report ok=%.y"
+  echo "  then:                 tools/r3-acceptance.py --suite-log <captured>"
 else
   echo "RELEASE GATE: FAIL"
 fi

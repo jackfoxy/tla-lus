@@ -737,8 +737,8 @@
   ::  Measured: `_RL_REWARD Konst` with `Konst == 1 = 1` runs to a normal
   ::  verdict at the pin, where an INIT/NEXT-style check calls it a constant.
   ::  `processRLReward` does carry a must-not-be-constant branch, and the
-  ::  snapshot lookup makes it unreachable; its own TODO says the message
-  ::  would be bogus anyway
+  ::  snapshot lookup makes it unreachable; the Java source's own note there
+  ::  says the message would be bogus anyway
   |=  [dm=(map @t dentry) role=@t nm=@t]
   ^-  (unit cfg-vdiag)
   =/  e  (~(get by dm) nm)
