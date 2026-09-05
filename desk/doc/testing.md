@@ -123,11 +123,14 @@ edge) and `BagsTest` (`BagOfAll(LAMBDA …)`, LAMBDA not in the WU3 graph). This
 the slow tier-2 element (~7.5 min); it belongs to the nightly runner, not
 every-change tier 1.
 
-**TLC batch (R1.1.5).** `test-tlc-batch` is the checker analogue: one
-`mule`-isolated arm runs 14 clean single-file test-model **safety** specs (ok /
-invariant-violated / deadlock, small state) through `check:check` and compares
-each `[verdict, distinct]` to the pinned TLC run, censusing divergences with the
-Hoon verdict inline. Result: **4/14 agree** — a sharp contrast to SANY's 140/142.
+**TLC batch (R1.1.5; 15 specs since R3.2).** `test-tlc-batch` is the checker
+analogue: one `mule`-isolated arm runs the clean single-file test-model
+**safety** specs (ok / invariant-violated / deadlock, small state) through
+`check:check` and compares each `[verdict, distinct]` to the pinned TLC run,
+censusing divergences with the Hoon verdict inline. It was **14 specs from
+R1.1.5 until R3.2 added `BagsTest`**, the corpus's `tlc-module-bags` supplier;
+it is **15/15 agreeing** today. As first run in R1.1.5 the result was **4/14
+agree** — a sharp contrast to SANY's 140/142.
 The 10 divergences map the checker's real-spec gaps: **7 are the `x \in S` /
 `x' \in S` nondeterministic-assignment residue** (`variable is unassigned`),
 plus `AssignmentNext` (Hoon deadlocks where TLC completes), `SubsetEq` (Hoon
@@ -211,6 +214,25 @@ once R3.0a landed and does not: its assumptions are `Print(…)` calls, so it
 fails on `TLC!Print` — `tlc-module-tlc`'s standing approved difference, a
 different row.
 
+**R3.2 then used the same rule on the OTHER corpus, and it cost a fourth
+census entry.** `BagsTest` — the census's only `tlc-module-bags` supplier flat
+enough for `tlc-batch` — needed a fix even to run (a SPECIFICATION with a
+next-state relation but no INITIAL PREDICATE was refused, the sibling R3.0a
+missed), and then 6 of its 126 assumptions failed. Not a Bags defect: **a RECORD
+did not compare equal to a FUNCTION**, because `+fcn-like` admitted a tuple and
+not `%rec`. **R3.2a closed it**, and found a second divergence while there —
+record form in rendering is tlc2's `isName`, not "the domain is all strings".
+The safety batch is 15 specs, 15/15.
+
+**Two things the rule itself got wrong, both now guarded.** It proposed
+`Github432` — the corpus's only other SYMMETRY candidate — which **cannot run at
+all**: its config is a Java-unit-test template (`{%1%}`) and the pin throws. The
+rule checked that a config exists, never that the pin can run it. And its
+feature→row table named **eleven of nineteen** rows the ledger does not have.
+Both are checked by `tier2-select.py` now. `tlc-safety-symmetry` therefore has
+**no viable tier-2 supplier** — `Github432` cannot run and `Paxos` is out on
+cost — which is a measured statement, not an open question.
+
 **The selection rule itself was R2.8.2b's first finding.** R2.8.2a shipped it
 answering *"add nothing"*; it was wrong in four ways, all under-reporting —
 it credited two specs to the checker that only the ORACLE CAPTURE runs, matched
@@ -257,8 +279,10 @@ R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
 - **SANY comparator** — 142 flat + 310 subdir = **452 test-model specs through
   the Hoon front-end vs Java SANY, all 452 agreeing** (R1.3 closed the front-end
   divergences; R1.1.R2 added the last 15 subdir specs).
-- **TLC safety comparator** — a curated set + a 14-spec batch through the Hoon
-  checker vs TLC; the divergences pin the evaluation residues (R1.5).
+- **TLC safety comparator** — a curated set + a **15**-spec batch through the
+  Hoon checker vs TLC (14 from R1.1.5, `BagsTest` added by R3.2), **15/15
+  agreeing**; the divergences it censused pinned the evaluation residues (R1.5)
+  and the last of them, `BagsTest`, was closed by R3.2a.
 - **TLC examples comparator (R2.8.2b, closed by R3.0)** — a `tlaplus-Examples`
   batch through the Hoon checker vs TLC, selected by `tools/tier2-select.py`.
   It censused three refusals on its first run and all three are now closed;
@@ -272,8 +296,10 @@ Deliberately deferred (each with a concrete unblock condition), tracked in
   wall and there isn't one, so the cap simply moved to 70 000.
 - ~~**A TLC liveness batch**~~ — **DONE**: wired by R1.8.1.4, taken to 9/9 by
   R1.6, compared on the full trace by R1.1.R1 (8/9, one censused entry), and
-  back to **9/9** once R2.7.5 closed `Github710d`; the liveness census is empty
-  (the three entries `divergences.txt` now carries are R2.8.2b's examples batch).
+  back to **9/9** once R2.7.5 closed `Github710d`; the liveness census is empty.
+  **So is every other census** — R2.8.2b's examples batch froze three entries and
+  R3.0 closed all three; R3.2 froze a fourth (`BagsTest`, in the safety batch)
+  and R3.2a closed that. `divergences.txt` carries none.
 - ~~**Trace + coverage comparison**~~ — **DONE (R1.1.R1)**; its `Tool.getActions`
   dependency landed in R1.5.4. Coverage counters are an approved difference.
 - ~~**Tier-3 performance models**~~ — **not deferred, DESCOPED (R1.1.R3)**: a
@@ -336,8 +362,8 @@ the raw binding, and the comparator could not see the difference because
 silenced: the safety batch read 13/14 agree, 1 listed. **R2.3.2 closed it** by
 porting alias rendering — including the EC 2107 initial-state branch, which
 `ModelChecker.java:1187` renders with `evalAlias(curState, curState)` and which
-`+render-trace` never touches — so the batch is back to 14/14 and the census
-entry is retired.
+`+render-trace` never touches — so the batch was back to 14/14 (all 14 specs it
+held at the time) and the census entry retired.
 
 The lesson generalizes past this one spec: **a projection that does not look at
 something cannot report it as agreeing.** The dropped generated-count is a

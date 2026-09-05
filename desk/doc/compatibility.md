@@ -12,7 +12,7 @@ here is a deliberate, documented divergence rather than a latent bug.
 | Oracle pin (SANY/PlusCal/TLC) | `tlaplus@4ba7d8811` (MIT) |
 | Example/fixture pins | `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6` (MIT) |
 | Agent state version | `%0` — `versioned-state` in `app/tla-lus`. Nothing has been released, so exactly one version exists: the one that ships. Pre-release reshapes are not versions and the desk carries no record of them |
-| Public API version | `api-version` 1 (`sur/tla-lus`, reported at `/x/version` with the state version, `[1 0]`). **Unchanged by R2.7.1's wire split**, per §10.6: pre-release reshapes are not versions. It moves at release |
+| Public API version | `api-version` 1 (`sur/tla-lus`, reported at `/x/version` with the state version, `[1 0]`). **Unchanged by R2.7.1's wire split**, per §10.6: pre-release reshapes are not versions. **R3 does not move it either** — nothing has shipped and no ship holds state worth preserving, so there is no migration anywhere in this project. It moves at release |
 | Kelvin | `sys.kelvin` = `[%zuse 411 410 409 408]` |
 | Scaffold gate | `tools/scaffold-gate.sh` (11 gates) — proves scaffold hygiene, not parity; passes whatever the ledger owes |
 | **Release gate** | `tools/release-gate.sh` (R1.9.3) — the scaffold gate **plus** ledger closure, tier 2, no stubs in port code, refusals documented both ways, upgrade/restart, reproducible artifacts; then `-test /=tla-lus=/tests ~` on the ship |
