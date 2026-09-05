@@ -363,27 +363,15 @@ TLC_LIVENESS_BATCH = [
 # tracks `_POSSIBLE` and the spec agrees again -- this time for the right
 # reason, its postcondition asserting `FullSet = 8` and `GainThree = 16`
 # against counters the port now produces.
-TLC_BATCH_DIVERGENCES = ["BagsTest -> Error: An assumption is false."]
+TLC_BATCH_DIVERGENCES = []
 # grouped cause, keyed by module
 TLC_BATCH_REASONS = {
-    "BagsTest":
-        "NOT a Bags defect: a RECORD does not compare equal to a FUNCTION. "
-        "Exactly 6 of the 126 assumptions fail (82, 83, 93, 106, 124, 126) and "
-        "they are exactly the ones whose EXPECTED VALUE is a record literal "
-        "`[a |-> 3, ...]`; every tuple-shaped or `:>`-built expectation passes, "
-        "including `BagOfAll(LAMBDA elem : TRUE, h) = TRUE :> 6` which takes a "
-        "record as INPUT. Minimal reproducer (`mc` case `rec-fcn-eq`, frozen): "
-        "`[a |-> 1] = (\"a\" :> 1)` is TRUE at the pin and FALSE here, as is "
-        "`[x \\in {\"a\"} |-> 1] = [a |-> 1]`, while `DOMAIN [a |-> 1] = "
-        "{\"a\"}` agrees. Cause: `+fcn-like` (lib/value.hoon:93) is "
-        "`?=(?(%fcn %seq) -.v)` -- it admits tuples but NOT `%rec`, so "
-        "`+equal-norm` falls through to the `%rec`-only branch; `+fcn-pairs` "
-        "has no `%rec` case either. In TLA+ a record IS a function from "
-        "strings, and tlc2's RecordValue compares equal to FcnRcdValue. "
-        "Charged to tlc-value-composite, DEMOTED here. Closing it also has to "
-        "settle FINGERPRINTING: if the two become equal they must hash the "
-        "same, or two equal states count as distinct -- a state-identity "
-        "change, R2.3.1's class of risk, so it is its own unit.",
+    #  R3.2 froze `BagsTest` here with 6 of its 126 assumptions false, and the
+    #  cause was NOT Bags: a RECORD did not compare equal to a FUNCTION,
+    #  because `+fcn-like` (lib/value.hoon) admitted a tuple and not `%rec`
+    #  while `+to-fcn-pairs`, four lines below the helper that got it wrong,
+    #  had the record case right all along. R3.2a fixed it and the batch
+    #  agrees on all 15 again.
 }
 
 # Liveness batch modules whose Hoon check disagrees with TLC, frozen from the

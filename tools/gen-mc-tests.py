@@ -42,20 +42,10 @@ DROP = re.compile(
 #  next increment a target; leaving the case out of the corpus entirely would
 #  lose the measurement.
 SKIPS: dict = {
-    #  R2.7.15b emptied this map. R3.2 refilled it with ONE case: the minimal
-    #  reproducer for the record-vs-function equality gap `BagsTest` surfaced
-    #  (`tlc-value-composite`, demoted). The golden is captured from the pin --
-    #  so the next increment has a target and a change at the pin still shows
-    #  as a diff -- and only the ARM is withheld, with this reason printed on
-    #  every run so the residue cannot go quiet.
-    "rec-fcn-eq":
-        "a RECORD does not compare equal to a FUNCTION: `+fcn-like` "
-        "(lib/value.hoon:93) is `?=(?(%fcn %seq) -.v)` and omits `%rec`, so "
-        "`+equal-norm` never takes the function path for a record. In TLA+ a "
-        "record IS a function from strings and tlc2 compares RecordValue to "
-        "FcnRcdValue. DOMAIN already agrees. Closing it must also settle "
-        "fingerprinting, or two equal states count as distinct -- its own "
-        "unit (tlc-value-composite)",
+    #  R2.7.15b emptied this map, R3.2 refilled it with `rec-fcn-eq`, and
+    #  R3.2a emptied it again by fixing the gap that case froze: a RECORD now
+    #  compares equal to a FUNCTION (`+fcn-like`/`+fcn-pairs`). The mechanism
+    #  stays for the next increment that needs it.
 }
 
 

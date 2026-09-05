@@ -90,7 +90,14 @@
 ::  +|  Coercions For Cross-Representation Equality
 ::
 ++  set-like  |=(v=value ?=(?(%set %intv) -.v))
-++  fcn-like  |=(v=value ?=(?(%fcn %seq) -.v))
+++  fcn-like
+  ::  R3.2a: a RECORD is one of these too. In TLA+ a record IS a function
+  ::  whose domain is a set of strings, and tlc2 compares any two through
+  ::  `toFcnRcd()` (`FcnRcdValue.compareTo`), so `[a |-> 1]` and `("a" :> 1)`
+  ::  are the same value. Leaving `%rec` out made every record-shaped
+  ::  expectation in `BagsTest` false -- found by R3.2, which is when the
+  ::  corpus first ran a spec that compares the two
+  |=(v=value ?=(?(%fcn %seq %rec) -.v))
 ::
 ++  expand-intv
   |=  [lo=@sd hi=@sd]
@@ -120,6 +127,10 @@
   ^-  (list vpair)
   ?-  -.v
     %fcn   p.v
+    ::  a record's domain points are its field names as STRINGS, which is
+    ::  exactly what `fp-enc` already encodes them as -- so the fingerprint
+    ::  agreed all along and only the comparison did not (R3.2a)
+    %rec   (turn p.v |=(f=vfield `vpair`[[%str k.f] v.f]))
       %seq
     =|  i=@sd
     =.  i  --1
@@ -132,13 +143,16 @@
     %str   ~
     %model  ~
     %intv  ~
-    %rec   ~
     %set   ~
   ==
 ::
 ++  to-fcn-pairs
   ::  tlc2's Value.toFcnRcd: a function is one, and so are a tuple (domain
-  ::  1..n) and a record (string domain). Bags are exactly these values
+  ::  1..n) and a record (string domain). Bags are exactly these values.
+  ::
+  ::  R3.2a: this arm had the record case RIGHT and `+fcn-pairs`, four lines
+  ::  up and used by `+equal-norm`, did not -- two nearly identical helpers,
+  ::  one correct. That is the whole of the record-vs-function equality bug
   |=  v=value
   ^-  (unit (list vpair))
   ?+  -.v  ~
@@ -274,6 +288,12 @@
   ::  storage/dedup — NOT the (partial) TLC comparison operator
   |=  [a=value b=value]
   ^-  ?
+  ::  R3.2a: tuples, records and functions are ONE kind for ordering, or two
+  ::  values that `+equal-norm` calls equal would sort apart -- an order that
+  ::  is inconsistent with the equality it is used beside. `kind-rank` is left
+  ::  alone so nothing else moves; the unification happens here
+  ?:  ?&((fcn-like a) (fcn-like b))
+    (pair-lth (fcn-pairs a) (fcn-pairs b))
   =/  ra  (kind-rank a)
   =/  rb  (kind-rank b)
   ?.  =(ra rb)  (lth ra rb)
@@ -381,7 +401,10 @@
     =/  es  (turn (norm-set (turn p.v normalize)) render)
     "\{{(join-commas es)}}"
       %rec
-    "[{(join-commas (turn (sort-fields p.v) render-field))}]"
+    ::  R3.2a: through the same predicate as a function's, so a record whose
+    ::  field name `+is-name` rejects falls back to the `:>` form exactly as
+    ::  the equal function does
+    (render-fcn (fcn-pairs v))
       %fcn
     (render-fcn p.v)
   ==
@@ -404,6 +427,42 @@
   ^-  tape
   "{(trip k.f)} |-> {(render v.f)}"
 ::
+++  is-name
+  ::  tlc2's `FcnRcdValue.isName` (value/impl/FcnRcdValue.java:861), which is
+  ::  what decides RECORD form when a function is printed -- and it is NOT
+  ::  "a legal TLA+ identifier": every character is `_` or a letter-or-digit,
+  ::  at least one is a LETTER, and a name of 4 or more characters may not
+  ::  start with `WF_` or `SF_`. Measured at the pin: `"1x" :> 1` prints
+  ::  `[1x |-> 1]` (digits may lead) while `"a b" :> 1` and `"" :> 1` keep
+  ::  the `:>` form. R3.2a
+  ::  no `?~` guard: an empty string has no letter, so `lien` answers `|` and
+  ::  the empty case falls out. Narrowing `cs` first would nest-fail the wet
+  ::  `levy`/`lien`, the standing zuse-408 trap
+  |=  s=@t
+  ^-  ?
+  =/  cs=tape  (trip s)
+  ?.  %-  levy  :-  cs
+      |=  c=@
+      ?|  =('_' c)
+          &((gte c 'a') (lte c 'z'))
+          &((gte c 'A') (lte c 'Z'))
+          &((gte c '0') (lte c '9'))
+      ==
+    |
+  ?.  %-  lien  :-  cs
+      |=(c=@ ?|(&((gte c 'a') (lte c 'z')) &((gte c 'A') (lte c 'Z'))))
+    |
+  ?:  (lth (met 3 s) 4)  &
+  ?&(!=('WF_' (end [3 3] s)) !=('SF_' (end [3 3] s)))
+::
+++  rcd-form
+  ::  a pair list prints in RECORD form iff every domain point is a string
+  ::  that `+is-name` accepts
+  |=  ps=(list vpair)
+  ^-  ?
+  %+  levy  ps
+  |=(pr=vpair &(?=(%str -.d.pr) (is-name p.d.pr)))
+::
 ++  render-fcn
   ::  a function renders as a tuple (contiguous 1..n domain), a record
   ::  (all-string domain), or the (d :> v @@ …) form otherwise
@@ -412,7 +471,7 @@
   ?:  =(~ ps)  "<<>>"
   ?:  (contiguous ps)
     "<<{(join-commas (turn ps |=(pr=vpair (render r.pr))))}>>"
-  ?:  (levy ps |=(pr=vpair ?=(%str -.d.pr)))
+  ?:  (rcd-form ps)
     =/  fs  (turn ps |=(pr=vpair `vfield`[?>(?=(%str -.d.pr) p.d.pr) r.pr]))
     "[{(join-commas (turn (sort-fields fs) render-field))}]"
   ::  tlc2 parenthesizes this form: `(2 :> 1 @@ 3 :> 1)`

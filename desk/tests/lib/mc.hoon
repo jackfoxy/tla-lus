@@ -1417,6 +1417,20 @@
     '---- MODULE spec ----\0a\\* R2.7.12: the three-or-more plural form, which uses a DIFFERENT separator\0a\\* from the two-name one -- "P1, P2, and P3 were violated." against\0a\\* "P1 and P2 were violated." (MP.java\'s TLC_TEMPORAL_PROPERTY_VIOLATED).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aP1 == <>(x = 1)\0aP2 == <>(x = 2)\0aP3 == <>(x = 3)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY P1\0aPROPERTY P2\0aPROPERTY P3\0a'
 ::
+++  test-mc-rec-fcn-eq
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '0 states generated, 0 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 0.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS TLC, Integers\0a\0a\\* In TLA+ a RECORD is a function whose domain is a set of strings, and tlc2\0a\\* compares the two representations equal (RecordValue vs FcnRcdValue). The\0a\\* port keeps `%rec` outside `+fcn-like`, so these are FALSE here and TRUE at\0a\\* the pin -- the whole of BagsTest\'s divergence, and nothing to do with Bags.\0aASSUME([a |-> 1] = ("a" :> 1))\0aASSUME([a |-> 1, b |-> 2] = ("a" :> 1) @@ ("b" :> 2))\0aASSUME([x \\in {"a"} |-> 1] = [a |-> 1])\0a\0a\\* this one AGREES, which is what makes the diagnosis precise: the domain is\0a\\* built right, only the equality is not\0aASSUME(DOMAIN [a |-> 1] = {"a"})\0a\0aSpec == [][TRUE]_<<>>\0a=====================\0a'
+  'SPECIFICATION Spec\0a'
+::
 ++  test-mc-rnd-exists
   %+  expect-eq
     !>  ^-  wain

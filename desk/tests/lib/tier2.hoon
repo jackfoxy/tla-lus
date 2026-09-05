@@ -413,8 +413,7 @@
 ++  test-tlc-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'BagsTest -> Error: An assumption is false.'
-    ==
+    ~
   !>
   %-  tlc-batch-run
   ^-  (list [@t (list @t) @t @t])
