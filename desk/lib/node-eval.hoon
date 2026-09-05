@@ -896,6 +896,45 @@
   |=  r=(list value:v)
   (turn i.ds |=(w=value:v `(list value:v)`[w r]))
 ::
+++  draw-orders
+  ::  one randomized index permutation PER BINDER GROUP, drawn in GROUP ORDER.
+  ::
+  ::  R3.0d, and the ordering IS the unit, so it was measured before it was
+  ::  written. `Tool.contexts(Ordering.RANDOMIZED, ...)` builds one
+  ::  `ValueEnumeration` per group and each `SubsetEnumerator` draws exactly
+  ::  twice at CONSTRUCTION -- `nextInt(n)` for the seed and `nextPrime` for
+  ::  the increment -- which is what `+subset-indices` reproduces. And
+  ::  **`SubsetEnumerator.reset()` is `i = 0` and nothing else**
+  ::  (`EnumerableValue.java:172`): it rewinds, it does NOT reseed. So an
+  ::  inner group REPLAYS the same permutation on every carry of the odometer,
+  ::  the draws all happen up front in group order, and no RNG value is
+  ::  consumed during enumeration. That is why this arm can draw everything
+  ::  once and hand the walk a fixed list
+  |=  [ds=(list (list value:v)) es=@]
+  ^-  [(list (list @ud)) @]
+  ?~  ds  [~ es]
+  =/  nn  (lent i.ds)
+  =^  ixs  es  (subset-indices:rg es nn nn)
+  =^  rest  es  $(ds t.ds)
+  [[ixs rest] es]
+::
+++  order-rows
+  ::  the odometer over drained domains under a per-group index PERMUTATION --
+  ::  `+bind-rows` with each group walked in its drawn order instead of its
+  ::  enumeration order. Index 0 still advances FIRST
+  ::  (`ContextEnumerator.nextElement`), so the LEADING binder varies fastest
+  ::  here exactly as it does in the exhaustive path. R3.0d
+  |=  [ds=(list (list value:v)) os=(list (list @ud))]
+  ^-  (list (list value:v))
+  ?~  ds  ~[~]
+  ?~  os  ~[~]
+  =/  rest  $(ds t.ds, os t.os)
+  %-  zing
+  %+  turn  rest
+  |=  r=(list value:v)
+  %+  turn  i.os
+  |=(ix=@ud `(list value:v)`[(snag ix i.ds) r])
+::
 ++  ctx-doms
   ::  a cdom per binder group: evaluate its range with the prefix bound
   |=  [bs=(list bgroup) e=eenv]
@@ -2462,6 +2501,15 @@
   ?~  xs  ~
   [[body (bind-group e g i.xs)] $(xs t.xs)]
 ::
+++  prow-items
+  ::  the same, over ROWS of a multi-group product rather than elements of one
+  ::  group -- one deferred conjunct per remaining context, in odometer order
+  ::  (R3.0d)
+  |=  [body=sem:sm gs=(list bgroup) rows=(list (list value:v)) e=eenv]
+  ^-  (list pitem)
+  ?~  rows  ~
+  [[body (bind-vals e gs i.rows)] $(rows t.rows)]
+::
 ++  next-states-prob
   ::  ONE successor of `cur` under a Next BODY, on the `-generate` path: the
   ::  walk returns as soon as `fil` accepts a successor. `p` carries both
@@ -2580,45 +2628,39 @@
     :-  0
     'unsupported: probabilistic evaluation of the next-state relation is not implemented for CASE (tlc2 -generate refuses the same way).'
   ?:  =(nm '$BoundedExists')
+    ::  R3.0d: several binders are the product here too. `contexts()` builds
+    ::  ONE ContextEnumerator over every group, so the domains are evaluated in
+    ::  the OUTER context and the odometer runs the leading binder fastest --
+    ::  the same two facts the exhaustive path was measured on (R3.0c) -- with
+    ::  each group additionally walked in its own drawn permutation
     =/  bs  (flatten-bound bound.n)
-    ?.  ?=([* ~] bs)
-      :_  p
-      :-  %err
-      :-  0
-      'unsupported: an action existential over multiple binders in PROBABILISTIC mode (-generate/-simulate). R3.0c ported the exhaustive path; this one needs the RANDOMIZED ContextEnumerator reset order in tlc2, which is unmeasured. See check-mode-generate.'
-    =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
-    ?:  ?=(%| -.sd)  [[%err p.sd] p]
-    =/  el  (drain-sexp p.sd)
-    ?:  ?=(%| -.el)  [[%err p.el] p]
-    =/  xs=(list value:v)  p.el
-    =/  nn  (lent xs)
-    ?:  =(0 nn)  [[%none ~] p]
-    =^  ixs  es.rs.p  (subset-indices:rg es.rs.p nn nn)
+    =/  ds  (bound-domains bs (senv %next cur part e))
+    ?:  ?=(%| -.ds)  [[%err p.ds] p]
+    ?:  (lien p.ds |=(xs=(list value:v) ?=(~ xs)))  [[%none ~] p]
+    =^  os  es.rs.p  (draw-orders p.ds es.rs.p)
     =/  body  (snag 0 args.n)
+    =/  rows  (order-rows p.ds os)
     |-  ^-  [pres pst]
-    ?~  ixs  [[%none ~] p]
-    =/  e2  (bind-group e i.bs (snag i.ixs xs))
-    =^  res  p  (psolve body cur part e2 acts p fil)
+    ?~  rows  [[%none ~] p]
+    =^  res  p  (psolve body cur part (bind-vals e bs i.rows) acts p fil)
     ?.  ?=(%none -.res)  [res p]
-    $(ixs t.ixs)
+    $(rows t.rows)
   ::  a bounded universal is NOT randomized by tlc2: it solves the first
   ::  element now and defers the rest onto the continuation
   ?:  =(nm '$BoundedForall')
+    ::  R3.0d: multi-binder here too, and NOT randomized -- tlc2 calls the
+    ::  plain `contexts(pred, ...)`, i.e. `Ordering.NORMALIZED`, takes the
+    ::  FIRST context now and defers the rest onto the ActionItemList. So this
+    ::  is `+bind-rows` (no draw, no RNG consumed) with the head solved and the
+    ::  tail deferred, which is what the single-binder code already did
     =/  bs  (flatten-bound bound.n)
-    ?.  ?=([* ~] bs)
-      :_  p
-      :-  %err
-      :-  0
-      'unsupported: an action universal over multiple binders in PROBABILISTIC mode (-generate/-simulate). R3.0c ported the exhaustive path; this one needs the RANDOMIZED ContextEnumerator reset order in tlc2, which is unmeasured. See check-mode-generate.'
-    =/  sd  (eval-domain rng.i.bs (senv %next cur part e))
-    ?:  ?=(%| -.sd)  [[%err p.sd] p]
-    =/  el  (drain-sexp p.sd)
-    ?:  ?=(%| -.el)  [[%err p.el] p]
-    =/  xs=(list value:v)  p.el
-    ?~  xs  (pnext cur part acts p fil)
+    =/  ds  (bound-domains bs (senv %next cur part e))
+    ?:  ?=(%| -.ds)  [[%err p.ds] p]
+    =/  rows  (bind-rows p.ds)
+    ?~  rows  (pnext cur part acts p fil)
     =/  body  (snag 0 args.n)
-    =/  rest  (flop (pgroup-items body i.bs t.xs e))
-    (psolve body cur part (bind-group e i.bs i.xs) (weld rest acts) p fil)
+    =/  rest  (flop (prow-items body bs t.rows e))
+    (psolve body cur part (bind-vals e bs i.rows) (weld rest acts) p fil)
   ?:  =(nm 'UNCHANGED')
     =/  names  (unchanged-vars (snag 0 args.n) psub.e)
     =/  out=state  part

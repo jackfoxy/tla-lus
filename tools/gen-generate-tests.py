@@ -65,6 +65,37 @@ Next == /\\ y' = y + 1
 Inv == x < 50
 ====
 """, "INIT Init\nNEXT Next\nINVARIANT Inv\n", 60, [1, 2, 3]),
+    # OPCODE_be with SEVERAL binders (R3.0d). One ContextEnumerator spans both
+    # groups: `Tool.contexts(Ordering.RANDOMIZED, ...)` constructs one
+    # SubsetEnumerator per group IN GROUP ORDER, each drawing twice at
+    # construction, and `reset()` rewinds without reseeding -- so the inner
+    # group replays its permutation on every carry and the leading binder
+    # varies fastest. Nothing but a differential can check that the draws and
+    # the walk are in the right order, which is what this case is for.
+    ("exists2", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x, y
+Init == x = 0 /\\ y = 0
+Next == /\\ y' = y + 1
+        /\\ \\E n \\in 1..3, m \\in 1..4 : x' = (x + n * m) % 100
+Inv == x < 90
+====
+""", "INIT Init\nNEXT Next\nINVARIANT Inv\n", 60, [1, 2, 3]),
+    # OPCODE_bf with SEVERAL binders (R3.0d). A bounded universal is NOT
+    # randomized -- tlc2 takes the plain NORMALIZED enumerator, solves the
+    # first context now and defers the rest onto the ActionItemList -- so this
+    # case checks the product is walked in odometer order with no RNG consumed,
+    # which is exactly the way the randomized case could go wrong unnoticed.
+    ("forall2", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x, y
+Init == x = 0 /\\ y = 0
+Next == /\\ y' = y + 1
+        /\\ \\E n \\in 1..5 : x' = (x + n) % 100
+        /\\ \\A i \\in 1..2, j \\in 1..2 : x' # (i * j)
+Inv == x < 90
+====
+""", "INIT Init\nNEXT Next\nINVARIANT Inv\n", 60, [1, 2, 3]),
 ]
 
 

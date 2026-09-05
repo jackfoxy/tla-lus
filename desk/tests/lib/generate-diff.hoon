@@ -95,4 +95,62 @@
   %+  expect-eq
     !>  `@ud`10
   !>  gen:(generate-spec:check src-disj cfg-disj 3 1 60)
+++  src-exists2  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ y\' = y + 1\0a        /\\ \\E n \\in 1..3, m \\in 1..4 : x\' = (x + n * m) % 100\0aInv == x < 90\0a====\0a'
+++  cfg-exists2  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+++  test-gen-exists2-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=12,y=1" "x=16,y=2" "x=22,y=3" "x=28,y=4" "x=30,y=5" "x=32,y=6" "x=41,y=7" "x=50,y=8" "x=54,y=9" "x=60,y=10" "x=66,y=11" "x=70,y=12" "x=72,y=13" "x=74,y=14" "x=86,y=15" "x=92,y=16"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-exists2 cfg-exists2 1 1 60))
+++  test-gen-count-exists2-1
+  %+  expect-eq
+    !>  `@ud`17
+  !>  gen:(generate-spec:check src-exists2 cfg-exists2 1 1 60)
+++  test-gen-exists2-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=2,y=1" "x=8,y=2" "x=11,y=3" "x=14,y=4" "x=17,y=5" "x=19,y=6" "x=25,y=7" "x=27,y=8" "x=30,y=9" "x=32,y=10" "x=38,y=11" "x=42,y=12" "x=48,y=13" "x=56,y=14" "x=59,y=15" "x=67,y=16" "x=69,y=17" "x=73,y=18" "x=79,y=19" "x=83,y=20" "x=85,y=21" "x=87,y=22" "x=90,y=23"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-exists2 cfg-exists2 2 1 60))
+++  test-gen-count-exists2-2
+  %+  expect-eq
+    !>  `@ud`24
+  !>  gen:(generate-spec:check src-exists2 cfg-exists2 2 1 60)
+++  test-gen-exists2-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=4,y=1" "x=13,y=2" "x=21,y=3" "x=33,y=4" "x=35,y=5" "x=39,y=6" "x=48,y=7" "x=52,y=8" "x=64,y=9" "x=70,y=10" "x=78,y=11" "x=87,y=12" "x=90,y=13"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-exists2 cfg-exists2 3 1 60))
+++  test-gen-count-exists2-3
+  %+  expect-eq
+    !>  `@ud`14
+  !>  gen:(generate-spec:check src-exists2 cfg-exists2 3 1 60)
+++  src-forall2  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ y\' = y + 1\0a        /\\ \\E n \\in 1..5 : x\' = (x + n) % 100\0a        /\\ \\A i \\in 1..2, j \\in 1..2 : x\' # (i * j)\0aInv == x < 90\0a====\0a'
+++  cfg-forall2  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+++  test-gen-forall2-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=3,y=1" "x=6,y=2" "x=7,y=3" "x=12,y=4" "x=17,y=5" "x=18,y=6" "x=22,y=7" "x=23,y=8" "x=24,y=9" "x=26,y=10" "x=29,y=11" "x=33,y=12" "x=34,y=13" "x=36,y=14" "x=41,y=15" "x=42,y=16" "x=45,y=17" "x=48,y=18" "x=51,y=19" "x=53,y=20" "x=56,y=21" "x=59,y=22" "x=64,y=23" "x=69,y=24" "x=72,y=25" "x=73,y=26" "x=77,y=27" "x=79,y=28" "x=84,y=29" "x=89,y=30" "x=91,y=31"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-forall2 cfg-forall2 1 1 60))
+++  test-gen-count-forall2-1
+  %+  expect-eq
+    !>  `@ud`32
+  !>  gen:(generate-spec:check src-forall2 cfg-forall2 1 1 60)
+++  test-gen-forall2-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=5,y=1" "x=6,y=2" "x=7,y=3" "x=9,y=4" "x=13,y=5" "x=17,y=6" "x=21,y=7" "x=26,y=8" "x=27,y=9" "x=31,y=10" "x=34,y=11" "x=37,y=12" "x=42,y=13" "x=45,y=14" "x=47,y=15" "x=52,y=16" "x=56,y=17" "x=60,y=18" "x=63,y=19" "x=64,y=20" "x=65,y=21" "x=67,y=22" "x=72,y=23" "x=77,y=24" "x=79,y=25" "x=80,y=26" "x=85,y=27" "x=88,y=28" "x=91,y=29"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-forall2 cfg-forall2 2 1 60))
+++  test-gen-count-forall2-2
+  %+  expect-eq
+    !>  `@ud`30
+  !>  gen:(generate-spec:check src-forall2 cfg-forall2 2 1 60)
+++  test-gen-forall2-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0,y=0" "x=3,y=1" "x=8,y=2" "x=11,y=3" "x=15,y=4" "x=17,y=5" "x=21,y=6" "x=25,y=7" "x=29,y=8" "x=31,y=9" "x=34,y=10" "x=39,y=11" "x=44,y=12" "x=45,y=13" "x=50,y=14" "x=54,y=15" "x=55,y=16" "x=56,y=17" "x=57,y=18" "x=60,y=19" "x=61,y=20" "x=62,y=21" "x=66,y=22" "x=70,y=23" "x=71,y=24" "x=75,y=25" "x=76,y=26" "x=81,y=27" "x=83,y=28" "x=87,y=29" "x=90,y=30"]
+  !>  %-  render-states:ne
+      path:(need viol:(generate-spec:check src-forall2 cfg-forall2 3 1 60))
+++  test-gen-count-forall2-3
+  %+  expect-eq
+    !>  `@ud`31
+  !>  gen:(generate-spec:check src-forall2 cfg-forall2 3 1 60)
 --
