@@ -1,0 +1,25 @@
+ACCEPT
+n-module 1.1-5.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-4.10
+    n-assumption 2.1-2.11
+      assume 2.1-2.6 ASSUME
+      n-generalid 2.8-2.11
+        n-idprefix ~ N_IdPrefix
+        identifier 2.8-2.11 TRUE
+    n-assumption 3.1-3.15
+      assumption 3.1-3.10 ASSUMPTION
+      n-generalid 3.12-3.15
+        n-idprefix ~ N_IdPrefix
+        identifier 3.12-3.15 TRUE
+    n-assumption 4.1-4.10
+      assumption 4.1-4.5 AXIOM
+      n-generalid 4.7-4.10
+        n-idprefix ~ N_IdPrefix
+        identifier 4.7-4.10 TRUE
+  n-endmodule 5.1-5.4
+    end-module 5.1-5.4 ====

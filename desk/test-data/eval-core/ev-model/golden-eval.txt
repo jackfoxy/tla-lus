@@ -1,0 +1,4 @@
+EVAL
+MSet SetEnumValue {a, b, c}
+Mem BoolValue FALSE
+SameM BoolValue TRUE

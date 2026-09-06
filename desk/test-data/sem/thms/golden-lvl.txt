@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={c} lc={c<=2}
+lvl NamedA L0 lp={c} lc={c<=2}
+lvl NamedT L0 lp={c} lc={c<=2}

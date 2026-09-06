@@ -1,0 +1,13 @@
+LIVESTRUCT
+OOS 1
+--- 0 ---
+PROMISES 0
+CHECKSTATE 1
+CHECKACTION 1
+PEMS 1
+TABLEAU 0
+TF
+/\ []<>-line 9, col 14 to line 9, col 18 of module A
+/\ []<>\/ (-ENABLED <line 8, col 36 to line 8, col 36 of module A>_line 8, col 34 to line 8, col 34 of module A)
+       \/ (<line 8, col 36 to line 8, col 36 of module A>_line 8, col 34 to line 8, col 34 of module A)
+ENDTF

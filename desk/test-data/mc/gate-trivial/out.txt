@@ -1,0 +1,1 @@
+Error: The spec is trivially false because Falsy is false.

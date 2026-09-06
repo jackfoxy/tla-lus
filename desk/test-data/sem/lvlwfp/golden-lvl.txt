@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=1}
+lvl W L3 lc={x<=1} nlp={x}
+lvl S L3 lc={x<=1} nlp={x}

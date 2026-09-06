@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=1}
+lvl Op L2 ml=[1] w=[0] lp={x} lc={x<=2}
+lvl I!D L2 lp={x} nlp={x}

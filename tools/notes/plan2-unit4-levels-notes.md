@@ -1,0 +1,556 @@
+# Plan-2 Unit 4 (levels/lint) — 4.0 Oracle Inventory and Frozen Baseline
+
+Subunit 4.0 of `unit-4-plan.md`, executed 2026-07-18 against the pinned
+oracle `tlaplus@4ba7d8811289fb8e95dac4d5e554c05216ba3100`.
+
+## Frozen baseline
+
+Pre-existing uncommitted increment (audited, preserved): level machinery in
+`desk/lib/semantic.hoon` (+1777 lines: `lres` constraint algebra,
+`l-x`/`l-args`/`l-def`/`l-substin`/`l-inst`/`l-lint`, builtin max-level
+tables), `SemDump.java` switched to full settings (semantic + levels +
+lint, no PlusCal validation), and 16 fixture families
+(`lvl*`, `lint*`, `recmut`).
+
+- Regeneration is byte-identical (`gen-sem-tests.py` twice, `md5sum` over
+  all goldens equal).
+- 47-case pre-4.0 suite: **45/47 green**; `lvlqtb`, `lvltmp` red, both on
+  one delta: unreferenced bound identifier `bound i L-1` (oracle) vs `L0`
+  (Hoon). `lvltmp`'s five temporal diags 4310–4314 already match.
+- Expanded 56-case suite (4.0 adds 9 fixtures): **48/56 green**. Red set
+  and exact deltas below; each red is a subunit's named failing case.
+
+## Two-phase gating (normative)
+
+SANY runs level checking only when semantic generation produced no errors:
+any semantic ERROR renders every levelCheck-derived level `-1`
+(declaration levels survive). A **level** error does the opposite —
+computed levels stay visible and only `D`-lines are added (all `lvl*`
+goldens show real levels beside 4205/4206/43xx). The Hoon renderer's
+blanket mask-to-`-1` is correct for phase one and must not fire for phase
+two.
+
+## SemDump 4.0 extensions
+
+- `apsubstin` arm (was the `?APSubstInNode` fallback), mirroring `substin`.
+- `LEVELS` section after `DIAGS`: one line per root-module def (+ module
+  node, + thmdefs), reading the public `LevelNode` collection fields
+  (no `levelChecked` assertions):
+  `lvl <name> L<n> [ml=[..] w=[..]] [mml=[..] olc=[..]] [lp={..}] [lc={..}] [alc={..}] [alp={..}] [nlp={..}]`
+  — max-levels and weights per argument; higher-order min-max levels and
+  op-level conditions (`olc[i][j][k]`, k over param *i*'s arity — the
+  allocation in `OpDefNode` line 1109 indexes by `params[i].getArity()`);
+  level params, level constraints (`p<=n`), arg-level constraints
+  (`(p,i)>=n`), arg-level params (`(op,i,param)`), non-Leibniz params.
+  Every collection is sorted lexicographically because SANY's
+  `HashSet`/`HashMap` iteration order is identity-hash volatile;
+  `ParamAndPosition`/`ArgLevelParam` are package-private with UID-bearing
+  `toString`s, so `tools/oracle/LevelProbe.java` (package
+  `tla2sany.semantic`) renders them by name only.
+- `gen-sem-tests.py` splits `LEVELS` into `golden-lvl.txt` per case:
+  **oracle-only** (manifest row `level-constraints`) until the 4.1 Hoon
+  constraint renderer exists. `golden.txt` and the generated test arms are
+  unchanged in shape, so green cases stay green.
+
+## Owner-to-fixture matrix
+
+| Subunit | Java owner (pin) | Rule family | Green fixtures | Named failing oracle case |
+|---|---|---|---|---|
+| 4.1 | `SetOfLevelConstraints`, `SetOfArgLevelConstraints`, `ArgLevelParam`, `ParamAndPosition` | constraint set algebra + rendering | — (Hoon algebra live but unobserved) | every `golden-lvl.txt` (56, oracle-only; e.g. `lvlho`: `lvl H L2 ml=[3] w=[1] mml=[2] olc=[F] lc={x<=1} nlp={x}`) |
+| 4.2 | `LevelNode`, first-order `OpApplNode`/`OpDefNode.levelCheck`, `BuiltInOperators` tables | bottom-up levels, arg-max 4205 | `constvar nullary nary infix quant letin ite casex spec lvlop` | `lvlqtb`/`lvltmp`: unreferenced bound identifier must stay `L-1`; `lvlcdot`: DIAGS text must backslash-escape (`\\cdot`) |
+| 4.3 | `OpDefNode.levelCheckParams`: `maxLevels`/`weights`/`minMaxLevel`/`opLevelCond` | higher-order applications | `lvlho` (4272), `hoparam` | `hoparam`'s `golden-lvl.txt` (`mml=[0;] olc=[FT;]`) — projection parity; doubly-higher-order argLevelParam remapping has no fixture yet (4.3 must add one) |
+| 4.4 | recursive-section fixpoint in `OpDefNode`, `$RecursiveFcnSpec` | recursion | `recmut recur lvlrec` (4290) `lvlsec` | `recfcn`: recursive function must carry `ubound f` self-binder + `$FcnApply` subtree; higher-order `RECURSIVE H(_(_))` is a parse REJECT (parser corpus owns it) |
+| 4.5 | node-specific `levelCheck`: prime, `ENABLED`, `UNCHANGED`, temporal 4310–4315, fairness, `\cdot`, `ASSUME` 4206 | node rules | `lvlpri lvlena lvlunc lvlwf lvlwfp lvlcdot`(pos) `lvlasm lvltmp`(diags) | `lvltmp`/`lvlqtb` bound `L-1` (shared with 4.2); BY/QED proof-body rules blocked on unit-3 residue (no fixture possible yet) |
+| 4.6 | `InstanceNode`/`SubstInNode`/`APSubstInNode.levelCheck`, `Subst.getSub*Set`, Leibniz | instances/substitution | `lvlinst lvlinstc` (4245, re-level) `instimp instun inst` | `lvlinsth`: operator substitution renders `oparg` not `apply`; `lvlinstm`: 4244+4246; `lvlinstp`: 4244+4247; `apsubst`: instanced theorem import (`apsubstin`) — unit-3 residue dependency |
+| 4.7 | `Linter.lintRecords`; driver `filterVisibleMessages`/`reportMessages` | record lint + controls | `lintok lintrc lintx`(cross-module) `lintsd`(same-domain suppression) | driver-level suppression/elevation: no oracle path through SemDump (report-time, not `Errors`-channel) — evidence is Hoon `lint-options` unit tests (4.7) |
+| 4.8 | Gall `%analyze` flags, `$kont` | integration | — | `%analyze` `level`/`lint` flags are typed-rejected today (job tests); wiring happens only after 4.2–4.7 |
+
+Red set (8): `lvlqtb lvltmp lvlcdot recfcn lvlinsth lvlinstm lvlinstp
+apsubst`. Everything else (48) green as of this baseline.
+
+## 4.0 closing validation (2026-07-18)
+
+- `python3 tools/gen-sem-tests.py` — 56 cases, TOTAL 56, regeneration
+  byte-identical on a second run (md5 over all goldens).
+- `python3 tools/validate.py --check` — clean: every generator reproduces
+  from the pin; 719 compared cases + 2 oracle-only;
+  `desk/doc/evidence-counts.md` regenerated (sem 31 → 56).
+- `python3 tools/check-parity.py --check` — ledger well-formed, 70 rows,
+  0 unclassified.
+- Focused suite `-test /=tla-lus=/tests/lib/sem ~` on tla-zod:
+  48/56, red = exactly the 8 named cases.
+- Full suite `-test /=tla-lus=/tests ~` on tla-zod: `ok=%.n` with the
+  failure set exactly `{apsubst lvlcdot lvlinsth lvlinstm lvlinstp lvlqtb
+  lvltmp recfcn}` — no regression in lexer/parser/parse-err/bnf/modres/
+  eval/mc/job/agent/fuzz suites. The suite goes back to `ok=%.y` only
+  when 4.2–4.6 land; that is deliberate (failing oracle cases first).
+
+## Notes for later subunits
+
+- `lvlinstm`/`lvlinstp` were built from `InstanceNode.levelCheck`
+  (lines ~195–290): 4246 fires when the instanced module's
+  arg-level-constraint minimum exceeds the substituted `OpDefNode`'s
+  `getMaxLevel(j)`; 4247 via an `ArgLevelParam` between two module params
+  (`D == F(c)`) whose substitutions conflict. Both also trip 4244
+  (non-Leibniz `Op(a) == a' = x`).
+- The lint suppression clauses (other component / other same-domain record
+  built from declarations) are inside `lintRecords` itself and are
+  Errors-channel visible — `lintsd` covers them. Only per-code
+  suppression/elevation is driver-level.
+- Do not grow the `$sem` or `$kont` `$%` unions for 4.x nodes (zuse-408
+  mold-compiler hang); use the reserved-apply encoding.
+
+## 4.1 Canonical constraint types and set algebra (done 2026-07-18)
+
+The projection went from oracle-only to byte-compared: `dump-sem` now
+appends the LEVELS section and `gen-sem-tests.py` compares tree + DIAGS
++ LEVELS as one wain per case. Focused suite 48/56; the red set is
+exactly the 8 named 4.2–4.6 cases from the 4.0 matrix (no new reds).
+Algebra unit suite `tests/lib/lvl.hoon` 10/10.
+
+What landed beyond the frozen 4.0 machinery:
+
+- `lres`/`oplev` grew `all` (allParams), `nlp` (nonLeibnizParams), and
+  `lbz` (isLeibnizArg; builtins = ArgWeights>0 with variadic index 0,
+  user defs = param absent from body nlp, monotonic across recursive
+  iterations). Non-Leibniz argument positions inject the operand's
+  allParams (`OpApplNode.levelCheck` line 638); bound identifiers are
+  removed from lp/all/nlp but NOT from the constraint sets.
+- LetIn: SANY never fills a LetInNode's nonLeibnizParams (keep empty);
+  lets contribute lc, alc, and occur-filtered alp (previously dropped).
+- Bound identifiers key constraints by a span-derived owner
+  (`+bound-key`, e.g. `b3.4`) standing in for SymbolNode identity —
+  same-named binders keep distinct entries and the renderer keeps
+  duplicates (`lc={x<=2,x<=2}` in setforms).
+- `+l-deps`/`denv`: dependency-first level check of every loaded module,
+  seeding definition oplevs (imported ops carry real constraint sets —
+  the `n<=2` on everything EXTENDS-ing Naturals comes from a Naturals
+  definition's own lc) and per-module `mlev` (constancy + module lc).
+  `+l-inst` consumes it instead of re-checking the instanced module.
+- `Subst.getSubLCSet` kind overrides in `+l-substin`: when the
+  instanced module is non-constant, CONSTANT-keyed entries tighten to 0
+  and VARIABLE-keyed to 1 before mapping through the substitution. The
+  `$SubstIn` reserved apply's op name now carries the module
+  (`'$SubstIn:B'`, `+substin-mod`; all matches are prefix-based).
+- Module line: lp = the constant declarations; lc/alc/alp union own
+  defs + EXTENDS-imported defs (`+extends-of`; INSTANCE-loaded modules'
+  raw defs must NOT contribute — that distinction is invisible in the
+  generation ctx, hence the tree walk) + assumes/theorems; alp filtered
+  per def by `ArgLevelParam.occur(params)`; `ModuleNode.getLevel()`
+  throws in SemDump, so the module always prints `L-1`.
+- Masked (semantic-error) form: `lvl <name> L-1` with `ml=? w=?` /
+  `mml=? olc=?` for arity>0 / higher-order defs — the oracle's getters
+  throw when levelCheck never ran.
+- Renderer order/format: entries render name-only, sorted
+  byte-lexicographically (Java Collections.sort), `alc` as
+  `(p,i)>=n`, `alp` as `(op,i,param)`, empty segments omitted; segment
+  order lp lc alc alp nlp.
+
+Deferred out of 4.1 (owned rows unchanged): the doubly-higher-order
+call-site argLevelParam remapping and its opLevelCond non-Leibniz rule
+(4.3), instance-node lc/alc/alp contributions to the module line and
+4244/4246/4247 (4.6 — today only lvlinstm/lvlinstp would notice),
+driver-level lint controls (4.7).
+
+Subunit handoff:
+
+```text
+Subunit: 4.1
+Java owner and entry method: SetOfLevelConstraints/SetOfArgLevelConstraints put+putAll, ArgLevelParam/ParamAndPosition, LevelNode collection fields; SemDump.lvlLine projection
+Current Hoon owner: lib/semantic.hoon (lc-*/ac-* algebra, lres/oplev/denv, l-deps, LEVELS renderer in l-module-core)
+Smallest failing parity case: none for 4.1; next failing cases are lvlqtb/lvltmp (4.2)
+New or changed nouns: lres/oplev += all/nlp/lbz; lenv += mlevs; denv; $SubstIn op name carries module
+Diagnostic/result expected: no diagnostic changes; LEVELS section byte-equality
+Focused validation result: sem 48/56 (reds = the 8 named 4.2-4.6 cases), lvl 10/10
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.n with exactly {apsubst lvlcdot lvlinsth lvlinstm lvlinstp lvlqtb lvltmp recfcn}; validate.py --check clean; check-parity.py --check clean (70 rows)
+Pause/resume evidence, if applicable: n/a (no Gall wiring in 4.1)
+Parity-manifest rows changed: level-constraints (oracle-only -> partial, compared evidence), level-substitution (note update)
+Compatibility limitations removed or added: LEVELS projection now compared; Leibniz *tracking* ported (4244/4246/4247 diagnostics still absent); doubly-higher-order remapping noted for 4.3
+Remaining dependencies: 4.2 next (bound-identifier L-1 sentinel, \cdot DIAGS escaping)
+```
+
+## 4.2 Bottom-up levels and basic operator constraints (done 2026-07-18)
+
+Both named failing cases closed; suite 51/56, red set now exactly
+`{apsubst lvlinsth lvlinstm lvlinstp recfcn}` (4.3–4.6 owners). The
+bulk of 4.2's scope (bottom-up levels, builtin level/weight/max-level
+tables, arity + 4205 argument-maximum checks, exact diagnostic
+code/span/message/order) was already green at the 4.0 baseline and is
+unchanged; what landed here:
+
+- **Unreferenced bound identifiers keep SANY's uninitialized `L-1`**
+  (`lvlqtb`, `lvltmp`): `sbind` gained a `used=?` flag (adding a record
+  field inside the `$+` cycle is safe — `spar` precedent; only `$%`
+  member growth hangs the zuse-408 mold compiler). `+l-apply-def` marks
+  each `ubound`/`bound` binder used iff its span-derived key appears in
+  the union of the arguments' `allParams` — exactly SANY, since a
+  reference is what invokes `FormalParamNode.levelCheck` (weight-0
+  positions still count), ranges are checked outside the binding scope,
+  and inner shadowing is already excluded because inner nodes removed
+  their own bound keys from `all`. The renderer prints binders with
+  `(rlvl |(mask !used.b) 0)`, the same form as formal params.
+- **D-line messages are escaped per SemDump `esc()`** (`lvlcdot`,
+  `lvltmp`'s 4313): `+esc-msg` doubles backslashes and escapes
+  \r/\t/\f after the first-line cut (`\cdot` → `\\cdot`, `\land` →
+  `\\land`). Tree lines (`apply \cdot …`) stay raw — SemDump only
+  escapes `str` values and DIAGS messages.
+
+Subunit handoff:
+
+```text
+Subunit: 4.2
+Java owner and entry method: LevelNode/FormalParamNode.levelCheck (uninitialized -1), first-order OpApplNode/OpDefNode.levelCheck, BuiltInOperators tables; SemDump.esc
+Current Hoon owner: lib/semantic.hoon (sbind used flag, l-apply-def usage marking, render-sem binder lines, esc-msg)
+Smallest failing parity case: none for 4.2; next failing cases are hoparam's doubly-higher-order remapping fixture (4.3, to be added) and recfcn (4.4)
+New or changed nouns: sbind += used=? (all construction sites default |; l-apply-def rewrites)
+Diagnostic/result expected: bound/ubound L-1 vs L0 in the tree; backslash-escaped DIAGS text
+Focused validation result: sem 51/56 (reds = apsubst lvlinsth lvlinstm lvlinstp recfcn), lvl 10/10 unchanged
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: 785 OK, ok=%.n with exactly the 5 reds above; validate.py --check clean; check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-basic (partial -> parity), level-node-rules (note: bound sentinel closed, BY/QED residue remains)
+Compatibility limitations removed or added: removed the two closed bullets (bound-identifier L-1, DIAGS escaping)
+Remaining dependencies: 4.3 (higher-order: add the doubly-higher-order argLevelParam remapping fixture), 4.4 (recfcn), 4.5 negative ASSUME fixtures, 4.6 instance ops
+```
+
+## 4.3 Higher-order operator rules (done 2026-07-19)
+
+Six new fixtures, all green (`ho273 hodbl horemap hoparm houn hoargm`;
+suite 57/62); red set unchanged at the 4.4/4.6 owners
+`{apsubst lvlinsth lvlinstm lvlinstp recfcn}`. Manifest row
+`level-higher-order` -> parity.
+
+Key oracle finding driving the design: `OpDefNode.levelCheck` REMOVES
+argLevelParams entries whose op and param are both its own formals, so
+the call-site alp blocks in `OpApplNode.levelCheck` only ever see
+surviving entries (one side foreign). The observable cases:
+
+- `horemap` (`H(F(_)) == F(x)`; `D(G(_)) == H(G)`): H exports
+  `alp={(F,0,x)}`; at the call site the op side remaps to the actual
+  formal-parameter operator argument -> `D alp={(G,0,x)}`, and the
+  alp-driven ac bounds `(F,0)>=level(G-oparg)=0` -> `D alc={(F,0)>=0}`
+  (keyed by H's formal, surviving into D and the module line).
+- `hoparm` (`CONSTANT P(_)`; `H(a) == P(a)`; `Use == H(x)`): the param
+  side remaps through the operand's level params -> `Use alp={(P,0,x)}`.
+- `ho273` (`Bad == H(Pr, x')`, `Bad2 == H(Pr, x)` with `Pr(e) == e'`):
+  4273 (opLevelCond co-argument max-level violation, at the apply span,
+  same first line as 4205) plus the doubly-higher-order non-Leibniz
+  rule (lines 758-773): `Bad2 nlp={x}` even though x is unprimed and H
+  itself is Leibniz — cond(i,j,k) && !argDef.isLeibnizArg(k) injects
+  operands[j].allParams. Applied AFTER the bound-identifier removal,
+  per Java's ordering.
+- alp-driven lc (`put(alp.param <= argDef.getMaxLevel(alp.i))` when the
+  op side receives a definition-valued operator argument) fires only
+  for surviving entries; no separate fixture (subsumed by the above).
+- `houn`: unused operator parameter -> `w=[0]`, `param F L-1`,
+  `mml=[0] olc=[F]`, and an oparg operand under a weight-0 position
+  does not raise the level.
+- `hodbl`: singly-higher-order pass-through (`D(G(_)) == H(G, x)`) ->
+  `D mml=[1]` from the call-site `(G,0)>=level(x)` opLevelCond bound.
+
+4270/4271 arity mismatches (`hoargm`) are GENERATION-side: `sym` grew
+`parg` (per-formal-param arities, filled from `lhs-params` for
+N_IdentLHS; everywhere else `~`), and `+g-opappl` checks each position
+BEFORE generating the argument: a bare reference of the wrong arity
+gets 4271 `Expected arity E but found operator of arity T.` at the
+reference span, any other expression gets 4270 at its span, the
+argument becomes nullODN and is NEVER generated (its own resolution
+errors must not surface — `H(x + 1)` without Naturals emits no 4004s),
+and the match phase appends 4271 `Argument number i to operator 'Op'`
+(trailing space + newline in the raw message) at the apply span after
+all argument errors. All levels mask to -1 (semantic errors), and
+arity>0 defs render `ml=? w=?` / `mml=? olc=?`.
+
+Subunit handoff:
+
+```text
+Subunit: 4.3
+Java owner and entry method: OpApplNode.levelCheck call-site blocks (alp-driven lc/ac, alp remapping, non-Leibniz rule 758-773); Generator selector 4270/4271; OpDefNode.match 4271
+Current Hoon owner: lib/semantic.hoon (l-apply-def par-idx/arg-lres/arg-sem + four new blocks; g-opappl expectation-aware argument walk; ref-arity; sym.parg)
+Smallest failing parity case: none for 4.3; next failing cases are recfcn (4.4) and lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: sym += parg=(list @ud) (16 construction sites, real arities only from lhs-params)
+Diagnostic/result expected: 4270/4271/4273 codes, spans, message text; alp/alc/lc/nlp projection entries
+Focused validation result: sem 57/62 (reds = apsubst lvlinsth lvlinstm lvlinstp recfcn), lvl 10/10
+Full validation result: full ship suite same 5 reds only; validate.py --check clean (62 cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-higher-order (partial -> parity, evidence now 8 fixtures)
+Compatibility limitations removed or added: doubly-higher-order remapping note removed; 4244/4246/4247 remain (4.6)
+Remaining dependencies: 4.4 (recfcn: $RecursiveFcnSpec self-binder), 4.5 negative ASSUME fixtures, 4.6 instance/substitution ops
+```
+
+## 4.4 Recursive fixpoint checking (done 2026-07-19)
+
+Suite 61/65; red set now exactly the 4.6 owners
+`{apsubst lvlinsth lvlinstm lvlinstp}`. Manifest row `level-recursion`
+-> parity.
+
+- `recfcn` closed with two generation fixes: (1) a recursive function
+  definition binds its own name as an unbounded formal at the
+  `$RecursiveFcnSpec` (`ubound f`, span = the whole definition), with
+  self-references resolving as FormalParamKind — `g-fcn-body` now
+  registers the name as `%formal-param` and emits the ubound; the
+  self-binder key flows through the generic machinery, giving the
+  `lc={f<=3,n<=3}` projection (lp-constrain of the body's lp by the
+  spec's max-level) and the used-flag `ubound f L0` for free. (2)
+  `%n-fcnappl` was MISSING from the `g-x` dispatch entirely — plain
+  function application `f[0]` silently generated nothing (the sem
+  corpus had never exercised it outside EXCEPT). New arm:
+  `$FcnApply(f, a)`, several selectors wrapped in `$Tuple`.
+- New fixtures, green on arrival: `recrev` (mutual recursion with the
+  declaration order reversed — order-independence of the fixed point),
+  `recun` (unused/pass-through recursive argument keeps the seeded
+  `ml=[2,2] w=[1,1]` floor — the seed is monotonic, not recomputed
+  down), `rechi` (recursion through an operator argument:
+  `R(n) == ... Ap(R, n - 1)` with `Ap(F(_), x) == F(x)`; the
+  rec-seeded R participates in the 4.3 call-site machinery).
+- Convergence bound: SANY has NO unbounded iteration to guard — the
+  recursive-section algorithm is a fixed two-pass fixpoint
+  (levelCheck(1), raise every member to the section maxima,
+  levelCheck(2)), mirrored one-for-one in `l-module-core`'s
+  it1/raise/it2. There is therefore no non-convergence failure mode to
+  type; recorded here as the rationale for plan task 4.
+
+Subunit handoff:
+
+```text
+Subunit: 4.4
+Java owner and entry method: ModuleNode.levelCheck recursive-section loop, OpDefNode seeded fields, Generator.processFunction ($RecursiveFcnSpec), OpApplNode $FcnApply
+Current Hoon owner: lib/semantic.hoon (rec-seed, l-module-core it1/raise/it2, g-fcn-body, g-x %n-fcnappl)
+Smallest failing parity case: none for 4.4; next failing cases are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: none (generation-side changes only)
+Diagnostic/result expected: $RecursiveFcnSpec tree shape incl. ubound self-binder; recursion projections
+Focused validation result: sem 61/65 (reds = the four 4.6 cases), lvl 10/10
+Full validation result: full ship suite 795 OK, same 4 reds; validate.py --check clean (65 cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-recursion (partial -> parity, evidence now 8 fixtures)
+Compatibility limitations removed or added: recfcn bullet removed
+Remaining dependencies: 4.5 (negative ASSUME fixtures; BY/QED blocked on unit-3 residue), 4.6 (instance operator substitutions, 4244/4246/4247, apsubst)
+```
+
+## 4.5 Node-specific level rules (done 2026-07-19)
+
+Suite 65/69 (all four new fixtures green ON ARRIVAL — the table-driven
+engine already enforced every rule; the fixtures are the missing
+boundary evidence); red set still exactly the 4.6 owners. Manifest row
+`level-node-rules` -> parity.
+
+Rule inventory finding: SANY has NO separate node-specific level codes
+beyond what already existed — every prime/ENABLED/UNCHANGED/fairness/
+\cdot/subscript restriction is a 4205 driven by the BuiltInOperators
+ArgMaxLevels table, ASSUME is 4206, and the temporal specials are
+4310-4315 (all previously green). New fixtures per plan slice:
+
+- `lvlprin`: nested prime `(x')'` -> 4205 on the outer prime (arg
+  max 1); `x'` at the boundary stays clean.
+- `lvlencu`: ENABLED at (level-2 arg ok) and above (temporal arg ->
+  4205); UNCHANGED at (level-1 arg ok) and above (`UNCHANGED (x')` ->
+  4205 — note `UNCHANGED x'` unparenthesized is a PARSE reject, as is
+  `[]x = x` in a definition body; the fixture uses parens).
+- `lvlwfn`: WF with an action-level subscript (arg-1 max 1) and SF
+  with a temporal action operand (arg-2 max 2), both 4205 at the
+  fairness node span.
+- `lvlasmn`: ASSUME at level 2 (`x' = x`) and level 3 (`[]TRUE`),
+  emitting distinct 4206s (level number in the second message line);
+  level 1 was already covered by `lvlasm`.
+
+BY/QED proof-body rules: no proof-step nodes exist in the IR (unit-3
+residue) — recorded as the ledger rationale; their level rules ride in
+when the nodes land.
+
+Subunit handoff:
+
+```text
+Subunit: 4.5
+Java owner and entry method: OpApplNode.levelCheck ArgMaxLevels-driven 4205, AssumeNode.levelCheck 4206, the 4310-4315 specials (already green)
+Current Hoon owner: lib/semantic.hoon (builtin-maxl tables, l-apply-def dsarg/dstmp/dsquant/dsrng, l-module-core assume check)
+Smallest failing parity case: none for 4.5; remaining reds are lvlinsth/lvlinstm/lvlinstp/apsubst (4.6)
+New or changed nouns: none (fixtures only)
+Diagnostic/result expected: boundary 4205s/4206s with exact spans and message levels
+Focused validation result: sem 65/69 (reds = the four 4.6 cases), lvl 10/10
+Full validation result: full ship suite 799 OK, same 4 reds; validate.py --check clean (69 cases; evidence-counts regenerated); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-node-rules (partial -> parity, evidence now 13 fixtures)
+Compatibility limitations removed or added: none (BY/QED already tracked as unit-3 residue)
+Remaining dependencies: 4.6 (instance/substitution: oparg rendering, 4244/4246/4247, APSubstIn), 4.7 lint options, 4.8 integration
+```
+
+## 4.6 Instance and substitution constraints (done 2026-07-19)
+
+The four named failing cases (`lvlinsth lvlinstm lvlinstp apsubst`)
+closed, plus two new coverage fixtures (`instlcl` local, `instrex`
+re-exported). Suite 71/71; the FULL ship suite is `ok=%.y` for the
+first time since the 4.0 baseline (818 OK). Manifest row
+`level-substitution` -> parity.
+
+Generation (`g-instance`):
+
+- **Operator-valued substitutions render as `$OpArg`** (`lvlinsth`):
+  `INSTANCE B WITH F <- Op` where B's F is `CONSTANT F(_)`. Both
+  explicit (via `oparg-of`) and implicit (arity>0 param -> reserved
+  `$OpArg` apply) substitution expressions.
+- **APSubstIn theorem import** (`apsubst`): a named theorem/assumption
+  of an instanced module imports as a thmdef whose body is a reserved
+  `$APSubstIn:<mod>` apply (sibling of `$SubstIn:<mod>`; matched by
+  `+apsubstin-mod`/`+anysubstin-mod`, rendered `apsubstin`). This was
+  the unit-3 residue dependency — now landed.
+- **constructSubst ordering** (`instlcl`): the substitution vector is
+  the implicit subs (one per instanced-module parameter that resolves
+  in the instantiating module, in the instanced module's declaration
+  order) with explicit WITH substitutions overwriting matching slots
+  in place or appending. `+g-instance`'s `ordered` builds exactly this.
+
+Level checking (`l-inst`, now returning `[ds lc]`):
+
+- Three passes in Java's order: per-sub constant-module 4245 then
+  non-Leibniz 4244; per-sub module-constraint 4245 then arg-level
+  4246; then the co-parameter 4247 over the module's argLevelParams.
+- The instance node's own **getSubLCSet level-constraint contribution**
+  (module constraints with the constant->0/variable->1 kind overrides,
+  mapped through the substitutions' level params, plus alp-driven
+  bounds and each sub expression's own lc) flows into the module line
+  via a new `ilc` accumulator in `l-module-core`'s top-level walk.
+- `mlev` grew `alc`/`alp` (the module node's arg-level constraint and
+  arg-level-param collections) so `l-inst` reads them without
+  re-deriving; `+l-module-core` returns them.
+
+**Root-cause fix (build-ctx), load-bearing:** A's context wrongly
+contained an instanced module's VARIABLE/CONSTANT *declarations*
+because `build-ctx` folded imports over `refs-of` (EXTENDS **and**
+INSTANCE). INSTANCE imports only *definitions* (via `+inst-syms`,
+prefixed); its raw declarations must not leak. Changed the imports
+fold to `+extends-of` (EXTENDS only). This is what made `instlcl`'s
+implicit-resolution correct (`y` from B no longer resolves in A). It
+also fixed `instrex`'s constraint leak. `inst`/`instun`/`instimp`/
+`lvlinst*` still green (they imported instanced defs via `inst-syms`
+all along; the raw-decl import was only ever wrong).
+
+**EXTENDS declaration re-export** (`instrex`, `+ext-decls`): SANY's
+`getConstantDecls`/`getVariableDecls` return own decls first, then
+those inherited through EXTENDS (transitively, each with the declaring
+module's span). `gen-module` now lists them via `+ext-decls`
+(own-first, name-deduped). Standard modules declare no CONSTANT/
+VARIABLE, so extending Naturals etc. adds nothing.
+
+**Configuration gate** (`+validate-target`, plan task 6): a pure
+each-typed accept/reject by target name and required maximum level for
+the later TLC configuration unit; three `tests/lib/lvl` unit tests
+(accept at/below max, level reject, unknown target).
+
+Subunit handoff:
+
+```text
+Subunit: 4.6
+Java owner and entry method: InstanceNode.levelCheck (three subst passes + getSubLCSet/getSubALCSet/getSubALPSet), SubstInNode/APSubstInNode.levelCheck, Subst.paramSet/getSubLCSet, Generator constructSubst/processSubst
+Current Hoon owner: lib/semantic.hoon (g-instance ordered + OpArg + APSubstIn, l-inst three passes + ilc, l-module-core %i/ilc, mlev alc/alp, build-ctx extends-of, ext-decls, own-decls, validate-target)
+Smallest failing parity case: none — full suite ok=%.y
+New or changed nouns: mlev += alc/alp; l-inst returns [ds lc]; g-instance returns [defs thms inst ds]; validate-target
+Diagnostic/result expected: 4244/4245/4246/4247 codes+spans+text; oparg/apsubstin tree shapes; module-line getSubLCSet lc
+Focused validation result: sem 71/71, lvl 13/13
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.y (818 OK, 0 failed); validate.py --check clean (71 sem cases); check-parity.py --check clean; scaffold-gate PASS
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: level-substitution (partial -> parity, 11 fixtures + validate-target)
+Compatibility limitations removed or added: removed oparg/4244/4246/4247/APSubstIn gaps; build-ctx INSTANCE-decl-leak fixed; EXTENDS decl re-export added
+Remaining dependencies: 4.7 (lint-options driver controls), 4.8 (%analyze integration); BY/QED proof-step level rules await unit-3 proof nodes
+```
+
+## 4.7 Record-constructor linting (done 2026-07-20)
+
+The 4802 field-name collision rule and its built-from-declarations
+suppression were already green (lintok/lintrc/lintx/lintsd). 4.7 adds
+the coverage cases and the driver-level controls. Suite 73/73, full
+ship suite ok=%.y (825 OK). Manifest row `linter` -> parity.
+
+- **Coverage fixtures**: `lintnest` (`[foo |-> [bar |-> 42]]` with bar
+  visible — the linter recurses into nested record constructors and
+  warns on the INNER field, span at the inner bar; `collect-records`
+  already walked args so this was green on arrival) and `lintmf`
+  (`[bar |-> 42, baz |-> bar]` — per-field checking, warns on bar
+  only). Both are Errors-channel observable, so they are ordinary
+  differential fixtures.
+- **Driver-level lint-options** (`+apply-lint-options`, tested in
+  `tests/lib/lvl`): a `lint-options` mold with two code sets
+  (`suppressed`, `as-errors`). Mirrors SANY's driver exactly:
+  `filterVisibleMessages` drops suppressed codes; `reportMessages`
+  elevates as-errors codes from `%warning` to `%error` preserving
+  order; and suppressed ∩ as-errors is a configuration error (SANY
+  rejects before running), returned as a typed `%|` failure listing
+  the overlapping codes. This is REPORT-TIME and invisible to the
+  Errors channel (SANY applies it in the driver after level checking),
+  so it can never reach a SemDump golden — hence the six unit tests
+  (passthrough, suppress, elevate, partial-suppress-by-code, overlap
+  reject) rather than differential fixtures. `+lint-warnings` exposes a
+  module's linting warnings alone for the 4.8 pipeline to filter.
+
+Subunit handoff:
+
+```text
+Subunit: 4.7
+Java owner and entry method: linter.Linter.lintRecords; SANY.filterVisibleMessages/reportMessages/isMessageElevated + the suppressed/as-errors overlap guard
+Current Hoon owner: lib/semantic.hoon (l-lint, collect-records, built-from-decls, lint-options, apply-lint-options, lint-warnings)
+Smallest failing parity case: none — full suite ok=%.y
+New or changed nouns: lint-options [suppressed=(set @ud) as-errors=(set @ud)]; apply-lint-options -> (each (list sdiag) @t); lint-warnings
+Diagnostic/result expected: 4802 nested/multi-field warnings; suppression/elevation/overlap-reject via unit tests
+Focused validation result: sem 73/73, lvl 19/19
+Full validation result: -test /=tla-lus=/tests ~ on tla-zod: ok=%.y (825 OK, 0 failed); validate.py --check clean (73 sem cases); check-parity.py --check clean
+Pause/resume evidence, if applicable: n/a
+Parity-manifest rows changed: linter (partial -> parity, 6 fixtures + lint-options unit tests)
+Compatibility limitations removed or added: removed the driver-level lint-controls gap
+Remaining dependencies: 4.8 wires apply-lint-options + validate-target into the real %analyze stages and closes the unit
+```
+
+## 4.8 Integrate, bound, document, close (done 2026-07-20)
+
+Unit 4 complete. Full ship suite ok=%.y (828 OK), validate + check-parity
+clean, all nine scaffold gates PASS.
+
+- **Phase-split diagnostics**: `l-module-core` now returns a fifth field
+  `phase=[sem lvl lint]` — the generation diags (`diags.m`), the level
+  diags (`dds`+`tds`+`pds`), and the lint diags (`lint-ds`). The
+  semantic-error early return puts everything in `sem`. `+analyze-graph`
+  exposes this (resolve -> gen-module -> l-module-core), ~ on resolution
+  failure.
+- **job.hoon**: new `%semantic` stage (`+do-semantic`) runs
+  `analyze-graph` in one bounded slice and emits diagnostics per the
+  request flags, converting `sdiag` -> wire `diagnostic` via
+  `+sdiag-to-diag` (code -> [%sany num], phase -> stage, sspan -> loc in
+  the root module). Lint diags pass through `apply-lint-options` (empty
+  options; a request-carried set is a future sur extension). `+plan`:
+  `%analyze` with any of semantic/level/lint -> [%parse %semantic
+  %terminal], else [%parse %terminal]. `+validate` no longer typed-
+  rejects the flags. `+do-terminal` fails on any error-severity diag
+  from parse/semantic/level/lint (an elevated lint warning flips to
+  %error and thus fails). Resolution failure proceeds to terminal (parse
+  errors drive the verdict) or surfaces a `[%lus 401]` %modules diag.
+- **Gating** is enforced inside `analyze-graph`/`l-module-core`, not the
+  pipeline: a semantic error suppresses level+lint (phase = [sem ~ ~]);
+  a level error suppresses lint. So even with all flags set, the emitted
+  diags respect SANY's phase gating.
+- **Bounded, no cursor**: a module bundle's analysis is one bounded slice
+  (like a capped run-check), so no `$kont` member was added. Pause/resume
+  is identical at every boundary — `every-boundary` tests over clean,
+  lint, and semantic-error analyze requests all pass.
+- **Tests** (`tests/lib/job`): clean -> %ok no diags; undefined op ->
+  %failed + 4200 at %semantic; non-constant ASSUME -> %failed + 4206 at
+  %level; level-flag-off suppresses the 4206; record collision -> %ok +
+  4802 warning at %lint; lint-flag-off suppresses it;
+  `test-analyze-budget-independent` = every-boundary at budget 1.
+
+HOON LESSONS (4.8): (1) referencing the `result` MOLD (sur `$%`) in a
+type annotation while a `job` with a `result` FIELD is in the subject
+mis-resolves the mold to the field's value type — return the job noun and
+access `result.j` (field access is fine), or compute the verdict inside
+the helper and return a `?`. (2) A `?>  ?=(^ errs.r)` on a nested tuple
+wing does NOT narrow it for later `i.errs.r` access — bind a local copy
+`=/ es errs.r` first, then `?=(^ es)`, then `i.es` (same class as the
+`=.`-into-narrowed-wing gotcha).
+
+## Unit 4 closeout
+
+All eight subunits (4.0–4.8) done. `desk/test-data/sem` is 73 cases,
+`tests/lib/lvl` is 19 (algebra + validate-target + lint-options),
+`tests/lib/job` covers the analyze pipeline. Manifest rows now
+parity: level-constraints, level-basic, level-higher-order,
+level-recursion, level-node-rules, level-substitution, linter,
+op-analyze. Remaining owed rows are other units (PlusCal, Clay, TLC
+core, liveness fairness). Unit-4 residue: BY/QED proof-step level rules
+(await unit-3 proof nodes); cross-module diagnostic origin-module spans;
+request-carried lint-options (sur extension).

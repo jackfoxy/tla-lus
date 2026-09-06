@@ -1,0 +1,13 @@
+T bm1 2.11 2.21 ---- MODULE
+T identifier 2.23 2.25 not
+T identifier 2.27 2.31 quite
+T bm0 3.1 3.11 ---- MODULE
+T identifier 3.13 3.13 T
+T separator 3.15 3.18 ----
+T identifier 4.1 4.1 x
+T def 4.3 4.4 ==
+T number-literal 4.6 4.6 1
+T end-module 5.1 5.4 ====
+T identifier 6.1 6.8 trailing
+T identifier 6.10 6.14 prose
+T identifier 6.16 6.22 ignored

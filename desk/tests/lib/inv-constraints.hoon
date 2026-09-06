@@ -1,0 +1,153 @@
+::  Invariants (ordered, first-violated), state/action constraints (prune),
+::  deadlock flag honoring, and invariant evaluation errors (Work Unit 7.3).
+::  Driven through run-check:check (result + run-stats), so no value crosses the
+::  low-budget test core. Expected verdicts/counts match tlc2.TLC (SafetyDump).
+/+  *test
+/=  check  /lib/check
+|%
+++  run  |=([s=@t c=@t] ^-(result:check -:(run-check:check s c 0)))
+::  a module with an explicit VARIABLE x and the supplied definition lines
+++  mod
+  |=  defs=tape
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE A ----\0a"  "EXTENDS Integers\0a"  "VARIABLE x\0a"
+    defs  "====\0a"
+  ==
+::
+::  +|  Multiple invariants, checked in declaration order
+::
+::  Small (x < 10) holds while NotThree (x # 3) is violated first at x = 3;
+::  the reported invariant is the first violated in declaration order
+++  test-multi-inv-order
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aSmall == x < 10\0aNotThree == x # 3\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aINVARIANT Small\0aINVARIANT NotThree\0a"))
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'NotThree']
+  !>  ?:  ?=([%violated [%invariant *] *] r)  [%.y name.violation.r]  [%.n '']
+::
+::  +|  State constraint (CONSTRAINT): prune before enqueue
+::
+::  Bound (x =< 4) bounds the reachable set to x in 0..4 (5 distinct); x = 5 is
+::  generated but pruned, so the run completes without deadlock or violation
+++  test-state-constraint
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aBound == x =< 4\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aCONSTRAINT Bound\0a"))
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y `@ud`5]
+  !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
+::
+::  +|  CONSTRAINT-pruned boundary: invariants are still checked (R1.5.1)
+::
+::  TLC prunes x = 5 from the search (Bound), but STILL checks the invariants on
+::  it, so NotFive is violated on the pruned boundary state and the trace runs
+::  0..5 (measured: `Invariant NotFive is violated`, 6 generated / 5 distinct).
+::  This is the case the tlc-safety-constraint row said no corpus spec combined
+::  (R1.5.8 audit).
+++  test-constraint-pruned-invariant
+  =/  m
+    %-  mod
+    "Init == x = 0\0aNext == x' = x + 1\0aBound == x =< 4\0aNotFive == x # 5\0a"
+  =/  c
+    ^-  @t
+    %-  crip
+    "INIT Init\0aNEXT Next\0aCONSTRAINT Bound\0aINVARIANT NotFive\0a"
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'NotFive' `@ud`6 `@ud`5]
+  !>
+  ?.  ?=([%violated [%invariant *] *] r)  [%.n '' 0 0]
+  [%.y name.violation.r generated.stats.r distinct.stats.r]
+::
+::  +|  Action constraint (ACTION_CONSTRAINT): prune the transition
+::
+++  test-action-constraint
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aNoBig == x' =< 4\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aACTION_CONSTRAINT NoBig\0a"))
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y `@ud`5]
+  !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
+::
+::  +|  Deadlock detection honoring the CHECK_DEADLOCK flag
+::
+::  Next has no successor at x = 2; with deadlock checking on (the default) that
+::  is a violation, with it off the run completes
+++  ddl-mod  (mod "Init == x = 0\0aNext == x < 2 /\\ x' = x + 1\0a")
+++  test-deadlock-on
+  =/  r  (run ddl-mod ^-(@t (crip "INIT Init\0aNEXT Next\0a")))
+  (expect-eq !>(%.y) !>(?=([%violated [%deadlock *] *] r)))
+++  test-deadlock-off
+  =/  r  (run ddl-mod ^-(@t (crip "INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a")))
+  (expect-eq !>(%.y) !>(?=([%ok *] r)))
+::
+::  +|  Implied INIT on the wire (R2.7.15c)
+::
+::  a level<=1 PROPERTY is an IMPLIED INIT: tlc2 checks it while COMPUTING the
+::  initial states and aborts there, printing no state-graph counts. This engine
+::  renders nothing, so the diagnostic arrives as `[%property name %.y]` — the
+::  `initial` flag R2.7.1 added for EC 2108 — with ZERO statistics. `+run-check`
+::  used to compute the bin and drop it, completing `%ok`
+++  test-implied-init-violated
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aInitBad == x = 5\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aPROPERTY InitBad\0a"))
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'InitBad' %.y]
+  !>  ?:  ?=([%violated [%property *] *] r)
+        [%.y name.violation.r initial.violation.r]
+      [%.n '' %.n]
+::
+::  the FAILING implied init is declared SECOND, so a router that tests the head
+::  of the bin completes clean. Measured at the pin (`mc` case prop-init-second)
+++  test-implied-init-second
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aInitOk == x >= 0\0aInitBad == x = 5\0a")
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aPROPERTY InitBad\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'InitBad']
+  !>  ?:(?=([%violated [%property *] *] r) [%.y name.violation.r] [%.n ''])
+::
+::  an INVARIANT false on the SAME initial state wins: `doInit` is state-major
+::  and checks EC 2107 before EC 2108
+++  test-implied-init-invariant-wins
+  =/  m
+    %-  mod
+    "Init == x = 0\0aNext == x' = x + 1\0aPos == x > 0\0aInitBad == x = 5\0a"
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aINVARIANT Pos\0aPROPERTY InitBad\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y 'Pos' %.y]
+  !>  ?:  ?=([%violated [%invariant *] *] r)
+        [%.y name.violation.r initial.violation.r]
+      [%.n '' %.n]
+::
+::  an implied init that HOLDS does not end the run: the ordinary safety search
+::  follows it, exactly as tlc2 carries on after `doInit`
+++  test-implied-init-holds
+  =/  m  (mod "Init == x = 0\0aNext == x < 3 /\\ x' = x + 1\0aInitOk == x = 0\0a")
+  =/  c
+    ^-  @t
+    (crip "INIT Init\0aNEXT Next\0aPROPERTY InitOk\0aCHECK_DEADLOCK FALSE\0a")
+  =/  r  (run m c)
+  %+  expect-eq
+    !>  [%.y `@ud`4]
+  !>  ?:(?=([%ok *] r) [%.y distinct.stats.r] [%.n 0])
+::
+::  +|  Evaluation error during an invariant check
+::
+::  an invariant that raises an evaluation error (division by zero) is a typed
+::  failure at the check point, not a false %ok or a silent skip
+++  test-inv-eval-error
+  =/  m  (mod "Init == x = 0\0aNext == x' = x + 1\0aBad == (x \\div 0) = 0\0a")
+  =/  c  ^-(@t (crip "INIT Init\0aNEXT Next\0aINVARIANT Bad\0a"))
+  =/  r  (run m c)
+  (expect-eq !>(%.y) !>(?=([%failed *] r)))
+--

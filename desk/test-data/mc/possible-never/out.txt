@@ -1,0 +1,4 @@
+[Never |-> 0]
+Error: Postcondition Never at line 11, col 10 to line 11, col 15 of module spec is false.
+4 states generated, 4 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.

@@ -1,0 +1,13 @@
+ACCEPT
+MODULE A 1.1-3.4
+  def J!D arity=0 local=n L3 2.1-2.32
+    substin subs=1 L3 2.1-2.32
+      sub c <-
+        apply [] opkind=BuiltInKind L3 2.27-2.32
+          apply TRUE opkind=BuiltInKind L0 2.29-2.32
+      in
+        apply SUBSET opkind=BuiltInKind L0 3.6-3.13
+          apply c opkind=ConstantDeclKind L0 3.13-3.13
+  instance name=J module=B local=n L0 2.1-2.32
+DIAGS
+D 4245 ERROR 2.1-2.32 Level error in instantiating module 'B':

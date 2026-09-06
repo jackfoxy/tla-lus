@@ -1,0 +1,84 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.1
+    n-operatordefinition 2.1-7.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setenumerate 2.7-7.1
+        lbc 2.7-2.7 {
+        n-opapplication 3.3-3.11
+          n-generalid 3.3-3.8
+            n-idprefix 3.3-3.6
+              n-idprefixelement 3.3-3.4
+                identifier 3.3-3.3 A
+                bang 3.4-3.4 !
+              n-idprefixelement 3.5-3.6
+                identifier 3.5-3.5 B
+                bang 3.6-3.6 !
+            n-postfixop 3.7-3.8 ^+
+          n-opargs 3.9-3.11
+            lbr 3.9-3.9 (
+            n-generalid 3.10-3.10
+              n-idprefix ~ N_IdPrefix
+              identifier 3.10-3.10 x
+            rbr 3.11-3.11 )
+        comma 3.12-3.12 ,
+        n-opapplication 4.3-4.11
+          n-generalid 4.3-4.8
+            n-idprefix 4.3-4.6
+              n-idprefixelement 4.3-4.4
+                identifier 4.3-4.3 A
+                bang 4.4-4.4 !
+              n-idprefixelement 4.5-4.6
+                identifier 4.5-4.5 B
+                bang 4.6-4.6 !
+            n-postfixop 4.7-4.8 ^*
+          n-opargs 4.9-4.11
+            lbr 4.9-4.9 (
+            n-generalid 4.10-4.10
+              n-idprefix ~ N_IdPrefix
+              identifier 4.10-4.10 x
+            rbr 4.11-4.11 )
+        comma 4.12-4.12 ,
+        n-opapplication 5.3-5.11
+          n-generalid 5.3-5.8
+            n-idprefix 5.3-5.6
+              n-idprefixelement 5.3-5.4
+                identifier 5.3-5.3 A
+                bang 5.4-5.4 !
+              n-idprefixelement 5.5-5.6
+                identifier 5.5-5.5 B
+                bang 5.6-5.6 !
+            n-postfixop 5.7-5.8 ^#
+          n-opargs 5.9-5.11
+            lbr 5.9-5.9 (
+            n-generalid 5.10-5.10
+              n-idprefix ~ N_IdPrefix
+              identifier 5.10-5.10 x
+            rbr 5.11-5.11 )
+        comma 5.12-5.12 ,
+        n-opapplication 6.3-6.10
+          n-generalid 6.3-6.7
+            n-idprefix 6.3-6.6
+              n-idprefixelement 6.3-6.4
+                identifier 6.3-6.3 A
+                bang 6.4-6.4 !
+              n-idprefixelement 6.5-6.6
+                identifier 6.5-6.5 B
+                bang 6.6-6.6 !
+            n-postfixop 6.7-6.7 '
+          n-opargs 6.8-6.10
+            lbr 6.8-6.8 (
+            n-generalid 6.9-6.9
+              n-idprefix ~ N_IdPrefix
+              identifier 6.9-6.9 x
+            rbr 6.10-6.10 )
+        rbc 7.1-7.1 }
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

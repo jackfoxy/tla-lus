@@ -1,0 +1,4 @@
+Finished computing initial states: 3 states generated, with 3 of them distinct.
+Starting level 2: 3 states generated, 3 distinct states found.
+Model checking completed. No error has been found.
+6 states generated, 3 distinct states found.

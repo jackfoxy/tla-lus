@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const N = 3
+RAW
+CONSTANT
+N = 3 
+---

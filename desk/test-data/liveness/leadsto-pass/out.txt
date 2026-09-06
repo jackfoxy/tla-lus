@@ -1,0 +1,8 @@
+LIVENESS
+VERDICT ok
+EC 0
+STAT generated 3
+STAT distinct 2
+STAT queue 0
+STAT depth 2
+TRACE 0

@@ -1,0 +1,29 @@
+ACCEPT
+n-module 1.1-4.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-3.14
+    n-useorhide 2.1-2.9
+      hide 2.1-2.4 HIDE
+      n-generalid 2.6-2.6
+        n-idprefix ~ N_IdPrefix
+        identifier 2.6-2.6 X
+      comma 2.7-2.7 ,
+      n-generalid 2.9-2.9
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.9 Y
+    n-useorhide 3.1-3.14
+      hide 3.1-3.4 HIDE
+      df 3.6-3.9 DEFS
+      n-generalid 3.11-3.11
+        n-idprefix ~ N_IdPrefix
+        identifier 3.11-3.11 X
+      comma 3.12-3.12 ,
+      n-generalid 3.14-3.14
+        n-idprefix ~ N_IdPrefix
+        identifier 3.14-3.14 Y
+  n-endmodule 4.1-4.4
+    end-module 4.1-4.4 ====

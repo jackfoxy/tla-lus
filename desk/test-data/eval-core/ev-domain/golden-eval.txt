@@ -1,0 +1,12 @@
+EVAL
+EmptyD SetEnumValue {}
+FromIv IntervalValue 1..3
+FromRcd SetEnumValue {"a", "b"}
+FromSet SetEnumValue {1, 2, 3}
+FromSetGap SetEnumValue {1, 3}
+FromTup IntervalValue 1..3
+FromZero IntervalValue 0..2
+Named FcnRcdValue <<1, 4, 9, 16>>
+NamedDom IntervalValue 1..4
+Neg IntervalValue -2..1
+Single IntervalValue 2..2

@@ -1,0 +1,10 @@
+REJECT
+***Parse Error***
+Was expecting "LOCAL, INSTANCE, PROOF, ASSUMPTION, THEOREM, RECURSIVE, declaration, or definition"
+Encountered "ASSUME ====" at line 2, column 1 and token "----" 
+
+Residual stack trace follows:
+Module body starting at line 2, column 1.
+Module definition starting at line 1, column 1.
+
+%%

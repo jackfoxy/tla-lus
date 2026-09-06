@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2}
+lvl Fact L0 ml=[2] w=[1] lc={n<=2}
+lvl Odd L0 ml=[2] w=[1] lc={n<=2}
+lvl Even L0 ml=[2] w=[1] lc={n<=2}

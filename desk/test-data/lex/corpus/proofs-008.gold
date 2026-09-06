@@ -1,0 +1,13 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T proposition 2.1 2.9 COROLLARY
+T identifier 2.11 2.14 TRUE
+T proof 3.1 3.5 PROOF
+T proofsteplexeme 3.7 3.10 <1>a
+T qed 3.12 3.14 QED
+T by 3.16 3.17 BY
+T proofsteplexeme 3.19 3.22 <1>a
+T comma 3.23 3.23 ,
+T proofsteplexeme 3.25 3.28 <1>b
+T end-module 4.1 4.4 ====

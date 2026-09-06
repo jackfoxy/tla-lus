@@ -1,0 +1,8 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,x<=2}
+lvl Init L1 lp={x} lc={x<=2}
+lvl Inv L1 lp={x} lc={x<=3}
+lvl Inv2 L0
+lvl Prop L1 lp={x} lc={x<=3}
+lvl Thm1 L1 lp={x} lc={x<=2}
+lvl Thm1b L1 lp={x} lc={x<=2}

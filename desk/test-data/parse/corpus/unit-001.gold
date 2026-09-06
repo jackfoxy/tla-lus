@@ -1,0 +1,44 @@
+ACCEPT
+n-module 1.1-4.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-3.32
+    n-paramdeclaration 2.1-2.16
+      n-consdecl 2.1-2.8
+        constant 2.1-2.8 CONSTANT
+      n-identdecl 2.10-2.10
+        identifier 2.10-2.10 x
+      comma 2.11-2.11 ,
+      n-identdecl 2.13-2.13
+        identifier 2.13-2.13 y
+      comma 2.14-2.14 ,
+      n-identdecl 2.16-2.16
+        identifier 2.16-2.16 z
+    n-paramdeclaration 3.1-3.32
+      n-consdecl 3.1-3.9
+        constant 3.1-3.9 CONSTANTS
+      n-identdecl 3.11-3.17
+        identifier 3.11-3.11 f
+        lbr 3.12-3.12 (
+        us 3.13-3.13 _
+        comma 3.14-3.14 ,
+        us 3.16-3.16 _
+        rbr 3.17-3.17 )
+      comma 3.18-3.18 ,
+      n-infixdecl 3.20-3.22
+        us 3.20-3.20 _
+        n-infixop 3.21-3.21 +
+        us 3.22-3.22 _
+      comma 3.23-3.23 ,
+      n-prefixdecl 3.25-3.27
+        n-nonexpprefixop 3.25-3.26 -.
+        us 3.27-3.27 _
+      comma 3.28-3.28 ,
+      n-postfixdecl 3.30-3.32
+        us 3.30-3.30 _
+        n-postfixop 3.31-3.32 ^+
+  n-endmodule 4.1-4.4
+    end-module 4.1-4.4 ====

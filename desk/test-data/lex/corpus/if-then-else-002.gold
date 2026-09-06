@@ -1,0 +1,15 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T if 3.3 3.4 IF
+T and 4.5 4.6 /\\
+T number-literal 4.8 4.8 1
+T and 5.5 5.6 /\\
+T number-literal 5.8 5.8 2
+T then 6.7 6.10 THEN
+T number-literal 6.12 6.12 3
+T else 7.7 7.10 ELSE
+T number-literal 7.12 7.12 4
+T end-module 8.1 8.4 ====

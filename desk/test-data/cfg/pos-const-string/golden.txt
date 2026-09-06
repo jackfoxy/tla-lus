@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const Str = "hi"
+RAW
+CONSTANT
+Str = "hi" 
+---

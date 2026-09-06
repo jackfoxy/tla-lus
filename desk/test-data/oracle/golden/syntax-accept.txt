@@ -1,0 +1,9 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/SyntaxAccept.tla
+Parsing file <TLCTMP>/Naturals.tla (jar:file:<REPO>/tlatools/org.lamport.tlatools/dist/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Semantic processing of module Naturals
+Semantic processing of module SyntaxAccept
+Linting of module SyntaxAccept
+exit-code: 0

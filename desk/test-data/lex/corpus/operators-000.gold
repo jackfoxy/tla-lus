@@ -1,0 +1,12 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.20 conflicts_with_octal
+T def 2.22 2.23 ==
+T op-30 2.25 2.26 \\o
+T lbr 2.28 2.28 (
+T number-literal 2.29 2.29 1
+T comma 2.30 2.30 ,
+T number-literal 2.31 2.31 2
+T rbr 2.32 2.32 )
+T end-module 3.1 3.4 ====

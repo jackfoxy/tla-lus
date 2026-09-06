@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=3}
+lvl H L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]
+lvl D L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=3} alp={(G,0,x)}

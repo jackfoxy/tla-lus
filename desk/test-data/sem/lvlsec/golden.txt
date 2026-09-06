@@ -1,0 +1,13 @@
+ACCEPT
+MODULE A 1.1-6.4
+  var x L1 2.10-2.10
+  def R arity=1 local=n L0 5.1-5.12
+    param a arity=0 L0 5.3-5.3
+    apply R opkind=UserDefinedOpKind L0 5.9-5.12
+      apply a opkind=FormalParamKind L0 5.11-5.11
+  def Bad arity=0 local=n L2 4.1-4.12
+    apply ' opkind=BuiltInKind L2 4.8-4.12
+      apply ' opkind=BuiltInKind L2 4.9-4.10
+        apply x opkind=VariableDeclKind L1 4.9-4.9
+DIAGS
+D 4205 ERROR 4.8-4.12 Level error in applying operator ':

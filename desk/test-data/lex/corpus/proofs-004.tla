@@ -1,0 +1,4 @@
+---- MODULE Test ----
+THEOREM x == TRUE
+PROOF OMITTED
+====

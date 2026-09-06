@@ -1,0 +1,3 @@
+CONFIG-ERROR
+TLC found an error in the configuration file at line 2
+The keyword INIT appeared twice.

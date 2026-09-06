@@ -1,0 +1,13 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T hide 2.1 2.4 HIDE
+T identifier 2.6 2.6 X
+T comma 2.7 2.7 ,
+T identifier 2.9 2.9 Y
+T hide 3.1 3.4 HIDE
+T df 3.6 3.9 DEFS
+T identifier 3.11 3.11 X
+T comma 3.12 3.12 ,
+T identifier 3.14 3.14 Y
+T end-module 4.1 4.4 ====

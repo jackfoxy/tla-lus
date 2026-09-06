@@ -1,0 +1,25 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+BadArgLt ! EC2266 EvalException: The second argument of < should be an integer, but instead it is: "a"
+BadArgPlus ! TLCRuntimeException: Attempted to apply the operator overridden by the Java method public static tlc2.value.impl.IntValue tlc2.module.Integers.Plus(tlc2.value.impl.IntValue,tlc2.value.impl.IntValue), but it produced the following error: Cannot cast tlc2.value.impl.StringValue to tlc2.value.impl.IntValue
+DivZero ! EC2179 EvalException: The second argument of \div is 0.
+ExptOverflow ! EC2178 EvalException: Overflow when computing 2^31
+ModNegDivisor ! EC2169 EvalException: The second argument of % should be a positive number, but instead it is: -2
+ModZero ! EC2169 EvalException: The second argument of % should be a positive number, but instead it is: 0
+OverflowMinus ! EC2178 EvalException: Overflow when computing -2147483647-2
+OverflowPlus ! EC2178 EvalException: Overflow when computing 2147483647+1
+OverflowTimes ! EC2178 EvalException: Overflow when computing 100000*100000

@@ -1,0 +1,12 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/SemanticInstance.tla
+Parsing file <TLCTMP>/Naturals.tla (jar:file:<REPO>/tlatools/org.lamport.tlatools/dist/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file <WORK>/Inner.tla
+Semantic processing of module Naturals
+Semantic processing of module Inner
+Semantic processing of module SemanticInstance
+Linting of module Inner
+Linting of module SemanticInstance
+exit-code: 0

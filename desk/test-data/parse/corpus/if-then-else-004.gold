@@ -1,0 +1,31 @@
+ACCEPT
+n-module 1.1-8.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-7.12
+    n-operatordefinition 2.1-7.12
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-ifthenelse 3.3-7.12
+        if 3.3-3.4 IF
+        n-disjlist 4.5-5.8
+          n-disjitem 4.5-4.8
+            or 4.5-4.6 \\/
+            n-number 4.8-4.8
+              number-literal 4.8-4.8 1
+          n-disjitem 5.5-5.8
+            or 5.5-5.6 \\/
+            n-number 5.8-5.8
+              number-literal 5.8-5.8 2
+        then 6.7-6.10 THEN
+        n-number 6.12-6.12
+          number-literal 6.12-6.12 3
+        else 7.7-7.10 ELSE
+        n-number 7.12-7.12
+          number-literal 7.12-7.12 4
+  n-endmodule 8.1-8.4
+    end-module 8.1-8.4 ====

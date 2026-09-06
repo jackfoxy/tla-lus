@@ -1,0 +1,18 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T recursive 2.1 2.9 RECURSIVE
+T identifier 2.11 2.11 f
+T lbr 2.12 2.12 (
+T us 2.13 2.13 _
+T rbr 2.14 2.14 )
+T identifier 3.1 3.1 f
+T lbr 3.2 3.2 (
+T identifier 3.3 3.3 x
+T rbr 3.4 3.4 )
+T def 3.6 3.7 ==
+T identifier 3.9 3.9 f
+T lbr 3.10 3.10 (
+T identifier 3.11 3.11 x
+T rbr 3.12 3.12 )
+T end-module 4.1 4.4 ====

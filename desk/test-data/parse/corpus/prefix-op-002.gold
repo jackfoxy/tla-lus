@@ -1,0 +1,104 @@
+ACCEPT
+n-module 1.1-15.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-14.1
+    n-operatordefinition 2.1-14.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setenumerate 2.7-14.1
+        lbc 2.7-2.7 {
+        n-prefixexpr 3.3-3.4
+          n-genprefixop 3.3-3.3
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 3.3-3.3 ~
+          n-generalid 3.4-3.4
+            n-idprefix ~ N_IdPrefix
+            identifier 3.4-3.4 x
+        comma 3.5-3.5 ,
+        n-prefixexpr 4.3-4.9
+          n-genprefixop 4.3-4.7
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 4.3-4.7 \\lnot
+          n-generalid 4.9-4.9
+            n-idprefix ~ N_IdPrefix
+            identifier 4.9-4.9 x
+        comma 4.10-4.10 ,
+        n-prefixexpr 5.3-5.8
+          n-genprefixop 5.3-5.6
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 5.3-5.6 \\neg
+          n-generalid 5.8-5.8
+            n-idprefix ~ N_IdPrefix
+            identifier 5.8-5.8 x
+        comma 5.9-5.9 ,
+        n-prefixexpr 6.3-6.9
+          n-genprefixop 6.3-6.7
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 6.3-6.7 UNION
+          n-generalid 6.9-6.9
+            n-idprefix ~ N_IdPrefix
+            identifier 6.9-6.9 x
+        comma 6.10-6.10 ,
+        n-prefixexpr 7.3-7.10
+          n-genprefixop 7.3-7.8
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 7.3-7.8 SUBSET
+          n-generalid 7.10-7.10
+            n-idprefix ~ N_IdPrefix
+            identifier 7.10-7.10 x
+        comma 7.11-7.11 ,
+        n-prefixexpr 8.3-8.10
+          n-genprefixop 8.3-8.8
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 8.3-8.8 DOMAIN
+          n-generalid 8.10-8.10
+            n-idprefix ~ N_IdPrefix
+            identifier 8.10-8.10 x
+        comma 8.11-8.11 ,
+        n-prefixexpr 9.3-9.4
+          n-geninfixop 9.3-9.3
+            n-idprefix ~ N_IdPrefix
+            n-infixop 9.3-9.3 -
+          n-generalid 9.4-9.4
+            n-idprefix ~ N_IdPrefix
+            identifier 9.4-9.4 x
+        comma 9.5-9.5 ,
+        n-prefixexpr 10.3-10.11
+          n-genprefixop 10.3-10.9
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 10.3-10.9 ENABLED
+          n-generalid 10.11-10.11
+            n-idprefix ~ N_IdPrefix
+            identifier 10.11-10.11 x
+        comma 10.12-10.12 ,
+        n-prefixexpr 11.3-11.13
+          n-genprefixop 11.3-11.11
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 11.3-11.11 UNCHANGED
+          n-generalid 11.13-11.13
+            n-idprefix ~ N_IdPrefix
+            identifier 11.13-11.13 x
+        comma 11.14-11.14 ,
+        n-prefixexpr 12.3-12.5
+          n-genprefixop 12.3-12.4
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 12.3-12.4 []
+          n-generalid 12.5-12.5
+            n-idprefix ~ N_IdPrefix
+            identifier 12.5-12.5 x
+        comma 12.6-12.6 ,
+        n-prefixexpr 13.3-13.5
+          n-genprefixop 13.3-13.4
+            n-idprefix ~ N_IdPrefix
+            n-prefixop 13.3-13.4 <>
+          n-generalid 13.5-13.5
+            n-idprefix ~ N_IdPrefix
+            identifier 13.5-13.5 x
+        rbc 14.1-14.1 }
+  n-endmodule 15.1-15.4
+    end-module 15.1-15.4 ====

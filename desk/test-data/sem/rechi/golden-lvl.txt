@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2}
+lvl Ap L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FT;]
+lvl R L0 ml=[2] w=[1] lc={n<=2}

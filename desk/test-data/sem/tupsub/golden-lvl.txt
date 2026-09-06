@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={i<=2,j<=2,y<=2,z<=2}
+lvl Sub L0 lc={y<=2,z<=2}
+lvl Ch L0 lc={i<=2,j<=2}

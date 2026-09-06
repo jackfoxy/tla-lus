@@ -1,0 +1,10 @@
+EVAL
+Big SetEnumValue {1, 2, 3}
+Card IntValue 3
+D SetEnumValue {1, 3}
+Filt SetEnumValue {2, 4, 6}
+I SetEnumValue {2, 3}
+In BoolValue TRUE
+Sq SetEnumValue {1, 4, 9}
+Sub SubsetValue {{}, {1}, {2}, {1, 2}}
+U SetEnumValue {1, 2, 3}

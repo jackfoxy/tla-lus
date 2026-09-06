@@ -1,0 +1,15 @@
+ACCEPT
+MODULE A 1.1-4.4
+  const k arity=0 L0 2.10-2.10
+  def Inst!Op arity=1 local=n L0 3.1-3.41
+    param n arity=0 L0 3.6-3.6
+    substin subs=2 L0 3.1-3.41
+      sub c <-
+        apply n opkind=FormalParamKind L0 3.33-3.33
+      sub d <-
+        apply k opkind=ConstantDeclKind L0 3.41-3.41
+      in
+        apply $SetEnumerate opkind=BuiltInKind L0 3.7-3.12
+          apply c opkind=ConstantDeclKind L0 3.8-3.8
+          apply d opkind=ConstantDeclKind L0 3.11-3.11
+  instance name=Inst module=B local=n L0 3.1-3.41

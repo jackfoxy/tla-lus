@@ -1,0 +1,29 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file <WORK>/SyntaxReject.tla
+***Parse Error***
+Encountered "=" at line 3, column 18 and token "EXCEPT"
+
+Residual stack trace follows:
+Except Spec starting at line 3, column 18.
+Some [] Form starting at line 3, column 8.
+ExtendableExpr starting at line 3, column 8.
+Expression starting at line 3, column 8.
+Definition starting at line 3, column 1.
+
+
+Fatal errors while parsing TLA+ spec in file SyntaxReject.tla
+
+In module SyntaxReject
+
+Could not parse module SyntaxReject from file SyntaxReject.tla
+*** Errors: 1
+
+In module SyntaxReject
+
+Could not parse module SyntaxReject from file SyntaxReject.tla
+
+
+
+exit-code: 255

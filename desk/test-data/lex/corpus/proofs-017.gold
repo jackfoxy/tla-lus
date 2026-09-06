@@ -1,0 +1,25 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T proposition 2.1 2.11 PROPOSITION
+T identifier 2.13 2.16 TRUE
+T proof 3.1 3.5 PROOF
+T barelevellexeme 4.1 4.3 <*>
+T number-literal 4.5 4.5 1
+T proof 5.3 5.7 PROOF
+T barelevellexeme 6.3 6.5 <+>
+T number-literal 6.7 6.7 2
+T barelevellexeme 7.3 7.5 <1>
+T qed 7.7 7.9 QED
+T proof 8.5 8.9 PROOF
+T barelevellexeme 9.5 9.7 <*>
+T number-literal 9.9 9.9 3
+T barelevellexeme 10.7 10.12 <1000>
+T number-literal 10.14 10.14 4
+T barelevellexeme 11.7 11.9 <*>
+T qed 11.11 11.13 QED
+T barelevellexeme 12.5 12.7 <2>
+T qed 12.9 12.11 QED
+T barelevellexeme 13.1 13.3 <0>
+T qed 13.5 13.7 QED
+T end-module 14.1 14.4 ====

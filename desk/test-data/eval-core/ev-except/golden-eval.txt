@@ -1,0 +1,10 @@
+EVAL
+ExAt FcnRcdValue <<1, 102, 3>>
+ExF FcnRcdValue <<1, 99, 3>>
+ExMulti FcnRcdValue <<7, 2, 8>>
+ExNest RecordValue [a |-> 1, b |-> [c |-> 42]]
+ExR RecordValue [a |-> 5, b |-> [c |-> 2]]
+ExT TupleValue <<1, 2, 30>>
+F FcnRcdValue <<1, 2, 3>>
+R RecordValue [a |-> 1, b |-> [c |-> 2]]
+T TupleValue <<1, 2, 3>>

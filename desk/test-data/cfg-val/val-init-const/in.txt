@@ -1,0 +1,3 @@
+CONSTANT C = 1
+INIT C
+NEXT Next

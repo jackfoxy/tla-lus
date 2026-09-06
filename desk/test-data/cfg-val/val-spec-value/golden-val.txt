@@ -1,0 +1,3 @@
+VALIDATE
+2230 ~
+The value of C is equal to 42

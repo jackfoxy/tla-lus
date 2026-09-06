@@ -1,0 +1,42 @@
+ACCEPT
+n-module 1.1-7.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-6.8
+    n-instance 2.1-6.8
+      n-nonlocalinstance 2.1-6.8
+        instance 2.1-2.8 INSTANCE
+        identifier 2.10-2.10 M
+        with 2.12-2.15 WITH
+        n-substitution 3.3-3.8
+          identifier 3.3-3.3 A
+          substitute 3.5-3.6 <-
+          n-generalid 3.8-3.8
+            n-idprefix ~ N_IdPrefix
+            identifier 3.8-3.8 a
+        comma 3.9-3.9 ,
+        n-substitution 4.3-4.13
+          n-nonexpprefixop 4.3-4.8 SUBSET
+          substitute 4.10-4.11 <-
+          n-generalid 4.13-4.13
+            n-idprefix ~ N_IdPrefix
+            identifier 4.13-4.13 b
+        comma 4.14-4.14 ,
+        n-substitution 5.3-5.8
+          n-infixop 5.3-5.3 *
+          substitute 5.5-5.6 <-
+          n-generalid 5.8-5.8
+            n-idprefix ~ N_IdPrefix
+            identifier 5.8-5.8 c
+        comma 5.9-5.9 ,
+        n-substitution 6.3-6.8
+          n-postfixop 6.3-6.3 '
+          substitute 6.5-6.6 <-
+          n-generalid 6.8-6.8
+            n-idprefix ~ N_IdPrefix
+            identifier 6.8-6.8 d
+  n-endmodule 7.1-7.4
+    end-module 7.1-7.4 ====

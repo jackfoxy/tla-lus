@@ -1,0 +1,11 @@
+ACCEPT
+MODULE A 1.1-6.4
+  const z arity=0 L0 2.10-2.10
+  def Foo arity=0 local=n L0 3.1-5.11
+    letin lets=2 L0 3.8-5.11
+      def a arity=0 local=n L0 3.12-3.17
+        apply z opkind=ConstantDeclKind L0 3.17-3.17
+      def b arity=0 local=n L0 4.12-4.17
+        apply a opkind=UserDefinedOpKind L0 4.17-4.17
+      in
+        apply b opkind=UserDefinedOpKind L0 5.11-5.11

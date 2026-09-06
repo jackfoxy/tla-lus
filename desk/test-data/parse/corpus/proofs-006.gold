@@ -1,0 +1,38 @@
+ACCEPT
+n-module 1.1-10.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-9.5
+    n-theorem 2.1-9.5
+      proposition 2.1-2.5 LEMMA
+      n-generalid 2.7-2.10
+        n-idprefix ~ N_IdPrefix
+        identifier 2.7-2.10 TRUE
+      n-terminalproof 3.1-9.5
+        proof 3.1-3.5 PROOF
+        by 3.7-3.8 BY
+        only 3.10-3.13 ONLY
+        n-generalid 4.3-4.3
+          n-idprefix ~ N_IdPrefix
+          identifier 4.3-4.3 P
+        comma 4.4-4.4 ,
+        n-generalid 5.3-5.3
+          n-idprefix ~ N_IdPrefix
+          identifier 5.3-5.3 Q
+        df 6.3-6.6 DEFS
+        n-generalid 7.5-7.5
+          n-idprefix ~ N_IdPrefix
+          n-infixop 7.5-7.5 >
+        comma 7.6-7.6 ,
+        n-generalid 8.5-8.5
+          n-idprefix ~ N_IdPrefix
+          identifier 8.5-8.5 R
+        comma 8.6-8.6 ,
+        n-generalid 9.5-9.5
+          n-idprefix ~ N_IdPrefix
+          n-infixop 9.5-9.5 =
+  n-endmodule 10.1-10.4
+    end-module 10.1-10.4 ====

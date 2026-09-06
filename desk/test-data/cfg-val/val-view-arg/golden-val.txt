@@ -1,0 +1,3 @@
+VALIDATE
+2228 ~
+TLC requires view function not to take any argument, but one was given: V

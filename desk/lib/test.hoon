@@ -1,9 +1,4 @@
-::  Generic testing utilities meant to be used from files in %/tests
-::
-::  Adapted from ~/gitrepos/obelisk/desk/lib/test.hoon: the obelisk-specific
-::  parse-results / eval-results arms (which needed the obelisk AST) are
-::  dropped; the generic +expect-* / +category / +run-chain vocabulary is
-::  kept verbatim in spirit so the assertion style matches the model repo.
+::  testing utilities meant to be directly used from files in %/tests
 ::
 |%
 ::  +expect-eq: compares :expected and :actual and pretty-prints the result
@@ -11,13 +6,16 @@
 ++  expect-eq
   |=  [expected=vase actual=vase]
   ^-  tang
+  ::
   =|  result=tang
+  ::
   =?  result  !=(q.expected q.actual)
     %+  weld  result
     ^-  tang
     :~  [%palm [": " ~ ~ ~] [leaf+"expected" (sell expected) ~]]
         [%palm [": " ~ ~ ~] [leaf+"actual  " (sell actual) ~]]
     ==
+  ::
   =?  result  !(~(nest ut p.actual) | p.expected)
     %+  weld  result
     ^-  tang
@@ -43,30 +41,33 @@
     %|  ~
     %&  ['expected failure - succeeded' ~]
   ==
-::  +expect-fail-message: kicks a trap, expecting crash with message
+::  +expect-fail-message: kicks a trap, expecting crash with message.
 ::
 ++  expect-fail-message
-  |=  [msg=@t a=(trap)]
-  ^-  tang
-  =/  b  (mule a)
-  ?-  -.b
+    |=  [msg=@t a=(trap)]
+    ^-  tang
+    =/  b  (mule a)
+    ?-  -.b
+      %|  |^
+          =/  =tang  (flatten +.b)
+          ?:  ?=(^ (find (trip msg) tang))
+            ~
+
+            ~&  "expected:  {<(trip msg)>}"
+            ~&  "find in tang:  {<(flatten +.b)>}"
+
+          %+  weld  ['expected error message - not found' ~]
+                    (show-crash-messages +.b)
+          ++  flatten
+            |=  tang=(list tank)
+            =|  res=tape
+            |-  ^-  tape
+            ?~  tang  res
+            $(tang t.tang, res (weld ~(ram re i.tang) res))
+          --
       %&  ['expected failure - succeeded' ~]
-      %|
-    |^
-    =/  =tang  (flatten +.b)
-    ?:  ?=(^ (find (trip msg) tang))
-      ~
-    %+  weld  ['expected error message - not found' ~]
-              (show-crash-messages +.b)
-    ++  flatten
-      |=  tang=(list tank)
-      =|  res=tape
-      |-  ^-  tape
-      ?~  tang  res
-      $(tang t.tang, res (weld ~(ram re i.tang) res))
-    --
-  ==
-::  +expect-success: kicks a trap, expecting success; returns trace on failure
+    ==
+::  +expect-runs: kicks a trap, expecting success; returns trace on failure
 ::
 ++  expect-success
   |=  a=(trap)
@@ -78,18 +79,22 @@
   ==
 ::  +show-crash-messages: prepends message summary lines from a crash trace
 ::
+::  Scans for %leaf tanks whose tape is a combined location+message entry
+::  of the form: /path/to/file.hoon:<[r c].[r c]>"message text"
+::  For each found, emits a formatted summary line, then a blank line,
+::  then the original trace.
+::
 ++  show-crash-messages
   |=  =tang
   ^-  ^tang
   =/  msgs
     %+  murn  tang
-    |=  t=tank
-    ^-  (unit tank)
-    ?.  ?=([%leaf *] t)  ~
-    ?~(p.t ~ `leaf+(strip-msg-quotes p.t))
+              |=  t=tank
+              ^-  (unit tank)
+              ?.  ?=([%leaf *] t)  ~
+              ?~(p.t ~ `leaf+(strip-msg-quotes p.t))
   ?~  msgs  tang
   (weld msgs `(list tank)`[leaf+"" tang])
-::  +strip-msg-quotes: strips surrounding quotes from a message tape
 ::
 ++  strip-msg-quotes
   |=  tp=tape
@@ -105,9 +110,18 @@
     ?:  =('"' lag)  ~
     ~[lag]
   [lag $(lag i.rest, rest t.rest)]
+::  +tape-flop: reverse a tape, returning tape (avoids wet-gate mull issues)
+::
+++  tape-flop
+  |=  tp=tape
+  ^-  tape
+  =|  acc=tape
+  |-  ^-  tape
+  ?~  tp  acc
+  $(tp t.tp, acc [i.tp acc])
 ::  $a-test-chain: a sequence of tests to be run
 ::
-::    NB: arms shouldn't start with `test-` so that `-test % ~` runs
+::  NB: arms shouldn't start with `test-` so that `-test % ~` runs
 ::
 +$  a-test-chain
   $_
@@ -122,18 +136,16 @@
   ^-  tang
   =/  res  $:seq
   ?-  -.res
-      %&  p.res
-      %|
-    ?.  =(~ tang.p.res)
-      tang.p.res
-    $(seq next.p.res)
+    %&  p.res
+    %|  ?.  =(~ tang.p.res)
+          tang.p.res
+        $(seq next.p.res)
   ==
 ::  +category: prepends a name to an error result; passes successes unchanged
 ::
 ++  category
-  |=  [a=tape b=tang]
-  ^-  tang
-  ?:  =(~ b)  ~
+  |=  [a=tape b=tang]  ^-  tang
+  ?:  =(~ b)  ~  :: test OK
   :-  leaf+"in: '{a}'"
   (turn b |=(c=tank rose+[~ "  " ~]^~[c]))
 --

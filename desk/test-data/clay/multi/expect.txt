@@ -1,0 +1,21 @@
+DIFFERENTIAL EXPECTATION (unit 10 Clay/inline equivalence)
+
+root      spec
+modules   spec.tla helper.tla
+cfg       cfg.txt          :: INIT/NEXT/INVARIANT
+op        %check %exhaustive
+
+The Clay run over these files MUST equal the inline run over the identical
+texts. The inline run is the frozen golden of tests/lib/job
+test-multi-module-check (a two-module inline %check whose root EXTENDS the
+`helper` module):
+
+  result     [%ok [5 4 0 4]]     :: generated distinct queued depth
+
+Provenance: the checked predicates are root-local (evaluating an operator
+imported from another *user* module via EXTENDS is a documented unit-6
+residue), so `Lim` in helper is never evaluated; the bundle still exercises
+multi-module parse/resolve/generate over an asynchronously loaded graph.
+
+Equivalence is proven at the result level (verdict + run-stats), not by a
+separate Clay oracle: Clay must match inline, never the reverse.

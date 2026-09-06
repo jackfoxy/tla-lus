@@ -1,0 +1,3 @@
+INIT Init2
+NEXT Next2
+INVARIANT Inv

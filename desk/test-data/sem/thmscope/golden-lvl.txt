@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1
+lvl Bar L0
+lvl Qux L0
+lvl Foo L0

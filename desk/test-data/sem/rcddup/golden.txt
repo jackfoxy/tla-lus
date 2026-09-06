@@ -1,0 +1,30 @@
+ACCEPT
+MODULE A 1.1-4.77
+  def Foo arity=0 local=n L-1 2.1-2.34
+    apply $RcdConstructor opkind=BuiltInKind L-1 2.8-2.34
+      apply $Pair opkind=BuiltInKind L-1 2.9-2.15
+        str a L-1 2.9-2.9
+        num 1 L-1 2.15-2.15
+      apply $Pair opkind=BuiltInKind L-1 2.18-2.24
+        str b L-1 2.18-2.18
+        num 2 L-1 2.24-2.24
+      apply $Pair opkind=BuiltInKind L-1 2.27-2.33
+        str a L-1 2.27-2.27
+        num 1 L-1 2.33-2.33
+  def Bar arity=0 local=n L-1 3.1-3.34
+    apply $SetOfRcds opkind=BuiltInKind L-1 3.8-3.34
+      apply $Pair opkind=BuiltInKind L-1 3.9-3.15
+        str a L-1 3.9-3.9
+        apply $SetEnumerate opkind=BuiltInKind L-1 3.13-3.15
+          num 1 L-1 3.14-3.14
+      apply $Pair opkind=BuiltInKind L-1 3.18-3.24
+        str b L-1 3.18-3.18
+        apply $SetEnumerate opkind=BuiltInKind L-1 3.22-3.24
+          num 2 L-1 3.23-3.23
+      apply $Pair opkind=BuiltInKind L-1 3.27-3.33
+        str a L-1 3.27-3.27
+        apply $SetEnumerate opkind=BuiltInKind L-1 3.31-3.33
+          num 1 L-1 3.32-3.32
+DIAGS
+D 4262 ERROR 2.27-2.27 Non-unique fields in constructor.
+D 4262 ERROR 3.27-3.27 Non-unique fields in constructor.

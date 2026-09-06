@@ -1,0 +1,3 @@
+REJECT
+Lexical error at line 2, column 9.  Encountered: "\n" (10), after : "?"
+%%

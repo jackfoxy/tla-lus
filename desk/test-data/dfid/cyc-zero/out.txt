@@ -1,0 +1,2 @@
+Finished computing initial states: 1 states generated, with 1 of them distinct.
+1 states generated, 1 distinct states found.

@@ -1,0 +1,11 @@
+Error: Temporal property P2 was violated.
+Error: The following behavior constitutes a counter-example:
+State 1: <Initial predicate>
+x = 0
+State 2: <Next line 11, col 13 to line 11, col 31 of module spec>
+x = 1
+State 3: <Next line 11, col 13 to line 11, col 31 of module spec>
+x = 2
+State 4: Stuttering
+8 states generated, 4 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.

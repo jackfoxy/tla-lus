@@ -1,0 +1,10 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=2} alc={(-.,0)>=3,(Foo,0)>=0}
+lvl BoxTest L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=2} alp={(-.,0,x)}
+lvl -. L0 ml=[2] w=[1]
+lvl ^+ L0 ml=[2] w=[1]
+lvl SetOpTest L1 ml=[3] w=[1] mml=[1] olc=[F] lp={x} lc={x<=2} alp={(Foo,0,x)}
+lvl UseSubset L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}
+lvl UseNeg L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}
+lvl UsePost L1 lp={x} lc={x<=2} alc={(Foo,0)>=0}
+lvl UseBoxOp L3 lp={x} lc={x<=2} alc={(-.,0)>=3}

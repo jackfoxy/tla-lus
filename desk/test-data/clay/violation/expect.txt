@@ -1,0 +1,18 @@
+DIFFERENTIAL EXPECTATION (unit 10 Clay/inline equivalence)
+
+root      spec
+modules   spec.tla         :: single module, unbounded counter
+cfg       cfg.txt          :: INIT/NEXT/INVARIANT
+op        %check %exhaustive
+
+The invariant fails at x = 3, so this case carries what a passing run
+cannot: a violation verdict, the invariant's name, and the shortest
+counterexample. The Clay run must equal the inline run over the same text:
+
+  result     [%violated [%invariant 'Inv'] [4 4 0 4]]
+  trace      %safety, 4 states (x = 0, 1, 2, 3)
+  report     the TLC-style violation text, byte-identical to inline
+
+Provenance: the states are generated in BFS order and the violating state
+is counted distinct but never expanded (TLC's doNext order, unit 7.4), so
+`generated` is 4, not 5.

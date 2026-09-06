@@ -1,0 +1,11 @@
+REJECT
+***Parse Error***
+Was expecting "Expression or Instance"
+Encountered "LAMBDA" at line 2, column 6 and token "==" 
+
+Residual stack trace follows:
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+Module definition starting at line 1, column 1.
+
+%%

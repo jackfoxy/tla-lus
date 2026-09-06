@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+const M = mv
+RAW
+CONSTANT
+M = mv 
+---

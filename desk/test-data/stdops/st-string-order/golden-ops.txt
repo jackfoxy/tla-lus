@@ -1,0 +1,11 @@
+BINDINGS
+EVAL
+Adversarial SetEnumValue {"bb", "a", "ab"}
+Ch StringValue "bb"
+ChModel ModelValue zz
+Dom SetEnumValue {"bb", "a", "ab"}
+Longer SetEnumValue {"aa", "ab", "b", "z"}
+Models SetEnumValue {zz, aa, mm}
+Pair TupleValue <<"bb", "a">>
+Plain SetEnumValue {"a", "b"}
+Rec RecordValue [bb |-> 1, a |-> 2, ab |-> 3]

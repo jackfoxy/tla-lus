@@ -1,0 +1,37 @@
+ACCEPT
+n-module 1.1-7.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-6.1
+    n-operatordefinition 2.1-6.1
+      n-identlhs 2.1-2.2
+        identifier 2.1-2.2 op
+      def 2.4-2.5 ==
+      n-setofrcds 2.7-6.1
+        lsb 2.7-2.7 [
+        n-fieldset 3.3-3.11
+          identifier 3.3-3.5 foo
+          colon 3.7-3.7 :
+          n-generalid 3.9-3.11
+            n-idprefix ~ N_IdPrefix
+            identifier 3.9-3.11 Nat
+        comma 3.12-3.12 ,
+        n-fieldset 4.3-4.11
+          identifier 4.3-4.5 bar
+          colon 4.7-4.7 :
+          n-generalid 4.9-4.11
+            n-idprefix ~ N_IdPrefix
+            identifier 4.9-4.11 Int
+        comma 4.12-4.12 ,
+        n-fieldset 5.3-5.12
+          identifier 5.3-5.5 baz
+          colon 5.7-5.7 :
+          n-generalid 5.9-5.12
+            n-idprefix ~ N_IdPrefix
+            identifier 5.9-5.12 Real
+        rsb 6.1-6.1 ]
+  n-endmodule 7.1-7.4
+    end-module 7.1-7.4 ====

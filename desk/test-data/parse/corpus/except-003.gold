@@ -1,0 +1,74 @@
+ACCEPT
+n-module 1.1-3.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-2.62
+    n-operatordefinition 2.1-2.62
+      n-identlhs 2.1-2.1
+        identifier 2.1-2.1 r
+      def 2.3-2.4 ==
+      n-except 2.6-2.62
+        lsb 2.6-2.6 [
+        n-generalid 2.7-2.7
+          n-idprefix ~ N_IdPrefix
+          identifier 2.7-2.7 a
+        except 2.9-2.14 EXCEPT
+        n-exceptspec 2.16-2.31
+          bang 2.16-2.16 !
+          n-exceptcomponent 2.17-2.19
+            lsb 2.17-2.17 [
+            n-number 2.18-2.18
+              number-literal 2.18-2.18 2
+            rsb 2.19-2.19 ]
+          n-exceptcomponent 2.20-2.24
+            lsb 2.20-2.20 [
+            n-string 2.21-2.23 "a"
+            rsb 2.24-2.24 ]
+          n-exceptcomponent 2.25-2.27
+            lsb 2.25-2.25 [
+            n-number 2.26-2.26
+              number-literal 2.26-2.26 3
+            rsb 2.27-2.27 ]
+          t-equal 2.29-2.29 =
+          n-generalid 2.31-2.31
+            n-idprefix ~ N_IdPrefix
+            identifier 2.31-2.31 @
+        comma 2.32-2.32 ,
+        n-exceptspec 2.34-2.46
+          bang 2.34-2.34 !
+          n-exceptcomponent 2.35-2.39
+            lsb 2.35-2.35 [
+            n-string 2.36-2.38 "b"
+            rsb 2.39-2.39 ]
+          n-exceptcomponent 2.40-2.42
+            lsb 2.40-2.40 [
+            n-generalid 2.41-2.41
+              n-idprefix ~ N_IdPrefix
+              identifier 2.41-2.41 x
+            rsb 2.42-2.42 ]
+          t-equal 2.44-2.44 =
+          n-number 2.46-2.46
+            number-literal 2.46-2.46 5
+        comma 2.47-2.47 ,
+        n-exceptspec 2.49-2.61
+          bang 2.49-2.49 !
+          n-exceptcomponent 2.50-2.52
+            lsb 2.50-2.50 [
+            n-generalid 2.51-2.51
+              n-idprefix ~ N_IdPrefix
+              identifier 2.51-2.51 y
+            rsb 2.52-2.52 ]
+          n-exceptcomponent 2.53-2.55
+            lsb 2.53-2.53 [
+            n-generalid 2.54-2.54
+              n-idprefix ~ N_IdPrefix
+              identifier 2.54-2.54 z
+            rsb 2.55-2.55 ]
+          t-equal 2.57-2.57 =
+          n-string 2.59-2.61 "c"
+        rsb 2.62-2.62 ]
+  n-endmodule 3.1-3.4
+    end-module 3.1-3.4 ====

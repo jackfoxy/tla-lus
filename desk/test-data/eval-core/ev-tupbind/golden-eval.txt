@@ -1,0 +1,8 @@
+EVAL
+AllT BoolValue FALSE
+ChT TupleValue <<1, 1>>
+ExT BoolValue TRUE
+FcnT FcnLambdaValue (<<1, 1>> :> 11 @@ <<1, 2>> :> 12 @@ <<2, 1>> :> 21 @@ <<2, 2>> :> 22)
+FiltT SetPredValue {<<1, 1>>, <<2, 2>>}
+MapT SetEnumValue {2, 3, 4}
+S SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}

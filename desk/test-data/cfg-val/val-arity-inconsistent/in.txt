@@ -1,0 +1,5 @@
+CONSTANT
+Op(1) = 2
+Op(1, 2) = 3
+INIT Init
+NEXT Next

@@ -1,0 +1,24 @@
+SAFETY
+VERDICT violated-invariant
+EC 2110
+INV Inv
+STAT generated 4
+STAT distinct 4
+STAT queue 1
+STAT depth 3
+TRACE 3
+STATE 1 0x17e25f7c55c6ef92
+LABEL <Initial predicate>
+/\ a = 0
+/\ b = 0
+ENDSTATE
+STATE 2 0x60e07fd6de574b3c
+LABEL <Next line 5, col 12 to line 5, col 39 of module A>
+/\ a = 1
+/\ b = 0
+ENDSTATE
+STATE 3 0x4622d29175ce560c
+LABEL <Next line 6, col 12 to line 6, col 39 of module A>
+/\ a = 1
+/\ b = 1
+ENDSTATE

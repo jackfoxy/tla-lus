@@ -1,0 +1,31 @@
+ACCEPT
+n-module 1.1-6.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-5.7
+    n-theorem 2.1-5.7
+      theorem 2.1-2.7 THEOREM
+      identifier 2.9-2.11 thm
+      def 2.13-2.14 ==
+      n-assumeprove 3.3-4.9
+        assume 3.3-3.8 ASSUME
+        n-newsymb 3.10-3.29
+          new 3.10-3.12 NEW
+          constant 3.14-3.21 CONSTANT
+          n-identdecl 3.23-3.23
+            identifier 3.23-3.23 x
+          in 3.25-3.27 \\in
+          n-generalid 3.29-3.29
+            n-idprefix ~ N_IdPrefix
+            identifier 3.29-3.29 S
+        prove 4.3-4.7 PROVE
+        n-generalid 4.9-4.9
+          n-idprefix ~ N_IdPrefix
+          identifier 4.9-4.9 C
+      n-terminalproof 5.1-5.7
+        obvious 5.1-5.7 OBVIOUS
+  n-endmodule 6.1-6.4
+    end-module 6.1-6.4 ====

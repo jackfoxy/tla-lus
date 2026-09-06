@@ -1,0 +1,5 @@
+# examples: HourClock  (safety ok, 12 states)
+SANY accept
+TLC ok
+STATES 24 12 0
+DEPTH 1

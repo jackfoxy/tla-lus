@@ -1,0 +1,559 @@
+# R1.2 — Fuzzing + fixture expansion (unit 11) — measurement notes
+
+Parent plan: `~/FoxyLabs/tla-lus/R1.2-fuzzing-plan.md` (.0–.7).
+Oracle pin: `tlaplus@4ba7d8811`.
+
+## R1.2.0 — kickoff (docs only)
+
+### The headline: a reachable crash, found by inspection before any fuzzer was written
+
+```
+---- MODULE A ----
+EXTENDS Naturals
+VARIABLE x, y
+Init == x = 0 /\ y = 0
+Next == x' = 1 - x /\ y' = y
+Live == <>(x = 1 /\ y = 0)
+====
+INIT Init / NEXT Next / PROPERTY Live
+```
+
+`check:check` **bails `%tlc-live-statepred-junction`**. TLC runs it to a verdict:
+`Error: Temporal property Live was violated.` / `2 distinct states found`.
+
+There is nothing exotic here — an eventually-operator over a conjunction of two state predicates.
+It was found by reading `+st-pred-bool:liveness` against `+cs-eval:liveness`, not by fuzzing, which
+is the first thing `.0` has to say about how much surface is unexplored.
+
+**The cause is an asymmetry between two evaluators over the same mold.** Both walk a `live-expr` at
+a state:
+
+| arm | handles | bails on |
+|---|---|---|
+| `+cs-eval` (checkState) | `%bool %neg %conj %disj %state` | `%act %enabled %all %even %next` |
+| `+st-pred-bool` (tableau node consistency) | `%bool %neg %state` | `%next %all %even` **`%conj %disj`** `%act %enabled` |
+
+`+state-preds-of:tableau` keeps a particle's members with `le-level <= 1`, and `le-level` of a
+`%conj` is the max of its children — so a conjunction of two state predicates has level 1, survives
+the filter, reaches `+st-pred-bool`, and hits a bail that `+cs-eval` would have evaluated. The
+R1.6.2 `TBGRAPH` projection makes this visible: `leadsto-viol`'s golden shows a particle whose
+second member *is* a conjunction (there at level 3, so the filter drops it — which is why no
+existing fixture trips this).
+
+This is `.3`'s first fixture and probably its first fix. It also validates the plan's ordering:
+`.3` (temporal/liveness) was already flagged as the increment to do first among the middle four.
+
+### (a) The bail surface, classified
+
+29 `!!` sites in port libraries. The first cut is **not** reachable-vs-unreachable, it is
+**production-reachable at all**:
+
+**19 sites are in a test-only driver.** `lib/eval.hoon`'s CST evaluator (`+eval` over `node`) is
+reached only from `desk/tests/lib/eval.hoon`. Production imports `lib/eval` for its *types*
+(`value:ev`, `vfield`, `vpair`) and four CST helpers (`kids-of`, `is-kind`, `op-name`,
+`genid-name`) — R1.4.4 retired the CST driver to test-only and R1.4 deleted the dead state
+generator from `check.hoon`. No input a user submits reaches those 19, **including all six
+unlabelled `!!`** (lines 528, 530, 569, 570, 579, 582).
+
+That materially re-scopes the plan: DoD item 3 ("no unlabelled `!!` remains in port code") is about
+a test-only file, so `.0` recommends **either deleting the CST driver or exempting it explicitly**
+— a decision for `.4`, not a fuzzing target. The `!!` hits in `lexer.hoon:148` and
+`syntax.hoon:111/181` are the TLA+ operator `!!` in token/precedence tables, not crashes at all.
+
+**The production-reachable surface is 21 sites, all labelled:**
+
+| site | tag | first read |
+|---|---|---|
+| `liveness.hoon:30-36` (7) | `%tlc-live-statepred-{next,temporal,junction,action,enabled}` | **`%conj`/`%disj` PROVEN REACHABLE (above)**; the rest need the same test |
+| `liveness.hoon:253-257` (5) | `%tlc-live-checkstate-{action,enabled,temporal,next}` | checkState is built from level<=1 PEM entries; `%act`/`%enabled` should be impossible — argument owed |
+| `liveness.hoon:277-279` (3) | `%tlc-live-checkaction-{temporal,next}` | checkAction is level<=2; `%all`/`%even` should be impossible — argument owed |
+| `tableau.hoon:86-87` (2) | `%tlc-live-encountered-actions` | **has a real EC**: 2249 `TLC_LIVE_ENCOUNTERED_ACTIONS`, "TLC encountered actions when computing closure." Convert, don't bail |
+| `temporal.hoon:810` (1) | `%tlc-live-wrong-formula-format` | **has a real EC**: 2214. Already fired on five test-model specs (R1.6.0); now unreachable via `+ast`'s user-op branch, but that is a fix upstream, not a proof |
+| `config.hoon:400` (1) | `%cfg-value-unexpected` | `+render-value` over a `cfg-value` variant `parse-cfg` cannot produce — argument owed |
+| `job.hoon:515` (1) | `%tla-lus-unplanned-stage` | an internal invariant on the stage plan, not input-driven — argument owed |
+| `diagnostics.hoon:128` (1) | `[%unmapped-ec code]` | an EC with no message mapping; reachable iff any emitter can produce an unmapped code |
+
+Two of the 21 already map to real tlc2 error codes (2214, 2249), so for those the conversion target
+is not invention: emit the EC as a typed rejection. That is the pattern to prefer everywhere —
+**a bail with a tlc2 EC behind it is a diagnostic waiting to be wired**, not an assertion.
+
+### (b) Generator strategy — per stage, and why the current one does not generalize
+
+`tests/lib/fuzz` generates a random token soup inside a module frame. That reaches the lexer and
+parser and essentially never reaches `sem`, `config`, or liveness — a random token stream almost
+never parses. So:
+
+- **Front end** (lexer/parser): keep the existing token-soup generator. It is the right shape and
+  the invariant is already enforced.
+- **Everything past it**: **mutate the existing corpora** rather than generate from a grammar. The
+  repo already holds hundreds of *valid* inputs (`test-data/{parse,sem,cfg,liveness,mc,safety}`),
+  and small mutations of a valid module stay parseable far more often than anything generated from
+  scratch. Mutation operators to start with: delete/duplicate a line, swap two operators of the
+  same arity, change a level (prime/unprime a variable, wrap a subformula in `[]`/`<>`), and
+  perturb a `.cfg` key.
+- **Decoding** (`.5`): no generator needed — `jam`/`cue` round-trips with bit-flips and truncation.
+
+Grammar-directed generation is explicitly **not** chosen at `.0`: it is a large build whose payoff
+is unclear next to a corpus that already exists, and it can be revisited if mutation plateaus.
+
+### (c) The budget — `mule` is not enough
+
+`mule` catches a bail; it does not catch a loop. R1.8.1.4's liveness build ran 480 s without a
+verdict on a 5-state spec. So the runner must classify **four** outcomes, not two:
+
+```
+%ok  %rejected  %bailed  %budget
+```
+
+with `%budget` produced by a step bound the runner threads into the stage (the port already has the
+device: `build-graph-cap`/`live-graph-cap`, `+expand-cap`, `fuel` in `eenv`). A `%budget` result is
+a *recorded failure*, not a hang — an arm must never be able to wedge the ship, which the dev-log
+already records as a real cost (`[[tla-lus-dev-environment]]`, dojo wedge recovery).
+
+### (d) Shrinking — deliberately none at `.0`
+
+A delta-debug over the mutation list is cheap to add later, but the mutation strategy in (b)
+produces inputs that are already close to a valid corpus case, so the reduction distance is small.
+Decision: **no shrinker in `.1`**; revisit if a found crash is not obviously minimal. The
+already-found `%tlc-live-statepred-junction` case is six lines, which supports this.
+
+### (e) Where arms and fixtures live
+
+- **Arms**: extend `tests/lib/fuzz.hoon` rather than adding per-stage shards. One shard keeps the
+  runner in one place and keeps the seeds together; the arms name their stage
+  (`test-fuzz-liveness-*`, `test-fuzz-cfg-*`).
+- **Fixtures**: a reduced crash lands in the corpus that *owns the stage* — a liveness crash in
+  `test-data/liveness`, a config crash in `test-data/cfg-val` — so it is picked up by that stage's
+  existing generator and comparator, and becomes a permanent tier-1 case. It does **not** land in a
+  fuzz-specific corpus, which would leave it outside every differential.
+
+### Consequences for the plan
+
+- `.4`'s scope shrinks to a decision (delete the CST driver, or exempt it) plus `node-eval`, since
+  `lib/eval`'s 19 sites are test-only.
+- `.3` gains a proven fixture and a probable fix before it starts.
+- DoD item 3 needs the test-only carve-out written into it.
+
+## R1.2.1 — the harness
+
+### What landed
+
+`tests/lib/fuzz.hoon` now has one runner instead of three ad-hoc arms. `+fz-run` takes a seed, a
+run count, a **generator** (`[index rng] -> input`) and a **stage adapter** (`input -> fz-outcome`),
+and returns only the failures — each carrying the input that caused it, so the case is reducible.
+
+```
++$  fz-outcome  ?(%ok %rejected %bailed %budget)
++$  fz-fail     [i=@ud out=fz-outcome inp=@t]
+```
+
+`%ok` and `%rejected` both pass: a typed rejection is a correct answer, and the invariant is about
+crashing, not about accepting. `%bailed` and `%budget` are failures.
+
+### The budget is a contract on the adapter, not a feature of the runner
+
+This is the design point worth recording. `mule` catches a bail; it does not catch a loop, and
+R1.8.1.4 found a liveness build that ran 480 s on a five-state spec. Hoon offers the harness no
+timeout it can impose from outside — so `+fz-run` **cannot** bound a stage. What it can do is
+require that each adapter call its stage with the caps that stage already owns (`live-graph-cap`,
+`+expand-cap`, `fuel:eenv`) and report a cap-hit as `%budget`.
+
+That obligation is unenforceable in code, so it is written in three places: the shard header,
+`doc/testing.md`, and here. An adapter that forgets it does not fail loudly — it hangs the arm,
+which is exactly the failure mode `[[tla-lus-dev-environment]]` records as costly.
+
+### The runner is tested, not assumed
+
+`test-fuzz-runner-classifies` drives four **synthetic** stages — one that bails, one that reports a
+budget, one that succeeds, one that rejects — and asserts the runner reports exactly the first two,
+with the offending input attached. Synthetic on purpose: it stays true whatever the port does, so it
+tests the harness rather than the port.
+
+`.0`'s real crash (`<>(x = 1 /\ y = 0)` → `%tlc-live-statepred-junction`) is deliberately **not**
+used here. It belongs to `.3` as a corpus fixture, and an arm built on a bug is an arm that fails
+the moment the bug is fixed.
+
+### Retrofit
+
+The three existing parser arms now go through `+fz-run` with the `+fz-parse` adapter and the
+`+gen-module` / `+gen-fixed` generators, so there is one mechanism. Coverage is unchanged (200 + 120
+random modules, 10 hand-written garbage inputs); what changed is that a failure now names the run
+index and hands back the input instead of collapsing to `%.n`.
+
+`+gen-fixed` — a generator over a fixed list — is what lets a hand-written adversarial set share the
+runner with the random ones, and it is how `.2`–`.5` will feed reduced fixtures back through.
+
+### Result
+
+`fuzz` 4/4 green. `doc/testing.md`'s Fuzzing section rewritten: the four outcomes, the adapter's
+budget obligation, the reduce-and-freeze procedure (reduce → commit to the corpus that OWNS the
+stage → capture its golden → only then fix), and an honest statement of what is covered today.
+
+### Hoon note
+
+`=/  name  value` needs a **two-space gap** on both sides of the name; `=/ name  value` is a syntax
+error, and the message points at the value rather than at the missing space.
+
+## R1.2.2 — semantic graph + config
+
+### Mutation, not generation
+
+`.0` decided to mutate valid inputs rather than generate from a grammar, and `.2` implements the
+line-level operators: drop a line, duplicate a line, swap two lines, replace a line with random
+token soup — 1 to 3 edits per case, over a base picked at random. Line-level on purpose: a
+character-level edit almost always breaks the parse, and a module that does not parse tells the
+semantic stage nothing.
+
+The bases are three corpus modules and three corpus `.cfg`s, **inlined** in the shard. A test cannot
+scry Clay for `test-data` (the framework passes no `our`/`now`), so embedding is the only option; the
+same constraint every generated shard in this repo works around.
+
+Four adapters: `+fz-sem` (`generate:semantic`), `+fz-cfg` (`+parse-cfg`), and `+fz-runspec-cfg` /
+`+fz-runspec-spec` — the whole config path (`+run-spec-of`: parse, validate against the graph,
+assemble) with one side fixed and the other mutated. Two arms rather than one because the path takes
+*two* inputs, and mutating both at once would almost never produce a pair that validates.
+
+**None of these four can report `%budget`**, and the shard says so: they walk a finite parse tree,
+with no state space to bound and no cap to pass. The adapter's budget obligation binds the stages
+that *iterate*, which are `.3`'s and `.4`'s.
+
+### 700 cases, zero bails — and why that alone would have been a weak result
+
+No crash was found. That is worth having, but on its own it is nearly meaningless: **an arm that
+only asserts "no bails" passes trivially if every mutation is rejected at the parse step and never
+reaches the stage under test.** So the reach was measured rather than assumed, with a `+fz-reach`
+counter over the same seeds:
+
+| arm | reached the stage | rejected earlier |
+|---|---|---|
+| `fz-sem` | 99 / 200 | 101 |
+| `fz-cfg` | 91 / 200 | 91 |
+| `fz-runspec-cfg` | 29 / 150 | 121 |
+| `fz-runspec-spec` | 16 / 150 | 134 |
+
+Half of the mutations reach the semantic graph and the config parser; 11–19 % reach the full
+run-spec path, which is expected — that path needs a module that resolves *and* a config that
+validates against it, so most single edits break the pair.
+
+`test-fuzz-reach-floors` asserts floors of 60 / 60 / 15 / 8 against those exact counts (the seeds are
+fixed, so they are reproducible). The floors sit well below the measurements, so ordinary drift does
+not trip them — but a change that stops mutations reaching a stage, or makes a stage reject
+everything, fails *there* instead of quietly leaving the four arms above passing on nothing.
+
+This is the fuzz form of the hazard R1.8.1.4 recorded for differentials: a filter added to make a
+test pass is a test that has stopped measuring.
+
+### Result
+
+`fuzz` **9/9** green. The shard now takes roughly ten minutes (`test-fuzz-sem-no-crash` alone is
+~120 s), which is worth knowing before adding more runs.
+
+### Hoon note
+
+`(snag i bases)` on a list narrowed by `?~ bases` nest-fails the wet gate with `-have.%~` — the
+zuse-408 hazard this repo keeps hitting. Use `=(0 (lent bases))` for the guard and cast at the call
+site: `(snag bi `(list @t)`bases)`.
+
+## R1.2.3 — temporal normalizer + liveness
+
+### The fixture came first, and it found a second bug
+
+Per the reduce-and-freeze procedure, `.0`'s crash was committed **before** being fixed:
+`test-data/liveness/conj-statepred` (`Live == <>(x = 1 /\ y = 0)`), with its oracle goldens captured
+by `gen-liveness-tests.py` — corpus 16 → 17 cases, `temporal-struct` 16 → 17 arms,
+`liveness-product` 15 → 16.
+
+That ordering paid immediately. Fixing the reported bail turned the arm from a crash into a
+**structural mismatch**, which the R1.6.2 `TBGRAPH` projection then made legible:
+
+```
+expected  TABLEAU 1 / TBINIT 1
+          {[]-<line 6, col 12-25>, -<line 6, col 12-25>, ()[]-<line 6, col 12-25>}
+
+actual    TABLEAU 2 / TBINIT 2
+          {[]\/ (-<col 12-16>) \/ (-<col 21-25>), ...}
+```
+
+tlc2 keeps `x = 1 /\ y = 0` as **one** `LNState` leaf spanning the whole conjunction. The port had
+built a `%conj` of two `%state` leaves, so `pushNeg` applied De Morgan to it and produced a
+two-node tableau where tlc2 builds one. Without the projection this would have been a silent
+structural divergence behind a correct verdict.
+
+### Two fixes, and only one of them is the parity fix
+
+**The normalizer (parity).** `+ast:temporal` built `[%conj …]` / `[%disj …]` unconditionally. tlc2's
+`OPCODE_cl`/`OPCODE_dl` build the junction, check its level, and **discard it for a level-based leaf
+of the original expression when it is at or below action level**. That is the same rule the
+negation, the implication, the if-then-else and the user-operator branch already follow here — the
+junction cases were simply missed. With it, `x = 1 /\ y = 0` is one `%state` leaf and the tableau
+matches.
+
+**`+st-pred-bool` (robustness).** It bailed `%tlc-live-statepred-junction` on `%conj`/`%disj` where
+its sibling `+cs-eval` evaluates them, and `+state-preds-of` can hand it a level-1 junction because
+`le-level` of a `%conj` is the max of its children. tlc2 has no case analysis here at all —
+`TBGraphNode.isConsistent` calls `tool.isValid` on the expression whatever its shape. The junction
+cases are now evaluated.
+
+The normalizer fix alone makes `conj-statepred` pass; the `+st-pred-bool` fix is kept because R1.2
+is a robustness unit and a level-1 junction can reach that arm by other routes. The remaining five
+bails there are above state level, where a particle member cannot be a state predicate, so reaching
+them would be a real invariant violation rather than an input shape — that argument is now in the
+code.
+
+### The first adapter over a stage that iterates
+
+`+fz-check` / `+fz-check-cfg` run the whole checker — normalize, tableau, product, SCC, lasso —
+over a mutated module (cfg fixed) and a mutated cfg (module fixed). These are the first adapters
+where `.1`'s budget obligation actually binds, and it is discharged rather than assumed:
+`check:check` carries `live-graph-cap` itself and renders a cap-hit as `Model checking stopped:
+state limit reached.`, which `+fz-check-lines` maps to `%budget`. Reach is measured by whether the
+output carries a `distinct states found` line — i.e. whether the checker really ran.
+
+Measured: **10 / 40** and **12 / 40**, lower than the `.2` stages because `check:check` needs a
+module that parses, resolves *and* validates against its cfg, with a temporal PROPERTY. Floors of
+5 and 6 added to `test-fuzz-reach-floors`.
+
+### Result
+
+`fuzz` **11/11**; 80 mutated liveness cases, no bails and no budget hits. `temporal`,
+`temporal-struct` (17), `tableau`, `liveness-{product,verdict,lasso,message,accept}`, `mc`,
+`sim-live`, `job`, `spec-decomp`, `trace` and `tier2` all green — the tier-2 liveness batch is still
+9/9, which matters because the normalizer change touches every liveness spec.
+
+### Hoon note
+
+The wet-gate-on-a-narrowed-list hazard bit twice more in one increment: `(snag …)` and `(lien …)`
+both nest-fail with `-have.%~` after a `?~`. Guard with `=(~ x)` and cast at the call site.
+
+## R1.2.4 — the evaluator
+
+### The CST decision: exempt, not delete — and the reason is a differential, not sentiment
+
+`.0` measured that 19 of the 29 `!!` sites are in `lib/eval`'s CST evaluator, reached only from
+`tests/lib/eval`, and re-scoped this increment to a decision. The decision is **keep it**, and the
+argument is about coverage rather than about the assertions:
+
+- `tests/lib/eval` is the **37-case `tlc2.REPL` differential** over *bare expressions*
+  (`1 + 2 * 3`, `10 \div 3`, `"hello"`), evaluated by `+eval-text`.
+- `gen-core-eval-tests`'s 20 cases are arity-0 **definitions inside modules**, evaluated by
+  `lib/node-eval` against `EvalDump`.
+
+They are not the same corpus and the coverage is not duplicated. Deleting the CST driver would mean
+re-authoring 37 expression cases as module fixtures with new goldens — a real loss of oracle
+coverage, traded for removing assertions **no user input can reach**. Not worth it.
+
+What *was* worth doing is the cheap half: **all six unlabelled `!!` are now labelled**
+(`%eval-qbound-no-in`, `%eval-qbound-no-range`, `%eval-no-expr-before-colon`,
+`%eval-empty-expr-before-colon`, `%eval-no-colon`, `%eval-no-expr-after-colon`). An unlabelled bail
+costs a debugging cycle to re-derive even in test-only code — R1.6.0 paid exactly that price on a
+labelled-but-uninformative one. The scope decision and its reasoning are now in the library header,
+so the exemption is discoverable from the code rather than only from this note.
+
+That discharges DoD item 3: **no unlabelled `!!` remains anywhere in port code**, and the
+test-only carve-out is explicit.
+
+### Fuzzing the production evaluator
+
+`lib/node-eval` has **zero** `!!` — its failures are already typed (`eval-err`). So the target here
+is not a bail surface but the solver: does init/next state solving survive mutated input?
+
+There is no smaller text-driven entry than the checker, so `.4` reuses `.3`'s adapters with
+**safety** bases — `INIT`/`NEXT` with an `INVARIANT`, which drives the BFS and therefore
+`+init-states`/`+next-states`, rather than the liveness engine. Two arms, module-mutated and
+cfg-mutated.
+
+Reach measured **5 / 40** and **8 / 40** — the lowest of any stage, because the safety base has a
+five-line body and a single line edit breaks it more often than not. Rather than hide that behind a
+low floor, the module arm now runs **80** cases instead of 40, and the floors (5 and 4) are recorded
+next to the measurement. Thin reach is a finding.
+
+### Result
+
+`fuzz` **13/13**; 120 mutated safety cases, no bails and no budget hits. `eval` (37) and
+`core-eval` (20) unchanged and green — the labelling touched no behavior — and `node-eval` green.
+
+## R1.2.5 — decoding a persisted continuation
+
+### The only surface whose hostile input is a stored noun
+
+`+load-kont:job` is `;;(kont (cue k.c))` — a bare coercion over an atom that survived a restart, a
+state migration, or a disk. It crashes on anything that is not a valid `kont`, and it is meant to:
+what makes that safe is not the arm but its **call sites**, all three of which wrap it in `mule` and
+turn the failure into a typed outcome. `+step` fails the job with
+`restarted: the in-flight state is from an incompatible engine version; resubmit` (the Work Unit 7.7
+migration contract); the two read-routing arms fall through without absorbing the response.
+
+So the arm under test is not `+load-kont` — testing that in isolation would only re-prove that a
+bare `;;` crashes, which the port never invokes unguarded. The adapter drives **`+step`**, the
+production entry, with a corrupted continuation, and asserts the *event* survives.
+
+### Two generators, because garbage is the easy case
+
+- `+gen-atom` — a random 64-bit atom where a jam should be. Cheap, and it covers `cue`'s special
+  handling of 0 and small atoms.
+- `+gen-corrupt` — a **valid** jammed `kont` with one bit flipped, or truncated at a random bit.
+  This is the shape a real disk or a version skew produces, and it is the one that gets *past* the
+  early structural checks in `cue` before failing somewhere deeper.
+
+400 cases, no bails. `job` re-run green.
+
+### The finding is a negative one, and it was verified rather than assumed
+
+Nothing needed fixing. That is worth recording precisely because the surface *looks* dangerous — a
+bare `;;` over persisted data is exactly the shape that is usually a bug — and the guard is three
+call sites away from the arm that appears to be at fault. Reading `+load-kont` alone would suggest a
+hole; only following its callers, or fuzzing the entry, shows the contract is already met.
+
+The two other `;;` sites in the desk are likewise already guarded: `on-load`'s
+`;;(versioned-state q.old-vase)` sits inside a `mule` with a documented "state corrupt, unable to
+migrate" fallback, and the Clay read's `;;(wain nun)` is wrapped with an `unreadable file body`
+rejection.
+
+### Result
+
+`fuzz` **15/15**. The shard is now the slowest in the suite — `test-fuzz-reach-floors` alone is
+~5 minutes, since it re-runs every stage to count reach — which is worth weighing before `.6` adds
+more.
+
+## R1.2.5b — halving the shard
+
+The shard had become the slowest in the suite, and the reason was structural rather than
+algorithmic: **every stage ran twice**. `+fz-run` walked the seeded sequence to collect failures and
+`+fz-reach` walked the *same* sequence again to count how many cases reached the stage — two passes
+for two numbers that come out of one.
+
+`+fz-run` now returns both (`[fails ok]`), `+fz-reach` is gone, and a new `+expect-clean` asserts
+the pair: nothing bailed or hit a cap, **and** the mutations still reached the stage at least
+`floor` times. The per-stage arm and its floor merged with it, so each stage's threshold now sits
+next to the run it describes instead of in a separate arm at the bottom of the file.
+
+**Measured: 15 arms → 14, and the shard went from roughly 12 minutes to 378 s.**
+
+Two details worth keeping:
+
+- Arms where reach is not a meaningful notion pass `0`: the parser accepts almost no random token
+  soup (that is the point of the arm), and the decoding arms have no parse step to be rejected at,
+  so every case reaches `+step` by construction. Writing the `0` explicitly is better than omitting
+  the concept, because it records that the question was asked.
+- `test-fuzz-runner-classifies` now also pins the **count**: the `%ok` stage contributes 1 and the
+  `%rejected` stage contributes 0. That difference is what every reach floor rests on, so the
+  synthetic test asserts it rather than leaving it implicit.
+
+## R1.2.6 — fixture expansion
+
+### The fixtures are a consumer's, not a producer's — so they are used as a VOCABULARY
+
+`vscode-tlaplus/tests/fixtures/parsers/tlc` holds **20 recorded TLC `-tool` output streams**, and
+the Toolbox has the same shape of resource. They cannot be used as a differential directly: they are
+inputs to a *parser* of TLC output, while this port is a *producer* of it. What they can do is
+answer a question nothing else in the repo could — **which tagged messages does a real consumer
+actually see?**
+
+Extracting every `@!@!@STARTMSG <code>:<class>` from the 20 streams gives **38 distinct EC codes**.
+`gen-mp-tests` covered 24 codes, and only 3 of them overlap. **35 of the 38 codes a consumer sees
+were not in the MP differential at all.**
+
+That is a better target list than the one the port had been working from, which was implicitly
+"the codes the port already emits".
+
+### What landed: 20 codes, and why not all 35
+
+| family | codes added |
+|---|---|
+| progress / stats | 2189, 2194, 2199, 2262, 2268, 2269 |
+| SANY lifecycle | 2219, 2220 |
+| coverage | 2202, 2221, 2772, 2773, 2774, 2775 |
+| trace | 2121, 2218, 2264 |
+| errors | 2103, 2212, 3002 |
+
+`gen-mp-tests` 28 → 48 vectors, 112 → **192 cases**, all green.
+
+The other 15 are censused with reasons rather than skipped silently:
+
+- **Seven embed a timestamp.** `TLC_STARTING`, `TLC_FINISHED`, `TLC_INIT_GENERATED1`,
+  `TLC_CHECKING_TEMPORAL_PROPS(_END)`, `TLC_PROGRESS_STATS`, `TLC_COVERAGE_START` all splice
+  `now()` into the message body. A golden captured from `MP.getMessage` would not reproduce on
+  re-capture, so `validate.py`'s byte-reproducibility gate would fail on them. Pinning these needs
+  a projection that elides the timestamp — a change to `MPDump`, not a vector.
+- **Four are conditional on parameter count or content** (`TLC_SUCCESS`, `TLC_BACK_TO_STATE`,
+  `TLC_STATE_PRINT2`, `GENERAL`), so each needs several vectors and branch-faithful Hoon rather
+  than one template.
+- **Two are out of scope** and already excluded by the ledger: `TLC_ENVIRONMENT_JVM_GC` (a JVM
+  concept) and `TLC_MODULE_OVERRIDE_STDOUT` (a user-supplied Java override class).
+- **Two** (`TLC_MODE_MC` with 13 parameters, `TLC_LIVE_IMPLIED_DEBUG`) are shaped for a run
+  configuration the port does not reproduce.
+
+### One correction the fixtures forced
+
+`TLC_STATE_PRINT3` is `"%1%:"` **plus `TLAConstants.STUTTERING`** — an appended constant, not a
+parameter. Reading the template alone gives `3:`; the oracle says `3: Stuttering`. The differential
+caught it on the first run, which is the argument for adding vectors rather than reading templates.
+
+## R1.2.7 — close-out
+
+### The audit found a parity bug, which is the point of auditing rather than asserting
+
+DoD item 2 says every production-reachable `!!` must be **proven unreachable with the argument
+written down, or converted**. Doing that properly means checking each refusal against tlc2's own
+`getLevel()` and `eval()` for the node type — and the first thing that fell out was a divergence:
+
+> `LNNext.getLevel()` returns `ActionLevel` **unconditionally** (`LNNext.java:25`). The port
+> returned the **body's** level.
+
+So a `()P` over a state predicate read as state-level in the port, `+state-preds-of` kept it as a
+tableau state predicate where `TBGraphNode`'s constructor filters it out, and it then hit
+`%tlc-live-statepred-next`. The bail was not guarding an impossible case; it was guarding a case the
+port had created for itself.
+
+Two more conversions came from the same reading:
+
+- **ENABLED is state-level.** `LNStateEnabled extends LNState`, so it survives every `<= 1` filter
+  and tlc2 evaluates it through `tool.enabled`. `+st-pred-bool` and `+cs-eval` refused it. Both now
+  call `+enabled-eval`.
+- **`LNNext.eval` is `body.eval(tool, s2, Empty)`** — the body at the *successor*. `()P` is
+  action-level, so it can be a checkAction entry; `+ca-eval` now evaluates it instead of refusing.
+
+### The final surface: 21 → 16, every one argued in the code
+
+| class | count | argument |
+|---|---|---|
+| unreachable by a level filter | 10 | `+state-preds-of` keeps `le-level <= 1` exactly as `TBGraphNode` does; `+classify` bins checkState at `<= 1` and checkAction at `2`. Above those levels the entry cannot arrive |
+| unreachable by construction | 3 | `+render-value:config` (parseValue produces five shapes), `job`'s unplanned-stage (the plan is built, not supplied), `diagnostics`' unmapped-EC (45 codes mapped as of `.6`) |
+| tlc2 also fails here | 3 | EC 2249 `TLC_LIVE_ENCOUNTERED_ACTIONS`, EC 2214 `TLC_LIVE_WRONG_FORMULA_FORMAT`, EC 2251 `TLC_LIVE_CANNOT_EVAL_FORMULA` |
+
+The third class is the honest one to be careful about. These are **not** assertions the port should
+delete — tlc2 raises a numbered diagnostic and aborts in the same place. The difference is that
+those arms return a bare `?`, so the port has no channel for a typed rejection and bails instead.
+Same input refused, different rendering. Giving them a channel means threading `(each … aerr)`
+through `+consistent-at`, `+cs-bits`, `+ca-bits`, the product build and the SCC search — a
+calling-convention change, costed in `compatibility.md` rather than done.
+
+### Definition of done
+
+1. **Every stage past the parser has a seeded arm** — semantic graph, config parsing, the whole
+   `run-spec` path, the temporal normalizer and liveness engine, the evaluator through the safety
+   search, and the decoding of a persisted continuation. ~1,300 cases per run. ✅
+2. **Every production-reachable `!!` is argued or converted** — 16 sites, each with its reason
+   beside it; 5 were removed by conversion during `.3` and `.7`. ✅
+3. **No unlabelled `!!` in production-reachable code** — the six were all in the test-only CST
+   driver and are labelled anyway; the only remaining bare `!!` in the desk are the TLA+ operator in
+   the lexer and parser tables. ✅
+4. **Non-termination is a recorded failure** — `%budget`, with the adapter obligation documented in
+   three places. ✅
+5. **Every crash found is a committed fixture** — `conj-statepred`, found by `.0` and committed by
+   `.3` before being fixed. ✅
+6. **`doc/testing.md` describes the real coverage** — rewritten at `.1` and again here. ✅
+
+### Gates
+
+Full ship suite `-test /=tla-lus=/tests ~` **`ok=%.y`, 1851 OK, 0 FAILED / 0 CRASHED, 0 build
+errors**; `validate.py` byte-reproducible; `check-parity.py --check` well-formed (72 parity /
+13 approved-difference / 9 partial / 112 terminal, unchanged — R1.2 closes no rows by design).
+
+### What R1.2 actually bought
+
+Two real defects, neither of which any existing differential could see: a liveness bail on an
+ordinary `<>(P /\ Q)` property, and a junction that was normalized one level too eagerly and built
+the wrong tableau. Plus a level divergence found by the close-out audit. And the MP differential
+went from covering the codes the port emits to covering the codes a **consumer** sees — 112 → 192
+cases.

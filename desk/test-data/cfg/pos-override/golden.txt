@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+override Foo <- Bar
+RAW
+CONSTANT
+Foo <- Bar 
+---

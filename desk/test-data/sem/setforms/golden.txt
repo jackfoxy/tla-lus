@@ -1,0 +1,20 @@
+ACCEPT
+MODULE A 1.1-6.4
+  const S arity=0 L0 2.10-2.10
+  const T arity=0 L0 2.13-2.13
+  def A1 arity=0 local=n L0 3.1-3.23
+    apply $SubsetOf opkind=BuiltInKind L0 3.7-3.23
+      bound x L0 3.8-3.8
+        apply S opkind=ConstantDeclKind L0 3.14-3.14
+      apply = opkind=BuiltInKind L0 3.18-3.22
+        apply x opkind=FormalParamKind L0 3.18-3.18
+        apply x opkind=FormalParamKind L0 3.22-3.22
+  def A2 arity=0 local=n L0 4.1-4.19
+    apply $SetOfAll opkind=BuiltInKind L0 4.7-4.19
+      bound x L0 4.12-4.12
+        apply S opkind=ConstantDeclKind L0 4.18-4.18
+      apply x opkind=FormalParamKind L0 4.8-4.8
+  def A3 arity=0 local=n L0 5.1-5.14
+    apply $SetOfFcns opkind=BuiltInKind L0 5.7-5.14
+      apply S opkind=ConstantDeclKind L0 5.8-5.8
+      apply T opkind=ConstantDeclKind L0 5.13-5.13

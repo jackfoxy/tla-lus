@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={P} lc={P<=0,x<=3} alc={(P,0)>=0} alp={(P,0,x)}
+lvl H L0 ml=[3] w=[1] lp={P} alc={(P,0)>=0} alp={(P,0,a)}
+lvl Use L1 lp={P,x} lc={x<=3} alc={(P,0)>=0} alp={(P,0,x)}

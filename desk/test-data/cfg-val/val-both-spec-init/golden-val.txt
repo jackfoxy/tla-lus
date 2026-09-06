@@ -1,0 +1,3 @@
+VALIDATE
+2227 ~
+The configuration file cannot specify both INIT/NEXT and SPECIFICATION fields.

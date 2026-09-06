@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=3,y<=3,y<=3,z<=3,z<=3}
+lvl Foo L0 lc={y<=3,z<=3}
+lvl Bar L0 lc={x<=3,y<=3,z<=3}

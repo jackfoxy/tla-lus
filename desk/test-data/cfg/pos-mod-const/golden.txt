@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+mod-const Other K = 7
+RAW
+CONSTANT
+K = [ Other ] 7 
+---

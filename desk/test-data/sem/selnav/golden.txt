@@ -1,0 +1,58 @@
+ACCEPT
+MODULE A 1.1-14.4
+  def Da arity=0 local=n L0 3.1-3.20
+    apply $Tuple opkind=BuiltInKind L0 3.7-3.20
+      num 10 L0 3.9-3.10
+      num 20 L0 3.13-3.14
+      num 30 L0 3.17-3.18
+  def A arity=0 local=n L0 4.1-4.9
+    apply $Nop opkind=BuiltInKind L0 4.6-4.9
+      num 20 L0 3.13-3.14
+  def Db arity=0 local=n L0 5.1-5.11
+    apply + opkind=UserDefinedOpKind L0 5.7-5.11
+      num 1 L0 5.7-5.7
+      num 5 L0 5.11-5.11
+  def B arity=0 local=n L0 6.1-6.10
+    apply $Nop opkind=BuiltInKind L0 6.6-6.10
+      num 1 L0 5.7-5.7
+  def C arity=0 local=n L0 7.1-7.10
+    apply $Nop opkind=BuiltInKind L0 7.6-7.10
+      num 5 L0 5.11-5.11
+  def Dc arity=0 local=n L0 8.1-8.15
+    apply $SetEnumerate opkind=BuiltInKind L0 8.7-8.15
+      num 1 L0 8.8-8.8
+      num 2 L0 8.11-8.11
+      num 3 L0 8.14-8.14
+  def D arity=0 local=n L0 9.1-9.9
+    apply $Nop opkind=BuiltInKind L0 9.6-9.9
+      num 2 L0 8.11-8.11
+  def Dd arity=0 local=n L0 10.1-10.17
+    apply + opkind=UserDefinedOpKind L0 10.7-10.17
+      num 3 L0 10.7-10.7
+      apply + opkind=UserDefinedOpKind L0 10.12-10.16
+        num 4 L0 10.12-10.12
+        num 7 L0 10.16-10.16
+  def E arity=0 local=n L0 11.1-11.13
+    apply $Nop opkind=BuiltInKind L0 11.6-11.13
+      num 4 L0 10.12-10.12
+  def Df arity=0 local=n L0 12.1-12.32
+    apply $FcnApply opkind=BuiltInKind L0 12.7-12.32
+      apply $FcnConstructor opkind=BuiltInKind L0 12.7-12.29
+        bound i L0 12.8-12.8
+          apply .. opkind=UserDefinedOpKind L0 12.14-12.18
+            num 1 L0 12.14-12.14
+            num 10 L0 12.17-12.18
+        apply + opkind=UserDefinedOpKind L0 12.24-12.28
+          apply i opkind=FormalParamKind L0 12.24-12.24
+          num 1 L0 12.28-12.28
+      num 3 L0 12.31-12.31
+  def G arity=0 local=n L0 13.1-13.10
+    apply $Nop opkind=BuiltInKind L0 13.6-13.10
+      apply $FcnConstructor opkind=BuiltInKind L0 12.7-12.29
+        bound i L0 12.8-12.8
+          apply .. opkind=UserDefinedOpKind L0 12.14-12.18
+            num 1 L0 12.14-12.14
+            num 10 L0 12.17-12.18
+        apply + opkind=UserDefinedOpKind L0 12.24-12.28
+          apply i opkind=FormalParamKind L0 12.24-12.24
+          num 1 L0 12.28-12.28

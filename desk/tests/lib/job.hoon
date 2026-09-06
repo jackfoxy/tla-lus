@@ -1,0 +1,1829 @@
+/-  *tla-lus
+/+  *test
+/=  job-lib  /lib/job
+/=  check     /lib/check
+|%
+  ::  Tests For The Resumable Job Kernel (unit P2-1)
+  ::
+  ::  Every plan invariant the kernel owns is exercised here: typed
+  ::  rejection of unsupported requests, budgeted slicing with a
+  ::  persisted continuation, pause/resume identity at every slice
+  ::  boundary, and limit enforcement at the point of growth.
+  ::
++$  jb  jobstate:job-lib
+::
+++  t0  ~2026.7.16
+::
+++  lim  default-limits:job-lib
+::
+++  bundle
+  |=  [spec=@t cfg=(unit @t)]
+  ^-  source-bundle
+  [%inline 'spec' (malt ~[['spec' spec]]) cfg]
+::
+++  check-req
+  |=  [spec=@t cfg=@t]
+  ^-  request
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~]
+::
+++  sim-req
+  |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
+  ^-  request
+  [[%check [| | | | ~ | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~]
+::
+++  dfid-req
+  ::  `tlc2.TLC -workers 1 -dfid <depth>` (R2.5)
+  |=  [spec=@t cfg=@t depth=@ud]
+  ^-  request
+  [[%check [| | | | ~ | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~]
+::
+++  gen-req
+  ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
+  |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
+  ^-  request
+  [[%check [| | | | ~ | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~]
+::
+++  clay-req
+  ::  a %clay %check request over ~zod/%spec at a pinned revision
+  |=  [root=module-name cfg=(unit path) roots=(list path)]
+  ^-  request
+  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [%clay ~zod %spec ud+1 root cfg roots]
+      lim  ~  ~
+  ==
+::
+++  analyze-req
+  |=  mods=(list [module-name @t])
+  ^-  request
+  =/  root  ?~(mods 'spec' -.i.mods)
+  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~]
+::
+++  analyze-req-f
+  ::  an %analyze request with explicit flags [syntax semantic level lint]
+  |=  [mods=(list [module-name @t]) flags=analyze-flags]
+  ^-  request
+  =/  root  ?~(mods 'spec' -.i.mods)
+  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~]
+::
+++  cyc-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 4
+  ====
+  '''
+::
+++  invfail-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Inv == x < 3
+  ====
+  '''
+::
+++  dead-spec
+  ::  deadlocks at x = 2 (the conjunct filters every successor)
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 2 /\ x' = x + 1
+  Inv == x < 9
+  ====
+  '''
+::
+++  live-spec
+  ::  []P over the 4-cycle; PGood holds everywhere, PBad fails at x = 2
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  PGood == [](x < 4)
+  PBad == [](x < 2)
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+::
+++  mc-cfg    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+++  bare-cfg  'INIT Init\0aNEXT Next\0a'
+::  a spec with a state constraint (exercises the cursor's constraint pruning)
+++  con-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Bound == x =< 4
+  ====
+  '''
+++  con-cfg  'INIT Init\0aNEXT Next\0aCONSTRAINT Bound\0a'
+::  a symmetric spec (exercises the cursor's permutation group; cfg cord is
+::  single-quoted so the model-value set braces are literal)
+++  sym-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, TLC
+  CONSTANT P
+  VARIABLE x
+  Init == \E p \in P : x = p
+  Next == \E p \in P : x' = p
+  Perms == Permutations(P)
+  Inv == TRUE
+  ====
+  '''
+++  sym-cfg  'CONSTANT P = {a, b}\0aSYMMETRY Perms\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::  a helper module imported by the root spec (multi-module MVP acceptance)
+++  helper-mod
+  ^~
+  '''
+  ---- MODULE helper ----
+  EXTENDS Naturals
+  Lim == 4
+  ====
+  '''
+++  multi-spec
+  ::  the root EXTENDS a user helper module (a two-module bundle); the checked
+  ::  predicates are root-local — evaluating an operator imported from another
+  ::  *user* module is a documented unit-6 residue (only own + INSTANCE defs are
+  ::  in the evaluation defmap)
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, helper
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 4
+  ====
+  '''
+::
+++  undef-spec
+  ::  Bar is undefined -> semantic error 4200 (generation phase)
+  ^~
+  '''
+  ---- MODULE spec ----
+  Foo == Bar
+  ====
+  '''
+::
+++  asm-spec
+  ::  a non-constant ASSUME -> level error 4206 (level phase)
+  ^~
+  '''
+  ---- MODULE spec ----
+  VARIABLE x
+  ASSUME x = x
+  ====
+  '''
+::
+++  lint-spec
+  ::  a record field shadowing a definition -> lint warning 4802
+  ^~
+  '''
+  ---- MODULE spec ----
+  bar == 23
+  R == [bar |-> 42]
+  ====
+  '''
+::
+++  analyze-run
+  ::  drive an analyze request to termination, returning whether the
+  ::  verdict failed and the error/warning diagnostics it emitted
+  |=  req=request
+  ^-  [failed=? errs=(list diagnostic) warns=(list diagnostic)]
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  =/  ds  diags.j
+  :+  ?=([~ %failed *] result.j)
+    (skim ds |=(d=diagnostic =(%error severity.d)))
+  (skim ds |=(d=diagnostic =(%warning severity.d)))
+::
+++  run-all
+  ::  step to termination, collecting the full event stream
+  |=  [j=jb budget=@ud]
+  ^-  [(list event) jb]
+  =/  acc=(list event)  ~
+  |-  ^-  [(list event) jb]
+  =/  r  (step:job-lib j budget t0)
+  ?-  -.r
+    %stop   [(weld acc events.r) job.r]
+    %more   $(j job.r, acc (weld acc events.r))
+    %await  ~|(%inline-run-never-awaits !!)
+  ==
+::
+++  run-k
+  ::  k bounded steps, then stop early
+  |=  [j=jb budget=@ud k=@ud]
+  ^-  [(list event) jb]
+  =/  acc=(list event)  ~
+  |-  ^-  [(list event) jb]
+  ?:  =(0 k)  [acc j]
+  =/  r  (step:job-lib j budget t0)
+  ?-  -.r
+    %stop   [(weld acc events.r) job.r]
+    %more   $(j job.r, k (dec k), acc (weld acc events.r))
+    %await  ~|(%inline-run-never-awaits !!)
+  ==
+::
+++  count-steps
+  |=  [j=jb budget=@ud]
+  ^-  @ud
+  =/  n  0
+  |-  ^-  @ud
+  =/  r  (step:job-lib j budget t0)
+  ?-  -.r
+    %stop   +(n)
+    %more   $(j job.r, n +(n))
+    %await  ~|(%inline-run-never-awaits !!)
+  ==
+::
+++  every-boundary
+  ::  interrupting after any slice must never change the event stream
+  ::  or the final job noun (plan invariant 6)
+  |=  [req=request budget=@ud]
+  ^-  tang
+  =/  j0    (init:job-lib req t0)
+  =/  full  (run-all j0 budget)
+  =/  n     (count-steps j0 budget)
+  =/  i  1
+  =|  out=tang
+  |-  ^-  tang
+  ?:  (gte i n)  out
+  =/  pa    (run-k j0 budget i)
+  =/  rest  (run-all +.pa budget)
+  %=  $
+    i    +(i)
+    out  ;:  weld
+           out
+           (expect-eq !>(-.full) !>((weld -.pa -.rest)))
+           (expect-eq !>(+.full) !>(+.rest))
+         ==
+  ==
+::
+::  +|  Validation: Typed Rejections
+::
+::
+++  test-validate-ok
+  (expect-eq !>(~) !>((validate:job-lib (check-req cyc-spec mc-cfg))))
+::
+::  a %clay bundle is accepted (unit 10.1); what it can be rejected for
+::  before any read is its reference shape and the missing config
+++  test-validate-clay
+  ;:  weld
+    %+  expect-eq
+      !>(~)
+    !>((validate:job-lib (clay-req 'spec' `/src/cfg/txt ~[/src])))
+  ::
+    %+  expect-eq
+      !>(`'a %check request requires a config')
+    !>((validate:job-lib (clay-req 'spec' ~ ~[/src])))
+  ::
+    %+  expect-eq
+      !>(`'a %clay bundle needs at least one module-search root')
+    !>((validate:job-lib (clay-req 'spec' `/src/cfg/txt ~)))
+  ::
+    %+  expect-eq
+      !>(`'empty root module name')
+    !>((validate:job-lib (clay-req '' `/src/cfg/txt ~[/src])))
+  ==
+::
+++  test-validate-write-over-source-rejected
+  ::  R2.2: a run must not be able to write over the sources it is checking.
+  ::  `+write-ref` refuses overlap in EITHER direction, so a target under a
+  ::  read root and a read root under the target are both refused.
+  =/  req=request
+    :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+        [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
+        lim
+        `[%base /spec]
+        ~
+    ==
+  %+  expect-eq
+    !>  `'write target /spec overlaps a module-search root; a run may not write over its own sources'
+  !>((validate:job-lib req))
+::
+++  test-validate-write-outside-roots-accepted
+  ::  the same request with a target that shares no prefix with the roots
+  =/  req=request
+    :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+        [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
+        lim
+        `[%base /out]
+        ~
+    ==
+  (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-write-inline-accepted
+  ::  an %inline bundle declares no search roots, so nothing of its own can
+  ::  be written over
+  =/  req=request
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
+  (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-write-bad-desk-rejected
+  =/  req=request
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
+  %+  expect-eq
+    !>(`'invalid desk name \'Bad Desk\'')
+  !>((validate:job-lib req))
+::
+++  test-validate-syntax-off-rejected
+  ::  R2.1: `analyze-flags.syntax` could never mean anything — parsing is
+  ::  mandatory, a parse error is fatal (never suppressible), and a SUCCESSFUL
+  ::  parse emits no diagnostics (`parse-typed` returns `diags=~`). It was
+  ::  accepted and ignored; it is now refused rather than given an invented
+  ::  meaning.
+  %+  expect-eq
+    !>  `'unsupported: syntactic analysis cannot be skipped; every later stage consumes the tree'
+  !>((validate:job-lib (analyze-req-f ~[['spec' cyc-spec]] [| & & &])))
+::
+++  test-validate-syntax-on-accepted
+  (expect-eq !>(~) !>((validate:job-lib (analyze-req-f ~[['spec' cyc-spec]] [& & & &]))))
+::
+++  test-validate-translate-rejected
+  =/  req=request
+    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~]
+  %+  expect-eq
+    !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
+  !>((validate:job-lib req))
+::
+++  test-validate-analyze-accepted
+  ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
+  ::  bundle validates
+  =/  req=request
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~]
+  (expect-eq !>(~) !>((validate:job-lib req)))
+::
+++  test-validate-translate-before-check-rejected
+  =/  req=request
+    [[%check [& | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
+  %+  expect-eq
+    !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
+  !>((validate:job-lib req))
+::
+++  test-validate-check-needs-config
+  =/  req=request
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~]
+  %+  expect-eq
+    !>(`'a %check request requires a config')
+  !>((validate:job-lib req))
+::
+++  test-validate-empty-bundle
+  =/  req=request
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
+  (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
+::
+++  test-validate-missing-root
+  =/  req=request
+    :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+        [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
+        lim  ~  ~
+    ==
+  (expect-eq !>(`'root module not in bundle') !>((validate:job-lib req)))
+::
+++  test-validate-oversized-source
+  =/  req  (check-req cyc-spec mc-cfg)
+  =.  max-source.limits.req  8
+  (expect-eq !>(`'source exceeds limit') !>((validate:job-lib req)))
+::
+++  test-validate-too-many-modules
+  =/  req=request
+    :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+        [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
+        lim  ~  ~
+    ==
+  =.  max-modules.limits.req  1
+  (expect-eq !>(`'too many modules') !>((validate:job-lib req)))
+::
+::  +|  Planning
+::
+::
+++  test-plan-shapes
+  ;:  weld
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %config %explore])
+    !>((plan:job-lib (check-req cyc-spec mc-cfg)))
+  ::
+    =/  live-cfg  'INIT Init\0aNEXT Next\0aPROPERTY PGood\0a'
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %config %explore %liveness])
+    !>((plan:job-lib (check-req live-spec live-cfg)))
+  ::
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %config %simulate])
+    !>((plan:job-lib (sim-req cyc-spec bare-cfg 42 3 8)))
+  ::
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %terminal])
+    !>((plan:job-lib (analyze-req ~[['spec' cyc-spec]])))
+  ::
+    ::  any deeper flag adds the %semantic stage
+    %+  expect-eq
+      !>(`(list stage)`~[%parse %semantic %terminal])
+    !>((plan:job-lib (analyze-req-f ~[['spec' cyc-spec]] [& & & &])))
+  ::
+    ::  a Clay bundle loads its sources first (unit 10.1)
+    %+  expect-eq
+      !>(`(list stage)`~[%modules %parse %config %explore])
+    !>((plan:job-lib (clay-req 'spec' `/src/cfg/txt ~[/src])))
+  ==
+::
+::  +|  Analyze Pipeline (unit 4.8)
+::
+::
+++  test-analyze-clean-ok
+  ::  a well-formed module analyzed at every flag: %ok, no diagnostics
+  =/  r  (analyze-run (analyze-req-f ~[['spec' cyc-spec]] [& & & &]))
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+    (expect-eq !>(~) !>(warns.r))
+  ==
+::
+++  test-analyze-semantic-error
+  ::  an undefined operator fails the run with a 4200 at the %semantic
+  ::  stage; level and lint do not run (SANY gating, via analyze-graph)
+  =/  r  (analyze-run (analyze-req-f ~[['spec' undef-spec]] [& & & &]))
+  =/  es  errs.r
+  ?>  ?=(^ es)
+  ;:  weld
+    (expect !>(failed.r))
+    (expect-eq !>([%sany 4.200]) !>(code.i.es))
+    (expect-eq !>(%semantic) !>(stage.i.es))
+  ==
+::
+++  test-analyze-level-error
+  ::  a non-constant ASSUME fails the run with a 4206 at the %level stage
+  =/  r  (analyze-run (analyze-req-f ~[['spec' asm-spec]] [& & & &]))
+  =/  es  errs.r
+  ?>  ?=(^ es)
+  ;:  weld
+    (expect !>(failed.r))
+    (expect-eq !>([%sany 4.206]) !>(code.i.es))
+    (expect-eq !>(%level) !>(stage.i.es))
+  ==
+::
+++  test-analyze-level-flag-off
+  ::  with the level flag off, the 4206 level error is not emitted and
+  ::  the run is %ok
+  =/  r  (analyze-run (analyze-req-f ~[['spec' asm-spec]] [& & | |]))
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+  ==
+::
+++  test-analyze-lint-warning
+  ::  a record-field collision is a %lint warning: emitted but does not
+  ::  fail the run
+  =/  r  (analyze-run (analyze-req-f ~[['spec' lint-spec]] [& & & &]))
+  =/  ws  warns.r
+  ?>  ?=(^ ws)
+  ;:  weld
+    (expect !>(!failed.r))
+    (expect-eq !>(~) !>(errs.r))
+    (expect-eq !>([%sany 4.802]) !>(code.i.ws))
+    (expect-eq !>(%lint) !>(stage.i.ws))
+  ==
+::
+::  +|  -messagesAsErrors (R2.4.5)
+::
+::  A MATCHED PAIR on the lint warning above: one request, one field different.
+::  tlc2 promotes at the moment `MP.printWarning` runs (`Assert.fail` BEFORE
+::  `recorder.record`), so the promoted diagnostic never lands as a warning and
+::  the run stops there.
+++  promote-req
+  ::  the lint-warning analyze request, with `codes` promoted to errors
+  |=  codes=(set diag-code)
+  ^-  request
+  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes]
+::
+++  test-promote-warning-fails-the-run
+  =/  req  (promote-req (silt ~[`diag-code`[%sany 4.802]]))
+  =/  r  (run-all (init:job-lib req t0) 256)
+  =/  j  +.r
+  =/  as-warn
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%warning severity.d))))
+  =/  as-err
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%error severity.d))))
+  ;:  weld
+    ::  the verdict is %failed, carrying the warning's own message
+    (expect-eq !>(`%failed) !>(?~(result.j ~ `-.u.result.j)))
+    ::  and 4802 is recorded as an ERROR, never as a warning: in tlc2 the
+    ::  promoted code never reaches `recorder.record` as a warning at all
+    (expect-eq !>([| &]) !>([as-warn as-err]))
+  ==
+::
+++  test-promote-off-keeps-the-warning
+  ::  the matched half: the same request with an empty set completes, and the
+  ::  4802 diagnostic is still a WARNING
+  =/  r  (run-all (init:job-lib (promote-req ~) t0) 256)
+  =/  j  +.r
+  =/  as-warn
+    (lien diags.j |=(d=diagnostic &(=([%sany 4.802] code.d) =(%warning severity.d))))
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>(&) !>(as-warn))
+  ==
+::
+++  test-promote-unrelated-code-is-inert
+  ::  a code the run never emits changes nothing, exactly as tlc2 does with
+  ::  `-messagesAsErrors 2143` on a spec that never triggers 2143
+  =/  r  (run-all (init:job-lib (promote-req (silt ~[`diag-code`[%tlc 2.143]])) t0) 256)
+  =/  j  +.r
+  (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+::
+++  test-promote-error-code-is-inert
+  ::  promoting a code that is emitted as an ERROR is inert too, and that is
+  ::  tlc2's rule and not a port choice: `isTlcMessageAsError` is consulted in
+  ::  `MP.printWarning` and nowhere else. Measured, `-messagesAsErrors 2110`
+  ::  (an error) leaves a run byte-identical
+  =/  base  (check-req invfail-spec mc-cfg)
+  =/  req  base(promote (silt ~[`diag-code`[%tlc 2.110]]))
+  =/  r  (run-all (init:job-lib req t0) 256)
+  =/  j  +.r
+  (expect-eq !>(`%violated) !>(?~(result.j ~ `-.u.result.j)))
+::
+++  test-analyze-lint-flag-off
+  ::  with the lint flag off, no 4802 warning is emitted
+  =/  r  (analyze-run (analyze-req-f ~[['spec' lint-spec]] [& & & |]))
+  (expect-eq !>(~) !>(warns.r))
+::
+++  test-analyze-budget-independent
+  ::  the analyze pipeline is pause/resume identical at every slice
+  ;:  weld
+    (every-boundary (analyze-req-f ~[['spec' cyc-spec]] [& & & &]) 1)
+    (every-boundary (analyze-req-f ~[['spec' lint-spec]] [& & & &]) 1)
+    (every-boundary (analyze-req-f ~[['spec' undef-spec]] [& & & &]) 1)
+  ==
+::
+::  +|  Safety Checking Through The Kernel
+::
+::
+++  test-check-ok
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+    (expect-eq !>(%terminal) !>(stage.j))
+    (expect-eq !>([3 3]) !>(progress.j))
+    (expect-eq !>([%stage %parse]) !>((snag 0 evs)))
+    (expect-eq !>([%result %ok 5 4 0 4 [0 1 1 1]]) !>((rear evs)))
+    (expect !>((~(has by artifacts.j) %report)))
+    (expect !>(!(~(has by artifacts.j) %trace)))
+    (expect-eq !>(~) !>(cont.j))
+  ==
+::
+++  test-check-budget-independent
+  ::  the final job is identical whatever the per-event budget
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  a  (run-all j0 256)
+  =/  b  (run-all j0 1)
+  ;:  weld
+    (expect-eq !>(+.a) !>(+.b))
+    ::  budget 1 slices the search across many more events
+    (expect !>((gth (count-steps j0 1) (count-steps j0 256))))
+  ==
+::
+++  test-check-violation
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%violated [%invariant 'Inv' %.n] [4 4 0 4 [1 1 1 1]]]) !>(result.j))
+    (expect !>((~(has by artifacts.j) %report)))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+++  test-check-trace-artifact
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 256)
+  =/  art  (~(got by artifacts.j) %trace)
+  ?>  ?=(%trace -.art)
+  =/  tr  trace.art
+  ;:  weld
+    (expect-eq !>(%safety) !>(kind.tr))
+    (expect-eq !>(4) !>((lent states.tr)))
+    (expect-eq !>(~) !>(loop-start.tr))
+    (expect-eq !>([1 ~ ~[['x' '0']]]) !>((snag 0 states.tr)))
+    =/  s2  (snag 1 states.tr)
+    (expect-eq !>(`'Next') !>(?~(action.s2 ~ `name.u.action.s2)))
+  ==
+::
+++  test-check-deadlock
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req dead-spec mc-cfg) t0) 256)
+  (expect-eq !>(`[%violated [%deadlock ~] [3 3 0 3 [0 1 1 1]]]) !>(result.j))
+::
+++  test-check-deadlock-disabled
+  =/  req=request
+    [[%check [| | | | ~ | ~ [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~]
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
+::
+++  test-pause-resume-every-boundary-safety
+  (every-boundary (check-req cyc-spec mc-cfg) 1)
+::  the extended BFS cursor (Work Unit 7: state/action constraints, symmetry
+::  group, out-degree) must resume byte-identically at every slice boundary
+++  test-pause-resume-every-boundary-constraint
+  (every-boundary (check-req con-spec con-cfg) 1)
+++  test-pause-resume-every-boundary-symmetry
+  (every-boundary (check-req sym-spec sym-cfg) 1)
+::  MVP acceptance: a multi-module inline %check (the root spec EXTENDS a user
+::  helper module) is parsed, resolved, and generated as a two-module bundle and
+::  runs end to end to a safety verdict matching tlc2.TLC
+++  test-multi-module-check
+  =/  req=request
+    :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+        [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
+        lim  ~  ~
+    ==
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  a search whose persisted cursor is under the noun-size bound completes
+::  normally (the limit is a defense-in-depth ceiling above max-states)
+++  test-noun-size-under-limit
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 1)
+  (expect-eq !>(%.y) !>(?=([%ok *] (need result.j))))
+::
+::  +|  Limits At The Point Of Growth
+::
+::
+++  test-limited-states
+  =/  req  (check-req cyc-spec mc-cfg)
+  =.  max-states.limits.req  2
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    (expect-eq !>(`%limited) !>(?~(result.j ~ `-.u.result.j)))
+    %+  expect-eq
+      !>(`%states)
+    !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
+  ==
+::
+++  test-limited-depth
+  =/  req  (check-req invfail-spec bare-cfg)
+  =.  max-depth.limits.req  2
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq
+    !>(`%depth)
+  !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
+::
+++  test-limited-time
+  ::  max-time is checked on entry to every slice
+  =/  j  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  r  (step:job-lib j 256 (add t0 ~m11))
+  ?>  ?=(%stop -.r)
+  ;:  weld
+    (expect-eq !>(%stop) !>(-.r))
+    (expect-eq !>(`[%limited %time *run-stats]) !>(result.job.r))
+  ==
+::
+++  test-limited-time-simulation-partial-stats
+  ::  a simulation interrupted by max-time reports the PARTIAL statistics
+  ::  accumulated so far (states generated > 0), not empty stats (unit 9.5).
+  ::  A big run + a small budget guarantees the sim is mid-flight after k slices.
+  =/  j0  (init:job-lib (sim-req cyc-spec bare-cfg 42 20 30) t0)
+  =/  jp  +:(run-k j0 4 12)
+  =/  r   (step:job-lib jp 4 (add t0 ~m11))
+  ?>  ?=(%stop -.r)
+  ?>  ?=(^ result.job.r)
+  ?>  ?=(%limited -.u.result.job.r)
+  ;:  weld
+    (expect-eq !>(%time) !>(kind.u.result.job.r))
+    (expect !>((gth generated.stats.job.r 0)))
+  ==
+::
+++  test-limited-artifact
+  =/  req  (check-req cyc-spec mc-cfg)
+  =.  max-artifact.limits.req  4
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%limited %artifact [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+    (expect-eq !>(~) !>(artifacts.j))
+  ==
+::  the state cap applies to a temporal (~>) run's graph build too, so the
+::  8.2-8.6 %check path is reached only within the limit (unit 8.8.3)
+++  test-limited-liveness-states
+  =/  req  (check-req live-spec lead-cfg)
+  =.  max-states.limits.req  2
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq
+    !>(`%states)
+  !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
+::
+::  +|  Config Honesty
+::
+::
+::  a malformed CONSTANT line (bare `CONSTANT N`, no `=`/`<-`) is the
+::  real ModelConfig CFG_EXPECTED_SYMBOL (5006), not a made-up rejection
+++  test-config-constant-no-value
+  =/  cfg  'INIT Init\0aNEXT Next\0aCONSTANT N\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
+  %+  expect-eq
+    !>  `[%failed 'TLC found an error in the configuration file at line 3\0aIt was expecting = or <-, but did not find it.']
+  !>  result.j
+::
+::  a repeated INVARIANT is valid in TLC (a list key accumulates), so the
+::  run proceeds; the engine checks the first invariant -> %ok on cyc
+++  test-config-repeated-invariant
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aINVARIANT Inv\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  no INIT and no SPECIFICATION with state variables -> TLC_CONFIG 2231
+++  test-config-missing-init
+  =/  cfg  'NEXT Next\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
+  %+  expect-eq
+    !>  `[%failed 'The configuration file did not specify the initial state predicate.']
+  !>  result.j
+::
+::  an invariant not defined in the spec -> TLC_CONFIG 2229 (validation
+::  against the WU3 graph, replacing the old CST body-lookup message)
+++  test-config-unknown-invariant
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Nope\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec cfg) t0) 256)
+  %+  expect-eq
+    !>  `[%failed 'The invariant Nope specified in the configuration file\0ais not defined in the specification.']
+  !>  result.j
+::
+++  test-parse-error-fails
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req 'not a module' mc-cfg) t0) 256)
+  ;:  weld
+    (expect-eq !>(`%failed) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>(1) !>((lent diags.j)))
+  ==
+::
+::  +|  Liveness Through The Kernel
+::
+::
+++  live-good-cfg  'INIT Init\0aNEXT Next\0aPROPERTY PGood\0a'
+++  live-bad-cfg   'INIT Init\0aNEXT Next\0aPROPERTY PBad\0a'
+++  lead-cfg       'INIT Init\0aNEXT Next\0aPROPERTY Lead\0a'
+::
+::  a pure []P property is a state invariant: TLC (and now the port, unit 8.9)
+::  checks it via the safety search, not the temporal engine. PGood holds
+::  everywhere -> %ok; PBad ([](x<2)) fails at x=2 -> an invariant violation with
+::  a safety trace. Box-state runs %parse/%config/%explore (3 stages, no %liveness).
+++  test-live-ok
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req live-spec live-good-cfg) t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+    (expect-eq !>([3 3]) !>(progress.j))
+  ==
+::
+++  test-live-violation
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req live-spec live-bad-cfg) t0) 256)
+  =/  art  (~(got by artifacts.j) %trace)
+  ?>  ?=(%trace -.art)
+  ;:  weld
+    (expect-eq !>(`[%violated [%invariant 'PBad' %.n] [3 3 0 3 [1 1 1 1]]]) !>(result.j))
+    (expect-eq !>(%safety) !>(kind.trace.art))
+  ==
+::
+++  test-live-leadsto
+  ::  a leads-to property (unit 8.8.1): (x=0) ~> (x=1) is now handled by the
+  ::  8.2–8.6 engine (was an "unsupported form" reject under the first-increment
+  ::  recognizer). With no fairness TLC permits stuttering at x=0, so it never
+  ::  reaches x=1 — the property is violated.
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req live-spec lead-cfg) t0) 256)
+  %+  expect-eq
+    !>(`[%violated [%property 'Lead' %.n] [5 4 0 4 [0 1 1 1]]])
+  !>(result.j)
+::
+++  test-pause-resume-every-boundary-liveness
+  (every-boundary (check-req live-spec live-bad-cfg) 1)
+::  the sliced 8.2-8.6 %check path (unit 8.8.2a): the leads-to property runs the
+::  tableau/product build a slice at a time, so budget 1 pauses at every
+::  product-step boundary — the verdict, lasso, and job noun must be identical
+++  test-pause-resume-every-boundary-leadsto
+  (every-boundary (check-req live-spec lead-cfg) 1)
+::
+::  +|  Simulation Through The Kernel
+::
+::
+++  test-sim-ok-deterministic
+  =/  req  (sim-req cyc-spec bare-cfg 42 3 8)
+  =/  [evs-a=(list event) ja=jb]  (run-all (init:job-lib req t0) 256)
+  =/  [evs-b=(list event) jz=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    (expect-eq !>(ja) !>(jz))
+    (expect-eq !>(`%ok) !>(?~(result.ja ~ `-.u.result.ja)))
+  ==
+::
+++  test-sim-finds-violation
+  =/  req  (sim-req invfail-spec mc-cfg 1 1 10)
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    %+  expect-eq
+      !>(`[%invariant 'Inv' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+::  +|  DFID Through The Kernel (R2.5)
+::
+::  Every expectation here is `tlc2.TLC -workers 1 -dfid N` at the pin. The
+::  COUNTS are compared, not the trace: the DFS order is drawn from a
+::  clock-seeded generator `-seed` does not reach, so two runs of the same jar
+::  can report different counterexamples while agreeing on every number.
+::
+::  +|  EC 2107 / 2110 On The Wire (R2.7.1)
+::
+::  The two used to arrive as the same `[%invariant name]`. These arms are the
+::  point of the split: same operator, same name, different `initial`.
+::
+++  test-invariant-violated-by-behavior
+  ::  EC 2110: found by a behavior, so the result carries a counterexample and
+  ::  the full state-graph statistics
+  =/  r  (run-all (init:job-lib (check-req invfail-spec mc-cfg) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`violation`[%invariant 'Inv' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) violation.u.result.j *violation))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+++  test-invariant-violated-by-initial-state
+  ::  EC 2107: `Inv == x > 0` is false at `x = 0`, so tlc2 reports it while
+  ::  COMPUTING the initial states — no behavior, and no statistics
+  =/  spec
+    '''
+    ---- MODULE spec ----
+    EXTENDS Naturals
+    VARIABLE x
+    Init == x = 0
+    Next == x' = x + 1
+    Inv == x > 0
+    ====
+    '''
+  =/  r  (run-all (init:job-lib (check-req spec mc-cfg) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>(`violation`[%invariant 'Inv' %.y])
+  !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) violation.u.result.j *violation))
+::
+::  R2.7.15c: an IMPLIED INIT on the KERNEL. The kernel used to compute the
+::  bin and drop it, so this spec completed `%ok` where the console reported
+::  EC 2108. `finish-arts` prepends `swarn` to the report, and the EC 2255
+::  state-level warning rides that channel, so the artifact is the console's
+::  output byte for byte -- the same discipline
+::  `test-dfid-kernel-report-matches-console` applies to DFID
+++  imp-init-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x \in {0, 3}
+  Next == x' = x
+  Spec == Init /\ [][Next]_x
+  ImpInit == x = 0
+  ====
+  '''
+++  imp-init-cfg  'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
+::
+++  test-implied-init-kernel
+  =/  r  (run-all (init:job-lib (check-req imp-init-spec imp-init-cfg) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    ::  no state-graph statistics: the run aborts while computing the initial
+    ::  states, and tlc2 prints none
+    %+  expect-eq
+      !>(`[%violated [%property 'ImpInit' %.y] *run-stats])
+    !>(result.j)
+    ::  the offending initial state, as the wire trace
+    %+  expect-eq  !>(1)
+    !>  ^-  @ud
+    =/  ta  (~(get by artifacts.j) %trace)
+    ?.  ?&(?=(^ ta) ?=(%trace -.u.ta))  0
+    ?.  ?=(%safety -.trace.u.ta)  0
+    (lent states.trace.u.ta)
+  ==
+::
+++  test-implied-init-kernel-report-matches-console
+  =/  r  (run-all (init:job-lib (check-req imp-init-spec imp-init-cfg) t0) 1.024)
+  =/  j  +.r
+  =/  ra  (~(get by artifacts.j) %report)
+  %+  expect-eq
+    !>(`@t`(rap 3 (join '\0a' (check:check imp-init-spec imp-init-cfg))))
+  !>(?:(?&(?=(^ ra) ?=(%text -.u.ra)) text.u.ra ''))
+::
+++  test-dfid-plan
+  %+  expect-eq
+    !>(`(list stage)`~[%parse %config %dfid])
+  !>((plan:job-lib (dfid-req cyc-spec bare-cfg 10)))
+::
+++  test-dfid-ok
+  ::  `-dfid 10` on the 4-cycle: the graph is exhausted inside the bound, so
+  ::  the completion line prints and the run is %ok at 11/4
+  =/  r  (run-all (init:job-lib (dfid-req cyc-spec bare-cfg 10) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>([11 4]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-bound-is-limited-not-ok
+  ::  `-dfid 2` stops AT the bound. tlc2 prints no completion line there, so
+  ::  reporting %ok would claim a search it did not perform
+  =/  r  (run-all (init:job-lib (dfid-req cyc-spec bare-cfg 2) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%limited %depth])
+    !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `[%limited kind.u.result.j] ~))
+    (expect-eq !>([2 2]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-finds-violation
+  ::  7 generated / 4 distinct, and the counts are the run's FINAL ones: the
+  ::  worker keeps walking after `setErrState` because its DFS loop never tests
+  ::  `stopCode`, so stopping at the violation would report fewer
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%invariant 'Inv' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect-eq !>([7 4]) !>([generated.stats.j distinct.stats.j]))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+++  test-dfid-trace-has-no-action-labels
+  ::  DFID's printers carry no action attribution -- `printInvariantTrace`
+  ::  prints the ordinal and nothing else -- so no trace state names one
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  =/  ta  (~(get by artifacts.j) %trace)
+  %+  expect-eq  !>(&)
+  !>  ^-  ?
+  ?.  ?&(?=(^ ta) ?=(%trace -.u.ta))  |
+  ?.  ?=(%safety -.trace.u.ta)  |
+  (levy states.trace.u.ta |=(ts=trace-state ?=(~ action.ts)))
+::
+++  test-dfid-deadlock
+  =/  r  (run-all (init:job-lib (dfid-req dead-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>(`[%deadlock ~])
+  !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+::
+++  test-dfid-box-state-property-runs
+  ::  `[]P` over a state-level P is appended to the config's INVARIANT vector
+  ::  by `processConfigProps`, so DFID checks it like any invariant and does
+  ::  NOT refuse -- measured at the pin, PBad reports at 4/3
+  =/  r  (run-all (init:job-lib (dfid-req live-spec live-bad-cfg 6) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    %+  expect-eq
+      !>(`[%invariant 'PBad' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect-eq !>([4 3]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-box-state-property-holds
+  =/  r  (run-all (init:job-lib (dfid-req live-spec live-good-cfg 6) t0) 1.024)
+  =/  j  +.r
+  ;:  weld
+    (expect-eq !>(`%ok) !>(?~(result.j ~ `-.u.result.j)))
+    (expect-eq !>([11 4]) !>([generated.stats.j distinct.stats.j]))
+  ==
+::
+++  test-dfid-refuses-genuine-liveness
+  ::  `DFIDModelChecker.java:67`, verbatim including the DOUBLE space before
+  ::  `Please`. It keys on a genuine temporal property, which is why the two
+  ::  box-state cases above run instead of hitting this
+  =/  r  (run-all (init:job-lib (dfid-req live-spec lead-cfg 6) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  :-  ~
+    :-  %failed
+    %^  cat  3
+      'Depth-First Iterative Deepening mode does not support checking liveness '
+    %^  cat  3
+      'properties (https://github.com/tlaplus/tlaplus/issues/548).  Please check '
+    'liveness properties in Breadth-First-Search mode.'
+  !>(result.j)
+::
+++  test-dfid-refuses-continue
+  ::  `-continue` under DFID is a tlc2 capability this engine has not built,
+  ::  so it is refused BY NAME rather than accepted and ignored (R2.1)
+  %+  expect-eq
+    !>  `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
+  !>  %-  validate:job-lib
+  [[%check [| | | & ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+::
+++  test-dfid-refuses-difftrace
+  ::  measured at the pin, `-difftrace` changes nothing outside `-simulate`
+  %+  expect-eq
+    !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
+  !>  %-  validate:job-lib
+  [[%check [| | & | ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+::
+++  test-dfid-kernel-report-matches-console
+  ::  the kernel's `%report` artifact is the CONSOLE renderer's output, so the
+  ::  22-case `tests/lib/dfid` differential covers this path too. Both go
+  ::  through `+render-dfid-outcome`; this arm is what keeps them from drifting
+  =/  r  (run-all (init:job-lib (dfid-req invfail-spec mc-cfg 10) t0) 1.024)
+  =/  j  +.r
+  =/  ra  (~(get by artifacts.j) %report)
+  %+  expect-eq
+    !>  ^-  @t
+    %+  rap  3
+    %+  join  '\0a'
+    (dfid-check:check invfail-spec mc-cfg 10)
+  !>(?:(?&(?=(^ ra) ?=(%text -.u.ra)) text.u.ra ''))
+::
+++  test-pause-resume-every-boundary-dfid
+  ::  the DFID cursor is resumable like every other: interrupting after any
+  ::  slice changes neither the event stream nor the final job noun
+  (every-boundary (dfid-req cyc-spec bare-cfg 6) 1)
+::
+::  +|  -generate (R2.4.6)
+::
+::  A MATCHED PAIR: one bundle, one seed, one field different. The nondeterminism
+::  sits BELOW the action-decomposition boundary, which is the only place
+::  `Tool.probabilistic` is observable -- a top-level `\/` or `\E` is consumed by
+::  `Tool.getActions` and the two modes are byte-identical there.
+++  gen-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x, y
+  Init == x = 0 /\ y = 0
+  Next == /\ y' = y + 1
+          /\ \E n \in 1..5 : x' = (x + n) % 100
+  Inv == x < 30
+  ====
+  '''
+++  gen-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::  `tlc2.TLC -simulate num=1 -workers 1 -seed 1 -depth 20`: 43 states generated,
+::  because the exhaustive walk takes every successor of the chosen action
+++  test-gen-off-matches-tlc
+  =/  r  (run-all (init:job-lib (sim-req gen-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  [`[%invariant 'Inv' %.n] `43]
+  !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
+      ?~(result.j ~ `generated.stats.j)
+::  the same run with `-generate`: 13, because the probabilistic walk returns at
+::  the FIRST successor the functor accepts instead of taking all five. Same
+::  verdict KIND, different arithmetic -- so the field reaches the engine rather
+::  than being read and ignored
+++  test-gen-on-matches-tlc
+  =/  r  (run-all (init:job-lib (gen-req gen-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  [`[%invariant 'Inv' %.n] `13]
+  !>  :-  ?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~)
+      ?~(result.j ~ `generated.stats.j)
+::  a CASE below the decomposition boundary. tlc2 ABORTS there -- exit 255, no
+::  model checking at all -- so the port fails the run rather than dropping the
+::  action and reporting a completed simulation over whatever actions remain
+++  gen-case-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x, y
+  Init == x = 0 /\ y = 0
+  Next == /\ y' = y + 1
+          /\ CASE x < 5 -> x' = x + 1
+               [] OTHER -> x' = 0
+  Inv == y < 8
+  ====
+  '''
+++  test-gen-case-refused
+  =/  r  (run-all (init:job-lib (gen-req gen-case-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  `%failed
+  !>  ?~(result.j ~ `-.u.result.j)
+::  the SAME spec under plain `-simulate` runs to a verdict, which is what makes
+::  the refusal a property of the probabilistic engine and not of the spec
+++  test-gen-case-runs-without-generate
+  =/  r  (run-all (init:job-lib (sim-req gen-case-spec gen-cfg 1 1 20) t0) 1.024)
+  =/  j  +.r
+  %+  expect-eq
+    !>  `%violated
+  !>  ?~(result.j ~ `-.u.result.j)
+::
+++  test-pause-resume-every-boundary-simulate
+  ::  the saved RNG sample must make slicing invisible
+  (every-boundary (sim-req cyc-spec bare-cfg 42 3 8) 1)
+::
+++  live-viol-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  A == x' = 1 - x
+  B == x' = x
+  Next == A \/ B
+  Live == <>[](x = 1)
+  ====
+  '''
+++  live-prop-cfg  'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
+::  a temporal PROPERTY is checked per behavior during simulation (9.3a); the
+::  %sim kont round-trips the normalized `oss` across the config->sim events
+++  test-sim-finds-property
+  =/  req  (sim-req live-viol-spec live-prop-cfg 1 3 8)
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    %+  expect-eq
+      !>(`[%property 'Live' %.n])
+    !>(?:(?&(?=(^ result.j) ?=(%violated -.u.result.j)) `violation.u.result.j ~))
+    (expect !>((~(has by artifacts.j) %trace)))
+  ==
+::
+::  +|  Analyze Through The Kernel
+::
+::
+++  test-analyze-ok
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (analyze-req ~[['spec' cyc-spec]]) t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok *run-stats]) !>(result.j))
+    (expect-eq !>(~) !>(diags.j))
+  ==
+::
+++  test-analyze-parse-error
+  =/  req
+    (analyze-req ~[['spec' cyc-spec] ['bad' 'not a module']])
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%failed 'analysis found 1 error(s)']) !>(result.j))
+    (expect-eq !>(1) !>((lent diags.j)))
+  ==
+::
+++  test-analyze-sliced
+  ::  one module parsed per work unit; budget 1 forces one per event
+  =/  req
+    %-  analyze-req
+    ~[['a' cyc-spec] ['b' cyc-spec] ['c' cyc-spec]]
+  =/  j0  (init:job-lib req t0)
+  ;:  weld
+    (expect !>((gth (count-steps j0 1) (count-steps j0 256))))
+    (expect-eq !>(+:(run-all j0 1)) !>(+:(run-all j0 256)))
+  ==
+::
+++  test-pause-resume-every-boundary-analyze
+  %+  every-boundary
+    (analyze-req ~[['a' cyc-spec] ['b' cyc-spec] ['c' cyc-spec]])
+  1
+::
+::  +|  Terminal Behavior
+::
+::
+++  test-terminal-step-idempotent
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req cyc-spec mc-cfg) t0) 256)
+  =/  r  (step:job-lib j 256 t0)
+  ?>  ?=(%stop -.r)
+  ;:  weld
+    (expect-eq !>(%stop) !>(-.r))
+    (expect-eq !>(~) !>(events.r))
+    (expect-eq !>(j) !>(job.r))
+  ==
+::
+++  test-project-hides-cursor
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  mid  +:(run-k j0 1 2)
+  =/  pub  (project:job-lib mid)
+  ;:  weld
+    (expect-eq !>(request.mid) !>(request.pub))
+    (expect-eq !>(stage.mid) !>(stage.pub))
+    (expect-eq !>(progress.mid) !>(progress.pub))
+  ==
+::
+::  +|  Agent-Wide Quotas And Retention (unit 10.4)
+::
+::  Every figure is derived from the jobs map, so a deleted job frees its
+::  quota by construction and the accounting cannot drift from the store.
+::
+++  small-quota
+  ^-  gquota:job-lib
+  [max-jobs=2 max-retained=400 max-inflight=1.000]
+::
+++  active-job
+  |=  start=@da
+  ^-  jb
+  (init:job-lib (check-req cyc-spec mc-cfg) start)
+::
+++  done-job
+  ::  a terminal job holding `n` bytes of report artifact
+  |=  [start=@da n=@ud]
+  ^-  jb
+  =/  j  (active-job start)
+  =.  result.j     `[%ok *run-stats]
+  =.  stage.j      %terminal
+  =.  artifacts.j  (~(put by artifacts.j) %report [%text (fil 3 n 'x')])
+  j
+::
+++  jmap
+  |=  l=(list [req-id jb])
+  ^-  (map req-id jb)
+  (malt l)
+::
+++  test-quota-active-jobs
+  ::  a job past the concurrency bound is refused, naming the bound;
+  ::  terminal jobs do not count against it
+  =/  js  (jmap ~[[~.a (active-job t0)] [~.b (active-job t0)]])
+  =/  fin  (jmap ~[[~.a (done-job t0 0)] [~.b (done-job t0 0)]])
+  ;:  weld
+    (expect-eq !>(2) !>((active-count:job-lib js)))
+    (expect-eq !>(0) !>((active-count:job-lib fin)))
+    %+  expect-eq
+      !>(`'global limit: too many active jobs')
+    !>((quota-reject:job-lib js small-quota (check-req cyc-spec mc-cfg)))
+    %+  expect-eq
+      !>(~)
+    !>((quota-reject:job-lib fin small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-quota-retained-bytes
+  ::  a full artifact store refuses new work rather than growing
+  =/  js  (jmap ~[[~.a (done-job t0 500)]])
+  ;:  weld
+    (expect !>((gth (retained-bytes:job-lib js) 400)))
+    %+  expect-eq
+      !>(`'global limit: retained artifact bytes; delete a result first')
+    !>((quota-reject:job-lib js small-quota (check-req cyc-spec mc-cfg)))
+    ::  deleting the job frees the quota, with no counter to update
+    %+  expect-eq
+      !>(~)
+    !>((quota-reject:job-lib (~(del by js) ~.a) small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-quota-inflight-source
+  ::  an active job holds source bytes: an inline bundle exactly what it
+  ::  carries, a Clay job the most it is allowed to read (it has not read
+  ::  anything yet). A terminal job holds none
+  =/  cr  (clay-req 'spec' `/src/cfg/txt ~[/src])
+  =.  max-source.limits.cr  1.000
+  =/  clay-js  (jmap ~[[~.a (init:job-lib cr t0)]])
+  =/  inline-js  (jmap ~[[~.a (active-job t0)]])
+  =/  bundle-bytes  (source-charge:job-lib (check-req cyc-spec mc-cfg))
+  ;:  weld
+    (expect-eq !>(1.000) !>((inflight-source:job-lib clay-js)))
+    (expect-eq !>(bundle-bytes) !>((inflight-source:job-lib inline-js)))
+    (expect-eq !>(0) !>((inflight-source:job-lib (jmap ~[[~.a (done-job t0 0)]]))))
+    %+  expect-eq
+      !>(`'global limit: in-flight source bytes')
+    !>((quota-reject:job-lib clay-js small-quota (check-req cyc-spec mc-cfg)))
+  ==
+::
+++  test-reclaim-oldest-first
+  ::  over the bound, the oldest terminal job gives up its artifacts and
+  ::  says so; the result and statistics stay
+  =/  js
+    %-  jmap
+    :~  [~.old (done-job t0 300)]
+        [~.new (done-job (add t0 ~h1) 300)]
+    ==
+  =/  out  (reclaim:job-lib js 400)
+  =/  old  (~(got by out) ~.old)
+  =/  new  (~(got by out) ~.new)
+  ;:  weld
+    (expect-eq !>(~) !>(artifacts.old))
+    (expect !>((~(has by artifacts.new) %report)))
+    (expect-eq !>(`[%ok *run-stats]) !>(result.old))
+    (expect-eq !>(`[%lus 403]) !>(?~(diags.old ~ `code.i.diags.old)))
+    (expect-eq !>(`%warning) !>(?~(diags.old ~ `severity.i.diags.old)))
+  ==
+::
+++  test-reclaim-spares-active-jobs
+  ::  an in-flight job's artifacts are never reclaimed under it
+  =/  live  (active-job t0)
+  =.  artifacts.live  (~(put by artifacts.live) %report [%text (fil 3 500 'x')])
+  =/  out  (reclaim:job-lib (jmap ~[[~.a live]]) 100)
+  ;:  weld
+    (expect !>((~(has by artifacts:(~(got by out) ~.a)) %report)))
+    (expect-eq !>(~) !>(diags:(~(got by out) ~.a)))
+  ==
+::
+++  test-reclaim-under-bound-is-identity
+  =/  js  (jmap ~[[~.a (done-job t0 10)]])
+  (expect-eq !>(js) !>((reclaim:job-lib js 400)))
+::
+++  test-noun-bound
+  ::  the in-flight noun bound the search and load cursors share
+  =/  small  (save-kont:job-lib [%parse ~['a'] ~])
+  ;:  weld
+    (expect-eq !>(%.n) !>((noun-over:job-lib ~ 10)))
+    (expect-eq !>(%.n) !>((noun-over:job-lib small 1.000)))
+    (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
+  ==
+
+::
+::  +|  Kernel Report == Console Report (R1.8.3)
+::
+::  The job kernel's sliced %liveness path and `check:check` used to render
+::  DIFFERENT reports for the same spec: the kernel passed `~` for the EC
+::  2257/2259 stuttering gate (its continuation carried no SPEC name, span or
+::  fairness) and `'Next'` for the root action name where the console path
+::  passes `sctx`'s `aname` (`Action` under a SPECIFICATION). Both are now on
+::  the %live continuation, so the two paths are asserted EQUAL rather than
+::  each being spot-checked against its own frozen golden.
+++  kernel-report
+  ::  run a %check to completion through the kernel and return its %report
+  |=  [spec=@t cfg=@t]
+  ^-  @t
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec cfg) t0) 256)
+  =/  a  (~(get by artifacts.j) %report)
+  ?~  a  ''
+  ?.  ?=(%text -.u.a)  ''
+  text.u.a
+::
+++  console-report
+  |=  [spec=@t cfg=@t]
+  ^-  @t
+  (rap 3 (join '\0a' (check:check spec cfg)))
+::
+++  same-report
+  |=  [spec=@t cfg=@t]
+  ^-  tang
+  %+  expect-eq
+    !>((console-report spec cfg))
+  !>((kernel-report spec cfg))
+::
+::  a STUTTERING counterexample under INIT/NEXT: the console path appends the
+::  EC 2257 hint, and the kernel used to drop it
+++  test-kernel-report-equals-console-2257
+  %+  same-report  live-spec  lead-cfg
+::
+::  the same property under a SPECIFICATION that carries NO fairness: EC 2259,
+::  which names the spec and its source location -- unreachable from the kernel
+::  before this unit, because a SPECIFICATION-form config was typed-rejected
+++  spec-nofair
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == \/ x' = x
+          \/ (x = 0 /\ x' = 1)
+  Spec == Init /\ [][Next]_x
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+++  test-kernel-report-equals-console-2259
+  %+  same-report  spec-nofair  'SPECIFICATION Spec\0aPROPERTY Lead\0a'
+::
+::  a SPECIFICATION WITH fairness: no hint at all, and the trace labels come
+::  from the decomposed action
+++  spec-fair
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = 1 - x
+  Spec == Init /\ [][Next]_x /\ WF_x(Next)
+  Live == <>[](x = 1)
+  ====
+  '''
+++  test-kernel-report-equals-console-fair
+  %+  same-report  spec-fair  'SPECIFICATION Spec\0aPROPERTY Live\0a'
+::
+::  and a plain safety run under a SPECIFICATION: the verdict the console path
+::  reaches, through the kernel
+++  spec-safety
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 3 /\ x' = x + 1
+  Inv == x < 9
+  Spec == Init /\ [][Next]_x
+  ====
+  '''
+++  test-kernel-report-equals-console-safety-spec
+  %+  same-report  spec-safety  'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+::  +|  Unsupported Options Are Refused, Never Ignored (R1.8.6)
+::
+::  VIEW and ALIAS are parsed, carried in the run-spec, and — until R1.8.6 —
+::  silently dropped by every engine path. A dropped VIEW is not cosmetic: tlc2
+::  fingerprints the VIEW's value, so ignoring one reports MORE distinct states
+::  than tlc2 and can change whether a run terminates. Both are now refused.
+++  view-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Inv == x < 9
+  V == x % 2
+  ====
+  '''
+++  test-view-collapses-states
+  ::  R2.3.1: VIEW is live. `view-spec` cycles x over 0..3 and the view is
+  ::  `x % 2`, so the four states collapse to two — the identity is the
+  ::  fingerprint of the VIEW'S VALUE, not of the bindings. This is the
+  ::  behaviour R1.8.6 refused rather than fake, and R2.3.1 implements.
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW V\0a') t0) 256)
+  (expect-eq !>(`[%ok [3 2 0 2 [0 1 1 1]]]) !>(result.j))
+::
+++  alias-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 3 /\ x' = x + 1
+  Inv == x < 2
+  Alias == [ v |-> x, doubled |-> x * 2, moved |-> x' # x ]
+  Spec == Init /\ [][Next]_x
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+::
+++  test-alias-renders-wire-trace
+  ::  R2.3.2: ALIAS is live, and it reaches the TYPED WIRE TRACE, not only the
+  ::  console report. The record BECOMES the state, in the RECORD'S constructor
+  ::  order (`v, doubled, moved`, not alphabetical) -- and `moved` is `x' # x`,
+  ::  which reads TRUE on every state but the LAST, because the last state has
+  ::  no successor and is paired with ITSELF. That final FALSE is what proves
+  ::  the successor pairing rather than a coincidence of values
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
+  =/  art  (~(got by artifacts.j) %trace)
+  ?>  ?=(%trace -.art)
+  =/  sts  states.trace.art
+  ;:  weld
+    (expect-eq !>(3) !>((lent sts)))
+    (expect-eq !>(~[['v' '0'] ['doubled' '0'] ['moved' 'TRUE']]) !>(bindings:(snag 0 sts)))
+    (expect-eq !>(~[['v' '1'] ['doubled' '2'] ['moved' 'TRUE']]) !>(bindings:(snag 1 sts)))
+    (expect-eq !>(~[['v' '2'] ['doubled' '4'] ['moved' 'FALSE']]) !>(bindings:(snag 2 sts)))
+  ==
+::
+++  test-alias-refused-with-property
+  ::  the lasso trace is rendered by the %liveness stage, which takes no alias,
+  ::  and tlc2 does alias it. Narrowed refusal, not a silent wrong trace
+  =/  cfg  'SPECIFICATION Spec\0aPROPERTY Lead\0aALIAS Alias\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)'])
+  !>(result.j)
+::
+++  test-alias-refused-in-simulation
+  ::  same shape one mode over: the simulated trace is not aliased either
+  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (sim-req alias-spec cfg 1 4 4) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)'])
+  !>(result.j)
+::
+::  the same spec WITHOUT the VIEW line still runs: the refusal is keyed on the
+::  option, not on the definition being present in the module
+++  test-view-definition-alone-is-fine
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a') t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  +|  Cfg Source Override (R2.3.3)
+::
+::  `check-opts.cfg` is tlc2's `-config`: it names one of the bundle's own
+::  sources to use as the config INSTEAD of the bundle's `cfg` field. The pair
+::  below is matched -- one bundle, carrying BOTH configs, run twice with only
+::  that field different -- so a passing test proves the override SELECTS
+::  rather than that a number happens to match.
+++  twocfg-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Loose == x < 4
+  Strict == x < 2
+  ====
+  '''
+::
+++  loose-cfg   'INIT Init\0aNEXT Next\0aINVARIANT Loose\0a'
+++  strict-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Strict\0a'
+::
+++  ovr-bundle
+  ::  carries its own `cfg` (loose, holds) AND a named source `strict` the
+  ::  override can select (strict, is violated)
+  ^-  source-bundle
+  :*  %inline  'spec'
+      (malt ~[['spec' twocfg-spec] ['strict' strict-cfg]])
+      `loose-cfg
+  ==
+::
+++  ovr-req
+  |=  nm=(unit source-name)
+  ^-  request
+  [[%check [| | | | nm | ~ [%exhaustive & 0]]] ovr-bundle lim ~ ~]
+::
+++  test-cfg-override-absent-uses-bundle-cfg
+  ::  no override: the bundle's own cfg runs, Loose holds, the run completes
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ovr-req ~) t0) 256)
+  (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+++  test-cfg-override-selects-named-source
+  ::  same bundle, override set: the NAMED source is the config, so Strict is
+  ::  the invariant and it is violated. A different verdict KIND, not just a
+  ::  different count -- the bundle's own cfg could not produce this
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ovr-req `'strict') t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Strict' %.n]) !>(violation.u.result.j))
+::
+++  test-cfg-override-unknown-source-rejected
+  ::  refused at SUBMIT, so nothing downstream can quietly fall back to the
+  ::  bundle's cfg and check a config the caller did not ask for
+  %+  expect-eq
+    !>(`'unknown cfg source: nope')
+  !>((validate:job-lib (ovr-req `'nope')))
+::
+++  test-cfg-override-clay-rejected
+  ::  a %clay bundle selects its config by PATH: the file's mark is part of
+  ::  the reference, so a bare name cannot supply it
+  =/  req=request
+    :*  [%check [| | | | `'some-cfg' | ~ [%exhaustive & 0]]]
+        [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
+        lim  ~  ~
+    ==
+  %+  expect-eq
+    !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
+  !>((validate:job-lib req))
+::
+::  +|  INVARIANT And PROPERTY In One Config (R2.3.4)
+::
+::  The kernel refused this combination because NEITHER path could do it: the
+::  liveness branch built its graph with `~` for invariants and the box-state
+::  branch substituted the property for them. Both now carry the config's
+::  invariant list, so the combination RUNS -- and a safety violation
+::  pre-empts the temporal check, exactly as `ModelChecker.doNext` returning
+::  pre-empts tlc2's final pass.
+++  ip-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 4
+  Spec == Init /\ [][Next]_x
+  Inv == x < 9
+  Tight == x < 2
+  BoxSmall == [](x < 9)
+  BoxTight == [](x < 2)
+  Live == <>(x = 3)
+  ====
+  '''
+::
+++  ip-inv-wins   'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY Live\0a'
+++  ip-prop-runs  'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY Live\0a'
+++  ip-box-order  'SPECIFICATION Spec\0aINVARIANT Tight\0aPROPERTY BoxTight\0a'
+++  ip-both-ok    'SPECIFICATION Spec\0aINVARIANT Inv\0aPROPERTY BoxSmall\0a'
+::
+++  test-inv-prop-accepted-not-refused
+  ::  the submit-time refusal is gone: the combination validates
+  (expect-eq !>(~) !>((validate:job-lib (check-req ip-spec ip-prop-runs))))
+::
+++  test-inv-prop-invariant-preempts-liveness
+  ::  the INVARIANT is violated at x = 2, so the run stops there with a SAFETY
+  ::  verdict and the temporal property is never reported -- the kernel used to
+  ::  refuse this config outright, and before that would not have checked `Tight`
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-inv-wins) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Tight' %.n]) !>(violation.u.result.j))
+::
+++  test-inv-prop-liveness-runs-when-invariant-holds
+  ::  the matched half: same spec, an invariant that HOLDS, so the run reaches
+  ::  the temporal check and reports the PROPERTY. A different verdict from the
+  ::  arm above, off one word of config
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-prop-runs) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%property 'Live' %.n]) !>(violation.u.result.j))
+::
+++  test-inv-prop-box-state-invariant-order
+  ::  a `[]P` box-state PROPERTY is checked as an INVARIANT, and the config's
+  ::  own invariants come FIRST: `processConfigInvariants()` fills `invVec`
+  ::  before `processConfigProps` appends to it. Both are false at x = 2 and
+  ::  tlc2 names `Tight`, so the port must too
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-box-order) t0) 256)
+  ?>  ?=(^ result.j)
+  ?>  ?=(%violated -.u.result.j)
+  (expect-eq !>(`violation`[%invariant 'Tight' %.n]) !>(violation.u.result.j))
+::
+++  test-inv-prop-both-hold
+  ::  both hold: the run completes
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req ip-spec ip-both-ok) t0) 256)
+  ?>  ?=(^ result.j)
+  (expect-eq !>(%ok) !>(-.u.result.j))
+::
+++  test-kernel-report-equals-console-inv-prop
+  ::  the kernel's rendered report is the console's, for the pre-empting case
+  %+  same-report  ip-spec  ip-inv-wins
+::
+++  test-kernel-report-equals-console-inv-prop-box
+  %+  same-report  ip-spec  ip-box-order
+::
+::  +|  Max Set Size (R2.4.1)
+::
+::  tlc2's `-maxSetSize` (`TLCGlobals.setBound`, default 1,000,000). R2.4.0
+::  measured which of its two guarded sites is actually reachable: NOT
+::  `StateVec.grow`/EC 2172 (`-maxSetSize 5` on a spec with 21 successors ran
+::  clean, 442 states) but `ValueVec.ensureCapacity`, whose message names the
+::  BOUND rather than the actual size. The port's `+force` is the same
+::  boundary -- where a lazy set must become a value.
+++  bigset-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals, FiniteSets
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 3
+  Inv == Cardinality({i \in 0..30 : TRUE}) = 31
+  ====
+  '''
+::
+++  bigset-req
+  |=  n=@ud
+  ^-  request
+  =/  l  lim
+  =.  max-set-size.l  n
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~]
+::
+++  test-max-set-size-default-runs
+  ::  the matched half: the same spec under the default bound completes
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (bigset-req 0) t0) 256)
+  ?>  ?=(^ result.j)
+  (expect-eq !>(%ok) !>(-.u.result.j))
+::
+++  test-max-set-size-bound-bites
+  ::  one field different, and the run FAILS with tlc2's own wording -- the
+  ::  bound names itself, as `ValueVec` does
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (bigset-req 5) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'Attempted to construct a set with too many elements (>5).'])
+  !>(result.j)
+::
+::  +|  Continue Past The First Violation (R2.4.2)
+::
+::  tlc2's `-continue`. R2.4.0 measured what the row could not decide: the run
+::  COMPLETES -- two EC 2110 blocks and then `Model checking completed. No
+::  error has been found.` with the WHOLE graph's counts. So `result` stays one
+::  (`%ok`), and the counterexamples become a list in their own artifact;
+::  `result`/`violation` are left alone for R2.7.1, the unit that owns the
+::  api-version bump.
+++  cont-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLES x, y
+  Init == x = 0 /\ y = 0
+  Next == x' = (x + 1) % 4 /\ y' = y
+  Inv == x < 2
+  ====
+  '''
+::
+++  cont-req
+  |=  c=?
+  ^-  request
+  [[%check [| | | c ~ | ~ [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~]
+::
+++  test-continue-off-stops-at-first
+  ::  the matched half: without the flag the run STOPS at the first violation
+  ::  and reports the prefix's counts -- 3 states, depth 3
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (cont-req |) t0) 256)
+  %+  expect-eq
+    !>(`[%violated [%invariant 'Inv' %.n] [3 3 0 3 [1 1 1 1]]])
+  !>(result.j)
+::
+++  test-continue-completes-with-all-violations
+  ::  one field different: the search runs to completion, so the VERDICT is
+  ::  `%ok` and the counts are the WHOLE graph's (5 generated / 4 distinct /
+  ::  depth 4, against 3/3/3 above). Both violations are on the wire
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (cont-req &) t0) 256)
+  =/  a  (~(get by artifacts.j) %violations)
+  ?>  ?=(^ a)
+  ?>  ?=(%violations -.u.a)
+  ;:  weld
+    (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+    (expect-eq !>(2) !>((lent viols.u.a)))
+    (expect-eq !>(`violation`[%invariant 'Inv' %.n]) !>(violation:(snag 0 viols.u.a)))
+    ::  discovery order: the depth-3 violator first, then the depth-4 one that
+    ::  is only reachable THROUGH it -- which is what proves the violating
+    ::  state is still enqueued
+    (expect-eq !>(3) !>((lent states.trace:(snag 0 viols.u.a))))
+    (expect-eq !>(4) !>((lent states.trace:(snag 1 viols.u.a))))
+  ==
+::
+::  +|  Render Options (R2.4.3)
+::
+::  `-view` and `-difftrace`. R2.4.0 left `-difftrace` open; R2.4.3 measured it
+::  by BYTE-DIFFING both modes: an exhaustive run is IDENTICAL with and without
+::  the flag, while a simulation omits unchanged bindings. So it is honoured on
+::  the sim path only, and refused elsewhere rather than accepted and ignored.
+++  vw-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLES x, y
+  Init == x = 0 /\ y = 0
+  Next == x' = (x + 1) % 4 /\ y' = y
+  Inv == x < 2
+  Vw == x
+  ====
+  '''
+::
+++  vw-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aVIEW Vw\0a'
+::
+++  vw-req
+  |=  v=?
+  ^-  request
+  [[%check [| v | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~]
+::
+++  test-view-render-off-shows-bindings
+  ::  the matched half: without the flag the trace prints the BINDINGS
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (vw-req |) t0) 256)
+  =/  a  (~(got by artifacts.j) %report)
+  ?>  ?=(%text -.a)
+  =/  ls  (to-wain:format text.a)
+  (expect !>((lien ls |=(l=@t =(l '/\\ x = 0')))))
+::
+++  test-view-render-on-shows-view-value
+  ::  one field different: every state renders as the VIEW'S VALUE -- a bare
+  ::  `0`, no `/\`, no names. Measured at the pin
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (vw-req &) t0) 256)
+  =/  a  (~(got by artifacts.j) %report)
+  ?>  ?=(%text -.a)
+  =/  ls  (to-wain:format text.a)
+  ;:  weld
+    (expect !>(!(lien ls |=(l=@t =(l '/\\ x = 0')))))
+    (expect !>((lien ls |=(l=@t =(l '0')))))
+  ==
+::
+++  test-view-render-without-view-refused
+  ::  the flag with no VIEW in the config has nothing to render
+  =/  req=request
+    [[%check [| & | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'unsupported: -view without a VIEW in the config (nothing to render)'])
+  !>(result.j)
+::
+++  test-difftrace-outside-simulation-refused
+  ::  measured: an exhaustive run is byte-identical with and without the flag,
+  ::  so accepting it there would be accepting an option that does nothing
+  =/  req=request
+    [[%check [| | & | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+  %+  expect-eq
+    !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
+  !>((validate:job-lib req))
+--

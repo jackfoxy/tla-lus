@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+mod-override Other M <- Op
+RAW
+CONSTANT
+M <- [ Other ] Op 
+---

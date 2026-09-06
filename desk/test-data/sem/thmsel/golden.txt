@@ -1,0 +1,49 @@
+ACCEPT
+MODULE A 1.1-10.4
+  var x L1 3.10-3.10
+  def Init arity=0 local=n L1 5.1-5.14
+    apply $Nop opkind=BuiltInKind L1 5.9-5.14
+      apply \in opkind=BuiltInKind L1 4.17-4.26
+        apply x opkind=VariableDeclKind L1 4.17-4.17
+        apply .. opkind=UserDefinedOpKind L0 4.23-4.26
+          num 0 L0 4.23-4.23
+          num 3 L0 4.26-4.26
+  def Inv arity=0 local=n L1 6.1-6.14
+    apply $Nop opkind=BuiltInKind L1 6.8-6.14
+      apply x opkind=VariableDeclKind L1 4.17-4.17
+  def Inv2 arity=0 local=n L0 7.1-7.15
+    apply $Nop opkind=BuiltInKind L0 7.9-7.15
+      apply .. opkind=UserDefinedOpKind L0 4.23-4.26
+        num 0 L0 4.23-4.23
+        num 3 L0 4.26-4.26
+  def Prop arity=0 local=n L1 9.1-9.17
+    apply $Nop opkind=BuiltInKind L1 9.9-9.17
+      apply x opkind=VariableDeclKind L1 8.27-8.27
+  thmdef Thm1 local=n L1 4.1-4.26
+    apply \in opkind=BuiltInKind L1 4.17-4.26
+      apply x opkind=VariableDeclKind L1 4.17-4.17
+      apply .. opkind=UserDefinedOpKind L0 4.23-4.26
+        num 0 L0 4.23-4.23
+        num 3 L0 4.26-4.26
+  thmdef Thm1b local=n L1 8.1-8.31
+    apply \land opkind=BuiltInKind L1 8.18-8.31
+      apply = opkind=BuiltInKind L1 8.18-8.22
+        apply x opkind=VariableDeclKind L1 8.18-8.18
+        num 1 L0 8.22-8.22
+      apply < opkind=UserDefinedOpKind L1 8.27-8.31
+        apply x opkind=VariableDeclKind L1 8.27-8.27
+        num 3 L0 8.31-8.31
+  theorem name=Thm1 L1 4.1-4.26
+    apply \in opkind=BuiltInKind L1 4.17-4.26
+      apply x opkind=VariableDeclKind L1 4.17-4.17
+      apply .. opkind=UserDefinedOpKind L0 4.23-4.26
+        num 0 L0 4.23-4.23
+        num 3 L0 4.26-4.26
+  theorem name=Thm1b L1 8.1-8.31
+    apply \land opkind=BuiltInKind L1 8.18-8.31
+      apply = opkind=BuiltInKind L1 8.18-8.22
+        apply x opkind=VariableDeclKind L1 8.18-8.18
+        num 1 L0 8.22-8.22
+      apply < opkind=UserDefinedOpKind L1 8.27-8.31
+        apply x opkind=VariableDeclKind L1 8.27-8.27
+        num 3 L0 8.31-8.31

@@ -1,0 +1,12 @@
+ACCEPT
+MODULE A 1.1-5.4
+  const a arity=0 L0 2.10-2.10
+  const b arity=0 L0 2.13-2.13
+  def S arity=0 local=n L0 3.1-3.11
+    apply $SetEnumerate opkind=BuiltInKind L0 3.6-3.11
+      apply a opkind=ConstantDeclKind L0 3.7-3.7
+      apply b opkind=ConstantDeclKind L0 3.10-3.10
+  def T arity=0 local=n L0 4.1-4.13
+    apply $Tuple opkind=BuiltInKind L0 4.6-4.13
+      apply a opkind=ConstantDeclKind L0 4.8-4.8
+      apply b opkind=ConstantDeclKind L0 4.11-4.11

@@ -1,0 +1,9 @@
+REJECT
+***Parse Error***
+Encountered "THEOREM Beginning of definition" at line 4, column 1 and token "====" 
+
+Residual stack trace follows:
+Module body starting at line 2, column 1.
+Module definition starting at line 1, column 1.
+
+%%

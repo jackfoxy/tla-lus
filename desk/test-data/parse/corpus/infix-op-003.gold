@@ -1,0 +1,517 @@
+ACCEPT
+n-module 1.1-106.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-104.6
+    n-operatordefinition 3.1-104.6
+      n-identlhs 3.1-104.1
+        identifier 3.1-3.2 op
+        lbr 3.3-3.3 (
+        n-infixdecl 4.3-4.7
+          us 4.3-4.3 _
+          n-infixop 4.5-4.5 &
+          us 4.7-4.7 _
+        comma 4.8-4.8 ,
+        n-infixdecl 5.3-5.8
+          us 5.3-5.3 _
+          n-infixop 5.5-5.6 &&
+          us 5.8-5.8 _
+        comma 5.9-5.9 ,
+        n-infixdecl 6.3-6.13
+          us 6.3-6.3 _
+          n-infixop 6.5-6.11 \\approx
+          us 6.13-6.13 _
+        comma 6.14-6.14 ,
+        n-infixdecl 7.3-7.8
+          us 7.3-7.3 _
+          n-infixop 7.5-7.6 :=
+          us 7.8-7.8 _
+        comma 7.9-7.9 ,
+        n-infixdecl 8.3-8.12
+          us 8.3-8.3 _
+          n-infixop 8.5-8.10 \\asymp
+          us 8.12-8.12 _
+        comma 8.13-8.13 ,
+        n-infixdecl 9.3-9.14
+          us 9.3-9.3 _
+          n-infixop 9.5-9.12 \\bigcirc
+          us 9.14-9.14 _
+        comma 9.15-9.15 ,
+        n-infixdecl 10.3-10.9
+          us 10.3-10.3 _
+          n-infixop 10.5-10.7 ::=
+          us 10.9-10.9 _
+        comma 10.10-10.10 ,
+        n-infixdecl 11.3-11.13
+          us 11.3-11.3 _
+          n-infixop 11.5-11.11 \\bullet
+          us 11.13-11.13 _
+        comma 11.14-11.14 ,
+        n-infixdecl 12.3-12.16
+          us 12.3-12.3 _
+          n-infixop 12.5-12.14 \\intersect
+          us 12.16-12.16 _
+        comma 12.17-12.17 ,
+        n-infixdecl 13.3-13.10
+          us 13.3-13.3 _
+          n-infixop 13.5-13.8 \\cap
+          us 13.10-13.10 _
+        comma 13.11-13.11 ,
+        n-infixdecl 14.3-14.11
+          us 14.3-14.3 _
+          n-infixop 14.5-14.9 \\cdot
+          us 14.11-14.11 _
+        comma 14.12-14.12 ,
+        n-infixdecl 15.3-15.8
+          us 15.3-15.3 _
+          n-infixop 15.5-15.6 \\o
+          us 15.8-15.8 _
+        comma 15.9-15.9 ,
+        n-infixdecl 16.3-16.11
+          us 16.3-16.3 _
+          n-infixop 16.5-16.9 \\circ
+          us 16.11-16.11 _
+        comma 16.12-16.12 ,
+        n-infixdecl 17.3-17.8
+          us 17.3-17.3 _
+          n-infixop 17.5-17.6 @@
+          us 17.8-17.8 _
+        comma 17.9-17.9 ,
+        n-infixdecl 18.3-18.11
+          us 18.3-18.3 _
+          n-infixop 18.5-18.9 \\cong
+          us 18.11-18.11 _
+        comma 18.12-18.12 ,
+        n-infixdecl 19.3-19.12
+          us 19.3-19.3 _
+          n-infixop 19.5-19.10 \\union
+          us 19.12-19.12 _
+        comma 19.13-19.13 ,
+        n-infixdecl 20.3-20.10
+          us 20.3-20.3 _
+          n-infixop 20.5-20.8 \\cup
+          us 20.10-20.10 _
+        comma 20.11-20.11 ,
+        n-infixdecl 21.3-21.10
+          us 21.3-21.3 _
+          n-infixop 21.5-21.8 \\div
+          us 21.10-21.10 _
+        comma 21.11-21.11 ,
+        n-infixdecl 22.3-22.7
+          us 22.3-22.3 _
+          n-infixop 22.5-22.5 $
+          us 22.7-22.7 _
+        comma 22.8-22.8 ,
+        n-infixdecl 23.3-23.8
+          us 23.3-23.3 _
+          n-infixop 23.5-23.6 $$
+          us 23.8-23.8 _
+        comma 23.9-23.9 ,
+        n-infixdecl 24.3-24.12
+          us 24.3-24.3 _
+          n-infixop 24.5-24.10 \\doteq
+          us 24.12-24.12 _
+        comma 24.13-24.13 ,
+        n-infixdecl 25.3-25.8
+          us 25.3-25.3 _
+          n-infixop 25.5-25.6 ..
+          us 25.8-25.8 _
+        comma 25.9-25.9 ,
+        n-infixdecl 26.3-26.9
+          us 26.3-26.3 _
+          n-infixop 26.5-26.7 ...
+          us 26.9-26.9 _
+        comma 26.10-26.10 ,
+        n-infixdecl 27.3-27.7
+          us 27.3-27.3 _
+          n-infixop 27.5-27.5 =
+          us 27.7-27.7 _
+        comma 27.8-27.8 ,
+        n-infixdecl 28.3-28.12
+          us 28.3-28.3 _
+          n-infixop 28.5-28.10 \\equiv
+          us 28.12-28.12 _
+        comma 28.13-28.13 ,
+        n-infixdecl 29.3-29.8
+          us 29.3-29.3 _
+          n-infixop 29.5-29.6 !!
+          us 29.8-29.8 _
+        comma 29.9-29.9 ,
+        n-infixdecl 30.3-30.8
+          us 30.3-30.3 _
+          n-infixop 30.5-30.6 >=
+          us 30.8-30.8 _
+        comma 30.9-30.9 ,
+        n-infixdecl 31.3-31.10
+          us 31.3-31.3 _
+          n-infixop 31.5-31.8 \\geq
+          us 31.10-31.10 _
+        comma 31.11-31.11 ,
+        n-infixdecl 32.3-32.9
+          us 32.3-32.3 _
+          n-infixop 32.5-32.7 \\gg
+          us 32.9-32.9 _
+        comma 32.10-32.10 ,
+        n-infixdecl 33.3-33.7
+          us 33.3-33.3 _
+          n-infixop 33.5-33.5 >
+          us 33.7-33.7 _
+        comma 33.8-33.8 ,
+        n-infixdecl 34.3-34.8
+          us 34.3-34.3 _
+          n-infixop 34.5-34.6 ##
+          us 34.8-34.8 _
+        comma 34.9-34.9 ,
+        n-infixdecl 35.3-35.9
+          us 35.3-35.3 _
+          n-infixop 35.5-35.7 <=>
+          us 35.9-35.9 _
+        comma 35.10-35.10 ,
+        n-infixdecl 36.3-36.8
+          us 36.3-36.3 _
+          n-infixop 36.5-36.6 =>
+          us 36.8-36.8 _
+        comma 36.9-36.9 ,
+        n-infixdecl 37.3-37.9
+          us 37.3-37.3 _
+          n-infixop 37.5-37.7 \\in
+          us 37.9-37.9 _
+        comma 37.10-37.10 ,
+        n-infixdecl 38.3-38.8
+          us 38.3-38.3 _
+          n-infixop 38.5-38.6 /\\
+          us 38.8-38.8 _
+        comma 38.9-38.9 ,
+        n-infixdecl 39.3-39.11
+          us 39.3-39.3 _
+          n-infixop 39.5-39.9 \\land
+          us 39.11-39.11 _
+        comma 39.12-39.12 ,
+        n-infixdecl 40.3-40.8
+          us 40.3-40.3 _
+          n-infixop 40.5-40.6 =|
+          us 40.8-40.8 _
+        comma 40.9-40.9 ,
+        n-infixdecl 41.3-41.8
+          us 41.3-41.3 _
+          n-infixop 41.5-41.6 ~>
+          us 41.8-41.8 _
+        comma 41.9-41.9 ,
+        n-infixdecl 42.3-42.8
+          us 42.3-42.3 _
+          n-infixop 42.5-42.6 <=
+          us 42.8-42.8 _
+        comma 42.9-42.9 ,
+        n-infixdecl 43.3-43.8
+          us 43.3-43.3 _
+          n-infixop 43.5-43.6 =<
+          us 43.8-43.8 _
+        comma 43.9-43.9 ,
+        n-infixdecl 44.3-44.10
+          us 44.3-44.3 _
+          n-infixop 44.5-44.8 \\leq
+          us 44.10-44.10 _
+        comma 44.11-44.11 ,
+        n-infixdecl 45.3-45.9
+          us 45.3-45.3 _
+          n-infixop 45.5-45.7 \\ll
+          us 45.9-45.9 _
+        comma 45.10-45.10 ,
+        n-infixdecl 46.3-46.8
+          us 46.3-46.3 _
+          n-infixop 46.5-46.6 \\/
+          us 46.8-46.8 _
+        comma 46.9-46.9 ,
+        n-infixdecl 47.3-47.10
+          us 47.3-47.3 _
+          n-infixop 47.5-47.8 \\lor
+          us 47.10-47.10 _
+        comma 47.11-47.11 ,
+        n-infixdecl 48.3-48.8
+          us 48.3-48.3 _
+          n-infixop 48.5-48.6 -|
+          us 48.8-48.8 _
+        comma 48.9-48.9 ,
+        n-infixdecl 49.3-49.7
+          us 49.3-49.3 _
+          n-infixop 49.5-49.5 <
+          us 49.7-49.7 _
+        comma 49.8-49.8 ,
+        n-infixdecl 50.3-50.8
+          us 50.3-50.3 _
+          n-infixop 50.5-50.6 <:
+          us 50.8-50.8 _
+        comma 50.9-50.9 ,
+        n-infixdecl 51.3-51.8
+          us 51.3-51.3 _
+          n-infixop 51.5-51.6 :>
+          us 51.8-51.8 _
+        comma 51.9-51.9 ,
+        n-infixdecl 52.3-52.7
+          us 52.3-52.3 _
+          n-infixop 52.5-52.5 -
+          us 52.7-52.7 _
+        comma 52.8-52.8 ,
+        n-infixdecl 53.3-53.8
+          us 53.3-53.3 _
+          n-infixop 53.5-53.6 --
+          us 53.8-53.8 _
+        comma 53.9-53.9 ,
+        n-infixdecl 54.3-54.7
+          us 54.3-54.3 _
+          n-infixop 54.5-54.5 %
+          us 54.7-54.7 _
+        comma 54.8-54.8 ,
+        n-infixdecl 55.3-55.8
+          us 55.3-55.3 _
+          n-infixop 55.5-55.6 %%
+          us 55.8-55.8 _
+        comma 55.9-55.9 ,
+        n-infixdecl 56.3-56.7
+          us 56.3-56.3 _
+          n-infixop 56.5-56.5 *
+          us 56.7-56.7 _
+        comma 56.8-56.8 ,
+        n-infixdecl 57.3-57.8
+          us 57.3-57.3 _
+          n-infixop 57.5-57.6 **
+          us 57.8-57.8 _
+        comma 57.9-57.9 ,
+        n-infixdecl 58.3-58.8
+          us 58.3-58.3 _
+          n-infixop 58.5-58.6 /=
+          us 58.8-58.8 _
+        comma 58.9-58.9 ,
+        n-infixdecl 59.3-59.7
+          us 59.3-59.3 _
+          n-infixop 59.5-59.5 #
+          us 59.7-59.7 _
+        comma 59.8-59.8 ,
+        n-infixdecl 60.3-60.12
+          us 60.3-60.3 _
+          n-infixop 60.5-60.10 \\notin
+          us 60.12-60.12 _
+        comma 60.13-60.13 ,
+        n-infixdecl 61.3-61.9
+          us 61.3-61.3 _
+          n-infixop 61.5-61.7 (.)
+          us 61.9-61.9 _
+        comma 61.10-61.10 ,
+        n-infixdecl 62.3-62.11
+          us 62.3-62.3 _
+          n-infixop 62.5-62.9 \\odot
+          us 62.11-62.11 _
+        comma 62.12-62.12 ,
+        n-infixdecl 63.3-63.9
+          us 63.3-63.3 _
+          n-infixop 63.5-63.7 (-)
+          us 63.9-63.9 _
+        comma 63.10-63.10 ,
+        n-infixdecl 64.3-64.13
+          us 64.3-64.3 _
+          n-infixop 64.5-64.11 \\ominus
+          us 64.13-64.13 _
+        comma 64.14-64.14 ,
+        n-infixdecl 65.3-65.9
+          us 65.3-65.3 _
+          n-infixop 65.5-65.7 (+)
+          us 65.9-65.9 _
+        comma 65.10-65.10 ,
+        n-infixdecl 66.3-66.12
+          us 66.3-66.3 _
+          n-infixop 66.5-66.10 \\oplus
+          us 66.12-66.12 _
+        comma 66.13-66.13 ,
+        n-infixdecl 67.3-67.9
+          us 67.3-67.3 _
+          n-infixop 67.5-67.7 (/)
+          us 67.9-67.9 _
+        comma 67.10-67.10 ,
+        n-infixdecl 68.3-68.13
+          us 68.3-68.3 _
+          n-infixop 68.5-68.11 \\oslash
+          us 68.13-68.13 _
+        comma 68.14-68.14 ,
+        n-infixdecl 69.3-69.10
+          us 69.3-69.3 _
+          n-infixop 69.5-69.8 (\\X)
+          us 69.10-69.10 _
+        comma 69.11-69.11 ,
+        n-infixdecl 70.3-70.13
+          us 70.3-70.3 _
+          n-infixop 70.5-70.11 \\otimes
+          us 70.13-70.13 _
+        comma 70.14-70.14 ,
+        n-infixdecl 71.3-71.7
+          us 71.3-71.3 _
+          n-infixop 71.5-71.5 +
+          us 71.7-71.7 _
+        comma 71.8-71.8 ,
+        n-infixdecl 72.3-72.10
+          us 72.3-72.3 _
+          n-infixop 72.5-72.8 -+->
+          us 72.10-72.10 _
+        comma 72.11-72.11 ,
+        n-infixdecl 73.3-73.8
+          us 73.3-73.3 _
+          n-infixop 73.5-73.6 ++
+          us 73.8-73.8 _
+        comma 73.9-73.9 ,
+        n-infixdecl 74.3-74.7
+          us 74.3-74.3 _
+          n-infixop 74.5-74.5 ^
+          us 74.7-74.7 _
+        comma 74.8-74.8 ,
+        n-infixdecl 75.3-75.8
+          us 75.3-75.3 _
+          n-infixop 75.5-75.6 ^^
+          us 75.8-75.8 _
+        comma 75.9-75.9 ,
+        n-infixdecl 76.3-76.11
+          us 76.3-76.3 _
+          n-infixop 76.5-76.9 \\prec
+          us 76.11-76.11 _
+        comma 76.12-76.12 ,
+        n-infixdecl 77.3-77.13
+          us 77.3-77.3 _
+          n-infixop 77.5-77.11 \\preceq
+          us 77.13-77.13 _
+        comma 77.14-77.14 ,
+        n-infixdecl 78.3-78.13
+          us 78.3-78.3 _
+          n-infixop 78.5-78.11 \\propto
+          us 78.13-78.13 _
+        comma 78.14-78.14 ,
+        n-infixdecl 79.3-79.8
+          us 79.3-79.3 _
+          n-infixop 79.5-79.6 ??
+          us 79.8-79.8 _
+        comma 79.9-79.9 ,
+        n-infixdecl 80.3-80.8
+          us 80.3-80.3 _
+          n-infixop 80.5-80.6 |=
+          us 80.8-80.8 _
+        comma 80.9-80.9 ,
+        n-infixdecl 81.3-81.8
+          us 81.3-81.3 _
+          n-infixop 81.5-81.6 |-
+          us 81.8-81.8 _
+        comma 81.9-81.9 ,
+        n-infixdecl 82.3-82.7
+          us 82.3-82.3 _
+          n-infixop 82.5-82.5 \\
+          us 82.7-82.7 _
+        comma 82.8-82.8 ,
+        n-infixdecl 83.3-83.10
+          us 83.3-83.3 _
+          n-infixop 83.5-83.8 \\sim
+          us 83.10-83.10 _
+        comma 83.11-83.11 ,
+        n-infixdecl 84.3-84.12
+          us 84.3-84.3 _
+          n-infixop 84.5-84.10 \\simeq
+          us 84.12-84.12 _
+        comma 84.13-84.13 ,
+        n-infixdecl 85.3-85.7
+          us 85.3-85.3 _
+          n-infixop 85.5-85.5 /
+          us 85.7-85.7 _
+        comma 85.8-85.8 ,
+        n-infixdecl 86.3-86.8
+          us 86.3-86.3 _
+          n-infixop 86.5-86.6 //
+          us 86.8-86.8 _
+        comma 86.9-86.9 ,
+        n-infixdecl 87.3-87.12
+          us 87.3-87.3 _
+          n-infixop 87.5-87.10 \\sqcap
+          us 87.12-87.12 _
+        comma 87.13-87.13 ,
+        n-infixdecl 88.3-88.12
+          us 88.3-88.3 _
+          n-infixop 88.5-88.10 \\sqcup
+          us 88.12-88.12 _
+        comma 88.13-88.13 ,
+        n-infixdecl 89.3-89.15
+          us 89.3-89.3 _
+          n-infixop 89.5-89.13 \\sqsubset
+          us 89.15-89.15 _
+        comma 89.16-89.16 ,
+        n-infixdecl 90.3-90.17
+          us 90.3-90.3 _
+          n-infixop 90.5-90.15 \\sqsubseteq
+          us 90.17-90.17 _
+        comma 90.18-90.18 ,
+        n-infixdecl 91.3-91.15
+          us 91.3-91.3 _
+          n-infixop 91.5-91.13 \\sqsupset
+          us 91.15-91.15 _
+        comma 91.16-91.16 ,
+        n-infixdecl 92.3-92.17
+          us 92.3-92.3 _
+          n-infixop 92.5-92.15 \\sqsupseteq
+          us 92.17-92.17 _
+        comma 92.18-92.18 ,
+        n-infixdecl 93.3-93.11
+          us 93.3-93.3 _
+          n-infixop 93.5-93.9 \\star
+          us 93.11-93.11 _
+        comma 93.12-93.12 ,
+        n-infixdecl 94.3-94.13
+          us 94.3-94.3 _
+          n-infixop 94.5-94.11 \\subset
+          us 94.13-94.13 _
+        comma 94.14-94.14 ,
+        n-infixdecl 95.3-95.15
+          us 95.3-95.3 _
+          n-infixop 95.5-95.13 \\subseteq
+          us 95.15-95.15 _
+        comma 95.16-95.16 ,
+        n-infixdecl 96.3-96.11
+          us 96.3-96.3 _
+          n-infixop 96.5-96.9 \\succ
+          us 96.11-96.11 _
+        comma 96.12-96.12 ,
+        n-infixdecl 97.3-97.13
+          us 97.3-97.3 _
+          n-infixop 97.5-97.11 \\succeq
+          us 97.13-97.13 _
+        comma 97.14-97.14 ,
+        n-infixdecl 98.3-98.13
+          us 98.3-98.3 _
+          n-infixop 98.5-98.11 \\supset
+          us 98.13-98.13 _
+        comma 98.14-98.14 ,
+        n-infixdecl 99.3-99.15
+          us 99.3-99.3 _
+          n-infixop 99.5-99.13 \\supseteq
+          us 99.15-99.15 _
+        comma 99.16-99.16 ,
+        n-infixdecl 100.3-100.12
+          us 100.3-100.3 _
+          n-infixop 100.5-100.10 \\uplus
+          us 100.12-100.12 _
+        comma 100.13-100.13 ,
+        n-infixdecl 101.3-101.7
+          us 101.3-101.3 _
+          n-infixop 101.5-101.5 |
+          us 101.7-101.7 _
+        comma 101.8-101.8 ,
+        n-infixdecl 102.3-102.8
+          us 102.3-102.3 _
+          n-infixop 102.5-102.6 ||
+          us 102.8-102.8 _
+        comma 102.9-102.9 ,
+        n-infixdecl 103.3-103.9
+          us 103.3-103.3 _
+          n-infixop 103.5-103.7 \\wr
+          us 103.9-103.9 _
+        rbr 104.1-104.1 )
+      def 104.3-104.4 ==
+      n-number 104.6-104.6
+        number-literal 104.6-104.6 1
+  n-endmodule 106.1-106.4
+    end-module 106.1-106.4 ====

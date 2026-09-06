@@ -1,0 +1,22 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T identifier 2.1 2.2 op
+T def 2.4 2.5 ==
+T identifier 2.7 2.7 f
+T lbr 2.8 2.8 (
+T lambda 2.9 2.14 LAMBDA
+T identifier 2.16 2.16 x
+T comma 2.17 2.17 ,
+T identifier 2.19 2.19 y
+T colon 2.21 2.21 :
+T identifier 2.23 2.23 x
+T op-81 2.25 2.25 +
+T identifier 2.27 2.27 y
+T comma 2.28 2.28 ,
+T lambda 2.30 2.35 LAMBDA
+T identifier 2.37 2.37 x
+T colon 2.39 2.39 :
+T number-literal 2.41 2.41 0
+T rbr 2.42 2.42 )
+T end-module 3.1 3.4 ====

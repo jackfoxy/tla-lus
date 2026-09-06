@@ -1,0 +1,4 @@
+VALIDATE
+2229 ~
+The invariant NoInv specified in the configuration file
+is not defined in the specification.

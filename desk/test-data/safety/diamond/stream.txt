@@ -1,0 +1,8 @@
+STREAM
+INIT 1
+S 0 a = 0; b = 0
+ENDINIT
+NEXT 0 2
+S 0 a = 1; b = 0
+S 1 a = 0; b = 1
+ENDNEXT

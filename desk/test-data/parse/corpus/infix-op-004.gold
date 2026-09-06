@@ -1,0 +1,1138 @@
+ACCEPT
+n-module 1.1-108.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 3.1-106.1
+    n-operatordefinition 3.1-106.1
+      n-identlhs 3.1-3.2
+        identifier 3.1-3.2 op
+      def 3.4-3.5 ==
+      n-setenumerate 3.7-106.1
+        lbc 3.7-3.7 {
+        n-infixexpr 4.3-4.7
+          n-generalid 4.3-4.3
+            n-idprefix ~ N_IdPrefix
+            identifier 4.3-4.3 x
+          n-geninfixop 4.5-4.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 4.5-4.5 &
+          n-generalid 4.7-4.7
+            n-idprefix ~ N_IdPrefix
+            identifier 4.7-4.7 y
+        comma 4.8-4.8 ,
+        n-infixexpr 5.3-5.8
+          n-generalid 5.3-5.3
+            n-idprefix ~ N_IdPrefix
+            identifier 5.3-5.3 x
+          n-geninfixop 5.5-5.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 5.5-5.6 &&
+          n-generalid 5.8-5.8
+            n-idprefix ~ N_IdPrefix
+            identifier 5.8-5.8 y
+        comma 5.9-5.9 ,
+        n-infixexpr 6.3-6.13
+          n-generalid 6.3-6.3
+            n-idprefix ~ N_IdPrefix
+            identifier 6.3-6.3 x
+          n-geninfixop 6.5-6.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 6.5-6.11 \\approx
+          n-generalid 6.13-6.13
+            n-idprefix ~ N_IdPrefix
+            identifier 6.13-6.13 y
+        comma 6.14-6.14 ,
+        n-infixexpr 7.3-7.8
+          n-generalid 7.3-7.3
+            n-idprefix ~ N_IdPrefix
+            identifier 7.3-7.3 x
+          n-geninfixop 7.5-7.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 7.5-7.6 :=
+          n-generalid 7.8-7.8
+            n-idprefix ~ N_IdPrefix
+            identifier 7.8-7.8 y
+        comma 7.9-7.9 ,
+        n-infixexpr 8.3-8.12
+          n-generalid 8.3-8.3
+            n-idprefix ~ N_IdPrefix
+            identifier 8.3-8.3 x
+          n-geninfixop 8.5-8.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 8.5-8.10 \\asymp
+          n-generalid 8.12-8.12
+            n-idprefix ~ N_IdPrefix
+            identifier 8.12-8.12 y
+        comma 8.13-8.13 ,
+        n-infixexpr 9.3-9.14
+          n-generalid 9.3-9.3
+            n-idprefix ~ N_IdPrefix
+            identifier 9.3-9.3 x
+          n-geninfixop 9.5-9.12
+            n-idprefix ~ N_IdPrefix
+            n-infixop 9.5-9.12 \\bigcirc
+          n-generalid 9.14-9.14
+            n-idprefix ~ N_IdPrefix
+            identifier 9.14-9.14 y
+        comma 9.15-9.15 ,
+        n-infixexpr 10.3-10.9
+          n-generalid 10.3-10.3
+            n-idprefix ~ N_IdPrefix
+            identifier 10.3-10.3 x
+          n-geninfixop 10.5-10.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 10.5-10.7 ::=
+          n-generalid 10.9-10.9
+            n-idprefix ~ N_IdPrefix
+            identifier 10.9-10.9 y
+        comma 10.10-10.10 ,
+        n-infixexpr 11.3-11.13
+          n-generalid 11.3-11.3
+            n-idprefix ~ N_IdPrefix
+            identifier 11.3-11.3 x
+          n-geninfixop 11.5-11.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 11.5-11.11 \\bullet
+          n-generalid 11.13-11.13
+            n-idprefix ~ N_IdPrefix
+            identifier 11.13-11.13 y
+        comma 11.14-11.14 ,
+        n-infixexpr 12.3-12.16
+          n-generalid 12.3-12.3
+            n-idprefix ~ N_IdPrefix
+            identifier 12.3-12.3 x
+          n-geninfixop 12.5-12.14
+            n-idprefix ~ N_IdPrefix
+            n-infixop 12.5-12.14 \\intersect
+          n-generalid 12.16-12.16
+            n-idprefix ~ N_IdPrefix
+            identifier 12.16-12.16 y
+        comma 12.17-12.17 ,
+        n-infixexpr 13.3-13.10
+          n-generalid 13.3-13.3
+            n-idprefix ~ N_IdPrefix
+            identifier 13.3-13.3 x
+          n-geninfixop 13.5-13.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 13.5-13.8 \\cap
+          n-generalid 13.10-13.10
+            n-idprefix ~ N_IdPrefix
+            identifier 13.10-13.10 y
+        comma 13.11-13.11 ,
+        n-infixexpr 14.3-14.11
+          n-generalid 14.3-14.3
+            n-idprefix ~ N_IdPrefix
+            identifier 14.3-14.3 x
+          n-geninfixop 14.5-14.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 14.5-14.9 \\cdot
+          n-generalid 14.11-14.11
+            n-idprefix ~ N_IdPrefix
+            identifier 14.11-14.11 y
+        comma 14.12-14.12 ,
+        n-infixexpr 15.3-15.8
+          n-generalid 15.3-15.3
+            n-idprefix ~ N_IdPrefix
+            identifier 15.3-15.3 x
+          n-geninfixop 15.5-15.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 15.5-15.6 \\o
+          n-generalid 15.8-15.8
+            n-idprefix ~ N_IdPrefix
+            identifier 15.8-15.8 y
+        comma 15.9-15.9 ,
+        n-infixexpr 16.3-16.11
+          n-generalid 16.3-16.3
+            n-idprefix ~ N_IdPrefix
+            identifier 16.3-16.3 x
+          n-geninfixop 16.5-16.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 16.5-16.9 \\circ
+          n-generalid 16.11-16.11
+            n-idprefix ~ N_IdPrefix
+            identifier 16.11-16.11 y
+        comma 16.12-16.12 ,
+        n-infixexpr 17.3-17.8
+          n-generalid 17.3-17.3
+            n-idprefix ~ N_IdPrefix
+            identifier 17.3-17.3 x
+          n-geninfixop 17.5-17.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 17.5-17.6 @@
+          n-generalid 17.8-17.8
+            n-idprefix ~ N_IdPrefix
+            identifier 17.8-17.8 y
+        comma 17.9-17.9 ,
+        n-infixexpr 18.3-18.11
+          n-generalid 18.3-18.3
+            n-idprefix ~ N_IdPrefix
+            identifier 18.3-18.3 x
+          n-geninfixop 18.5-18.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 18.5-18.9 \\cong
+          n-generalid 18.11-18.11
+            n-idprefix ~ N_IdPrefix
+            identifier 18.11-18.11 y
+        comma 18.12-18.12 ,
+        n-infixexpr 19.3-19.12
+          n-generalid 19.3-19.3
+            n-idprefix ~ N_IdPrefix
+            identifier 19.3-19.3 x
+          n-geninfixop 19.5-19.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 19.5-19.10 \\union
+          n-generalid 19.12-19.12
+            n-idprefix ~ N_IdPrefix
+            identifier 19.12-19.12 y
+        comma 19.13-19.13 ,
+        n-infixexpr 20.3-20.10
+          n-generalid 20.3-20.3
+            n-idprefix ~ N_IdPrefix
+            identifier 20.3-20.3 x
+          n-geninfixop 20.5-20.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 20.5-20.8 \\cup
+          n-generalid 20.10-20.10
+            n-idprefix ~ N_IdPrefix
+            identifier 20.10-20.10 y
+        comma 20.11-20.11 ,
+        n-infixexpr 21.3-21.10
+          n-generalid 21.3-21.3
+            n-idprefix ~ N_IdPrefix
+            identifier 21.3-21.3 x
+          n-geninfixop 21.5-21.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 21.5-21.8 \\div
+          n-generalid 21.10-21.10
+            n-idprefix ~ N_IdPrefix
+            identifier 21.10-21.10 y
+        comma 21.11-21.11 ,
+        n-infixexpr 22.3-22.7
+          n-generalid 22.3-22.3
+            n-idprefix ~ N_IdPrefix
+            identifier 22.3-22.3 x
+          n-geninfixop 22.5-22.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 22.5-22.5 $
+          n-generalid 22.7-22.7
+            n-idprefix ~ N_IdPrefix
+            identifier 22.7-22.7 y
+        comma 22.8-22.8 ,
+        n-infixexpr 23.3-23.8
+          n-generalid 23.3-23.3
+            n-idprefix ~ N_IdPrefix
+            identifier 23.3-23.3 x
+          n-geninfixop 23.5-23.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 23.5-23.6 $$
+          n-generalid 23.8-23.8
+            n-idprefix ~ N_IdPrefix
+            identifier 23.8-23.8 y
+        comma 23.9-23.9 ,
+        n-infixexpr 24.3-24.12
+          n-generalid 24.3-24.3
+            n-idprefix ~ N_IdPrefix
+            identifier 24.3-24.3 x
+          n-geninfixop 24.5-24.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 24.5-24.10 \\doteq
+          n-generalid 24.12-24.12
+            n-idprefix ~ N_IdPrefix
+            identifier 24.12-24.12 y
+        comma 24.13-24.13 ,
+        n-infixexpr 25.3-25.8
+          n-generalid 25.3-25.3
+            n-idprefix ~ N_IdPrefix
+            identifier 25.3-25.3 x
+          n-geninfixop 25.5-25.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 25.5-25.6 ..
+          n-generalid 25.8-25.8
+            n-idprefix ~ N_IdPrefix
+            identifier 25.8-25.8 y
+        comma 25.9-25.9 ,
+        n-infixexpr 26.3-26.9
+          n-generalid 26.3-26.3
+            n-idprefix ~ N_IdPrefix
+            identifier 26.3-26.3 x
+          n-geninfixop 26.5-26.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 26.5-26.7 ...
+          n-generalid 26.9-26.9
+            n-idprefix ~ N_IdPrefix
+            identifier 26.9-26.9 y
+        comma 26.10-26.10 ,
+        n-infixexpr 27.3-27.7
+          n-generalid 27.3-27.3
+            n-idprefix ~ N_IdPrefix
+            identifier 27.3-27.3 x
+          n-geninfixop 27.5-27.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 27.5-27.5 =
+          n-generalid 27.7-27.7
+            n-idprefix ~ N_IdPrefix
+            identifier 27.7-27.7 y
+        comma 27.8-27.8 ,
+        n-infixexpr 28.3-28.12
+          n-generalid 28.3-28.3
+            n-idprefix ~ N_IdPrefix
+            identifier 28.3-28.3 x
+          n-geninfixop 28.5-28.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 28.5-28.10 \\equiv
+          n-generalid 28.12-28.12
+            n-idprefix ~ N_IdPrefix
+            identifier 28.12-28.12 y
+        comma 28.13-28.13 ,
+        n-infixexpr 29.3-29.8
+          n-generalid 29.3-29.3
+            n-idprefix ~ N_IdPrefix
+            identifier 29.3-29.3 x
+          n-geninfixop 29.5-29.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 29.5-29.6 !!
+          n-generalid 29.8-29.8
+            n-idprefix ~ N_IdPrefix
+            identifier 29.8-29.8 y
+        comma 29.9-29.9 ,
+        n-infixexpr 30.3-30.8
+          n-generalid 30.3-30.3
+            n-idprefix ~ N_IdPrefix
+            identifier 30.3-30.3 x
+          n-geninfixop 30.5-30.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 30.5-30.6 >=
+          n-generalid 30.8-30.8
+            n-idprefix ~ N_IdPrefix
+            identifier 30.8-30.8 y
+        comma 30.9-30.9 ,
+        n-infixexpr 31.3-31.10
+          n-generalid 31.3-31.3
+            n-idprefix ~ N_IdPrefix
+            identifier 31.3-31.3 x
+          n-geninfixop 31.5-31.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 31.5-31.8 \\geq
+          n-generalid 31.10-31.10
+            n-idprefix ~ N_IdPrefix
+            identifier 31.10-31.10 y
+        comma 31.11-31.11 ,
+        n-infixexpr 32.3-32.9
+          n-generalid 32.3-32.3
+            n-idprefix ~ N_IdPrefix
+            identifier 32.3-32.3 x
+          n-geninfixop 32.5-32.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 32.5-32.7 \\gg
+          n-generalid 32.9-32.9
+            n-idprefix ~ N_IdPrefix
+            identifier 32.9-32.9 y
+        comma 32.10-32.10 ,
+        n-infixexpr 33.3-33.7
+          n-generalid 33.3-33.3
+            n-idprefix ~ N_IdPrefix
+            identifier 33.3-33.3 x
+          n-geninfixop 33.5-33.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 33.5-33.5 >
+          n-generalid 33.7-33.7
+            n-idprefix ~ N_IdPrefix
+            identifier 33.7-33.7 y
+        comma 33.8-33.8 ,
+        n-infixexpr 34.3-34.8
+          n-generalid 34.3-34.3
+            n-idprefix ~ N_IdPrefix
+            identifier 34.3-34.3 x
+          n-geninfixop 34.5-34.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 34.5-34.6 ##
+          n-generalid 34.8-34.8
+            n-idprefix ~ N_IdPrefix
+            identifier 34.8-34.8 y
+        comma 34.9-34.9 ,
+        n-infixexpr 35.3-35.9
+          n-generalid 35.3-35.3
+            n-idprefix ~ N_IdPrefix
+            identifier 35.3-35.3 x
+          n-geninfixop 35.5-35.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 35.5-35.7 <=>
+          n-generalid 35.9-35.9
+            n-idprefix ~ N_IdPrefix
+            identifier 35.9-35.9 y
+        comma 35.10-35.10 ,
+        n-infixexpr 36.3-36.8
+          n-generalid 36.3-36.3
+            n-idprefix ~ N_IdPrefix
+            identifier 36.3-36.3 x
+          n-geninfixop 36.5-36.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 36.5-36.6 =>
+          n-generalid 36.8-36.8
+            n-idprefix ~ N_IdPrefix
+            identifier 36.8-36.8 y
+        comma 36.9-36.9 ,
+        n-infixexpr 37.3-37.9
+          n-generalid 37.3-37.3
+            n-idprefix ~ N_IdPrefix
+            identifier 37.3-37.3 x
+          n-geninfixop 37.5-37.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 37.5-37.7 \\in
+          n-generalid 37.9-37.9
+            n-idprefix ~ N_IdPrefix
+            identifier 37.9-37.9 y
+        comma 37.10-37.10 ,
+        n-infixexpr 38.3-38.8
+          n-generalid 38.3-38.3
+            n-idprefix ~ N_IdPrefix
+            identifier 38.3-38.3 x
+          n-geninfixop 38.5-38.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 38.5-38.6 /\\
+          n-generalid 38.8-38.8
+            n-idprefix ~ N_IdPrefix
+            identifier 38.8-38.8 y
+        comma 38.9-38.9 ,
+        n-infixexpr 39.3-39.11
+          n-generalid 39.3-39.3
+            n-idprefix ~ N_IdPrefix
+            identifier 39.3-39.3 x
+          n-geninfixop 39.5-39.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 39.5-39.9 \\land
+          n-generalid 39.11-39.11
+            n-idprefix ~ N_IdPrefix
+            identifier 39.11-39.11 y
+        comma 39.12-39.12 ,
+        n-infixexpr 40.3-40.8
+          n-generalid 40.3-40.3
+            n-idprefix ~ N_IdPrefix
+            identifier 40.3-40.3 x
+          n-geninfixop 40.5-40.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 40.5-40.6 =|
+          n-generalid 40.8-40.8
+            n-idprefix ~ N_IdPrefix
+            identifier 40.8-40.8 y
+        comma 40.9-40.9 ,
+        n-infixexpr 41.3-41.8
+          n-generalid 41.3-41.3
+            n-idprefix ~ N_IdPrefix
+            identifier 41.3-41.3 x
+          n-geninfixop 41.5-41.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 41.5-41.6 ~>
+          n-generalid 41.8-41.8
+            n-idprefix ~ N_IdPrefix
+            identifier 41.8-41.8 y
+        comma 41.9-41.9 ,
+        n-infixexpr 42.3-42.8
+          n-generalid 42.3-42.3
+            n-idprefix ~ N_IdPrefix
+            identifier 42.3-42.3 x
+          n-geninfixop 42.5-42.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 42.5-42.6 <=
+          n-generalid 42.8-42.8
+            n-idprefix ~ N_IdPrefix
+            identifier 42.8-42.8 y
+        comma 42.9-42.9 ,
+        n-infixexpr 43.3-43.8
+          n-generalid 43.3-43.3
+            n-idprefix ~ N_IdPrefix
+            identifier 43.3-43.3 x
+          n-geninfixop 43.5-43.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 43.5-43.6 =<
+          n-generalid 43.8-43.8
+            n-idprefix ~ N_IdPrefix
+            identifier 43.8-43.8 y
+        comma 43.9-43.9 ,
+        n-infixexpr 44.3-44.10
+          n-generalid 44.3-44.3
+            n-idprefix ~ N_IdPrefix
+            identifier 44.3-44.3 x
+          n-geninfixop 44.5-44.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 44.5-44.8 \\leq
+          n-generalid 44.10-44.10
+            n-idprefix ~ N_IdPrefix
+            identifier 44.10-44.10 y
+        comma 44.11-44.11 ,
+        n-infixexpr 45.3-45.9
+          n-generalid 45.3-45.3
+            n-idprefix ~ N_IdPrefix
+            identifier 45.3-45.3 x
+          n-geninfixop 45.5-45.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 45.5-45.7 \\ll
+          n-generalid 45.9-45.9
+            n-idprefix ~ N_IdPrefix
+            identifier 45.9-45.9 y
+        comma 45.10-45.10 ,
+        n-infixexpr 46.3-46.8
+          n-generalid 46.3-46.3
+            n-idprefix ~ N_IdPrefix
+            identifier 46.3-46.3 x
+          n-geninfixop 46.5-46.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 46.5-46.6 \\/
+          n-generalid 46.8-46.8
+            n-idprefix ~ N_IdPrefix
+            identifier 46.8-46.8 y
+        comma 46.9-46.9 ,
+        n-infixexpr 47.3-47.10
+          n-generalid 47.3-47.3
+            n-idprefix ~ N_IdPrefix
+            identifier 47.3-47.3 x
+          n-geninfixop 47.5-47.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 47.5-47.8 \\lor
+          n-generalid 47.10-47.10
+            n-idprefix ~ N_IdPrefix
+            identifier 47.10-47.10 y
+        comma 47.11-47.11 ,
+        n-infixexpr 48.3-48.8
+          n-generalid 48.3-48.3
+            n-idprefix ~ N_IdPrefix
+            identifier 48.3-48.3 x
+          n-geninfixop 48.5-48.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 48.5-48.6 -|
+          n-generalid 48.8-48.8
+            n-idprefix ~ N_IdPrefix
+            identifier 48.8-48.8 y
+        comma 48.9-48.9 ,
+        n-infixexpr 49.3-49.7
+          n-generalid 49.3-49.3
+            n-idprefix ~ N_IdPrefix
+            identifier 49.3-49.3 x
+          n-geninfixop 49.5-49.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 49.5-49.5 <
+          n-generalid 49.7-49.7
+            n-idprefix ~ N_IdPrefix
+            identifier 49.7-49.7 y
+        comma 49.8-49.8 ,
+        n-infixexpr 50.3-50.8
+          n-generalid 50.3-50.3
+            n-idprefix ~ N_IdPrefix
+            identifier 50.3-50.3 x
+          n-geninfixop 50.5-50.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 50.5-50.6 <:
+          n-generalid 50.8-50.8
+            n-idprefix ~ N_IdPrefix
+            identifier 50.8-50.8 y
+        comma 50.9-50.9 ,
+        n-infixexpr 51.3-51.8
+          n-generalid 51.3-51.3
+            n-idprefix ~ N_IdPrefix
+            identifier 51.3-51.3 x
+          n-geninfixop 51.5-51.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 51.5-51.6 :>
+          n-generalid 51.8-51.8
+            n-idprefix ~ N_IdPrefix
+            identifier 51.8-51.8 y
+        comma 51.9-51.9 ,
+        n-infixexpr 52.3-52.7
+          n-generalid 52.3-52.3
+            n-idprefix ~ N_IdPrefix
+            identifier 52.3-52.3 x
+          n-geninfixop 52.5-52.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 52.5-52.5 -
+          n-generalid 52.7-52.7
+            n-idprefix ~ N_IdPrefix
+            identifier 52.7-52.7 y
+        comma 52.8-52.8 ,
+        n-infixexpr 53.3-53.8
+          n-generalid 53.3-53.3
+            n-idprefix ~ N_IdPrefix
+            identifier 53.3-53.3 x
+          n-geninfixop 53.5-53.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 53.5-53.6 --
+          n-generalid 53.8-53.8
+            n-idprefix ~ N_IdPrefix
+            identifier 53.8-53.8 y
+        comma 53.9-53.9 ,
+        n-infixexpr 54.3-54.7
+          n-generalid 54.3-54.3
+            n-idprefix ~ N_IdPrefix
+            identifier 54.3-54.3 x
+          n-geninfixop 54.5-54.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 54.5-54.5 %
+          n-generalid 54.7-54.7
+            n-idprefix ~ N_IdPrefix
+            identifier 54.7-54.7 y
+        comma 54.8-54.8 ,
+        n-infixexpr 55.3-55.8
+          n-generalid 55.3-55.3
+            n-idprefix ~ N_IdPrefix
+            identifier 55.3-55.3 x
+          n-geninfixop 55.5-55.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 55.5-55.6 %%
+          n-generalid 55.8-55.8
+            n-idprefix ~ N_IdPrefix
+            identifier 55.8-55.8 y
+        comma 55.9-55.9 ,
+        n-infixexpr 56.3-56.7
+          n-generalid 56.3-56.3
+            n-idprefix ~ N_IdPrefix
+            identifier 56.3-56.3 x
+          n-geninfixop 56.5-56.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 56.5-56.5 *
+          n-generalid 56.7-56.7
+            n-idprefix ~ N_IdPrefix
+            identifier 56.7-56.7 y
+        comma 56.8-56.8 ,
+        n-infixexpr 57.3-57.8
+          n-generalid 57.3-57.3
+            n-idprefix ~ N_IdPrefix
+            identifier 57.3-57.3 x
+          n-geninfixop 57.5-57.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 57.5-57.6 **
+          n-generalid 57.8-57.8
+            n-idprefix ~ N_IdPrefix
+            identifier 57.8-57.8 y
+        comma 57.9-57.9 ,
+        n-infixexpr 58.3-58.8
+          n-generalid 58.3-58.3
+            n-idprefix ~ N_IdPrefix
+            identifier 58.3-58.3 x
+          n-geninfixop 58.5-58.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 58.5-58.6 /=
+          n-generalid 58.8-58.8
+            n-idprefix ~ N_IdPrefix
+            identifier 58.8-58.8 y
+        comma 58.9-58.9 ,
+        n-infixexpr 59.3-59.7
+          n-generalid 59.3-59.3
+            n-idprefix ~ N_IdPrefix
+            identifier 59.3-59.3 x
+          n-geninfixop 59.5-59.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 59.5-59.5 #
+          n-generalid 59.7-59.7
+            n-idprefix ~ N_IdPrefix
+            identifier 59.7-59.7 y
+        comma 59.8-59.8 ,
+        n-infixexpr 60.3-60.12
+          n-generalid 60.3-60.3
+            n-idprefix ~ N_IdPrefix
+            identifier 60.3-60.3 x
+          n-geninfixop 60.5-60.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 60.5-60.10 \\notin
+          n-generalid 60.12-60.12
+            n-idprefix ~ N_IdPrefix
+            identifier 60.12-60.12 y
+        comma 60.13-60.13 ,
+        n-infixexpr 61.3-61.9
+          n-generalid 61.3-61.3
+            n-idprefix ~ N_IdPrefix
+            identifier 61.3-61.3 x
+          n-geninfixop 61.5-61.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 61.5-61.7 (.)
+          n-generalid 61.9-61.9
+            n-idprefix ~ N_IdPrefix
+            identifier 61.9-61.9 y
+        comma 61.10-61.10 ,
+        n-infixexpr 62.3-62.11
+          n-generalid 62.3-62.3
+            n-idprefix ~ N_IdPrefix
+            identifier 62.3-62.3 x
+          n-geninfixop 62.5-62.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 62.5-62.9 \\odot
+          n-generalid 62.11-62.11
+            n-idprefix ~ N_IdPrefix
+            identifier 62.11-62.11 y
+        comma 62.12-62.12 ,
+        n-infixexpr 63.3-63.9
+          n-generalid 63.3-63.3
+            n-idprefix ~ N_IdPrefix
+            identifier 63.3-63.3 x
+          n-geninfixop 63.5-63.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 63.5-63.7 (-)
+          n-generalid 63.9-63.9
+            n-idprefix ~ N_IdPrefix
+            identifier 63.9-63.9 y
+        comma 63.10-63.10 ,
+        n-infixexpr 64.3-64.13
+          n-generalid 64.3-64.3
+            n-idprefix ~ N_IdPrefix
+            identifier 64.3-64.3 x
+          n-geninfixop 64.5-64.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 64.5-64.11 \\ominus
+          n-generalid 64.13-64.13
+            n-idprefix ~ N_IdPrefix
+            identifier 64.13-64.13 y
+        comma 64.14-64.14 ,
+        n-infixexpr 65.3-65.9
+          n-generalid 65.3-65.3
+            n-idprefix ~ N_IdPrefix
+            identifier 65.3-65.3 x
+          n-geninfixop 65.5-65.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 65.5-65.7 (+)
+          n-generalid 65.9-65.9
+            n-idprefix ~ N_IdPrefix
+            identifier 65.9-65.9 y
+        comma 65.10-65.10 ,
+        n-infixexpr 66.3-66.12
+          n-generalid 66.3-66.3
+            n-idprefix ~ N_IdPrefix
+            identifier 66.3-66.3 x
+          n-geninfixop 66.5-66.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 66.5-66.10 \\oplus
+          n-generalid 66.12-66.12
+            n-idprefix ~ N_IdPrefix
+            identifier 66.12-66.12 y
+        comma 66.13-66.13 ,
+        n-infixexpr 67.3-67.9
+          n-generalid 67.3-67.3
+            n-idprefix ~ N_IdPrefix
+            identifier 67.3-67.3 x
+          n-geninfixop 67.5-67.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 67.5-67.7 (/)
+          n-generalid 67.9-67.9
+            n-idprefix ~ N_IdPrefix
+            identifier 67.9-67.9 y
+        comma 67.10-67.10 ,
+        n-infixexpr 68.3-68.13
+          n-generalid 68.3-68.3
+            n-idprefix ~ N_IdPrefix
+            identifier 68.3-68.3 x
+          n-geninfixop 68.5-68.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 68.5-68.11 \\oslash
+          n-generalid 68.13-68.13
+            n-idprefix ~ N_IdPrefix
+            identifier 68.13-68.13 y
+        comma 68.14-68.14 ,
+        n-infixexpr 69.3-69.10
+          n-generalid 69.3-69.3
+            n-idprefix ~ N_IdPrefix
+            identifier 69.3-69.3 x
+          n-geninfixop 69.5-69.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 69.5-69.8 (\\X)
+          n-generalid 69.10-69.10
+            n-idprefix ~ N_IdPrefix
+            identifier 69.10-69.10 y
+        comma 69.11-69.11 ,
+        n-infixexpr 70.3-70.13
+          n-generalid 70.3-70.3
+            n-idprefix ~ N_IdPrefix
+            identifier 70.3-70.3 x
+          n-geninfixop 70.5-70.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 70.5-70.11 \\otimes
+          n-generalid 70.13-70.13
+            n-idprefix ~ N_IdPrefix
+            identifier 70.13-70.13 y
+        comma 70.14-70.14 ,
+        n-infixexpr 71.3-71.7
+          n-generalid 71.3-71.3
+            n-idprefix ~ N_IdPrefix
+            identifier 71.3-71.3 x
+          n-geninfixop 71.5-71.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 71.5-71.5 +
+          n-generalid 71.7-71.7
+            n-idprefix ~ N_IdPrefix
+            identifier 71.7-71.7 y
+        comma 71.8-71.8 ,
+        n-infixexpr 72.3-72.10
+          n-generalid 72.3-72.3
+            n-idprefix ~ N_IdPrefix
+            identifier 72.3-72.3 x
+          n-geninfixop 72.5-72.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 72.5-72.8 -+->
+          n-generalid 72.10-72.10
+            n-idprefix ~ N_IdPrefix
+            identifier 72.10-72.10 y
+        comma 72.11-72.11 ,
+        n-infixexpr 73.3-73.8
+          n-generalid 73.3-73.3
+            n-idprefix ~ N_IdPrefix
+            identifier 73.3-73.3 x
+          n-geninfixop 73.5-73.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 73.5-73.6 ++
+          n-generalid 73.8-73.8
+            n-idprefix ~ N_IdPrefix
+            identifier 73.8-73.8 y
+        comma 73.9-73.9 ,
+        n-infixexpr 74.3-74.7
+          n-generalid 74.3-74.3
+            n-idprefix ~ N_IdPrefix
+            identifier 74.3-74.3 x
+          n-geninfixop 74.5-74.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 74.5-74.5 ^
+          n-generalid 74.7-74.7
+            n-idprefix ~ N_IdPrefix
+            identifier 74.7-74.7 y
+        comma 74.8-74.8 ,
+        n-infixexpr 75.3-75.8
+          n-generalid 75.3-75.3
+            n-idprefix ~ N_IdPrefix
+            identifier 75.3-75.3 x
+          n-geninfixop 75.5-75.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 75.5-75.6 ^^
+          n-generalid 75.8-75.8
+            n-idprefix ~ N_IdPrefix
+            identifier 75.8-75.8 y
+        comma 75.9-75.9 ,
+        n-infixexpr 76.3-76.11
+          n-generalid 76.3-76.3
+            n-idprefix ~ N_IdPrefix
+            identifier 76.3-76.3 x
+          n-geninfixop 76.5-76.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 76.5-76.9 \\prec
+          n-generalid 76.11-76.11
+            n-idprefix ~ N_IdPrefix
+            identifier 76.11-76.11 y
+        comma 76.12-76.12 ,
+        n-infixexpr 77.3-77.13
+          n-generalid 77.3-77.3
+            n-idprefix ~ N_IdPrefix
+            identifier 77.3-77.3 x
+          n-geninfixop 77.5-77.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 77.5-77.11 \\preceq
+          n-generalid 77.13-77.13
+            n-idprefix ~ N_IdPrefix
+            identifier 77.13-77.13 y
+        comma 77.14-77.14 ,
+        n-infixexpr 78.3-78.13
+          n-generalid 78.3-78.3
+            n-idprefix ~ N_IdPrefix
+            identifier 78.3-78.3 x
+          n-geninfixop 78.5-78.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 78.5-78.11 \\propto
+          n-generalid 78.13-78.13
+            n-idprefix ~ N_IdPrefix
+            identifier 78.13-78.13 y
+        comma 78.14-78.14 ,
+        n-infixexpr 79.3-79.8
+          n-generalid 79.3-79.3
+            n-idprefix ~ N_IdPrefix
+            identifier 79.3-79.3 x
+          n-geninfixop 79.5-79.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 79.5-79.6 ??
+          n-generalid 79.8-79.8
+            n-idprefix ~ N_IdPrefix
+            identifier 79.8-79.8 y
+        comma 79.9-79.9 ,
+        n-infixexpr 80.3-80.8
+          n-generalid 80.3-80.3
+            n-idprefix ~ N_IdPrefix
+            identifier 80.3-80.3 x
+          n-geninfixop 80.5-80.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 80.5-80.6 |=
+          n-generalid 80.8-80.8
+            n-idprefix ~ N_IdPrefix
+            identifier 80.8-80.8 y
+        comma 80.9-80.9 ,
+        n-infixexpr 81.3-81.8
+          n-generalid 81.3-81.3
+            n-idprefix ~ N_IdPrefix
+            identifier 81.3-81.3 x
+          n-geninfixop 81.5-81.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 81.5-81.6 |-
+          n-generalid 81.8-81.8
+            n-idprefix ~ N_IdPrefix
+            identifier 81.8-81.8 y
+        comma 81.9-81.9 ,
+        n-infixexpr 82.3-82.7
+          n-generalid 82.3-82.3
+            n-idprefix ~ N_IdPrefix
+            identifier 82.3-82.3 x
+          n-geninfixop 82.5-82.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 82.5-82.5 \\
+          n-generalid 82.7-82.7
+            n-idprefix ~ N_IdPrefix
+            identifier 82.7-82.7 y
+        comma 82.8-82.8 ,
+        n-infixexpr 83.3-83.10
+          n-generalid 83.3-83.3
+            n-idprefix ~ N_IdPrefix
+            identifier 83.3-83.3 x
+          n-geninfixop 83.5-83.8
+            n-idprefix ~ N_IdPrefix
+            n-infixop 83.5-83.8 \\sim
+          n-generalid 83.10-83.10
+            n-idprefix ~ N_IdPrefix
+            identifier 83.10-83.10 y
+        comma 83.11-83.11 ,
+        n-infixexpr 84.3-84.12
+          n-generalid 84.3-84.3
+            n-idprefix ~ N_IdPrefix
+            identifier 84.3-84.3 x
+          n-geninfixop 84.5-84.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 84.5-84.10 \\simeq
+          n-generalid 84.12-84.12
+            n-idprefix ~ N_IdPrefix
+            identifier 84.12-84.12 y
+        comma 84.13-84.13 ,
+        n-infixexpr 85.3-85.7
+          n-generalid 85.3-85.3
+            n-idprefix ~ N_IdPrefix
+            identifier 85.3-85.3 x
+          n-geninfixop 85.5-85.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 85.5-85.5 /
+          n-generalid 85.7-85.7
+            n-idprefix ~ N_IdPrefix
+            identifier 85.7-85.7 y
+        comma 85.8-85.8 ,
+        n-infixexpr 86.3-86.8
+          n-generalid 86.3-86.3
+            n-idprefix ~ N_IdPrefix
+            identifier 86.3-86.3 x
+          n-geninfixop 86.5-86.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 86.5-86.6 //
+          n-generalid 86.8-86.8
+            n-idprefix ~ N_IdPrefix
+            identifier 86.8-86.8 y
+        comma 86.9-86.9 ,
+        n-infixexpr 87.3-87.12
+          n-generalid 87.3-87.3
+            n-idprefix ~ N_IdPrefix
+            identifier 87.3-87.3 x
+          n-geninfixop 87.5-87.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 87.5-87.10 \\sqcap
+          n-generalid 87.12-87.12
+            n-idprefix ~ N_IdPrefix
+            identifier 87.12-87.12 y
+        comma 87.13-87.13 ,
+        n-infixexpr 88.3-88.12
+          n-generalid 88.3-88.3
+            n-idprefix ~ N_IdPrefix
+            identifier 88.3-88.3 x
+          n-geninfixop 88.5-88.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 88.5-88.10 \\sqcup
+          n-generalid 88.12-88.12
+            n-idprefix ~ N_IdPrefix
+            identifier 88.12-88.12 y
+        comma 88.13-88.13 ,
+        n-infixexpr 89.3-89.15
+          n-generalid 89.3-89.3
+            n-idprefix ~ N_IdPrefix
+            identifier 89.3-89.3 x
+          n-geninfixop 89.5-89.13
+            n-idprefix ~ N_IdPrefix
+            n-infixop 89.5-89.13 \\sqsubset
+          n-generalid 89.15-89.15
+            n-idprefix ~ N_IdPrefix
+            identifier 89.15-89.15 y
+        comma 89.16-89.16 ,
+        n-infixexpr 90.3-90.17
+          n-generalid 90.3-90.3
+            n-idprefix ~ N_IdPrefix
+            identifier 90.3-90.3 x
+          n-geninfixop 90.5-90.15
+            n-idprefix ~ N_IdPrefix
+            n-infixop 90.5-90.15 \\sqsubseteq
+          n-generalid 90.17-90.17
+            n-idprefix ~ N_IdPrefix
+            identifier 90.17-90.17 y
+        comma 90.18-90.18 ,
+        n-infixexpr 91.3-91.15
+          n-generalid 91.3-91.3
+            n-idprefix ~ N_IdPrefix
+            identifier 91.3-91.3 x
+          n-geninfixop 91.5-91.13
+            n-idprefix ~ N_IdPrefix
+            n-infixop 91.5-91.13 \\sqsupset
+          n-generalid 91.15-91.15
+            n-idprefix ~ N_IdPrefix
+            identifier 91.15-91.15 y
+        comma 91.16-91.16 ,
+        n-infixexpr 92.3-92.17
+          n-generalid 92.3-92.3
+            n-idprefix ~ N_IdPrefix
+            identifier 92.3-92.3 x
+          n-geninfixop 92.5-92.15
+            n-idprefix ~ N_IdPrefix
+            n-infixop 92.5-92.15 \\sqsupseteq
+          n-generalid 92.17-92.17
+            n-idprefix ~ N_IdPrefix
+            identifier 92.17-92.17 y
+        comma 92.18-92.18 ,
+        n-infixexpr 93.3-93.11
+          n-generalid 93.3-93.3
+            n-idprefix ~ N_IdPrefix
+            identifier 93.3-93.3 x
+          n-geninfixop 93.5-93.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 93.5-93.9 \\star
+          n-generalid 93.11-93.11
+            n-idprefix ~ N_IdPrefix
+            identifier 93.11-93.11 y
+        comma 93.12-93.12 ,
+        n-infixexpr 94.3-94.13
+          n-generalid 94.3-94.3
+            n-idprefix ~ N_IdPrefix
+            identifier 94.3-94.3 x
+          n-geninfixop 94.5-94.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 94.5-94.11 \\subset
+          n-generalid 94.13-94.13
+            n-idprefix ~ N_IdPrefix
+            identifier 94.13-94.13 y
+        comma 94.14-94.14 ,
+        n-infixexpr 95.3-95.15
+          n-generalid 95.3-95.3
+            n-idprefix ~ N_IdPrefix
+            identifier 95.3-95.3 x
+          n-geninfixop 95.5-95.13
+            n-idprefix ~ N_IdPrefix
+            n-infixop 95.5-95.13 \\subseteq
+          n-generalid 95.15-95.15
+            n-idprefix ~ N_IdPrefix
+            identifier 95.15-95.15 y
+        comma 95.16-95.16 ,
+        n-infixexpr 96.3-96.11
+          n-generalid 96.3-96.3
+            n-idprefix ~ N_IdPrefix
+            identifier 96.3-96.3 x
+          n-geninfixop 96.5-96.9
+            n-idprefix ~ N_IdPrefix
+            n-infixop 96.5-96.9 \\succ
+          n-generalid 96.11-96.11
+            n-idprefix ~ N_IdPrefix
+            identifier 96.11-96.11 y
+        comma 96.12-96.12 ,
+        n-infixexpr 97.3-97.13
+          n-generalid 97.3-97.3
+            n-idprefix ~ N_IdPrefix
+            identifier 97.3-97.3 x
+          n-geninfixop 97.5-97.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 97.5-97.11 \\succeq
+          n-generalid 97.13-97.13
+            n-idprefix ~ N_IdPrefix
+            identifier 97.13-97.13 y
+        comma 97.14-97.14 ,
+        n-infixexpr 98.3-98.13
+          n-generalid 98.3-98.3
+            n-idprefix ~ N_IdPrefix
+            identifier 98.3-98.3 x
+          n-geninfixop 98.5-98.11
+            n-idprefix ~ N_IdPrefix
+            n-infixop 98.5-98.11 \\supset
+          n-generalid 98.13-98.13
+            n-idprefix ~ N_IdPrefix
+            identifier 98.13-98.13 y
+        comma 98.14-98.14 ,
+        n-infixexpr 99.3-99.15
+          n-generalid 99.3-99.3
+            n-idprefix ~ N_IdPrefix
+            identifier 99.3-99.3 x
+          n-geninfixop 99.5-99.13
+            n-idprefix ~ N_IdPrefix
+            n-infixop 99.5-99.13 \\supseteq
+          n-generalid 99.15-99.15
+            n-idprefix ~ N_IdPrefix
+            identifier 99.15-99.15 y
+        comma 99.16-99.16 ,
+        n-times 100.3-100.8
+          n-generalid 100.3-100.3
+            n-idprefix ~ N_IdPrefix
+            identifier 100.3-100.3 x
+          n-geninfixop 100.5-100.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 100.5-100.6 \\X
+          n-generalid 100.8-100.8
+            n-idprefix ~ N_IdPrefix
+            identifier 100.8-100.8 y
+        comma 100.9-100.9 ,
+        n-times 101.3-101.12
+          n-generalid 101.3-101.3
+            n-idprefix ~ N_IdPrefix
+            identifier 101.3-101.3 x
+          n-geninfixop 101.5-101.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 101.5-101.10 \\times
+          n-generalid 101.12-101.12
+            n-idprefix ~ N_IdPrefix
+            identifier 101.12-101.12 y
+        comma 101.13-101.13 ,
+        n-infixexpr 102.3-102.12
+          n-generalid 102.3-102.3
+            n-idprefix ~ N_IdPrefix
+            identifier 102.3-102.3 x
+          n-geninfixop 102.5-102.10
+            n-idprefix ~ N_IdPrefix
+            n-infixop 102.5-102.10 \\uplus
+          n-generalid 102.12-102.12
+            n-idprefix ~ N_IdPrefix
+            identifier 102.12-102.12 y
+        comma 102.13-102.13 ,
+        n-infixexpr 103.3-103.7
+          n-generalid 103.3-103.3
+            n-idprefix ~ N_IdPrefix
+            identifier 103.3-103.3 x
+          n-geninfixop 103.5-103.5
+            n-idprefix ~ N_IdPrefix
+            n-infixop 103.5-103.5 |
+          n-generalid 103.7-103.7
+            n-idprefix ~ N_IdPrefix
+            identifier 103.7-103.7 y
+        comma 103.8-103.8 ,
+        n-infixexpr 104.3-104.8
+          n-generalid 104.3-104.3
+            n-idprefix ~ N_IdPrefix
+            identifier 104.3-104.3 x
+          n-geninfixop 104.5-104.6
+            n-idprefix ~ N_IdPrefix
+            n-infixop 104.5-104.6 ||
+          n-generalid 104.8-104.8
+            n-idprefix ~ N_IdPrefix
+            identifier 104.8-104.8 y
+        comma 104.9-104.9 ,
+        n-infixexpr 105.3-105.9
+          n-generalid 105.3-105.3
+            n-idprefix ~ N_IdPrefix
+            identifier 105.3-105.3 x
+          n-geninfixop 105.5-105.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 105.5-105.7 \\wr
+          n-generalid 105.9-105.9
+            n-idprefix ~ N_IdPrefix
+            identifier 105.9-105.9 y
+        rbc 106.1-106.1 }
+  n-endmodule 108.1-108.4
+    end-module 108.1-108.4 ====

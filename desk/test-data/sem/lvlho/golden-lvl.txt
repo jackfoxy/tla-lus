@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=1}
+lvl H L2 ml=[3] w=[1] mml=[2] olc=[F] lc={x<=1} nlp={x}
+lvl Pr L2 ml=[1] w=[0]
+lvl Bad L2 lc={x<=1} nlp={x}

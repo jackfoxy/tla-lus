@@ -1,0 +1,7 @@
+ACCEPT
+MODULE A 1.1-3.4
+  def Apply arity=2 local=n L0 2.1-2.24
+    param op arity=1 L0 2.7-2.11
+    param x arity=0 L0 2.14-2.14
+    apply op opkind=FormalParamKind L0 2.20-2.24
+      apply x opkind=FormalParamKind L0 2.23-2.23

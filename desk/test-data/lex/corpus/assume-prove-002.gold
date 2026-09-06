@@ -1,0 +1,16 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T theorem 2.1 2.7 THEOREM
+T identifier 2.9 2.11 thm
+T def 2.13 2.14 ==
+T assume 3.3 3.8 ASSUME
+T new 3.10 3.12 NEW
+T constant 3.14 3.21 CONSTANT
+T identifier 3.23 3.23 x
+T in 3.25 3.27 \\in
+T identifier 3.29 3.29 S
+T prove 4.3 4.7 PROVE
+T identifier 4.9 4.9 C
+T obvious 5.1 5.7 OBVIOUS
+T end-module 6.1 6.4 ====

@@ -1,0 +1,88 @@
+ACCEPT
+n-module 1.1-11.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-10.12
+    n-operatordefinition 2.1-5.12
+      n-identlhs 2.1-2.4
+        identifier 2.1-2.4 conj
+      def 2.6-2.7 ==
+      n-conjlist 3.3-5.12
+        n-conjitem 3.3-3.13
+          and 3.3-3.4 /\\
+          n-label 3.6-3.13
+            n-generalid 3.6-3.8
+              n-idprefix ~ N_IdPrefix
+              identifier 3.6-3.8 lbl
+            coloncolon 3.10-3.11 ::
+            n-generalid 3.13-3.13
+              n-idprefix ~ N_IdPrefix
+              identifier 3.13-3.13 A
+        n-conjitem 4.3-4.11
+          and 4.3-4.4 /\\
+          n-infixexpr 4.6-4.11
+            n-generalid 4.6-4.6
+              n-idprefix ~ N_IdPrefix
+              identifier 4.6-4.6 B
+            n-geninfixop 4.8-4.9
+              n-idprefix ~ N_IdPrefix
+              n-infixop 4.8-4.9 :=
+            n-generalid 4.11-4.11
+              n-idprefix ~ N_IdPrefix
+              identifier 4.11-4.11 C
+        n-conjitem 5.3-5.12
+          and 5.3-5.4 /\\
+          n-infixexpr 5.6-5.12
+            n-generalid 5.6-5.6
+              n-idprefix ~ N_IdPrefix
+              identifier 5.6-5.6 D
+            n-geninfixop 5.8-5.10
+              n-idprefix ~ N_IdPrefix
+              n-infixop 5.8-5.10 ::=
+            n-generalid 5.12-5.12
+              n-idprefix ~ N_IdPrefix
+              identifier 5.12-5.12 E
+    n-operatordefinition 7.1-10.12
+      n-identlhs 7.1-7.4
+        identifier 7.1-7.4 disj
+      def 7.6-7.7 ==
+      n-disjlist 8.3-10.12
+        n-disjitem 8.3-8.13
+          or 8.3-8.4 \\/
+          n-label 8.6-8.13
+            n-generalid 8.6-8.8
+              n-idprefix ~ N_IdPrefix
+              identifier 8.6-8.8 lbl
+            coloncolon 8.10-8.11 ::
+            n-generalid 8.13-8.13
+              n-idprefix ~ N_IdPrefix
+              identifier 8.13-8.13 A
+        n-disjitem 9.3-9.11
+          or 9.3-9.4 \\/
+          n-infixexpr 9.6-9.11
+            n-generalid 9.6-9.6
+              n-idprefix ~ N_IdPrefix
+              identifier 9.6-9.6 B
+            n-geninfixop 9.8-9.9
+              n-idprefix ~ N_IdPrefix
+              n-infixop 9.8-9.9 :=
+            n-generalid 9.11-9.11
+              n-idprefix ~ N_IdPrefix
+              identifier 9.11-9.11 C
+        n-disjitem 10.3-10.12
+          or 10.3-10.4 \\/
+          n-infixexpr 10.6-10.12
+            n-generalid 10.6-10.6
+              n-idprefix ~ N_IdPrefix
+              identifier 10.6-10.6 D
+            n-geninfixop 10.8-10.10
+              n-idprefix ~ N_IdPrefix
+              n-infixop 10.8-10.10 ::=
+            n-generalid 10.12-10.12
+              n-idprefix ~ N_IdPrefix
+              identifier 10.12-10.12 E
+  n-endmodule 11.1-11.4
+    end-module 11.1-11.4 ====

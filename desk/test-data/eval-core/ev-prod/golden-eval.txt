@@ -1,0 +1,3 @@
+EVAL
+P SetOfTuplesValue {<<1, 1>>, <<1, 2>>, <<2, 1>>, <<2, 2>>}
+R SetOfTuplesValue {<<1, 3>>, <<2, 3>>}

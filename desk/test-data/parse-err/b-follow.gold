@@ -1,0 +1,9 @@
+REJECT
+***Parse Error***
+Was expecting "==== or more Module body"
+Encountered "2" at line 2, column 10 and token "1" 
+
+Residual stack trace follows:
+Module definition starting at line 1, column 1.
+
+%%

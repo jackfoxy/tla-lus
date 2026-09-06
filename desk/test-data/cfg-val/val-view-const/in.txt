@@ -1,0 +1,4 @@
+INIT Init
+NEXT Next
+VIEW V
+CONSTANT V = 42

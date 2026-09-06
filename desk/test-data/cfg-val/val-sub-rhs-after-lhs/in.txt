@@ -1,0 +1,4 @@
+CONSTANTS C <- Foo
+Foo <- Bar
+INIT Init
+NEXT Next

@@ -1,0 +1,3 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=2}
+lvl Bad L3 lc={x<=2} nlp={x}

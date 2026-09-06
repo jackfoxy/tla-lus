@@ -1,0 +1,25 @@
+T bm1 1.1 1.11 ---- MODULE
+T identifier 1.13 1.16 Test
+T separator 1.18 1.21 ----
+T local 2.1 2.5 LOCAL
+T identifier 2.7 2.8 op
+T def 2.10 2.11 ==
+T identifier 2.13 2.13 x
+T local 3.1 3.5 LOCAL
+T identifier 3.7 3.7 f
+T lsb 3.8 3.8 [
+T identifier 3.9 3.9 x
+T in 3.11 3.13 \\in
+T identifier 3.15 3.17 Nat
+T rsb 3.18 3.18 ]
+T def 3.20 3.21 ==
+T identifier 3.23 3.23 x
+T local 4.1 4.5 LOCAL
+T instance 4.7 4.14 INSTANCE
+T identifier 4.16 4.16 M
+T local 5.1 5.5 LOCAL
+T identifier 5.7 5.7 M
+T def 5.9 5.10 ==
+T instance 5.12 5.19 INSTANCE
+T identifier 5.21 5.21 M
+T end-module 6.1 6.4 ====

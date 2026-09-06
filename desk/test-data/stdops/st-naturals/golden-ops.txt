@@ -1,0 +1,30 @@
+BINDINGS
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+Div IntValue 3
+Expt IntValue 1024
+ExptZero ! EC2180 EvalException: 0^0 is undefined.
+Geq BoolValue FALSE
+Gt BoolValue TRUE
+Interval IntervalValue 1..5
+IntervalEmpty IntervalValue {}
+Leq BoolValue TRUE
+Lt BoolValue TRUE
+Minus IntValue 5
+MinusNeg IntValue -2
+Mod IntValue 1
+NatMem BoolValue TRUE
+NatSet UserValue Nat
+Plus IntValue 5
+Times IntValue 20

@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Encountered "3" at line 2, column 11 and token "WF_" 
+
+Residual stack trace follows:
+restricted form of expression starting at line 2, column 11.
+Fairness Expression starting at line 2, column 8.
+ExtendableExpr starting at line 2, column 8.
+Expression starting at line 2, column 8.
+Definition starting at line 2, column 1.
+
+%%

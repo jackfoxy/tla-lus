@@ -1,0 +1,8 @@
+ACCEPT
+MODULE A 1.1-4.4
+  thmdef Foo local=n L-1 2.1-2.19
+    apply TRUE opkind=BuiltInKind L-1 2.16-2.19
+  theorem name=Foo L-1 2.1-2.19
+    apply TRUE opkind=BuiltInKind L-1 2.16-2.19
+DIAGS
+D 4357 ERROR 3.11-3.14 The only expression allowed as a fact in a HIDE is

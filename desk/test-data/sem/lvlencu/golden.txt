@@ -1,0 +1,24 @@
+ACCEPT
+MODULE A 1.1-7.4
+  var x L1 2.10-2.10
+  def E1 arity=0 local=n L1 3.1-3.22
+    apply ENABLED opkind=BuiltInKind L1 3.7-3.22
+      apply = opkind=BuiltInKind L2 3.16-3.21
+        apply ' opkind=BuiltInKind L2 3.16-3.17
+          apply x opkind=VariableDeclKind L1 3.16-3.16
+        apply x opkind=VariableDeclKind L1 3.21-3.21
+  def E2 arity=0 local=n L1 4.1-4.24
+    apply ENABLED opkind=BuiltInKind L1 4.7-4.24
+      apply ~> opkind=BuiltInKind L3 4.17-4.22
+        apply x opkind=VariableDeclKind L1 4.17-4.17
+        apply x opkind=VariableDeclKind L1 4.22-4.22
+  def U1 arity=0 local=n L2 5.1-5.17
+    apply UNCHANGED opkind=BuiltInKind L2 5.7-5.17
+      apply x opkind=VariableDeclKind L1 5.17-5.17
+  def U2 arity=0 local=n L2 6.1-6.20
+    apply UNCHANGED opkind=BuiltInKind L2 6.7-6.20
+      apply ' opkind=BuiltInKind L2 6.18-6.19
+        apply x opkind=VariableDeclKind L1 6.18-6.18
+DIAGS
+D 4205 ERROR 4.7-4.24 Level error in applying operator ENABLED:
+D 4205 ERROR 6.7-6.20 Level error in applying operator UNCHANGED:

@@ -1,0 +1,30 @@
+ACCEPT
+n-module 1.1-3.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-2.26
+    n-operatordefinition 2.1-2.26
+      n-identlhs 2.1-2.1
+        identifier 2.1-2.1 r
+      def 2.3-2.4 ==
+      n-except 2.6-2.26
+        lsb 2.6-2.6 [
+        n-generalid 2.7-2.7
+          n-idprefix ~ N_IdPrefix
+          identifier 2.7-2.7 a
+        except 2.9-2.14 EXCEPT
+        n-exceptspec 2.16-2.25
+          bang 2.16-2.16 !
+          n-exceptcomponent 2.17-2.19
+            lsb 2.17-2.17 [
+            n-number 2.18-2.18
+              number-literal 2.18-2.18 2
+            rsb 2.19-2.19 ]
+          t-equal 2.21-2.21 =
+          n-string 2.23-2.25 "a"
+        rsb 2.26-2.26 ]
+  n-endmodule 3.1-3.4
+    end-module 3.1-3.4 ====

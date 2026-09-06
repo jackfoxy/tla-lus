@@ -1,0 +1,3 @@
+VALIDATE
+2233 ~
+The view function V cannot be a constant.

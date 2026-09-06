@@ -1,0 +1,15 @@
+ACCEPT
+MODULE A 1.1-5.4
+  def F arity=2 local=n L0 4.1-4.43
+    param a arity=0 L0 4.3-4.3
+    param b arity=0 L0 4.6-4.6
+    apply $IfThenElse opkind=BuiltInKind L0 4.12-4.43
+      apply = opkind=BuiltInKind L0 4.15-4.19
+        apply b opkind=FormalParamKind L0 4.15-4.15
+        num 0 L0 4.19-4.19
+      num 0 L0 4.26-4.26
+      apply F opkind=UserDefinedOpKind L0 4.33-4.43
+        apply a opkind=FormalParamKind L0 4.35-4.35
+        apply - opkind=UserDefinedOpKind L0 4.38-4.42
+          apply b opkind=FormalParamKind L0 4.38-4.38
+          num 1 L0 4.42-4.42

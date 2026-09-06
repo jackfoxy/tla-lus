@@ -1,0 +1,60 @@
+ACCEPT
+n-module 1.1-11.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-10.7
+    n-theorem 2.1-10.7
+      theorem 2.1-2.7 THEOREM
+      identifier 2.9-2.11 thm
+      def 2.13-2.14 ==
+      n-assumeprove 3.3-9.9
+        assume 3.3-3.8 ASSUME
+        n-newsymb 4.5-4.9
+          new 4.5-4.7 NEW
+          n-identdecl 4.9-4.9
+            identifier 4.9-4.9 f
+        comma 4.10-4.10 ,
+        n-infixexpr 5.5-5.9
+          n-number 5.5-5.5
+            number-literal 5.5-5.5 1
+          n-geninfixop 5.7-5.7
+            n-idprefix ~ N_IdPrefix
+            n-infixop 5.7-5.7 +
+          n-number 5.9-5.9
+            number-literal 5.9-5.9 2
+        comma 5.10-5.10 ,
+        n-conjlist 6.5-7.8
+          n-conjitem 6.5-6.8
+            and 6.5-6.6 /\\
+            n-number 6.8-6.8
+              number-literal 6.8-6.8 1
+          n-conjitem 7.5-7.8
+            and 7.5-7.6 /\\
+            n-number 7.8-7.8
+              number-literal 7.8-7.8 2
+        comma 7.9-7.9 ,
+        n-label 8.5-8.27
+          n-generalid 8.5-8.7
+            n-idprefix ~ N_IdPrefix
+            identifier 8.5-8.7 lbl
+          coloncolon 8.9-8.10 ::
+          n-assumeprove 8.12-8.27
+            assume 8.12-8.17 ASSUME
+            n-generalid 8.19-8.19
+              n-idprefix ~ N_IdPrefix
+              identifier 8.19-8.19 P
+            prove 8.21-8.25 PROVE
+            n-generalid 8.27-8.27
+              n-idprefix ~ N_IdPrefix
+              identifier 8.27-8.27 Q
+        prove 9.3-9.7 PROVE
+        n-generalid 9.9-9.9
+          n-idprefix ~ N_IdPrefix
+          identifier 9.9-9.9 C
+      n-terminalproof 10.1-10.7
+        omitted 10.1-10.7 OMITTED
+  n-endmodule 11.1-11.4
+    end-module 11.1-11.4 ====

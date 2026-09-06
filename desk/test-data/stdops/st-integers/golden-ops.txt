@@ -1,0 +1,27 @@
+BINDINGS
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+Cmp BoolValue TRUE
+DivBothNeg IntValue 3
+DivNegL IntValue -4
+DivNegR IntValue -4
+IntMem BoolValue TRUE
+IntSet UserValue Int
+ModNegL IntValue 2
+NatMemNeg BoolValue FALSE
+Neg IntValue -5
+NegExpr IntValue -7
+NegInterval IntervalValue -2..2

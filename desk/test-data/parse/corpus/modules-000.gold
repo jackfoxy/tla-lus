@@ -1,0 +1,10 @@
+ACCEPT
+n-module 1.1-2.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body ~ N_Body
+  n-endmodule 2.1-2.4
+    end-module 2.1-2.4 ====

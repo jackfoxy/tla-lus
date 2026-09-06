@@ -1,0 +1,11 @@
+ACCEPT
+MODULE A 1.1-6.4
+  const P arity=1 L0 2.10-2.13
+  var x L1 3.10-3.10
+  def H arity=1 local=n L0 4.1-4.12
+    param a arity=0 L0 4.3-4.3
+    apply P opkind=ConstantDeclKind L0 4.9-4.12
+      apply a opkind=FormalParamKind L0 4.11-4.11
+  def Use arity=0 local=n L1 5.1-5.11
+    apply H opkind=UserDefinedOpKind L1 5.8-5.11
+      apply x opkind=VariableDeclKind L1 5.10-5.10

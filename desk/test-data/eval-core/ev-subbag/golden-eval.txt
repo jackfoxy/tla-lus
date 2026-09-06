@@ -1,0 +1,5 @@
+EVAL
+B FcnRcdValue <<1, 1>>
+Empty SetEnumValue {<<>>}
+NSubs IntValue 4
+Subs SetEnumValue {<<>>, <<1>>, (2 :> 1), <<1, 1>>}

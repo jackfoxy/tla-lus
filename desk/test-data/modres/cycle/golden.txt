@@ -1,0 +1,20 @@
+
+****** SANY2 Version 2.2 created 08 July 2020
+
+Parsing file A.tla
+Parsing file B.tla
+
+Fatal errors while parsing TLA+ spec in file A.tla
+
+Unknown location
+
+Circular dependency among .tla files; dependency cycle is:
+
+  A.tla --> B.tla --> A.tla
+*** Errors: 1
+
+Unknown location
+
+Circular dependency among .tla files; dependency cycle is:
+
+  A.tla --> B.tla --> A.tla

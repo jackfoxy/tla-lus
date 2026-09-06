@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,v<=1,x<=2,y<=3}
+lvl ChooseOne L0 ml=[2,2] w=[1,1] mml=[;0] olc=[;FF] lc={x<=2,y<=3}
+lvl Spec L3 lp={v} lc={v<=1,x<=2,y<=3} nlp={v}

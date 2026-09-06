@@ -1,0 +1,12 @@
+REJECT
+***Parse Error***
+Item at line 5, col 1 to line 5, col 1 of module Test is not properly indented inside conjunction or  disjunction list item at line 4, col 5 to line 5, col 1 of module Test
+
+Residual stack trace follows:
+AND-OR Junction starting at line 3, column 5.
+ExtendableExpr starting at line 3, column 5.
+Expression starting at line 3, column 5.
+Definition starting at line 2, column 1.
+Module body starting at line 2, column 1.
+
+%%

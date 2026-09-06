@@ -1,0 +1,9 @@
+LIVENESS
+VERDICT ok
+EC 0
+WARN 2279
+STAT generated 4
+STAT distinct 1
+STAT queue 0
+STAT depth 1
+TRACE 0

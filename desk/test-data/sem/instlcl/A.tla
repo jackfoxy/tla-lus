@@ -1,0 +1,6 @@
+---- MODULE A ----
+VARIABLE x
+CONSTANT c
+LOCAL INSTANCE B WITH y <- x
+Use == Op
+====

@@ -1,0 +1,20 @@
+LIVESTRUCT
+OOS 1
+--- 0 ---
+PROMISES 0
+CHECKSTATE 0
+CHECKACTION 1
+PEMS 1
+TABLEAU 1
+TBINIT 1
+TBGRAPH
+Node 0.
+{[]-line 8, col 12 to line 8, col 16 of module A,
+ -line 8, col 12 to line 8, col 16 of module A,
+ ()[]-line 8, col 12 to line 8, col 16 of module A} --> 0 
+ENDTBGRAPH
+TF
+/\ []-line 8, col 12 to line 8, col 16 of module A
+/\ /\ []<>\/ (-ENABLED <line 7, col 36 to line 7, col 38 of module A>_line 7, col 34 to line 7, col 34 of module A)
+          \/ (<line 7, col 36 to line 7, col 38 of module A>_line 7, col 34 to line 7, col 34 of module A)
+ENDTF

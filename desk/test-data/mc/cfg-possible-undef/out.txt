@@ -1,0 +1,2 @@
+Error: The possible NoSuchOp specified in the configuration file
+is not defined in the specification.

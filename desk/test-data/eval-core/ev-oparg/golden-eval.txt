@@ -1,0 +1,6 @@
+EVAL
+A1 IntValue 6
+A2 IntValue 7
+A3 IntValue 14
+A4 IntValue 7
+Sel TupleValue <<2, 4>>

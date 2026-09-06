@@ -1,0 +1,8 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,x<=2,x<=3}
+lvl SOp1a L0 ml=[2] w=[1] lc={x<=2}
+lvl OOp2 L0 ml=[3,3,3] w=[1,1,1] mml=[0,0;;] olc=[FFTFFT;;]
+lvl E1 L0
+lvl COp L0 ml=[2,2] w=[1,1] lc={x<=3}
+lvl OOp5 L0 ml=[3,3,3,3,3,3] w=[1,1,1,1,1,1] mml=[0,0,0,0,0;;;;;] olc=[FFFFFTFFFFFTFFFFFTFFFFFTFFFFFT;;;;;]
+lvl E2 L0

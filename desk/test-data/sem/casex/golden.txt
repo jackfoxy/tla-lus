@@ -1,0 +1,14 @@
+ACCEPT
+MODULE A 1.1-4.4
+  const P arity=0 L0 2.10-2.10
+  const Q arity=0 L0 2.13-2.13
+  const a arity=0 L0 2.16-2.16
+  const b arity=0 L0 2.19-2.19
+  def C arity=0 local=n L0 3.1-3.26
+    apply $Case opkind=BuiltInKind L0 3.6-3.26
+      apply $Pair opkind=BuiltInKind L0 3.11-3.16
+        apply P opkind=ConstantDeclKind L0 3.11-3.11
+        apply a opkind=ConstantDeclKind L0 3.16-3.16
+      apply $Pair opkind=BuiltInKind L0 3.21-3.26
+        apply Q opkind=ConstantDeclKind L0 3.21-3.21
+        apply b opkind=ConstantDeclKind L0 3.26-3.26

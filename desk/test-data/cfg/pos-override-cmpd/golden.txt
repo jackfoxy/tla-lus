@@ -1,0 +1,7 @@
+CONFIG
+deadlock true
+override frob!bar!glitch <- Baz
+RAW
+CONSTANT
+frob ! bar ! glitch <- Baz 
+---

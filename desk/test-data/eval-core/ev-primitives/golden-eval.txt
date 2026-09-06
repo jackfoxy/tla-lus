@@ -1,0 +1,11 @@
+EVAL
+Empty StringValue ""
+EmptyIv IntervalValue {}
+Esc StringValue "a\"b"
+Iv IntervalValue 3..7
+NegInt IntValue -7
+No BoolValue FALSE
+PosInt IntValue 42
+Str StringValue "hello"
+Yes BoolValue TRUE
+Zero IntValue 0

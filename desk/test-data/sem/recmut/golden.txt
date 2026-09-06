@@ -1,0 +1,13 @@
+ACCEPT
+MODULE A 1.1-6.4
+  var x L1 2.10-2.10
+  def P arity=1 local=n L2 4.1-4.12
+    param n arity=0 L0 4.3-4.3
+    apply Q opkind=UserDefinedOpKind L2 4.9-4.12
+      apply n opkind=FormalParamKind L0 4.11-4.11
+  def Q arity=1 local=n L2 5.1-5.14
+    param n arity=0 L0 5.3-5.3
+    apply = opkind=BuiltInKind L2 5.9-5.14
+      apply ' opkind=BuiltInKind L2 5.9-5.10
+        apply x opkind=VariableDeclKind L1 5.9-5.9
+      apply n opkind=FormalParamKind L0 5.14-5.14

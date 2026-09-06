@@ -1,0 +1,7 @@
+LEVELS
+lvl MODULE A L-1 lc={f<=2,g<=2,n<=2}
+lvl E1 L1 lp={f} lc={f<=2}
+lvl E2 L1 lp={f} lc={f<=2}
+lvl E3 L1 lp={f} lc={f<=2}
+lvl E4 L1 lp={f} lc={f<=2}
+lvl E5 L1 lp={f,g} lc={f<=2,g<=2}

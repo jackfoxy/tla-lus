@@ -1,0 +1,15 @@
+ACCEPT
+n-module 1.1-3.4
+  n-beginmodule 1.1-1.21
+    bm1 1.1-1.11 ---- MODULE
+    identifier 1.13-1.16 Test
+    separator 1.18-1.21 ----
+  n-extends ~ N_Extends
+  n-body 2.1-2.12
+    n-theorem 2.1-2.12
+      theorem 2.1-2.7 THEOREM
+      n-generalid 2.9-2.12
+        n-idprefix ~ N_IdPrefix
+        identifier 2.9-2.12 TRUE
+  n-endmodule 3.1-3.4
+    end-module 3.1-3.4 ====

@@ -1,0 +1,4 @@
+VALIDATE
+2281 ~
+The configuration file substitutes constant C with non-constant T - specifically: TLC encountered a temporal formula ([]A) when evaluating a predicate or action.
+line 5, col 6 to line 5, col 14 of module A

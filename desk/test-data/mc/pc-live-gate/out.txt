@@ -1,0 +1,13 @@
+Error: Temporal property Live was violated.
+Error: The following behavior constitutes a counter-example:
+State 1: <Initial predicate>
+x = 0
+State 2: <Next line 10, col 13 to line 10, col 31 of module spec>
+x = 1
+State 3: <Next line 10, col 13 to line 10, col 31 of module spec>
+x = 2
+State 4: Stuttering
+Warning: The stuttering counterexample above may be caused by the absence of a fairness constraint in the behavior specification Spec defined at line 11, col 1 to line 11, col 26 of module spec. To rule out such counterexamples, conjoin a suitable fairness constraint to Spec (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).
+Error: Postcondition Post at line 13, col 9 to line 13, col 32 of module spec is false.
+8 states generated, 4 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.

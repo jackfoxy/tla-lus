@@ -1,0 +1,7 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2}
+lvl P L0
+lvl Q L0
+lvl T L0
+lvl Mem L0
+lvl Filt L0

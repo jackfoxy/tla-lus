@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={n<=2,s<=3,x<=1}
+lvl Foo L0 ml=[3,3] w=[1,1] mml=[0;] olc=[FF;] lc={s<=3}
+lvl Bar L0 ml=[3] w=[1] lc={s<=3}
+lvl Spec L3 lp={x} lc={s<=3,x<=1} nlp={x}
