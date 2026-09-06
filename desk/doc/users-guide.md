@@ -24,13 +24,15 @@ running check resumes from its last completed stage.
 ## Concepts
 
 - **Request** — one operation (`%translate`, `%analyze`, `%check`) over a
-  **source bundle**, with **limits** and a write flag. Operations the
-  pipeline cannot yet run faithfully are **rejected at submit by name**
-  (see `doc/compatibility.md`); today that includes `%translate`, the
-  `%analyze` semantic/level/lint flags, and `%clay` sources.
+  **source bundle**, with **limits**, an optional **write target**, and a set
+  of diagnostic codes to promote to errors. Anything the pipeline cannot run
+  faithfully is **rejected at submit by name** (see `doc/compatibility.md`);
+  the headline case is `%translate` — PlusCal translation is out of scope and
+  the ledger marks it `excluded`. `%analyze`'s semantic/level/lint flags and
+  `%clay` sources are **live**.
 - **Source bundle** — either `%inline` (modules and an optional `.cfg` passed
-  as nouns) or `%clay` (a root `.tla` path in a desk plus module-search
-  roots; not yet loaded — rejected at submit until unit 10).
+  as nouns) or `%clay` (a root module NAME in a desk, a config path, and
+  module-search roots; loaded asynchronously at one pinned revision).
 - **Job** — a submitted request identified by a `req-id` you choose. It runs
   as a chain of bounded slices — long searches persist a resumable cursor
   between events — and ends in exactly one **result**.
@@ -54,10 +56,13 @@ Inv  == x < 4
 ====
 '''
 =cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
-=req  :*  [%check [| ~ [%exhaustive & 0]]]
+::  check-opts is [translate view difftrace continue cfg coverage
+::  postconditions mode]; request is [op src limits write promote]
+=req  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
           [%inline 'Counter' (malt ~[['Counter' spec]]) `cfg]
           default-limits:job-lib
-          |
+          ~
+          ~
       ==
 :tla-lus &tla-lus-action [%submit ~.counter req]
 ```
@@ -65,8 +70,8 @@ Inv  == x < 4
 Then read the result:
 
 ```
-.^((unit job) %gx /=tla-lus=/job/counter)
-.^(artifact %gx /=tla-lus=/job/counter/artifact/report)
+.^((unit job) %gx /=tla-lus=/job/counter/noun)
+.^(artifact %gx /=tla-lus=/job/counter/artifact/report/noun)
 ```
 
 A passing model reports `%ok` with `run-stats` (states generated / distinct /
@@ -81,8 +86,11 @@ holds at the relevant states.
 For a spec that lives in a desk, submit a `%clay` bundle pointing at the root
 `.tla` and any module-search roots. Store modules under the `%tla` mark
 (lowercased file names — Clay path segments carry no case; the declared
-module-name check still validates the original case). Clay is read-only unless
-you set `allow-write=&` and use the write action.
+module-name check still validates the original case). Clay is read-only unless the request carries a
+`write` target (`` `[desk pax] ``), which is validated at submit and refused if
+it overlaps the run's own module-search roots. Select the config with
+`src.cfg` (a path); `check-opts.cfg` is the `%inline` spelling and is refused
+on a `%clay` bundle.
 
 ## Model checking modes
 
@@ -114,7 +122,8 @@ idempotent. Remove a finished job's stored result with `[%delete-result
   `%stage`/`%progress`/`%diagnostic`/`%result` events; a late subscriber gets a
   replayed snapshot first.
 - Scry `/x/job/<id>` for the whole job, or `/x/job/<id>/artifact/report` for
-  the summary.
+  the summary. From the dojo a `%gx` scry takes the mark on the end of the
+  path: `.^((unit job) %gx /=tla-lus=/job/<id>/noun)`.
 - A counterexample trace lists states as `State N: <label>` with `var = value`
   bindings; a liveness lasso ends in `State M: Stuttering`.
 

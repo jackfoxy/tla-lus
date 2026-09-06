@@ -114,6 +114,7 @@ is idempotent. Subscribing to an unknown id fails the watch.
 
 | Path | Returns |
 |---|---|
+| `/x/version` | `[api=@ud state=@ud]` — the public API revision and the agent's state version (`[1 0]`) |
 | `/x/jobs` | `(list [req-id stage])` — all jobs and their current stage |
 | `/x/job/<id>` | `(unit job)` — the public job projection (internal cursors are never exposed) |
 | `/x/job/<id>/artifact/<name>` | `artifact` — a terminal job's artifact (`%report` text; `%trace` on a violation) |
@@ -147,18 +148,22 @@ Next == x' = (x + 1) % 4
 Inv  == x < 4
 ====
 '''
-=req  :*  op=[%check [translate=| cfg=~ mode=[%exhaustive deadlock=&]]]
+::  check-opts is [translate view difftrace continue cfg coverage
+::  postconditions mode]; request is [op src limits write promote]
+=req  :*  op=[%check [| | | | ~ | ~ [%exhaustive & 0]]]
           src=[%inline 'Counter' (malt ~[['Counter' spec]]) `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a']
           limits=*limits          ::  or default-limits:job-lib
           write=~                  ::  or `[%base /tlaout] to persist artifacts
+          promote=~                ::  diagnostic codes to raise to errors
       ==
 ::  the request id is a @ta of your choosing
 :tla-lus &tla-lus-action [%submit ~.counter req]
 
 ::  peek results (the %gx care supplies the %x head of the on-peek path)
-.^((list [req-id stage]) %gx /=tla-lus=/jobs)
-.^((unit job) %gx /=tla-lus=/job/counter)
-.^(artifact %gx /=tla-lus=/job/counter/artifact/report)
+.^([api=@ud state=@ud] %gx /=tla-lus=/version/noun)
+.^((list [req-id stage]) %gx /=tla-lus=/jobs/noun)
+.^((unit job) %gx /=tla-lus=/job/counter/noun)
+.^(artifact %gx /=tla-lus=/job/counter/artifact/report/noun)
 
 ::  cancel / clean up
 :tla-lus &tla-lus-action [%cancel ~.counter]
@@ -268,12 +273,18 @@ parity gap needs a field the contract cannot express (most recently the
 state-graph out-degree distribution in `run-stats`). It freezes at release.
 
 The pipeline behind it is now filled in: the parity ledger
-(`parity-manifest.md`) is closed — 125 rows, none owed — so `%check` runs the
-real safety, liveness and simulation engines over **both** `%inline` and
-`%clay` sources, and `%analyze` runs the real semantic/level/lint pipeline.
+(`parity-manifest.md`) is closed — **134 rows, 134 terminal, none owed
+(2026-09-05, R3.0d)** — so `%check` runs the real safety, liveness, simulation
+and DFID engines over **both** `%inline` and `%clay` sources, `%analyze` runs
+the real semantic/level/lint pipeline, and a terminal run's artifacts can be
+written back to Clay. `VIEW`, `ALIAS` and the cfg source override are live;
+each is refused only in the narrow combination it cannot serve faithfully.
+
 What remains unsupported is unsupported **by decision**, not by omission, and
-every case is a typed rejection naming what is missing: PlusCal translation,
-`VIEW`, `ALIAS`, and a cfg source override. `compatibility.md` carries the full
-support matrix — every one of the thirteen approved differences with its
-evidence — and its "Typed-rejected / unsupported public options" table is the
-list of things a caller can ask for and not get. Nothing degrades silently.
+every case is a typed rejection naming what is missing — most visibly PlusCal
+translation, which the ledger marks `excluded` rather than absent.
+`compatibility.md` carries the full support matrix — every one of the ten
+approved-difference rows with its evidence — and its "Typed-rejected /
+unsupported public options" table is the list of things a caller can ask for
+and not get. `release-gate.sh` checks that table against the desk **in both
+directions**, so it cannot drift. Nothing degrades silently.
