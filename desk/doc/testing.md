@@ -76,7 +76,9 @@ Integers / Sequences / FiniteSets / Bags / TLC), or `excluded:<reason>`
 community/extended modules, or `check-excluded:<mod>` for a model that pulls in
 an excluded-operator module). The rules are total, so an upstream-added spec
 lands in a bucket and drifts the frozen inventory — which `tier2.py --check`
-catches (the drift guard).
+catches (the drift guard). **Total is not correct: on the Examples corpus the
+buckets are wrong, all in the direction of under-reporting** — measured
+2026-10-08, see *Examples coverage, measured after R3* below.
 
 **Oracle projection.** For a curated, self-contained subset the generator
 captures a normalized Java projection (`desk/test-data/tier2/oracle/<name>.txt`):
@@ -244,6 +246,70 @@ feature→row table against the ledger's row names, which found **eleven of
 nineteen** entries naming rows that do not exist. See
 `tools/notes/plan2-R2.8.2b-examples-coverage-notes.md` and
 `tools/notes/plan2-R3.0-refusals-notes.md`.
+
+**Examples coverage, measured after R3 (2026-10-08).** R3's acceptance covers
+the **measured corpus**, and for `tlaplus-Examples` that corpus is small. At the
+pin (`47b0e2cc0`) the manifests list **408 modules and 224 models**. Leaving out
+the PlusCal modules (35 modules, 15 models — PlusCal is out of the project)
+leaves **373 modules and 209 models**: 167 TLC models (162 exhaustive, 3
+simulate, 2 generate) and 42 Apalache `symbolic` models, which have no TLC
+counterpart. Of those:
+
+| what | compared against the pin | of |
+|---|---|---|
+| modules through `+sany-verdict` vs Java SANY | **6** (`HourClock`, `TCommit`, `CigaretteSmokers`, `SimpleAllocator`, `Channel`, `SimpleMath`) | 373 |
+| models through `check:check` vs tlc2 | **5** (`HourClock`, `TCommit`, `Channel`, `SimpleMath`, `CigaretteSmokers`) — `DieHard` in `TLC_CURATED` is the **test-model** copy | 167 |
+| measured and not passing | `Paxos` (not finished in ~50 min where tlc2 takes 4.2 s); `PrintValues` (`TLC!Print`, an approved difference) | — |
+
+The other ~160 TLC models and ~365 modules have **never been run**, in either
+direction. "Agrees on the measured corpus" is true. "Runs the Examples" is not
+something the evidence supports, and the evidence does not refute it either.
+
+**The inventory under-reports what is checkable, in four ways** (L3 — the tool
+that answers "is there work?" again turned out to be unaudited):
+
+1. **`module_refs` reads comments.** `EXTENDS\s+(.+)$` takes the rest of the
+   line, so `EXTENDS Naturals \* an import` becomes a module named
+   `Naturals \* an import`. The `INSTANCE` regex also matches prose, so
+   `module:so`, `module:statement` and `module:M,node,occurs,…` are words from
+   comments. Of the **103** `excluded:module` Examples rows, **67 have no real
+   non-standard dependency**.
+2. **Nested modules are counted as unresolved.** `Inner`, `InnerBuf`,
+   `Common`, … are `---- MODULE` blocks inside the same file.
+3. **A local EXTENDS is treated as an excluded module.** `refs <= CHECK_MODS`
+   fails for any module that extends a sibling, so every `MC*.tla` model wrapper
+   lands in `sany:check-excluded:<sibling>`. Of those **81** rows, **54** are
+   checkable.
+4. **Only `exhaustive search` counts as a model**, and **`proof` modules are
+   excluded outright**, even though the front-end parses proof steps (R1.3.5.4).
+   Proof modules need the TLAPS library on the module path. They do not need
+   `tlapm`.
+
+Corrected by transitive closure with comments stripped, **98** Examples modules
+are `check`-eligible (the inventory says 36), and **117** of the 167 TLC models
+close over the six `CHECK_MODS` alone. The rest need CommunityModules
+(`SequencesExt`, `Functions`, `FiniteSetsExt`, `IOUtils`, `CSV`, `SVG`,
+`UndirectedGraphs`, `Graphs`, `Bitwise`, `DyadicRationals`, `Statistics`,
+`VectorClocks`, `BagsExt`), the TLAPS library (`TLAPS`, `*Theorems`,
+`NaturalsInduction`, `WellFoundedInduction`), `Apalache`, `Json` or `Reals`.
+**None of those three upstreams is pinned.** Upstream CI puts all three on the
+module path.
+
+**Model-level blockers already known from the ledger, before anything is run:**
+`Print`/`PrintT` (10 models, `tlc-module-tlc`'s approved difference); SYMMETRY
+with a temporal PROPERTY (6, refused); VIEW with a temporal PROPERTY (2,
+refused); `live-graph-cap` = 100 000 distinct states for a liveness build
+(`CoffeeCan1000Beans`, 501 500); `IOExec`/`JavaTime`/`TLCGet("duration")` (4,
+wall-clock or process effects). **Throughput is the dominant unknown.** Upstream
+CI's *small* set (recorded TLC runtime ≤ 30 s) is **127 TLC models totalling
+≥ 3.9 M distinct states**, the largest single model is `MCLamportMutex` at
+724 274, and tier 3's fastest workload runs at a few hundred distinct states
+per second.
+
+The work to close all of this is planned, not scheduled, in
+`R4-examples-work-breakdown.md` (the plan corpus, beside `R3-work-breakdown.md`).
+Until that runs, treat any statement that `%tla-lus` handles a given Examples
+spec as unmeasured.
 
 **Subdir batch (R1.1.6–R1.1.9, completed R1.1.R2).**
 `desk/tests/lib/tier2-sub.hoon` runs **every in-scope test-model subdir spec
