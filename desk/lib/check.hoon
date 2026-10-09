@@ -1070,7 +1070,7 @@
     aor
   %+  turn  (weld named rest)
   |=  k=@t
-  [k (crip (render:ev (~(got by st) k)))]
+  [k (crip (render:vl (~(got by st) k)))]
 ::
 ++  alias-state
   ::  ALIAS rendering (R2.3.2), a faithful port of `Tool.evalAlias`.
@@ -1132,7 +1132,7 @@
   ^-  wain
   ?^  vw
     =/  r  (eval:ne u.vw e(s0 st, s1 st, primed |))
-    ?:  ?=(%& -.r)  ~[(crip (render:ev p.r))]
+    ?:  ?=(%& -.r)  ~[(crip (render:vl p.r))]
     $(vw ~)
   ^-  wain
   =/  ps0  (state-pairs order st)
@@ -1141,7 +1141,7 @@
     %+  skip  ps0
     |=  [k=@t v=@t]
     =/  o  (~(get by u.dif) k)
-    ?~(o | =(v (crip (render:ev u.o))))
+    ?~(o | =(v (crip (render:vl u.o))))
   =/  bare=?  ?=([* ~] ps)
   %+  turn  ps
   |=  [k=@t v=@t]
@@ -2912,14 +2912,25 @@
   ::  isAxiom only when the source keyword image is literally `AXIOM`
   ::  (AssumeNode.java:65), so `ASSUME`/`ASSUMPTION` are still checked and a
   ::  false AXIOM does not fail the run. R1.5.13
-  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne]
-  ^-  (unit [ec=@ud msg=@t])
+  ::
+  ::  The messages are tlc2's MP templates with the assumption's LOCATION as
+  ::  `%1%` (R4.2j: they had been `An assumption is false.` and `Evaluating an
+  ::  assumption failed: ...`, which no test compared against the pin).
+  ::  `at` is that location, which the job kernel reports as the violated
+  ::  assumption's name. The module is the root's: `sem-thm` carries no
+  ::  origin, so an ASSUME imported through EXTENDS is located in the root
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne modn=@t]
+  ^-  (unit [ec=@ud msg=@t at=@t])
   ?~  asmz  ~
   ?:  axiom.i.asmz  $(asmz t.asmz)
   ?~  body.i.asmz  $(asmz t.asmz)
+  ::  the BODY's span, not the declaration's: tlc2 locates the expression
+  ::  (`col 8` past `ASSUME `), measured
+  =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
   =/  r  (pred-bool:ne u.body.i.asmz ~ ~ e)
-  ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]
-  ?.  p.r  `[2.104 'An assumption is false.']
+  ?:  ?=(%| -.r)
+    `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
+  ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
   $(asmz t.asmz)
 ::
 ++  out-stats
@@ -4307,7 +4318,7 @@
   =*  c  p.sc
   =/  su  (dfid-setup c maxd 0)
   ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
   =/  o   o.p.su
   =/  e   (dfid-env o)
@@ -4727,7 +4738,7 @@
   =/  sc  (search-ctx-seed spec cfg seed)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
   ::  coverage alongside a temporal PROPERTY is refused BY NAME rather than
   ::  silently dropped: the counters this port collects live on the safety
@@ -5311,7 +5322,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [[%failed p.sc] *run-stats]
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
   ?^  ae  [[%failed msg.u.ae] *run-stats]
   ::  a temporal property: a pure []P box-state is a state invariant (checked by
   ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine

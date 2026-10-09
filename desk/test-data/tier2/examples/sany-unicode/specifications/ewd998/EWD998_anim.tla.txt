@@ -1,0 +1,7 @@
+SANY exit 0
+line 115, col 5 to line 115, col 11 of module EWD998_anim
+The field name "counter" in the record constructor is identical to the existing definition or declaration
+named counter, located at line 50, col 2 to line 50, col 8 of module EWD998ChanID.
+The field in the record will not take the value of the counter definition or declaration.
+In TLA+, field names in records are strings, regardless of any similarly named declarations or definitions.
+Therefore, DOMAIN [counter |-> ...] = {"counter"} holds true.

@@ -9,7 +9,11 @@ three tiers.
 
 All goldens come from `tla2tools.jar` built from the pinned commits
 (`tlaplus@4ba7d8811`, `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6`;
-see `port-map.md` §0). Both `tools/validate.py` and
+see `port-map.md` §1). R4 adds the module trees upstream Examples CI puts on the
+path: `CommunityModules@a20cc8eb2` (release `202604221529`), the
+`tlapm@fd3988fc4` library, `Apalache.tla` from `apalache@a9d9f8267` (`v0.57.1`),
+and `tlauc@a4f21b9fc` (`1.1.0`) for the Unicode clause. `tools/r4-deps.sh`
+fetches and verifies them. Both `tools/validate.py` and
 `test-data/oracle/regen.sh` refuse to (re)generate goldens if the checkout is
 off-pin, so a golden can never silently drift to a newer tool version.
 
@@ -69,16 +73,19 @@ The corpora:
   checkpoints, structured values, stuttering, and lasso traces.
 
 **Classification.** `gen-tier2-tests.py` classifies every module of both corpora
-into `desk/test-data/tier2/inventory.txt` — `sany` (parse/semantic in scope),
-`check` (SANY + TLC, EXTENDS only the parity-ported operator modules Naturals /
-Integers / Sequences / FiniteSets / Bags / TLC), or `excluded:<reason>`
-(`pluscal`, `feature:action composition`, `proof`, `module:<unresolved>` for
-community/extended modules, or `check-excluded:<mod>` for a model that pulls in
-an excluded-operator module). The rules are total, so an upstream-added spec
-lands in a bucket and drifts the frozen inventory — which `tier2.py --check`
-catches (the drift guard). **Total is not correct: on the Examples corpus the
-buckets are wrong, all in the direction of under-reporting** — measured
-2026-10-08, see *Examples coverage, measured after R3* below.
+into `desk/test-data/tier2/inventory.txt` — `sany` (parse/semantic in scope;
+detail `symbolic` for an Apalache-only model, `proof` for a proof module,
+`check-excluded:<mod>` for a model whose closure pulls in an excluded-operator
+module), `check` (SANY + a TLC model — `exhaustive search`, `simulate` or
+`generate` — whose transitive closure EXTENDS/INSTANCEs only the parity-ported
+operator modules Naturals / Integers / Sequences / FiniteSets / Bags / TLC), or
+`excluded:<reason>` (`pluscal`, or `module:<unresolved>` for a closure that
+needs a module outside the vendored StandardModules). The closure is followed
+through local modules with comments stripped and nested `MODULE` blocks removed
+(R4.0b). The rules are total, so an upstream-added spec lands in a bucket and
+drifts the frozen inventory — which `tier2.py --check` catches (the drift
+guard). **Total was not correct**: until R4.0b the Examples buckets under-reported
+in four ways, see *Examples coverage, measured after R3* below.
 
 **Oracle projection.** For a curated, self-contained subset the generator
 captures a normalized Java projection (`desk/test-data/tier2/oracle/<name>.txt`):
@@ -265,8 +272,15 @@ The other ~160 TLC models and ~365 modules have **never been run**, in either
 direction. "Agrees on the measured corpus" is true. "Runs the Examples" is not
 something the evidence supports, and the evidence does not refute it either.
 
-**The inventory under-reports what is checkable, in four ways** (L3 — the tool
-that answers "is there work?" again turned out to be unaudited):
+**The inventory under-reported what is checkable, in four ways** (L3 — the tool
+that answers "is there work?" again turned out to be unaudited). **R4.0b repaired
+all four** (`gen-tier2-tests.py`), each with a fixture in
+`tools/test-tier2-classify.py` that fails under the old rule; `tools/tier2.py`
+runs them first. The inventory now reports **98** Examples modules `check`,
+**123** `excluded:module` (every one needs CommunityModules, the TLAPS library or
+`Apalache`), **110** `sany`, **40** `sany:symbolic` (Apalache-only models,
+parse class), **2** `sany:check-excluded` and **35** PlusCal. The defects, as
+found:
 
 1. **`module_refs` reads comments.** `EXTENDS\s+(.+)$` takes the rest of the
    line, so `EXTENDS Naturals \* an import` becomes a module named
@@ -286,14 +300,14 @@ that answers "is there work?" again turned out to be unaudited):
    `tlapm`.
 
 Corrected by transitive closure with comments stripped, **98** Examples modules
-are `check`-eligible (the inventory says 36), and **117** of the 167 TLC models
+are `check`-eligible (the old inventory said 36), and **117** of the 167 TLC models
 close over the six `CHECK_MODS` alone. The rest need CommunityModules
 (`SequencesExt`, `Functions`, `FiniteSetsExt`, `IOUtils`, `CSV`, `SVG`,
 `UndirectedGraphs`, `Graphs`, `Bitwise`, `DyadicRationals`, `Statistics`,
 `VectorClocks`, `BagsExt`), the TLAPS library (`TLAPS`, `*Theorems`,
 `NaturalsInduction`, `WellFoundedInduction`), `Apalache`, `Json` or `Reals`.
-**None of those three upstreams is pinned.** Upstream CI puts all three on the
-module path.
+Upstream CI puts all three on the module path. **R4.0a pinned them on
+2026-10-08** (see *The oracle and the pin* above).
 
 **Model-level blockers already known from the ledger, before anything is run:**
 `Print`/`PrintT` (10 models, `tlc-module-tlc`'s approved difference); SYMMETRY
@@ -307,7 +321,7 @@ CI's *small* set (recorded TLC runtime ≤ 30 s) is **127 TLC models totalling
 per second.
 
 The work to close all of this is planned, not scheduled, in
-`R4-examples-work-breakdown.md` (the plan corpus, beside `R3-work-breakdown.md`).
+`R4-examples-work-breakdown-r4.md` (the plan corpus, beside `R3-work-breakdown.md`).
 Until that runs, treat any statement that `%tla-lus` handles a given Examples
 spec as unmeasured.
 
@@ -316,9 +330,15 @@ spec as unmeasured.
 whose module closure resolves — all 310** — through `+sany-verdict` in chunked
 `mule`-isolated arms. A spec's identity is its relative **path** (root module
 names collide across subdirs), and the embedded closure is emitted in sorted
-module order so the shard is byte-reproducible. Result: **310/310 agree**; the
-census is empty (R1.3 closed the last front-end divergence). Combined SANY
-coverage is **452/452** embedded test-model specs (142 flat + 310 subdir).
+module order so the shard is byte-reproducible. Result at R3: **310/310 agree**;
+the census was empty (R1.3 closed the last front-end divergence). **R4.0b
+(2026-10-08) repaired the classifier that picks these specs** (`testing.md`
+§*Examples coverage*), which admitted 20 flat and 20 subdir specs never compared
+before and dropped one (`bcastByz`, a multi-line EXTENDS of `Functions`). Today:
+**162 flat (144 agree) + 329 subdir (324 agree) = 468/491**. The 23 that diverge
+are frozen with reasons in `divergences.txt`: 18 multi-module files
+(`tlc-monolith`), INSTANCE inside LET and an operator-constant arity check
+(`semantic-graph`), and 3 nested-module rejects not yet measured — all R4.1c.
 
 R1.1.6–.9 raised the closure cap 1.5 KB → 4 → 8 → 16 KB and stopped there, and
 this document, the generator NB and the R1.1.9 row all then said the 15 specs
@@ -342,9 +362,9 @@ R1.1 stood up the tier-2 differential layer end to end. What is live and frozen
 (all byte-reproducible via `tools/tier2.py --check`, drift-guarded):
 
 - **Classified scope inventory** over both corpora (`inventory.txt`).
-- **SANY comparator** — 142 flat + 310 subdir = **452 test-model specs through
-  the Hoon front-end vs Java SANY, all 452 agreeing** (R1.3 closed the front-end
-  divergences; R1.1.R2 added the last 15 subdir specs).
+- **SANY comparator** — 162 flat + 329 subdir = **491 test-model specs through
+  the Hoon front-end vs Java SANY, 468 agreeing and 23 censused** (R4.0b; at R3
+  it was 452/452, before the classifier repair admitted the specs it had hidden).
 - **TLC safety comparator** — a curated set + a **15**-spec batch through the
   Hoon checker vs TLC (14 from R1.1.5, `BagsTest` added by R3.2), **15/15
   agreeing**; the divergences it censused pinned the evaluation residues (R1.5)
@@ -371,6 +391,27 @@ Deliberately deferred (each with a concrete unblock condition), tracked in
 - ~~**Tier-3 performance models**~~ — **not deferred, DESCOPED (R1.1.R3)**: a
   performance harness measures the port against itself, so it cannot feed R1's
   parity gate. Moved to future work; see the tier-3 section below.
+
+## The black-box layer (R4.0f)
+
+Everything above compares the ENGINE to the pin. The black-box layer instead
+drives the AGENT the way a client must — through `%tla-lus-action` pokes, Behn
+wakes and `/x/job/<id>` scries — and asserts only what the wire shows. It is the
+July 2026 suite (`~/FoxyLabs/tla-lus/prompt-tests.md`), re-founded on oracles:
+its original expected values were guesses written before the agent existed, and
+the pin contradicted 12 of them.
+
+- **`desk/tests/lib/blackbox/`** — 37 `-test` arms, generated by
+  `tools/gen-blackbox.py` (`--check` for drift), each through
+  `lib/tla-lus-test-adapter`. Every arm names ONE oracle: the pinned jar run on
+  the same fixture (`-tool` for TLC; CI's exit-code categories), or a cited
+  `api.md` behaviour. 7 more are **withheld** on measured divergences
+  (`op-wire-failure`, R4.2j) and 7 are **excluded** with reasons (the typed
+  wire cannot express them). The ledger is `desk/test-data/blackbox/coverage.md`.
+- **The corpus half** — `desk/test-data/blackbox/models.json` (158 manifest
+  models) and `parse.json` (373 modules), split to stay under the scaffold
+  gate's 100 KB fixture bound, is the work list `tools/examples.py` drives through
+  the public wire on a live ship (R4.0d); its oracle is the MANIFEST.
 
 ## Close-out gates, and why they are their own unit (R1.8.8)
 
@@ -399,7 +440,7 @@ So a close-out unit runs, in this order:
 | tier 1 | `python3 tools/validate.py --check` | every golden reproduces byte-identically from the pin |
 | tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
-| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 11 gates (runs tier 1 as its gate 2) |
+| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 12 gates (runs tier 1 as its gate 2; gate 12: every file under `desk/` names a mark) |
 | release | `bash tools/release-gate.sh` | **PASSES as of 2026-09-05** (R3.0d closed the last owed row). It failed by design from R2.0 to then — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
 | acceptance | `python3 tools/r3-acceptance.py --suite-log <captured suite output>` (R3.3.2; `r1-acceptance.py` is R1's and stays red, by design) | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |

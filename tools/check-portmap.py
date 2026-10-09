@@ -26,7 +26,10 @@ they share with each other and with the tree. That is what this checks:
      support matrix (R1.9.1) — a deliberate divergence cannot be added to the
      ledger and left out of the document that is supposed to enumerate them;
   6. every `+$` on the public wire (`sur/tla-lus.hoon`) appears in api.md
-     (R1.9.2) — a noun a consumer can receive cannot ship undocumented.
+     (R1.9.2) — a noun a consumer can receive cannot ship undocumented;
+  7. the R4 module-path pins in `tools/r4-deps.sh` are the ones port-map §1
+     quotes in full and testing.md / compatibility.md quote abbreviated
+     (R4.0a) — the same rule as (2), for the trees Examples CI adds.
 
 Exit 0 clean, 1 on any drift, with the offending reference named.
 """
@@ -41,6 +44,7 @@ PORTMAP = DESK / "doc/port-map.md"
 LEDGER = DESK / "doc/parity-manifest.md"
 GATE = REPO / "tools/scaffold-gate.sh"
 VALIDATE = REPO / "tools/validate.py"
+R4DEPS = REPO / "tools/r4-deps.sh"
 
 fails = []
 
@@ -231,6 +235,29 @@ def check_wire_documented() -> None:
         ok(f"all {len(molds)} public wire molds appear in api.md")
 
 
+def check_r4_pins() -> None:
+    """(7) R4's module-path pins, quoted identically wherever quoted."""
+    pins = dict(re.findall(r'^PIN_([A-Z]+)_COMMIT="([0-9a-f]{40})"',
+                           R4DEPS.read_text(), re.M))
+    if len(pins) != 4:
+        bad(f"r4-deps.sh: expected 4 PIN_*_COMMIT lines, found {sorted(pins)}")
+        return
+    pm = PORTMAP.read_text()
+    short = {"testing.md": (DESK / "doc/testing.md").read_text(),
+             "compatibility.md": (DESK / "doc/compatibility.md").read_text()}
+    miss = [f"port-map §1 lacks {k} {v[:9]}" for k, v in pins.items()
+            if f"`{v}`" not in pm]
+    for doc, text in short.items():
+        miss += [f"{doc} lacks {k} @{v[:9]}" for k, v in pins.items()
+                 if f"@{v[:9]}" not in text]
+    if miss:
+        for m in miss:
+            bad(m)
+    else:
+        ok(f"R4 module-path pins agree across r4-deps.sh, port-map, testing, "
+           f"compatibility ({len(pins)} pins)")
+
+
 def main() -> int:
     print("== port-map / ledger coherence ==")
     check_owners()
@@ -239,6 +266,7 @@ def main() -> int:
     check_tally()
     check_approved_differences()
     check_wire_documented()
+    check_r4_pins()
     if fails:
         print(f"\nDRIFT: {len(fails)} problem(s).")
         return 1

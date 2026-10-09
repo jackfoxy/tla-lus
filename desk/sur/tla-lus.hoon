@@ -228,8 +228,9 @@
           cas=case
           ::  root module name; the file is <root-dir>/<lowercased-name>/tla
           root=module-name
-          ::  cfg file path within the desk (the desk has no %cfg mark, so
-          ::  a Clay-served cfg uses a non-.tla mark, e.g. /spec-cfg/txt)
+          ::  cfg file path within the desk, mark included: /spec/cfg
+          ::  (the %cfg mark, mar/cfg.hoon) or any text mark, e.g.
+          ::  /spec-cfg/txt
           cfg=(unit path)
           ::  module-search root directories, tried in order
           roots=(list path)

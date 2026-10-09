@@ -6,7 +6,8 @@
   ::  Module Resolution And Standard-Module Loading
   ::
   ::  Port of tla2sany/modanalyzer (SpecObj) behavior at the pinned
-  ::  commit: BFS resolution of EXTENDS/INSTANCE references in
+  ::  commit: resolution of EXTENDS/INSTANCE references in SpecObj's
+  ::  order (any unresolved extension before any instantiation) and
   ::  appearance order, inner modules registered from their outer file,
   ::  user modules shadowing the vendored StandardModules, SANY's
   ::  missing-module / circular-dependency / file-name-mismatch errors,
@@ -26,7 +27,7 @@
       tree=node
   ==
 +$  mod-graph
-  $:  order=(list @t)          ::  file parse order (BFS, SANY-equal)
+  $:  order=(list @t)          ::  file parse order (SpecObj's, SANY-equal)
       mods=(map @t loaded)
       deps=(map @t (list @t))  ::  per file: referenced names, in order
       sem-order=(list @t)      ::  dependency-first order for unit 6
@@ -104,6 +105,40 @@
   ?:  (~(has in seen) i.raw)  $(raw t.raw)
   $(raw t.raw, seen (~(put in seen) i.raw), out [i.raw out])
 ::
+++  monolith-module
+  ::  SANY's last resort for a module with no file of its own: the block in
+  ::  the ROOT file from its `---- MODULE <name> ----` line through the next
+  ::  `====` line, both markers included (MonolithSpecExtractor.module, which
+  ::  ParseUnit calls once every resolver has missed). Both markers are
+  ::  whole-line matches there (`String.matches`), so a header with anything
+  ::  else on its line is not one
+  |=  [text=@t name=@t]
+  ^-  (unit @t)
+  =/  ws  (mask " \09\0d")
+  =/  head
+    ;~  plug
+      (stun [4 4.096] hep)
+      (star ws)
+      (jest 'MODULE')
+      (plus ws)
+      (jest name)
+      (star ws)
+      (stun [3 4.096] hep)
+      (star (mask "\0d"))
+    ==
+  =/  lines=wain  (to-wain:format text)
+  |-  ^-  (unit @t)
+  ?~  lines  ~
+  ?~  (rush i.lines head)  $(lines t.lines)
+  ::  an unterminated block is still a block: Java stops at end of file
+  =/  body=wain  ~[i.lines]
+  =/  rest=wain  t.lines
+  |-  ^-  (unit @t)
+  ?~  rest  `(of-wain:format (flop body))
+  ?:  =('====' (end [3 4] i.rest))
+    `(of-wain:format (flop [i.rest body]))
+  $(rest t.rest, body [i.rest body])
+::
 ::  +|  Resolvers
 ::
 ::
@@ -139,17 +174,79 @@
   ?:  ?=(%| -.pr)  [pr cache]
   [pr (~(put by cache) key p.pr)]
 ::
+++  own-refs
+  ::  a module's OWN extendees and instancees, in appearance order, and its
+  ::  direct inner modules -- not descending into those inner modules, since
+  ::  SANY keeps each ModulePointer's relatives apart
+  |=  tree=node
+  ^-  [ext=(list @t) inst=(list @t) inner=(list @t)]
+  =|  acc=[ext=(list @t) inst=(list @t) inner=(list @t)]
+  =/  top=?  &
+  |-  ^+  acc
+  ?.  ?=(%node -.tree)  acc
+  ?:  &(!top =(%n-module kind.tree))
+    =/  nm  (module-name-of tree)
+    acc(inner (snoc inner.acc ?~(nm '' u.nm)))
+  ?:  =(%n-extends kind.tree)
+    =/  ids=(list @t)
+      %+  murn  kids.tree
+      |=  k=node
+      ^-  (unit @t)
+      ?.  ?=(%leaf -.k)  ~
+      ?.  =(%identifier kind.token.k)  ~
+      `text.token.k
+    acc(ext (weld ext.acc ids))
+  ?:  =(%n-nonlocalinstance kind.tree)
+    ::  [instance name ...]: the module name is the second kid
+    ?.  ?=([* [%leaf *] *] kids.tree)  acc
+    acc(inst (snoc inst.acc text.token.i.t.kids.tree))
+  =/  ks  kids.tree
+  |-  ^+  acc
+  ?~  ks  acc
+  $(ks t.ks, acc ^$(tree i.ks, top |))
+::
+++  find-next
+  ::  SpecObj.findNextUnresolvedExtention / ...Instantiation: depth-first
+  ::  from the root, a module's own unresolved names first, then its
+  ::  resolved extendees, its resolved instancees and its inner modules,
+  ::  each visited once. `ext` picks which kind of name is wanted
+  |=  [root=@t mods=(map @t loaded) ext=?]
+  ^-  (unit [name=@t from=@t])
+  =|  seen=(set @t)
+  =<  -
+  |-  ^-  [(unit [name=@t from=@t]) (set @t)]
+  ?:  (~(has in seen) root)  [~ seen]
+  =.  seen  (~(put in seen) root)
+  =/  ld  (~(get by mods) root)
+  ?~  ld  [~ seen]
+  =/  r  (own-refs tree.u.ld)
+  =/  miss=(list @t)
+    (skip ?:(ext ext.r inst.r) |=(n=@t (~(has by mods) n)))
+  ?^  miss  [`[i.miss root] seen]
+  =/  have  |=(n=@t (~(has by mods) n))
+  =/  subs=(list @t)
+    :(weld (skim ext.r have) (skim inst.r have) inner.r)
+  |-  ^-  [(unit [name=@t from=@t]) (set @t)]
+  ?~  subs  [~ seen]
+  =/  got  ^$(root i.subs)
+  ?^  -.got  got
+  $(subs t.subs, seen +.got)
+::
 ++  resolve
-  ::  BFS module resolution from the root
+  ::  module resolution from the root in SANY's order (SpecObj's loop):
+  ::  the next module loaded is any unresolved EXTENDS anywhere in the
+  ::  tree before any unresolved INSTANCE. (Until R4.1c this was a plain
+  ::  BFS, which agreed with SANY on every corpus case and parsed
+  ::  `A EXTENDS B; INSTANCE C` with B extending a third module in the
+  ::  wrong order.)
   |=  [root=@t res=resolver cache=pcache]
   ^-  [order=(list @t) out=(each mod-graph mres-err) cache=pcache]
   =|  order=(list @t)
   =|  mods=(map @t loaded)
   =|  deps=(map @t (list @t))
-  ::  queue of [name importer]
-  =/  queue=(list [name=@t from=@t])  [root '']~
+  =/  nxt=(unit [name=@t from=@t])  `[root '']
   |-  ^-  [(list @t) (each mod-graph mres-err) pcache]
-  ?~  queue
+  ?~  nxt
     ::  cycle check over file-level deps, then semantic order
     =/  cyc  (find-cycle root deps)
     ?^  cyc
@@ -157,16 +254,20 @@
     :+  (flop order)
       [%& [(flop order) mods deps (sem-order root deps)]]
     cache
-  =/  [name=@t from=@t]  i.queue
-  ?:  (~(has by mods) name)
-    $(queue `(list [name=@t from=@t])`t.queue)
+  =/  name=@t  name.u.nxt
+  =/  from=@t  from.u.nxt
   ::  user modules shadow the standard library
   =/  found=(unit [src=mod-src text=@t])
     =/  user  (res name)
     ?^  user  `[?:(=(name root) %root %file) text.u.user]
     =/  std  (~(get by standard-modules:stdmods) name)
     ?^  std  `[%std u.std]
-    ~
+    ::  last, a block in the root file itself (R4.1c, `tlc-monolith`)
+    =/  rt  (res root)
+    ?~  rt  ~
+    =/  mono  (monolith-module text.u.rt name)
+    ?~  mono  ~
+    `[%file u.mono]
   ?~  found
     [(flop order) [%| [%missing name from]] cache]
   =.  order  [name order]
@@ -187,17 +288,9 @@
     %+  turn  inners
     |=  [nm=@t tr=node]
     [nm `loaded`[nm %inner 0 tr]]
-  =/  rs  (refs-of tree)
-  =.  deps  (~(put by deps) name rs)
-  ::  enqueue unresolved references in appearance order (BFS)
-  =/  new
-    %+  murn  rs
-    |=  r=@t
-    ^-  (unit [@t @t])
-    ?:  (~(has by mods) r)  ~
-    ?:  (lien `(list [name=@t from=@t])`queue |=([q=@t *] =(q r)))  ~
-    `[r name]
-  $(queue `(list [name=@t from=@t])`(weld t.queue new))
+  =.  deps  (~(put by deps) name (refs-of tree))
+  =/  e  (find-next root mods &)
+  $(nxt ?^(e e (find-next root mods |)))
 ::
 ++  find-cycle
   ::  DFS over file-level deps; returns the first cycle path

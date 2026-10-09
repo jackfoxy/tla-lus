@@ -1,0 +1,169 @@
+# model | manifest result | pin result | manifest distinct/total/depth | pin distinct/total/depth | agree
+# pin counts are -workers 1 -fp 0; the manifest's were recorded by upstream CI (workers per manifest, its own tool versions)
+specifications/Bakery-Boulangerie/MCBakery.cfg | success | success | 655200/3403584/1 | 655200/3403584/1 | yes
+specifications/Bakery-Boulangerie/MCBoulanger.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/MC.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_3/MC.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/Chameneos/Chameneos.cfg | success | success | 34534/104697/13 | 34534/104697/13 | yes
+specifications/CheckpointCoordination/MCCheckpointCoordination.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/CheckpointCoordination/MCCheckpointCoordinationFailure.cfg | safety failure | safety failure | -/-/- | 88152/1302999/12 | yes
+specifications/CigaretteSmokers/CigaretteSmokers.cfg | success | success | 6/15/2 | 6/15/2 | yes
+specifications/CoffeeCan/CoffeeCan1000Beans.cfg | success | success | 501500/2000002/1 | 501500/2000002/1 | yes
+specifications/CoffeeCan/CoffeeCan100Beans.cfg | success | success | 5150/20002/1 | 5150/20002/1 | yes
+specifications/CoffeeCan/CoffeeCan3000Beans.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/DieHard/DieHard.cfg | safety failure | safety failure | -/-/- | 14/73/7 | yes
+specifications/DieHard/MCDieHarder.cfg | safety failure | safety failure | -/-/- | 14/73/7 | yes
+specifications/DieHard/MCDieHardest.cfg | safety failure | safety failure | -/-/- | 11566/140897/12 | yes
+specifications/Disruptor/Disruptor_MPMC.cfg | success | success | 112929/422781/81 | 112929/422781/81 | yes
+specifications/Disruptor/Disruptor_MPMC_liveliness.cfg | success | success | 14365/44581/61 | 14365/44581/61 | yes
+specifications/Disruptor/Disruptor_SPMC.cfg | success | success | 8496/28049/82 | 8496/28049/82 | yes
+specifications/FiniteMonotonic/MCCRDT.cfg | success | success | 25000/1350001/16 | 25000/1350001/16 | yes
+specifications/FiniteMonotonic/MCDistributedReplicatedLog.cfg | liveness failure | liveness failure | -/-/- | 37/271/4 | yes
+specifications/FiniteMonotonic/MCReplicatedLog.cfg | success | success | 1363/17425/13 | 1363/17425/13 | yes
+specifications/GameOfLife/GameOfLife.cfg | success | success | 65536/131072/1 | 65536/131072/1 | yes
+specifications/Huang/Huang.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/KeyValueStore/MCKVSSafetyLarge.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/KeyValueStore/MCKVSSafetyMedium.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/KeyValueStore/MCKVSSafetySmall.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/KeyValueStore/MCKVsnap.cfg | success | success | -/-/- | 32293/63082/13 | yes
+specifications/KnuthYao/SimKnuthYao.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/LearnProofs/MCFindHighest.cfg | success | success | 742/1523/5 | 742/1523/5 | yes
+specifications/LeastCircularSubstring/MCLeastCircularSubstringMedium.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/LeastCircularSubstring/MCLeastCircularSubstringSmall.cfg | success | success | 8554/8681/95 | 8554/8681/95 | yes
+specifications/LoopInvariance/MCBinarySearch.cfg | success | success | 27953/34383/6 | 27953/34383/6 | yes
+specifications/LoopInvariance/MCQuicksort.cfg | success | success | 4548/11223/9 | 4548/11223/9 | yes
+specifications/Majority/MCMajority.cfg | success | success | 2733/3459/6 | 2733/3459/6 | yes
+specifications/MisraReachability/MCParReach.cfg | success | success | 393/747/18 | 393/747/18 | yes
+specifications/MisraReachability/MCReachabilityTestAllGraphs.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/MisraReachability/MCReachabilityTestRandomGraphs.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/MisraReachability/MCReachable.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/MissionariesAndCannibals/MissionariesAndCannibals.cfg | safety failure | safety failure | -/-/- | 61/225/12 | yes
+specifications/Moving_Cat_Puzzle/CatEvenBoxes.cfg | success | success | 48/128/1 | 48/128/1 | yes
+specifications/Moving_Cat_Puzzle/CatOddBoxes.cfg | success | success | 30/78/1 | 30/78/1 | yes
+specifications/MultiCarElevator/ElevatorLivenessLarge.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/MultiCarElevator/ElevatorLivenessMedium.cfg | success | success | 4122/14296/36 | 4122/14296/36 | yes
+specifications/MultiCarElevator/ElevatorSafetyLarge.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/MultiCarElevator/ElevatorSafetyMedium.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/MultiCarElevator/ElevatorSafetySmall.cfg | success | success | 4122/14296/37 | 4122/14296/36 | NO
+specifications/MultiPaxos-SMR/MultiPaxos_MC.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/MultiPaxos-SMR/MultiPaxos_MC_small.cfg | success | success | 343796/736012/28 | 343796/736012/28 | yes
+specifications/N-Queens/Queens.toolbox/FourQueens/MC.cfg | safety failure | safety failure | -/-/- | 40/62/5 | yes
+specifications/N-Queens/QueensPluscal.toolbox/FourQueens/MC.cfg | safety failure | safety failure | -/-/- | 40/62/5 | yes
+specifications/NanoBlockchain/MCNanoLarge.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/NanoBlockchain/MCNanoMedium.cfg | success | success | 530587/1120079/11 | 530587/1120079/11 | yes
+specifications/NanoBlockchain/MCNanoSmall.cfg | success | success | 3003/6083/7 | 3003/6083/7 | yes
+specifications/Paxos/MCConsensus.cfg | success | success | 4/7/1 | 4/7/1 | yes
+specifications/Paxos/MCPaxos.cfg | success | success | 25/82/9 | 25/82/9 | yes
+specifications/Paxos/MCVoting.cfg | success | success | 77/451/11 | 77/451/11 | yes
+specifications/PaxosHowToWinATuringAward/MCConsensus.cfg | success | success | 4/4/2 | 4/4/2 | yes
+specifications/PaxosHowToWinATuringAward/MCPaxosSmall.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/PaxosHowToWinATuringAward/MCPaxosTiny.cfg | success | success | 3921/23563/17 | 3921/23563/17 | yes
+specifications/PaxosHowToWinATuringAward/MCVoting.cfg | success | success | 6752/41017/16 | 6752/41017/16 | yes
+specifications/Prisoners/Prisoners.cfg | success | success | 214/860/14 | 214/860/14 | yes
+specifications/Prisoners_Single_Switch/Prisoner.cfg | success | success | 16/49/5 | 16/49/5 | yes
+specifications/Prisoners_Single_Switch/PrisonerLightUnknown.cfg | success | success | 62/188/11 | 62/188/10 | NO
+specifications/Prisoners_Single_Switch/PrisonerSolo.cfg | success | success | 2/3/2 | 2/3/2 | yes
+specifications/Prisoners_Single_Switch/PrisonerSoloLightUnknown.cfg | success | success | 4/6/2 | 4/6/2 | yes
+specifications/ReadersWriters/MC.cfg | success | success | 21527/59674/13 | 21527/59674/13 | yes
+specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.cfg | success | success | 2881/6826/21 | 2881/6826/21 | yes
+specifications/SDP_Verification/SDP_Attack_Spec/MC.cfg | safety failure | safety failure | -/-/- | 526/1103/11 | yes
+specifications/SimplifiedFastPaxos/FastPaxos.cfg | success | success | 25617/320053/22 | 25617/320053/22 | yes
+specifications/SimplifiedFastPaxos/Paxos.cfg | success | success | 1207/13290/22 | 1207/13290/22 | yes
+specifications/SingleLaneBridge/MC.cfg | success | success | 3605/20181/29 | 3605/20181/29 | yes
+specifications/SlidingPuzzles/SlidingPuzzles.cfg | safety failure | safety failure | -/-/- | 24005/81561/117 | yes
+specifications/SlidingPuzzles/SlidingPuzzles_anim.cfg | safety failure | safety failure | -/-/- | 24005/81561/117 | yes
+specifications/SpanningTree/SpanTree.cfg | success | success | 1236/10278/6 | 1236/10278/5 | NO
+specifications/SpanningTree/SpanTreeRandom.cfg | success | success | -/-/- | 79550/1357252/6 | yes
+specifications/SpanningTree/SpanTreeTest4Nodes.cfg | success | success | 3984/21784/4 | 3984/21784/4 | yes
+specifications/SpanningTree/SpanTreeTest5Nodes.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/SpecifyingSystems/AdvancedExamples/MCInnerSequential.cfg | success | success | 3528/24368/9 | 3528/24368/9 | yes
+specifications/SpecifyingSystems/AdvancedExamples/MCInnerSerial.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/SpecifyingSystems/AsynchronousInterface/AsynchInterface.cfg | success | success | 12/30/2 | 12/30/2 | yes
+specifications/SpecifyingSystems/AsynchronousInterface/Channel.cfg | success | success | 12/30/2 | 12/30/2 | yes
+specifications/SpecifyingSystems/AsynchronousInterface/PrintValues.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/SpecifyingSystems/CachingMemory/MCInternalMemory.cfg | success | success | 4408/21400/10 | 4408/21400/10 | yes
+specifications/SpecifyingSystems/CachingMemory/MCWriteThroughCache.cfg | success | success | 5196/28170/18 | 5196/28170/18 | yes
+specifications/SpecifyingSystems/FIFO/MCInnerFIFO.cfg | success | success | 3864/9660/11 | 3864/9660/11 | yes
+specifications/SpecifyingSystems/HourClock/HourClock.cfg | success | success | 12/24/1 | 12/24/1 | yes
+specifications/SpecifyingSystems/HourClock/HourClock2.cfg | success | success | 12/24/1 | 12/24/1 | yes
+specifications/SpecifyingSystems/Liveness/LiveHourClock.cfg | success | success | 12/24/1 | 12/24/1 | yes
+specifications/SpecifyingSystems/Liveness/MCLiveInternalMemory.cfg | success | success | 4408/21400/10 | 4408/21400/10 | yes
+specifications/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.cfg | success | success | 5196/28170/18 | 5196/28170/18 | yes
+specifications/SpecifyingSystems/RealTime/MCRealTimeHourClock.cfg | liveness failure | liveness failure | -/-/- | 216/696/2 | yes
+specifications/SpecifyingSystems/SimpleMath/SimpleMath.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/SpecifyingSystems/TLC/ABCorrectness.cfg | success | success | 20/36/3 | 20/36/3 | yes
+specifications/SpecifyingSystems/TLC/MCAlternatingBit.cfg | success | success | 240/1392/10 | 240/1392/10 | yes
+specifications/Stones/Stones.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/TLC/TestGraphs.cfg | success | success | 2590/2790/51 | 2590/2790/51 | yes
+specifications/TLC/TestMCReachability.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/TransitiveClosure/TransitiveClosure.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/TwoPhase/MCTwoPhase.cfg | success | success | 4/5/4 | 4/5/4 | yes
+specifications/YoYo/MCYoYoNoPruning.cfg | success | success | 60/110/19 | 60/110/19 | yes
+specifications/YoYo/MCYoYoPruning.cfg | success | success | 102/157/31 | 102/157/31 | yes
+specifications/YoYo/YoYoAllGraphs.cfg | success | success | 26731/48535/39 | 26731/48535/39 | yes
+specifications/aba-asyn-byz/aba_asyn_byz.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/acp/ACP_NB_TLC.cfg | success | success | 4284/23988/19 | 4284/23988/19 | yes
+specifications/acp/ACP_NB_WRONG_TLC.cfg | safety failure | safety failure | -/-/- | 11852/59286/13 | yes
+specifications/acp/ACP_SB_TLC.cfg | success | success | 54944/218352/21 | 54944/218352/21 | yes
+specifications/allocator/AllocatorImplementation.cfg | success | success | 17701/64414/16 | 17701/64414/16 | yes
+specifications/allocator/AllocatorRefinement.cfg | success | success | 1690/5854/7 | 1690/5854/7 | yes
+specifications/allocator/SchedulingAllocator.cfg | success | success | 1690/5854/7 | 1690/5854/7 | yes
+specifications/allocator/SimpleAllocator.cfg | success | success | 400/1633/6 | 400/1633/6 | yes
+specifications/barriers/Barrier.cfg | success | success | 64/194/7 | 64/194/7 | yes
+specifications/bcastByz/bcastByz.cfg | success | success | 14424/227344/7 | 14424/227344/7 | yes
+specifications/bcastByz/bcastByzNoBcast.cfg | success | success | 45/90/1 | 45/90/1 | yes
+specifications/bcastFolklore/bcastFolklore.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/bosco/bosco.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/braf/BufferedRandomAccessFile.cfg | success | success | 3316/128581/11 | 3316/128581/10 | NO
+specifications/btree/btree.cfg | success | success | 374727/2820091/40 | 374727/2820091/38 | NO
+specifications/btree/kvstore.cfg | success | success | 2641/28585/11 | 2641/28585/9 | NO
+specifications/byihive/VoucherCancel.cfg | success | success | 4199/26848/11 | 4199/26848/11 | yes
+specifications/byihive/VoucherIssue.cfg | success | success | 4199/26848/11 | 4199/26848/11 | yes
+specifications/byihive/VoucherLifeCycle.cfg | success | success | 64/193/7 | 64/193/7 | yes
+specifications/byihive/VoucherRedeem.cfg | success | success | 4199/26848/11 | 4199/26848/11 | yes
+specifications/byihive/VoucherTransfer.cfg | success | success | 4197/26848/11 | 4197/26848/11 | yes
+specifications/c1cs/c1cs.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/cf1s-folklore/cf1s_folklore.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/chang_roberts/MCChangRoberts.cfg | success | success | 137/227/10 | 137/227/10 | yes
+specifications/dag-consensus/BlockDagTest.cfg | success | success | -/-/- | 0/0/0 | yes
+specifications/dag-consensus/TLCSailfish1.cfg | success | success | 109604/314144/16 | 109604/314144/16 | yes
+specifications/dag-consensus/TLCSailfish2.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/detector_chan96/EnvironmentController.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/MC.cfg | success | success | -/-/- | 90882/282810/54 | yes
+specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/MC.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/diskpaxos/MC_HDiskSynod.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/echo/MCEcho.cfg | success | success | 75/116/16 | 75/116/16 | yes
+specifications/ewd426/SimTokenRing.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/ewd426/TokenRing.cfg | success | success | 46656/248832/1 | 46656/248832/1 | yes
+specifications/ewd687a/EWD687a_anim.cfg | safety failure | safety failure | -/-/- | -/-/- | yes
+specifications/ewd687a/MCEWD687a.cfg | success | success | -/-/- | 18028/177171/27 | yes
+specifications/ewd840/EWD840.cfg | success | success | 302/2001/10 | 302/2001/9 | NO
+specifications/ewd840/EWD840_anim.cfg | safety failure | safety failure | -/-/- | -/-/- | yes
+specifications/ewd840/EWD840_json.cfg | success | success | 1566/15986/12 | 1566/15986/12 | yes
+specifications/ewd840/SyncTerminationDetection.cfg | success | success | 129/3722/1 | 129/3722/1 | yes
+specifications/ewd998/AsyncTerminationDetection.cfg | success | success | 4097/53271/14 | 4097/53271/14 | yes
+specifications/ewd998/EWD998.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/ewd998/EWD998Small.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/ewd998/EWD998Chan.cfg | success | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/ewd998/EWD998ChanID.cfg | success | success | 14/15/14 | 14/15/14 | yes
+specifications/ewd998/EWD998ChanID_export.cfg | unknown | exit 255 | -/-/- | -/-/- | NO
+specifications/ewd998/EWD998ChanID_shiviz.cfg | unknown | exit 255 | -/-/- | -/-/- | NO
+specifications/ewd998/EWD998ChanTrace.cfg | success | success | -/-/- | 659/11169/655 | yes
+specifications/ewd998/SmokeEWD998.cfg | success | success | -/-/- | -/-/- | yes
+specifications/ewd998/SmokeEWD998_SC.cfg | unknown | SMOKE ok: no error in 60s | -/-/- | -/-/- | yes
+specifications/glowingRaccoon/clean.cfg | success | success | 63/99/10 | 63/99/10 | yes
+specifications/glowingRaccoon/product.cfg | success | success | 305/376/23 | 305/376/23 | yes
+specifications/glowingRaccoon/stages.cfg | success | success | 83/93/23 | 83/93/23 | yes
+specifications/lamport_mutex/MCLamportMutex.cfg | success | success | 724274/2729079/61 | 724274/2729079/61 | yes
+specifications/locks_auxiliary_vars/LockHS.cfg | success | success | 28/41/10 | 28/41/10 | yes
+specifications/nbacc_ray97/nbacc_ray97.cfg | success | success | 3016/49592/7 | 3016/49592/7 | yes
+specifications/nbacg_guer01/nbacg_guer01.cfg | success | success | 24922/159538/16 | 24922/159538/16 | yes
+specifications/spanning/MC_spanning.cfg | safety failure | safety failure | -/-/- | 5/19/3 | yes
+specifications/sums_even/MC_sums_even.cfg | success | success | 0/0/0 | 0/0/0 | yes
+specifications/tcp/MCtcp.cfg | success | success | 1182/6322/14 | 1182/6322/14 | yes
+specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/MC.cfg | safety failure | safety failure | -/-/- | 233/768/32 | yes
+specifications/tower_of_hanoi/Hanoi_anim.cfg | safety failure | safety failure | -/-/- | 25/80/8 | yes
+specifications/transaction_commit/PaxosCommit.cfg | success | SMOKE ok: no error in 60s | 1321761/16959159/28 | -/-/- | yes
+specifications/transaction_commit/TCommit.cfg | success | success | 34/94/7 | 34/94/7 | yes
+specifications/transaction_commit/TwoPhase.cfg | success | success | 288/1146/11 | 288/1146/11 | yes

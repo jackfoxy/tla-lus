@@ -14,6 +14,10 @@ against an unrecorded moving checkout.
 | `tlaplus/tlaplus` | `/mnt/mars/gitrepos/tlaplus` | `git@github.com:jackfoxy/tlaplus.git` (fork of `tlaplus/tlaplus`) | `4ba7d8811289fb8e95dac4d5e554c05216ba3100` | 2026-05-26 | MIT (`LICENSE`) |
 | `tlaplus/Examples` | `/mnt/mars/gitrepos/tlaplus-Examples` | `git@github.com:jackfoxy/tlaplus-Examples.git` | `47b0e2cc0268836b89f5ce451f38e5df5f1cf773` | 2026-05-24 | MIT (`LICENSE.md`) |
 | `tlaplus/vscode-tlaplus` | `/mnt/mars/gitrepos/vscode-tlaplus` | `git@github.com:jackfoxy/vscode-tlaplus.git` | `acc095d6f8b075788bfbb4c09288c778757abaec` | 2026-05-08 | MIT (`LICENSE`) |
+| `tlaplus/CommunityModules` (R4) | `/mnt/mars/gitrepos/CommunityModules` | `https://github.com/tlaplus/CommunityModules.git` | `a20cc8eb2ee6e7140848ca511040cf283e9d7256` (release `202604221529`) | 2026-04-22 | MIT (`LICENSE`) |
+| `tlaplus/tlapm` library (R4) | `/mnt/mars/gitrepos/tlapm` | `https://github.com/tlaplus/tlapm.git` | `fd3988fc4e930565e0fa118158055448673dbcd2` (`main`) | 2026-04-14 | BSD-2-Clause (`LICENSE`) |
+| `apalache-mc/apalache` (R4) | `/mnt/mars/gitrepos/apalache` | `https://github.com/apalache-mc/apalache.git` | `a9d9f8267db1c9d24f864eaf7610450496447f25` (release `v0.57.1`) | 2026-05-22 | Apache-2.0 (`LICENSE`, `NOTICE`) |
+| `tlaplus-community/tlauc` (R4) | `/mnt/mars/gitrepos/tlauc` | `https://github.com/tlaplus-community/tlauc.git` | `a4f21b9fc0891341f0b1ec56c88e08514bab101d` (release `1.1.0`) | 2025-07-22 | MIT (`LICENSE`) |
 
 Checkout caveats recorded at pin time (2026-07-12):
 
@@ -21,12 +25,34 @@ Checkout caveats recorded at pin time (2026-07-12):
   local runs; tracked tree clean. Oracle runs copy fixtures to a temp dir so
   the checkout is never polluted further.
 - `tlaplus-Examples`: locally modified
-  `specifications/TeachingConcurrency/Simple.cfg`. Do not use that spec as an
-  oracle fixture until the checkout is restored.
+  `specifications/TeachingConcurrency/Simple.cfg` at pin time. **Re-verified
+  2026-10-08 (R4.0a): `git status` is clean**, so the spec is usable again.
 - `vscode-tlaplus`: clean. Bundled `tools/tla2tools.jar` in that repo is NOT
   the oracle; only the jar built from the pinned `tlaplus` commit is.
 
-Attribution: all three upstreams are MIT-licensed. Any translated code,
+**R4 pins (R4.0a, 2026-10-08).** The four rows marked R4 are what upstream
+Examples CI (`.github/scripts/linux-setup.sh`) would have fetched on
+2026-05-24, the Examples pin's date: CI takes `releases/latest`, and tlapm
+`main`, so each pin is the last release (or `main` commit) on or before that
+date. **The release artifact is the oracle, not the repo tree**: the
+CommunityModules repo carries `Quorum*` and `GraphTheorems*`, which its release
+jar does not ship. `tools/r4-deps.sh` is the single source of these pins. It
+fetches the artifacts to `/mnt/mars/gitrepos/r4-deps/`, checks their sha256 and
+proves each artifact matches the commit cited here. `tools/check-portmap.py`
+checks that this table and `testing.md`/`compatibility.md` agree with it.
+
+How CI resolves a module (measured from `SimpleFilenameToStream` at the oracle
+pin, and from `parse_modules.py`): the spec's directory, then `-DTLA-Library`
+(unused by CI), then **every classpath entry's `tla2sany/StandardModules/`**,
+then **every classpath entry's root**. CI's classpath is
+`tla2tools.jar : apalache.jar : <spec dir> : CommunityModules-deps.jar : tlapm/library`.
+So `tla2tools.jar`'s own `Json.tla` shadows CommunityModules' `Json.tla`, its
+`Bags.tla`/`FiniteSets.tla` shadow the tlapm library's copies, and Apalache's
+`Apalache`/`Variants`/`Option` are found in the StandardModules pass. TLC runs
+take the same classpath minus the spec dir, plus `-workers auto -lncheck final`.
+
+Attribution: the original three upstreams are MIT-licensed. Of the R4 pins,
+tlapm's library is BSD-2-Clause and Apalache is Apache-2.0 with a `NOTICE`. Any translated code,
 copied fixture, or vendored StandardModule in this desk must retain the
 upstream copyright notice and a pointer to the pinned commit.
 
@@ -246,7 +272,7 @@ Classification: `api-shape` (informs Gall nouns/API), `test-fixture`
 Tiny cases proving the oracle harness end to end; the golden outputs live in
 `desk/test-data/oracle/golden/` and regenerate via
 `desk/test-data/oracle/regen.sh` (normalization rules §3). Upstream-copied
-fixtures note their origin in a `SOURCE` file per case.
+fixtures note their origin in a `SOURCE.txt` file per case.
 
 | Case | Area | Fixture | Oracle command | Expected |
 |---|---|---|---|---|

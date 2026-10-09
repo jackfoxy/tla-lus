@@ -124,6 +124,22 @@ else
   fail "parity ledger malformed — see /tmp/tla-parity.log"; tail -6 /tmp/tla-parity.log
 fi
 
+echo "== gate 12: every desk file has a mark =="
+# Clay validates EVERY file of a commit through the mark its extension names;
+# one file with no mark (`%no-cast-between %mime %py` / `%jsonl`) fails the
+# whole |commit. The desk is deployed by copying desk/ wholesale (R4.0e), so
+# every file under it must name a mark in desk/mar, or one `|new-desk`
+# supplies (hoon, noun).
+MARKS=$( { ls "$DESK/mar" | sed -n 's/\.hoon$//p'; echo hoon; echo noun; } | sort -u)
+UNMARKED=$(find "$DESK" -type f | while read -r f; do
+  b=$(basename "$f")
+  case "$b" in *.*) e="${b##*.}" ;; *) e="" ;; esac
+  printf '%s\n' "$MARKS" | grep -qx -- "$e" || echo "$f"
+done)
+[ -z "$UNMARKED" ] && pass "every file under desk/ names a mark" \
+  || { fail "$(printf '%s\n' "$UNMARKED" | wc -l) file(s) with no mark:"; \
+       printf '%s\n' "$UNMARKED" | sed "s|$DESK/|    |" | head -20; }
+
 echo
 if [ "$FAIL" -eq 0 ]; then
   echo "SCAFFOLD GATE: PASS"

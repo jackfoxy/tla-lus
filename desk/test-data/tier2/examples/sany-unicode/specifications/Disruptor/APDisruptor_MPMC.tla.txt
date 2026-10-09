@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 46, col 1 to line 46, col 23 of module APDisruptor_MPMC
+Multiple declarations or definitions for symbol Range.
+This duplicates the one at line 44, col 1 to line 44, col 35 of module APDisruptor_MPMC.

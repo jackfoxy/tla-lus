@@ -1,134 +1,71 @@
+/-  api=tla-lus
 |%
-::  +|  %shared-vocabulary
+  ::  Black-Box Suite Vocabulary (R4.0f)
+  ::
+  ::  The July 2026 suite (`prompt-tests.md`) re-founded on the real wire.
+  ::  Every generated arm under tests/lib/blackbox/ builds one +bb-case
+  ::  and hands it to +expect-case; the adapter is the only file that knows
+  ::  how a case becomes pokes, wakes and scries. (Not `case`: that face is
+  ::  the Clay revision mold, and shadowing it fails far from here.)
+  ::
+  ::  The corpus half of the July suite is not here: a manifest model is many
+  ::  Behn slices on a live agent, so tools/examples.py drives it through the
+  ::  public wire instead (desk/test-data/blackbox/models.json).
+  ::
+::  +|  Types
 ::
-::  The molds the generated corpus and failure arms are written against, plus
-::  the normalized public test shape the adapter returns.  Every generated
-::  `.hoon` file under tests/lib does `/-  *tla-lus-test`, so this file is the
-::  compile-time contract for the whole suite.  It is deliberately small: the
-::  wire-level app contract lives in [[tla-lus]]; the runtime assumptions live
-::  in [[tla-lus-test-adapter]].
-::
-::  +tool: which back-end tool a case exercises
-::
-::    Kept in one enum so tlc / apalache / tlaps cases stay attributable even
-::    though they are split across separate corpus files.
-::
-+$  tool  ?(%tlc %apalache %sany %tlaps %pluscal)
-::  +mode: execution mode submitted with a run
-::
-+$  mode
-  $%  [%parse ~]                :: SANY parse / lint only
-      [%prove ~]               :: TLAPS proof obligation discharge
-      [%translate ~]           :: PlusCal -> TLA+ translation
-      [%exhaustive ~]          :: TLC exhaustive search
-      [%generate ~]            :: TLC state generation
-      [%symbolic depth=@ud]    :: Apalache symbolic (bounded) check
-      [%simulate traces=@ud]   :: TLC random simulation
-  ==
-::  +outcome: model-checking outcome categories with a stable oracle
-::
-::    A declared failure is a passing test when the observed outcome equals the
-::    declared one, so the failure categories are first-class here.
-::
-+$  outcome
-  ?(%success %safety-failure %liveness-failure %assumption-failure %deadlock-failure)
-::  +status: terminal status / error category
-::
-::    Superset of +outcome that also carries parser, config, interface and
-::    resource error categories used by the non-corpus failure suite.
-::
-+$  status  @tas
-::  +run-stats: optional run statistics (distinct/total states, depth)
-::
-::    Shaped to match the generated literals; every field is a unit so a
-::    partially-reported run still nests.  Depth is presently never asserted.
-::
-+$  run-stats  (unit [distinct=(unit @ud) total=(unit @ud) depth=(unit @ud)])
-::  +options: submitted run options
-::
-+$  options
-  $:  workers=?(%auto @ud)
-      timeout=@ud
-      seed=(unit @ud)
-      max-states=(unit @ud)
-      max-input=(unit @ud)
-      flags=(list @t)
-  ==
-::  +scenario: how a failure case is driven through the Gall API
+::  +scenario: how a case is driven through the Gall API
 ::
 +$  scenario
-  $?  %run                     :: ordinary submit-then-observe
-      %invalid-mode            :: submit an unsupported mode
-      %invalid-depth           :: submit a bad depth
-      %invalid-seed            :: submit a bad seed
-      %cancel                  :: submit then cancel before completion
-      %malformed-mark          :: poke with the wrong mark
-      %malformed-payload       :: poke with a malformed payload
-      %unauthorized            :: poke from an unauthorized ship
-      %unknown-scry            :: scry an unknown path
-      %duplicate-request       :: reuse a live request id
-      %missing-request-id      :: submit without a request id
-      %query-before-submit     :: query a result before submitting
-      %query-after-completion  :: query a result after completion
-      %repeat                  :: submit the same run twice deterministically
-      %concurrent              :: submit independent runs concurrently
-      %restart                 :: submit, persist, restart, re-query
-      %rejected-run-isolation  :: reject a run, confirm agent still usable
+  $?  %run                     ::  submit, wake to a result
+      %cancel                  ::  submit, one wake, cancel
+      %malformed-mark          ::  poke with a mark the agent does not take
+      %malformed-payload       ::  poke the right mark with an ill-typed noun
+      %unauthorized            ::  poke from a foreign ship
+      %unknown-scry            ::  peek a path the agent does not serve
+      %duplicate-request       ::  reuse an active request id
+      %query-before-submit     ::  peek a job that was never submitted
+      %query-after-completion  ::  peek a finished job again
+      %repeat                  ::  run the same request twice
+      %concurrent              ::  run two jobs with interleaved wakes
+      %restart                 ::  save and reload the agent mid-run
+      %rejected-run-isolation  ::  a rejected submit, then a good one
   ==
-::  +corpus-case: one CI-validated manifest model, byte-attributable
+::  +fixture: an inline source bundle (root, modules, cfg text)
 ::
-+$  corpus-case
-  $:  id=@t                    :: stable coverage id
-      manifest=@t              :: Examples manifest path
-      module=@t                :: module fixture path
-      model=@t                 :: model/config fixture path
-      =tool
-      =mode
-      expected=outcome         :: declared manifest result
-      runtime=@t               :: declared runtime metadata
-      quick=?                  :: quick regression vs full acceptance
-      stats=run-stats          :: optional declared statistics
-      =options
++$  fixture  [root=@t modules=(list [@t @t]) cfg=(unit @t)]
+::  +over: request limits a case overrides; ~ keeps the engine default
+::
++$  over
+  $:  max-states=(unit @ud)
+      max-time=(unit @dr)
+      max-source=(unit @ud)
   ==
-::  +failure-case: one deterministic public failure fixture
+::  +bb-case: one scenario and the value its named oracle expects
 ::
-+$  failure-case
-  $:  name=@t                  :: case name
+::    `expected` is upstream CI's outcome category for a TLC run
+::    (`tla_utils.resolve_tlc_exit_code`), a SANY category for an analyze
+::    run, or the documented agent answer; the generator records which.
+::
++$  bb-case
+  $:  name=@t
       =scenario
-      root=@t                  :: root module fixture path
-      config=(unit @t)         :: optional config fixture path
-      =tool
-      =mode
-      =options
-      expected=status          :: declared terminal status / error category
-      code=(unit @ud)          :: optional stable error code
-      fragment=(unit @t)       :: optional diagnostic message fragment
-      actions=(list @t)        :: optional counterexample action sequence
-      loop=(unit @ud)          :: optional lasso loop-back index
-  ==
-::  +trace: normalized counterexample
-::
-::    Only the meaningful state/action sequence and loop point, never the
-::    pretty-printed whitespace.
-::
-+$  trace
-  $:  states=(list @t)
+      src=fixture
+      =op:api
+      =over
+      expected=@tas
+      code=(unit @ud)
+      fragment=(unit @t)
+      actions=(list @t)
       loop=(unit @ud)
   ==
 ::  +report: the small public shape every observed run is normalized to
 ::
-::    This is the ONLY shape the assertion helpers read.  If the app's real
-::    API changes, only [[tla-lus-test-adapter]] must change to keep producing
-::    this shape.
-::
 +$  report
-  $:  id=@t                    :: echoed request id
-      terminal=?               :: reached a terminal state
-      status=status            :: terminal status / outcome category
-      outcome=(unit outcome)   :: model-checking outcome if any
-      code=(unit @ud)          :: stable error code if any
-      summary=@t               :: diagnostic summary (fragment carrier)
-      trace=(unit trace)       :: optional counterexample
-      stats=run-stats          :: available run statistics
+  $:  status=@tas
+      code=(unit @ud)
+      summary=@t
+      actions=(list @t)
+      loop=(unit @ud)
   ==
 --

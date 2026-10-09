@@ -233,7 +233,19 @@
     "[{(join-commas es)}]"
   ::
       %fcn
-    (render (fcn-view v))
+    ::  a non-sequence function stays %fcn under +fcn-view, so render its
+    ::  pairs here; recursing on it would never terminate (R4.0d: a trace
+    ::  state holding [b \in {"E","W"} |-> ...] ran the loom out)
+    =/  fv  (fcn-view v)
+    ?.  ?=(%fcn -.fv)  (render fv)
+    =/  ps  %+  turn  p.fv
+            |=([d=value r=value] "{(render d)} :> {(render r)}")
+    =/  body
+      |-  ^-  tape
+      ?~  ps  ~
+      ?~  t.ps  i.ps
+      :(weld i.ps " @@ " $(ps t.ps))
+    "({body})"
   ==
 ::
 ++  render-int

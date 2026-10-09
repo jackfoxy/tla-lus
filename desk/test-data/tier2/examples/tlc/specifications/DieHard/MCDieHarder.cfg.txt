@@ -1,0 +1,19 @@
+RESULT safety failure
+Error: Invariant NotSolved is violated.
+73 states generated, 14 distinct states found, 1 states left on queue.
+The depth of the complete state graph search is 7.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+contents = [j1 |-> 0, j2 |-> 0]
+State 2: <FillJug("j2") line 56, col 16 to line 56, col 63 of module DieHarder>
+contents = [j1 |-> 0, j2 |-> 5]
+State 3: <JugToJug("j2","j1") line 62, col 7 to line 63, col 59 of module DieHarder>
+contents = [j1 |-> 3, j2 |-> 2]
+State 4: <EmptyJug("j1") line 58, col 16 to line 58, col 53 of module DieHarder>
+contents = [j1 |-> 0, j2 |-> 2]
+State 5: <JugToJug("j2","j1") line 62, col 7 to line 63, col 59 of module DieHarder>
+contents = [j1 |-> 2, j2 |-> 0]
+State 6: <FillJug("j2") line 56, col 16 to line 56, col 63 of module DieHarder>
+contents = [j1 |-> 2, j2 |-> 5]
+State 7: <JugToJug("j2","j1") line 62, col 7 to line 63, col 59 of module DieHarder>
+contents = [j1 |-> 3, j2 |-> 4]

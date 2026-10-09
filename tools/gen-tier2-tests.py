@@ -79,13 +79,76 @@ def check_pin() -> bool:
 
 
 # ---------------------------------------------------------------- classify ---
+# R4.0b repaired four defects here, each proved by a fixture in
+# `tools/test-tier2-classify.py` that FAILS under the old rule:
+#   1. the refs were read from comments (`EXTENDS Naturals \* note` named a
+#      module `Naturals \* note`; `INSTANCE` matched prose), and a multi-line
+#      EXTENDS lost every name after the first line;
+#   2. a nested `---- MODULE Inner ----` block counted as an unresolved module;
+#   3. refs were not followed through LOCAL modules, so an `MC*.tla` wrapper
+#      was judged by its sibling's NAME rather than by what the sibling needs;
+#   4. only `exhaustive search` counted as a model and `proof` modules were
+#      excluded outright -- `simulate`/`generate` are TLC models, a `symbolic`
+#      model is Apalache's (parse only), and a proof module is parsed.
+IDENT = r"[A-Za-z0-9_]*[A-Za-z_][A-Za-z0-9_]*"
+
+
+def strip_comments(t: str) -> str:
+    """TLA+ comments out: `(* *)` (nesting) and `\\*` to end of line, string
+    literals kept verbatim so a `(*` inside one is not a comment opener."""
+    out, i, depth, n = [], 0, 0, len(t)
+    while i < n:
+        if t.startswith("(*", i):
+            depth += 1
+            i += 2
+        elif depth and t.startswith("*)", i):
+            depth -= 1
+            i += 2
+        elif depth:
+            i += 1
+        elif t.startswith("\\*", i):
+            j = t.find("\n", i)
+            i = n if j < 0 else j
+        elif t[i] == '"':
+            j = i + 1
+            while j < n and t[j] != '"' and t[j] != "\n":
+                j += 2 if t[j] == "\\" else 1
+            out.append(t[i:j + 1])
+            i = j + 1
+        else:
+            out.append(t[i])
+            i += 1
+    return "".join(out)
+
+
 def module_refs(text: str) -> set:
-    """EXTENDS names + INSTANCE targets referenced by a module's text."""
+    """EXTENDS names + INSTANCE targets a module's text references, comments
+    stripped, EXTENDS lists spanning lines, nested-module names removed."""
+    t = strip_comments(text)
     refs = set()
-    for m in re.findall(r"^\s*EXTENDS\s+(.+)$", text, re.M):
-        refs |= {s.strip() for s in m.split(",") if s.strip()}
-    refs |= set(re.findall(r"\bINSTANCE\s+([A-Za-z_][A-Za-z0-9_]*)", text))
-    return refs
+    for m in re.finditer(rf"\bEXTENDS\s+({IDENT}(?:\s*,\s*{IDENT})*)", t):
+        refs |= set(re.findall(IDENT, m.group(1)))
+    refs |= set(re.findall(rf"\bINSTANCE\s+({IDENT})", t))
+    inner = set(re.findall(rf"-{{4,}}\s*MODULE\s+({IDENT})", t))
+    first = re.search(rf"-{{4,}}\s*MODULE\s+({IDENT})", t)
+    inner.discard(first.group(1) if first else None)
+    return refs - inner
+
+
+def ext_closure(root: str, byname: dict) -> set:
+    """The non-local modules `root`'s transitive closure references, following
+    EXTENDS/INSTANCE through every local module (`byname`: name -> Path)."""
+    ext, seen, q = set(), set(), [root]
+    while q:
+        n = q.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        if n not in byname:
+            ext.add(n)
+            continue
+        q.extend(module_refs(read(byname[n])))
+    return ext
 
 
 def read(p: Path) -> str:
@@ -96,33 +159,47 @@ def is_pluscal(text: str) -> bool:
     return bool(PLUSCAL.search(text) or PLUSCAL2.search(text))
 
 
-def classify(text: str, local: set, has_cfg: bool):
-    """Return (klass, detail). `local` = module names resolvable in the same
-    corpus dir. Rules are total."""
+def classify(text: str, ext: set, has_model: bool):
+    """Return (klass, detail). `ext` = the closure's non-local modules
+    (`ext_closure`). Rules are total."""
     if is_pluscal(text):
         return "excluded", "pluscal"
-    refs = module_refs(text)
-    unresolved = {r for r in refs if r not in VENDORED and r not in local}
+    unresolved = ext - VENDORED
     if unresolved:
         return "excluded", "module:" + ",".join(sorted(unresolved))
-    if has_cfg and refs <= CHECK_MODS:
+    if has_model and ext <= CHECK_MODS:
         return "check", ""          # safety/liveness decided by the cfg/run
-    if has_cfg:
+    if has_model:
         # parses + has a model, but pulls in an excluded-operator module
-        return "sany", "check-excluded:" + ",".join(
-            sorted(refs - CHECK_MODS - {""}))
+        return "sany", "check-excluded:" + ",".join(sorted(ext - CHECK_MODS))
     return "sany", ""
 
 
+def testmodel_byname(tla: Path) -> dict:
+    """test-model resolution: the spec's own directory, then the flat root
+    (the same order `closure_of` embeds)."""
+    byname = {p.stem: p for p in tla.parent.glob("*.tla")}
+    for p in TESTMODEL.glob("*.tla"):
+        byname.setdefault(p.stem, p)
+    return byname
+
+
 def testmodel_rows():
-    local = {p.stem for p in TESTMODEL.rglob("*.tla")}
     rows = []
     for tla in sorted(TESTMODEL.rglob("*.tla")):
         cfg = tla.with_suffix(".cfg")
-        k, d = classify(read(tla), local, cfg.exists())
+        ext = ext_closure(tla.stem, testmodel_byname(tla))
+        k, d = classify(read(tla), ext, cfg.exists())
         rel = tla.relative_to(TESTMODEL)
         rows.append(("test-model", str(rel), k, d))
     return rows
+
+
+def manifest_mode(mo: dict) -> str:
+    """A manifest model's mode as one word: `simulate` is a dict
+    (`{"simulate": {"traceCount": N}}`), the rest are strings."""
+    m = mo.get("mode")
+    return next(iter(m)) if isinstance(m, dict) else str(m)
 
 
 def examples_rows():
@@ -130,22 +207,21 @@ def examples_rows():
     rows = []
     for mf in sorted(EXAMPLES.glob("specifications/**/manifest.json")):
         m = json.load(open(mf))
-        base = EXAMPLES
         for md in m.get("modules", []):
             path = md["path"]
-            tla = base / path
-            local = {p.stem for p in (base / os.path.dirname(path)).glob("*.tla")}
+            tla = EXAMPLES / path
             feats = md.get("features", [])
-            if feats:
-                rows.append(("examples", path, "excluded",
-                             "feature:" + ",".join(sorted(feats))))
+            if "pluscal" in feats:
+                rows.append(("examples", path, "excluded", "pluscal"))
                 continue
-            if "proof" in md:
-                rows.append(("examples", path, "excluded", "proof"))
-                continue
-            has_model = any(mo.get("mode") == "exhaustive search"
-                            for mo in md.get("models", []))
-            k, d = classify(read(tla) if tla.exists() else "", local, has_model)
+            modes = {manifest_mode(mo) for mo in md.get("models", [])}
+            has_model = bool(modes - {"symbolic"})
+            byname = {p.stem: p for p in tla.parent.glob("*.tla")}
+            ext = ext_closure(tla.stem, byname)
+            k, d = classify(read(tla) if tla.exists() else "", ext, has_model)
+            if k == "sany" and not d:
+                d = ("proof" if "proof" in md
+                     else "symbolic" if "symbolic" in modes else "")
             rows.append(("examples", path, k, d))
     return rows
 
@@ -249,10 +325,12 @@ def sany_batch_modules() -> list:
     of R1.1.3). Subdir specs are a later step. Run through the Hoon SANY
     pipeline in one mule-isolated arm and compared en masse to Java."""
     local = {p.stem for p in TESTMODEL.glob("*.tla")}
+    flat = {p.stem: p for p in TESTMODEL.glob("*.tla")}
     out = []
     for tla in sorted(TESTMODEL.glob("*.tla")):
         text = read(tla)
-        k, _ = classify(text, local, tla.with_suffix(".cfg").exists())
+        k, _ = classify(text, ext_closure(tla.stem, flat),
+                        tla.with_suffix(".cfg").exists())
         if k not in ("sany", "check"):
             continue
         if any(m not in local for m in dep_closure(TESTMODEL, tla.stem)):
@@ -266,10 +344,37 @@ def sany_batch_modules() -> list:
 # where outcome is `crash` or `hoon=<accept|reject>`; the batch arm asserts the
 # actual divergence list equals this frozen set. Populated from the ship run;
 # grouped reasons live in `divergences.txt`.
-SANY_BATCH_DIVERGENCES = []
+#
+# R4.0b: the classifier repair admitted 20 flat specs never compared before,
+# and 18 diverge -- every one a MULTI-MODULE FILE the old classifier hid
+# (it counted the extra module names as unresolved). Order is the arm's own
+# (`(sort out lte)`, atom order), copied from the ship run.
+SANY_BATCH_DIVERGENCES = [
+    # R4.1c (2026-10-08): the monolith fallback (`tlc-monolith`) closed 14 of
+    # the 15 trailing-module specs. CyclicRedefineInstance stays, for a
+    # different reason: its INSTANCE is inside a LET.
+    "Github725b:hoon=reject", "Github725f:hoon=reject",
+    "Github687spec:hoon=reject", "CyclicRedefineInstance:hoon=reject",
+]
+_TRAILING = ("a TRAILING module after the root's `====`: SANY resolves a "
+             "module with no file of its own from the ROOT file "
+             "(ParseUnit -> MonolithSpecExtractor.module); the port does not. "
+             "`tlc-monolith` re-opened by R4.0b; R4.1c")
+_NESTED = ("NESTED module only (no trailing one), which lib/modules registers; "
+           "the reject cause is UNMEASURED -- R4.1c")
 BATCH_REASONS = {
     # BagsTest closed by R1.3.1 (LAMBDA in the WU3 graph). IllegalOperatorTest
     # closed by R1.3.2.1 (deep-4271, first-order op-arg check). Both now agree.
+    **{m: _TRAILING for m in (
+        "Github702", "Github725", "Github817", "Github687", "Github297",
+        "Github1161", "Github725c", "Github725g", "MonolithSpec",
+        "Github687fifo", "CyclicRedefine", "CyclicRedefineVars",
+        "UndeclaredRecursion", "NoFairnessButLiveProp",
+        "CyclicRedefineInstance")},
+    **{m: _NESTED for m in ("Github725b", "Github725f", "Github687spec")},
+    "CyclicRedefineInstance": "INSTANCE inside LET (`LET B == INSTANCE Base "
+                              "IN ...`), as `suite/test59`; its trailing module "
+                              "now resolves (R4.1c). `semantic-graph`; R4.1c",
 }
 
 
@@ -553,12 +658,32 @@ SUB_BATCH_DIVERGENCES = [
     # positions the import prepended (+g-instance adds |iparams| to the member
     # arity), so +genid-prefix-args now welds the `M(args)!` prefix arguments
     # onto the application's own — retiring the spurious EC 4204.
+    #
+    # R4.0b: the classifier repair admitted 20 never-compared subdir specs;
+    # 5 diverged. R4.1c's monolith fallback closed `braf` and
+    # `ActionCompositionDistributive`; EWD998_TTrace's trailing modules now
+    # resolve too, and what is left of it is an INSTANCE inside LET.
+    # R4.1c closed sany/Github723 (EC 4243 on an implicit substitution).
+    "suite/test59 -> hoon=reject",
+    "EWD998/EWD998_TTrace -> hoon=reject",
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
 _CONF = "SANY conformance edge (front-end semantic/level residue, R1.3)"
 _INST = "INSTANCE ... WITH substitution edge (R1.3)"
 SUB_BATCH_REASONS = {
+    # R4.0b (2026-10-08): hidden from the batch by the old classifier.
+    "suite/test59": "INSTANCE inside LET (`LET M == INSTANCE test59a IN ...`); "
+                    "the comment saying so made the old classifier exclude it. "
+                    "`semantic-graph` demoted by R4.0b; R4.1c",
+    "sany/Github723": "WRONG ACCEPT: an implicit INSTANCE substitution of the "
+                      "operator constant `C(_)` by a same-named `C(x, y)` of "
+                      "arity 2 -- SANY: `An operator must be substituted for "
+                      "symbol 'C', and it must have arity 1.` `semantic-graph` "
+                      "demoted by R4.0b; R4.1c",
+    "EWD998/EWD998_TTrace": "INSTANCE inside LET (`LET EWD998_TE == INSTANCE "
+                            "EWD998_TE IN ...`), as `suite/test59`; its trailing "
+                            "modules resolve since R4.1c. `semantic-graph`",
     # R1.3.1 closed the LAMBDA specs (ModuleOverwrites, coverage/F,K,L,
     # EWD840/Error02,Error03,MC02,MC02Sim, suite/test201).
     # test203 closed by R1.3.3.1 (parametrized instance `foo(n)`, Gap A).
@@ -612,13 +737,12 @@ def closure_of(tla: Path):
 def sany_subdir_specs() -> list:
     """(path-id, root-module, {module: text}) for small-closure in-scope subdir
     specs whose closure resolves entirely (no missing module)."""
-    flat = {p.stem for p in TESTMODEL.glob("*.tla")}
     out = []
     for tla in sorted(TESTMODEL.rglob("*.tla")):
         if tla.parent == TESTMODEL:
             continue
-        loc = {p.stem for p in tla.parent.glob("*.tla")} | flat
-        k, _ = classify(read(tla), loc, tla.with_suffix(".cfg").exists())
+        k, _ = classify(read(tla), ext_closure(tla.stem, testmodel_byname(tla)),
+                        tla.with_suffix(".cfg").exists())
         if k not in ("sany", "check"):
             continue
         cl, byname = closure_of(tla)

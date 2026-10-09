@@ -45,6 +45,14 @@ def snapshot() -> dict:
 
 def main() -> int:
     check = "--check" in sys.argv
+    # R4.0b: the classifier's four repairs each carry a fixture that must
+    # bite (fail under the old rule); a regression there corrupts the
+    # inventory every count below is derived from.
+    r = subprocess.run([sys.executable, str(REPO / "tools/test-tier2-classify.py")],
+                       text=True)
+    if r.returncode != 0:
+        print("classifier fixtures failed", file=sys.stderr)
+        return 2
     before = snapshot()
     print("regenerating tier-2 goldens from the pins...")
     r = subprocess.run([sys.executable, str(GEN)], text=True)
@@ -73,13 +81,15 @@ def main() -> int:
     print("Hoon comparators: desk/tests/lib/tier2.hoon — SANY accept/reject "
           "(R1.1.1), and the WHOLE TLC projection the goldens carry: verdict, "
           "distinct/queue counts, search depth and the labelled behavior trace "
-          "(R1.1.2 + R1.1.R1). A 142-spec "
-          "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2, 142/142 agree), a 15-spec "
+          "(R1.1.2 + R1.1.R1). A 162-spec "
+          "mule-isolated SANY batch (R1.1.3/4 + R1.3.1/R1.3.2; 142 until R4.0b's "
+          "classifier repair admitted 20 more -- 144/162 agree), a 15-spec "
           "TLC safety batch (R1.1.5 + R1.5.1/R1.5.2/R1.5.3/R1.5.9 + R1.1.R1, `BagsTest` "
           "added by R3.2, 15/15 agree), and a "
-          "310-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3/R1.3.5/R1.3.7 + "
-          "R1.1.R2's cap raise to 70 000, tier2-sub.hoon, 310/310 agree -- every "
-          "in-scope subdir spec whose closure resolves, 452/452 SANY overall), plus "
+          "329-spec subdir SANY batch (R1.1.6-9 + R1.3.1/R1.3.2/R1.3.3/R1.3.5/R1.3.7 + "
+          "R1.1.R2's cap raise to 70 000; 310 until R4.0b, tier2-sub.hoon, 324/329 "
+          "agree -- every in-scope subdir spec whose closure resolves, 468/491 "
+          "SANY overall), plus "
           "a 9-spec TLC LIVENESS batch "
           "(R1.8.1.4 + R1.1.R1, closed to 9/9 by R2.7.5/R2.7.6.0), and a "
           "3-spec tlaplus-Examples TLC batch (R2.8.2b, selected by "
@@ -90,7 +100,11 @@ def main() -> int:
           "GENERATED count is dropped (`DieHard` 253 vs 252, `Continue` 4 vs 3) and each "
           "state's BINDINGS are sorted (tlc2 prints them in java.util.Hashtable bucket "
           "order — an approved difference, see doc/compatibility.md). "
-          "The census is EMPTY. R2.8.2b's examples batch froze THREE entries "
+          "The census was EMPTY at R3. R4.0b's classifier repair admitted 40 "
+          "never-compared specs and froze 23 divergences: 18 MULTI-MODULE files "
+          "(tlc-monolith), INSTANCE inside LET and an operator-constant arity "
+          "check (semantic-graph), and 3 nested-module rejects not yet measured "
+          "-- all R4.1c. R2.8.2b's examples batch froze THREE entries "
           "on its first run, all of them REFUSALS the port answered where tlc2 "
           "answers a verdict, and R3.0 closed all three: a config with no "
           "behaviour spec (cfg-runspec), a LAMBDA as an operator-valued "

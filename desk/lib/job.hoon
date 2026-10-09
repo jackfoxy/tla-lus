@@ -432,9 +432,9 @@
   ?:  ?&(coverage.opts.op.req !?=(%exhaustive -.mode.opts.op.req))
     `'unsupported: -coverage outside exhaustive mode (the counters live on the safety search)'
   ?:  ?=(%clay -.src.req)
-    ::  a %clay bundle selects its config by PATH, not by name: the desk has
-    ::  no `%cfg` mark, so the file's mark is part of the reference (hence
-    ::  `/spec-cfg/txt`) and a bare name cannot supply it. The capability is
+    ::  a %clay bundle selects its config by PATH, not by name: a Clay path
+    ::  ends in its mark (`/spec/cfg`, or `/spec-cfg/txt`), so the reference
+    ::  needs it and a bare name cannot supply it. The capability is
     ::  present on this bundle, spelled `src.cfg` -- refused, not missing
     ?:  ?=(^ cfg.opts.op.req)
       `'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)'
@@ -889,7 +889,20 @@
       ?:  (~(has by standard-modules:stdmods) name.u.p)
         =.  have.c  (~(put in have.c) name.u.p)
         $
-      [c (flop reads) `[%fail (missing-msg name.u.p from.u.p)]]
+      ::  last, a block in the root file itself (R4.1c, `tlc-monolith`):
+      ::  delivered back to this loop as if it had been read, so it is
+      ::  registered, size-checked and parsed exactly as a file is
+      =/  rtxt  (~(get by mods.c) root.c)
+      =/  mono=(unit @t)
+        ?~(rtxt ~ (monolith-module:mod u.rtxt name.u.p))
+      ?~  mono
+        [c (flop reads) `[%fail (missing-msg name.u.p from.u.p)]]
+      =/  tag  next.c
+      =.  next.c  +(next.c)
+      =/  at=path  (~(gut by refs.c) root.c /)
+      =.  pend.c  (~(put by pend.c) tag [%module name.u.p from.u.p at ~])
+      =.  inbox.c  [[tag [%& u.mono]] inbox.c]
+      $
     =/  txt  p.res.r
     =.  bytes.c  (add bytes.c (met 3 txt))
     ?:  (gth bytes.c max-source.lims)
@@ -1227,8 +1240,19 @@
     ?:  %+  lien  diags.j
         |=(d=diagnostic &(=(%error severity.d) ?=(?(%parse %modules) stage.d)))
       (more j pre)
-    =/  d=diagnostic
-      [[%lus 401] %error %modules 'module resolution failed' ~ ~]
+    ::  R4.2j: name the failure in SANY's words, as the %clay loader does
+    ::  (`+missing-msg`, `+mismatch-msg`); only a cycle or an unparsable
+    ::  module keeps the generic text, the parse stage having reported
+    ::  the latter already
+    =/  why=@t
+      =/  rr  (resolve:mod root.src (inline-resolver:mod modules.src) ~)
+      ?.  ?=(%| -.out.rr)  'module resolution failed'
+      =/  e  p.out.rr
+      ?+  -.e  'module resolution failed'
+        %missing   (missing-msg what.e in.e)
+        %mismatch  (mismatch-msg file.e module.e)
+      ==
+    =/  d=diagnostic  [[%lus 401] %error %modules why ~ ~]
     =/  r  (add-diags j ~[d])
     (more j.r (weld pre evs.r))
   =/  as-diags
@@ -1268,13 +1292,18 @@
   (finish j.r [%failed msg.d] (weld pre evs.r))
 ::
 ++  assume-fail
-  ::  a false (EC 2104) or non-boolean (EC 2105) ASSUME is a typed TLC failure
-  ::  at the model-checking stage, recorded like a config diagnostic
-  |=  [j=jobstate ec=@ud msg=@t pre=(list event)]
+  ::  a non-boolean ASSUME (EC 2105) is a typed TLC failure at the
+  ::  model-checking stage, recorded like a config diagnostic. A FALSE one
+  ::  (EC 2104) is a VERDICT: tlc2 exits 10, CI calls it `assumption
+  ::  failure`, and the wire has `[%assumption name]` for exactly this -- it
+  ::  had never been produced (R4.2j). Its name is the assumption's location
+  |=  [j=jobstate ae=[ec=@ud msg=@t at=@t] pre=(list event)]
   ^-  step-out
-  =/  dg=diagnostic  [[%tlc ec] %error %explore msg ~ ~]
+  =/  dg=diagnostic  [[%tlc ec.ae] %error %explore msg.ae ~ ~]
   =/  r  (add-diags j ~[dg])
-  (finish j.r [%failed msg] (weld pre evs.r))
+  ?.  =(2.104 ec.ae)
+    (finish j.r [%failed msg.ae] (weld pre evs.r))
+  (finish j.r [%violated [%assumption at.ae] *run-stats] (weld pre evs.r))
 ::
 ++  do-config
   ::  consume the parsed root tree and build the engine continuation.
@@ -1461,8 +1490,8 @@
   =/  consts  (consts-of:check constants.rs)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
-  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars))
-  ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
+  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn)
+  ?^  ae  (assume-fail j u.ae pre)
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY WARNS AND CONTINUES (EC 2279),
   ::  matching tlc2 and the console path. Unit 8.7.2's engine blocker was
   ::  re-measured and is stale -- see `+search-ctx-seed`'s note. The warning

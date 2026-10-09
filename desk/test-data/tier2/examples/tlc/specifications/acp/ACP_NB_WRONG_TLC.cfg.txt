@@ -1,0 +1,278 @@
+RESULT safety failure
+Error: Invariant AC1 is violated.
+59286 states generated, 11852 distinct states found, 1248 states left on queue.
+The depth of the complete state graph search is 13.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> FALSE,
+        voteSent |-> FALSE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> FALSE @@ p1 :> FALSE) ]
+/\ coordinator = [ vote |-> (p0 :> waiting @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 2: <request(p0) line 100, col 15 to line 105, col 41 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> FALSE,
+        voteSent |-> FALSE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> FALSE) ]
+/\ coordinator = [ vote |-> (p0 :> waiting @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 3: <sendVote(p0) line 211, col 16 to line 216, col 42 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> FALSE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> FALSE) ]
+/\ coordinator = [ vote |-> (p0 :> waiting @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 4: <request(p1) line 100, col 15 to line 105, col 41 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> FALSE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> waiting @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 5: <sendVote(p1) line 211, col 16 to line 216, col 42 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> waiting @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 6: <getVote(p0) line 118, col 15 to line 126, col 41 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> waiting),
+/\ participant = ( p0 :>
+State 7: <getVote(p1) line 118, col 15 to line 126, col 41 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> undecided,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 8: <makeDecision line 162, col 17 to line 169, col 43 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> notsent @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 9: <coordBroadcast(p0) line 180, col 22 to line 186, col 48 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> undecided,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> commit @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 10: <decide(p0) line 265, col 14 to line 271, col 40 of module ACP_SB>
+        alive |-> TRUE,
+        alive |-> TRUE,
+        decision |-> commit,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> FALSE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> commit @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 11: <parDie(p0) line 280, col 14 to line 284, col 40 of module ACP_SB>
+        alive |-> FALSE,
+        alive |-> TRUE,
+        decision |-> commit,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> TRUE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> TRUE,
+  broadcast |-> (p0 :> commit @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> FALSE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 12: <coordDie line 196, col 13 to line 198, col 39 of module ACP_SB>
+        alive |-> FALSE,
+        alive |-> TRUE,
+        decision |-> commit,
+        decision |-> undecided,
+        faulty |-> FALSE,
+        faulty |-> TRUE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> FALSE,
+  broadcast |-> (p0 :> commit @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> TRUE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>
+State 13: <abortOnTimeout(p1) line 95, col 22 to line 101, col 48 of module ACP_NB_WRONG_TLC>
+        alive |-> FALSE,
+        alive |-> TRUE,
+        decision |-> abort,
+        decision |-> commit,
+        faulty |-> FALSE,
+        faulty |-> TRUE,
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] )
+        forward |-> (p0 :> notsent @@ p1 :> notsent) ] @@
+        voteSent |-> TRUE,
+        voteSent |-> TRUE,
+      [ vote |-> yes,
+      [ vote |-> yes,
+  alive |-> FALSE,
+  broadcast |-> (p0 :> commit @@ p1 :> notsent),
+  decision |-> commit,
+  faulty |-> TRUE,
+  p1 :>
+  request |-> (p0 :> TRUE @@ p1 :> TRUE) ]
+/\ coordinator = [ vote |-> (p0 :> yes @@ p1 :> yes),
+/\ participant = ( p0 :>

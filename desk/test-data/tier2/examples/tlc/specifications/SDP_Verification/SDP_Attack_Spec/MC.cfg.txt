@@ -1,0 +1,865 @@
+RESULT safety failure
+Error: Invariant DataAccessSafeLaw is violated.
+1103 states generated, 526 distinct states found, 175 states left on queue.
+The depth of the complete state graph search is 11.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = {}
+/\ DataKnowledge = {}
+/\ DropPackets = {}
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = {}
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 0
+/\ uAuthSession = {}
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Start_Auth"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {}
+/\ uTstamp = 0
+State 2: <UsrCommitSpaAuth line 362, col 5 to line 385, col 75 of module SPA_Attack>
+     ClientID |-> 1,
+     HMAC |-> 238,
+     SvrIP |-> 58,
+     SvrPort |-> 124,
+     Tstamp |-> 0,
+     Type |-> "User" ] >>
+     dIP |-> 12,
+     dPort |-> 8000,
+     sIP |-> 11,
+     sPort |-> 1024,
+    ClientID |-> 1,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    dIP |-> 12,
+    dPort |-> 8000,
+    sIP |-> 11,
+    sPort |-> 1024,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = << [ MsgID |-> "SPA_AUTH",
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = {}
+/\ DataKnowledge = {}
+/\ DropPackets = {}
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = {}
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 0
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Auth_End"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {}
+/\ uTstamp = 1
+State 3: <UsrConnectSvr line 403, col 5 to line 420, col 72 of module SPA_Attack>
+     ClientID |-> 1,
+     Flg |-> "TCP_SYN" ] >>
+     HMAC |-> 238,
+     SvrIP |-> 58,
+     SvrPort |-> 124,
+     Tstamp |-> 0,
+     Type |-> "User" ] >>
+     Type |-> "User",
+     dIP |-> 12,
+     dIP |-> 22,
+     dPort |-> 80,
+     dPort |-> 8000,
+     sIP |-> 11,
+     sPort |-> 1024,
+     sPort |-> 1025,
+    ClientID |-> 1,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    dIP |-> 12,
+    dPort |-> 8000,
+    sIP |-> 11,
+    sPort |-> 1024,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = << [ MsgID |-> "SPA_AUTH",
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = {}
+/\ DataKnowledge = {}
+/\ DropPackets = {}
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = << [ sIP |-> 11,
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = {}
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 0
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 4: <SDPSvrProcSpaAuth line 536, col 5 to line 576, col 71 of module SPA_Attack>
+           action |-> "Accept" ] ] >>
+           dIP |-> 22,
+           dPort |-> 80,
+           protocol |-> "TCP",
+           sPort |-> 65536,
+         [ sIP |-> 11,
+     Flg |-> "TCP_SYN" ] >>
+     Rule |->
+     Type |-> "User",
+     dIP |-> 22,
+     dPort |-> 80,
+     sPort |-> 1025,
+    ClientID |-> 1,
+    ClientID |-> 1,
+    HMAC |-> 238,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    dIP |-> 12,
+    dIP |-> 12,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = {}
+/\ DataKnowledge = {}
+/\ DropPackets = {}
+/\ FwCtlChannel = << [ op |-> "Add",
+/\ FwDataChannel = << [ sIP |-> 11,
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 0
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 5: <AttackerSniffDataChannel line 885, col 5 to line 903, col 28 of module SPA_Attack>
+           action |-> "Accept" ] ] >>
+           dIP |-> 22,
+           dPort |-> 80,
+           protocol |-> "TCP",
+           sPort |-> 65536,
+         [ sIP |-> 11,
+     Flg |-> "TCP_SYN" ] >>
+     Rule |->
+     Type |-> "User",
+     dIP |-> 22,
+     dPort |-> 80,
+     sPort |-> 1025,
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = { [ sIP |-> 11,
+/\ DropPackets = {}
+/\ FwCtlChannel = << [ op |-> "Add",
+/\ FwDataChannel = << [ sIP |-> 11,
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 6: <FwProcEndPointAccess line 647, col 4 to line 677, col 63 of module SPA_Attack>
+           action |-> "Accept" ] ] >>
+           dIP |-> 22,
+           dPort |-> 80,
+           protocol |-> "TCP",
+           sPort |-> 65536,
+         [ sIP |-> 11,
+     Rule |->
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    Type |-> "User",
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 1025,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = {}
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = { [ sIP |-> 11,
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = << [ op |-> "Add",
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 7: <FwProcAclCfg line 601, col 5 to line 611, col 73 of module SPA_Attack>
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    Type |-> "User",
+    action |-> "Accept" ] }
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    protocol |-> "TCP",
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 65536,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = { [ sIP |-> 11,
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = { [ sIP |-> 11,
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 0
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = {}
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 8: <AttackerProbeSvr line 1029, col 5 to line 1047, col 72 of module SPA_Attack>
+     Flg |-> "TCP_SYN" ] >>
+     Type |-> "Attacker",
+     dIP |-> 22,
+     dPort |-> 80,
+     sPort |-> 2024,
+    AuthID |-> 65535 ] }
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    State |-> "SYN_SENT",
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    action |-> "Accept" ] }
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    protocol |-> "TCP",
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 2024,
+    sPort |-> 65536,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = { [ sIP |-> 11,
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = {}
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = << [ sIP |-> 11,
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 1
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = { [ sIP |-> 11,
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 9: <FwProcEndPointAccess line 647, col 4 to line 677, col 63 of module SPA_Attack>
+     Flg |-> "TCP_SYN" ] >>
+     Type |-> "Attacker",
+     dIP |-> 22,
+     dPort |-> 80,
+     sPort |-> 2024,
+    AuthID |-> 65535 ] }
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    State |-> "SYN_SENT",
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    action |-> "Accept" ] }
+    action |-> "Accept" ],
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    protocol |-> "TCP",
+    protocol |-> "TCP",
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 2024,
+    sPort |-> 2024,
+    sPort |-> 65536,
+  [ sIP |-> 11,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = { [ sIP |-> 11,
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = {}
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 1
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = { [ sIP |-> 11,
+/\ sChannel = << [ sIP |-> 11,
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = {}
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 10: <ServerRcvTCPSyn line 727, col 5 to line 777, col 59 of module SPA_Attack>
+     Flg |-> "TCP_SYN_ACK" ] >>
+     Type |-> "Attacker",
+     dIP |-> 11,
+     dPort |-> 2024,
+     sPort |-> 80,
+    AuthID |-> 65535 ] }
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    State |-> "SYN_RCVD" ] }
+    State |-> "SYN_SENT",
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "Attacker",
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    action |-> "Accept" ] }
+    action |-> "Accept" ],
+    dIP |-> 11,
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 2024,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    protocol |-> "TCP",
+    protocol |-> "TCP",
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 2024,
+    sPort |-> 2024,
+    sPort |-> 65536,
+    sPort |-> 80,
+  [ sIP |-> 11,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = { [ sIP |-> 11,
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = {}
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = <<>>
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = << [ sIP |-> 22,
+/\ aCounter = 1
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = { [ sIP |-> 11,
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = { [ sIP |-> 22,
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1
+State 11: <AttackerRcvSynAck line 1056, col 5 to line 1079, col 63 of module SPA_Attack>
+     Flg |-> "TCP_ACK" ] >>
+     Type |-> "Attacker",
+     dIP |-> 22,
+     dPort |-> 80,
+     sPort |-> 2024,
+    AuthID |-> 65535 ] }
+    ClientID |-> 1,
+    ClientID |-> 1,
+    Flg |-> "TCP_SYN" ] }
+    Flg |-> "TCP_SYN" ] }
+    HMAC |-> 238,
+    HMAC |-> 238,
+    State |-> "ESTABLISHED",
+    State |-> "SYN_RCVD" ] }
+    SvrIP |-> 58,
+    SvrIP |-> 58,
+    SvrPort |-> 124,
+    SvrPort |-> 124,
+    Tstamp |-> 0,
+    Tstamp |-> 0,
+    Type |-> "Attacker",
+    Type |-> "User" ] }
+    Type |-> "User" ] }
+    Type |-> "User",
+    Type |-> "User",
+    action |-> "Accept" ] }
+    action |-> "Accept" ],
+    dIP |-> 11,
+    dIP |-> 12,
+    dIP |-> 12,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dIP |-> 22,
+    dPort |-> 2024,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 80,
+    dPort |-> 8000,
+    dPort |-> 8000,
+    protocol |-> "TCP",
+    protocol |-> "TCP",
+    sIP |-> 11,
+    sIP |-> 11,
+    sPort |-> 1024,
+    sPort |-> 1024,
+    sPort |-> 1025,
+    sPort |-> 1025,
+    sPort |-> 2024,
+    sPort |-> 2024,
+    sPort |-> 65536,
+    sPort |-> 80,
+  [ sIP |-> 11,
+/\ Account = {[Key |-> 44, ClientID |-> 1]}
+/\ AclRuleSet = { [ sIP |-> 11,
+/\ AgedRuleSet = {}
+/\ AuthChannel = <<>>
+/\ AuthKnowledge = {}
+/\ CapAuthMsg = {}
+/\ CapDataMsg = { [ sIP |-> 11,
+/\ DataKnowledge = {}
+/\ DropPackets = { [ sIP |-> 11,
+/\ FwCtlChannel = <<>>
+/\ FwDataChannel = << [ sIP |-> 11,
+/\ FwState = "Work"
+/\ Key = 44
+/\ ReplayCount = 0
+/\ ReplaySession = {}
+/\ SDPSucSession = { [ MsgID |-> "SPA_AUTH",
+/\ SDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ SDPSvrState = "Work"
+/\ SpoofCount = 0
+/\ SpoofSession = {}
+/\ aChannel = <<>>
+/\ aCounter = 1
+/\ aIP = 11
+/\ aSession = {}
+/\ aState = "Listen"
+/\ aTCPLinkSet = { [ sIP |-> 11,
+/\ sChannel = <<>>
+/\ sState = "Listen"
+/\ sSvrInfo = [IP |-> 22, Port |-> 80]
+/\ sTCPLinkSet = { [ sIP |-> 22,
+/\ sniffCount = 1
+/\ uAuthSession = { [ MsgID |-> "SPA_AUTH",
+/\ uChannel = <<>>
+/\ uID = 1
+/\ uIP = 11
+/\ uSDPSvrInfo = [IP |-> 12, Port |-> 8000]
+/\ uState = "Connecting"
+/\ uSvrInfo = [IP |-> 22, Port |-> 80]
+/\ uTCPLinkSet = {[sIP |-> 11, sPort |-> 1025, dIP |-> 22, dPort |-> 80, State |-> "SYN_SENT"]}
+/\ uTstamp = 1

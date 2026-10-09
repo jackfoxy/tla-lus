@@ -408,6 +408,16 @@
     !>(`[%ok [5 4 0 4 [0 1 1 1]]])
   !>((clay-result f (clay-req 'spec' `/src/cfg/txt ~[/src /alt])))
 ::
+++  test-clay-monolith-trailing-module
+  ::  R4.1c: a module with no file under any root, and not a standard
+  ::  module, is taken from the ROOT file's trailing block -- SANY's last
+  ::  resort (ParseUnit -> MonolithSpecExtractor.module)
+  =/  mono  (rap 3 ~[spec-mod '\0a\0a' helper-mod '\0a'])
+  =/  f  (mk-fs ~[[/src/spec/tla mono] [/src/cfg/txt mc-cfg]])
+  %+  expect-eq
+    !>(`[%ok [5 4 0 4 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/cfg/txt ~[/src])))
+::
 ++  test-clay-standard-module-needs-no-file
   ::  a user file shadows a standard module, so the read is attempted;
   ::  when no root has it, the vendored module answers and the run stands

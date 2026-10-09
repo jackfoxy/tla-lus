@@ -1,0 +1,18 @@
+RESULT liveness failure
+Error: Temporal property InSync was violated.
+271 states generated, 37 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.
+Error: The following behavior constitutes a counter-example:
+State 1: <Initial predicate>
+cLogs = (n1 :> <<>> @@ n2 :> <<>> @@ n3 :> <<>>)
+State 2: <Extend(n2) line 35, col 5 to line 38, col 49 of module DistributedReplicatedLog>
+cLogs = (n1 :> <<>> @@ n2 :> <<v, v, v>> @@ n3 :> <<>>)
+State 3: <Copy(n3) line 26, col 9 to line 32, col 96 of module DistributedReplicatedLog>
+cLogs = (n1 :> <<>> @@ n2 :> <<v, v, v>> @@ n3 :> <<v, v, v>>)
+State 4: <Copy(n1) line 26, col 9 to line 32, col 96 of module DistributedReplicatedLog>
+cLogs = (n1 :> <<v, v>> @@ n2 :> <<v, v, v>> @@ n3 :> <<v, v, v>>)
+State 5: <Extend(n2) line 35, col 5 to line 38, col 49 of module DistributedReplicatedLog>
+cLogs = (n1 :> <<v, v>> @@ n2 :> <<v, v, v, v, v>> @@ n3 :> <<v, v, v>>)
+State 6: <Copy(n1) line 26, col 9 to line 32, col 96 of module DistributedReplicatedLog>
+cLogs = (n1 :> <<v, v, v>> @@ n2 :> <<v, v, v, v, v>> @@ n3 :> <<v, v, v>>)
+Back to state 2: <Extend(n2) line 35, col 5 to line 38, col 49 of module DistributedReplicatedLog>

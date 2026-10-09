@@ -2,6 +2,7 @@
 /+  *test
 /=  action-mark  /mar/tla-lus/action
 /=  update-mark  /mar/tla-lus/update
+/=  cfg-mark     /mar/cfg
 |%
   ::  Mark Round-Trips For All Public Nouns
   ::
@@ -118,4 +119,14 @@
 ::
 ++  test-update-malformed-result
   (expect-fail |.((grab-update [%job ~.j1 [%result [%sideways ~]]])))
+::
+::  R4.0e: the `%cfg` mark lets a `.cfg` reach Clay at all (before it, one
+::  aborted the whole |commit). It is raw text, like `%tla`: the bytes a
+::  file holds come back out unchanged, tabs and a trailing newline included
+++  test-cfg-mark-round-trips
+  =/  body=@t  'CONSTANT N = 3\0aINIT Init\0a\09NEXT Next\0a'
+  =/  got=@t
+    %-  mime:grab:~(. cfg-mark *@t)
+    mime:grow:~(. cfg-mark body)
+  (expect-eq !>(body) !>(got))
 --

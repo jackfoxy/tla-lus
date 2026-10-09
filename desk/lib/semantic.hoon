@@ -2919,9 +2919,25 @@
             ==
     ?~  pl  [(flop nms) (flop exs) (flop isubs) ds]
     =/  pn  pn.i.pl
-    =/  pkind=symkind
-      =/  bs  (~(get by bctx) pn)
-      ?~(bs %constant kind.u.bs)
+    =/  bs  (~(get by bctx) pn)
+    =/  pkind=symkind  ?~(bs %constant kind.u.bs)
+    ::  R4.1c: SANY's checkSubstitutionForCorrectArity (EC 4243) on an
+    ::  IMPLICIT substitution: an operator constant takes a same-named
+    ::  operator of exactly its arity. The port had no such check, so
+    ::  `sany/Github723` (`C(_)` substituted by `C(x, y)`) was a wrong
+    ::  accept. The EXPLICIT path (`WITH C <- F`) reports through
+    ::  generateOpArg first at the pin (`Expected arity 1 but found ...`,
+    ::  then a 4243 located in --TLA+ BUILTINS--) and is not yet measured
+    ::  against the port
+    =/  want=@ud  ?~(bs 0 arity.u.bs)
+    =/  arity-err
+      |=  [have=@ud at=sspan]
+      ^-  (list sdiag)
+      ?:  =(want have)  ~
+      :_  ~
+      %^  derr  4.243  at
+      %+  weld  "An operator must be substituted for symbol '{(trip pn)}', "
+      "and it must have arity {(a-co want)}."
     =/  ex=(unit node)  ex.i.pl
     ?^  ex
       =/  oa  (oparg-of u.ex c)
@@ -2956,6 +2972,7 @@
       nms    [pn nms]
       exs    [iex exs]
       isubs  [[pn pkind `iex] isubs]
+      ds     (weld ds (arity-err arity.u.s (span-of:ast u)))
     ==
   =/  sub-lvl
     %+  roll  subs.ip

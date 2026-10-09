@@ -23,6 +23,10 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 
 ## Actions (poke `%tla-lus-action`)
 
+Only the ship itself may poke: `+on-poke` asserts `src.bowl = our.bowl`, so a
+poke from any other ship is nacked. A poke under any other mark, or whose vase
+is not an `action`, is nacked too.
+
 ```hoon
 +$  action
   $%  [%submit id=req-id =request]
@@ -33,9 +37,10 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 
 - **`%submit`** — validate `request` and start a job under `id`. Re-submitting
   an `id` whose job is still active is rejected (`%rejected … 'duplicate active
-  id'`); re-submitting a terminal id is allowed. Validation failures reject with
-  a reason. On success the agent emits `%ack` and schedules the first bounded
-  slice.
+  id'`), and so is re-submitting a **terminal** id (`'a result for this id
+  already exists; delete it first'`): an id names one run. Validation failures
+  reject with a reason. On success the agent emits `%ack` and schedules the
+  first bounded slice.
 - **`%cancel`** — idempotent. An unknown or already-terminal id is a no-op; an
   active job is sealed with `[%cancelled ~]` and emits a `%result` update.
 - **`%delete-result`** — remove a **terminal** job's stored result and
@@ -273,8 +278,11 @@ parity gap needs a field the contract cannot express (most recently the
 state-graph out-degree distribution in `run-stats`). It freezes at release.
 
 The pipeline behind it is now filled in: the parity ledger
-(`parity-manifest.md`) is closed — **134 rows, 134 terminal, none owed
-(2026-09-05, R3.0d)** — so `%check` runs the real safety, liveness, simulation
+(`parity-manifest.md`) was closed at R3 — **134 rows, 134 terminal, none owed
+(2026-09-05, R3.0d)**; R4.0b re-opened two rows (`tlc-monolith`, a root file
+carrying trailing modules; `semantic-graph`, INSTANCE inside LET and an
+operator-constant arity check) and R4.0f created a third (`op-wire-failure`:
+how a failing run reaches the wire), so 3 are owed — and `%check` runs the real safety, liveness, simulation
 and DFID engines over **both** `%inline` and `%clay` sources, `%analyze` runs
 the real semantic/level/lint pipeline, and a terminal run's artifacts can be
 written back to Clay. `VIEW`, `ALIAS` and the cfg source override are live;
