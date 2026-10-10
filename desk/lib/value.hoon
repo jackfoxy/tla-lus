@@ -183,12 +183,52 @@
 ::  +|  Equality (total, cross-representation)
 ::
 ++  equal
+  ::  `+ekey` is normalization-invariant, so nothing is normalized here
   |=  [a=value b=value]
   ^-  ?
-  (equal-norm (normalize a) (normalize b))
+  =((ekey a) (ekey b))
 ::
 ++  equal-norm
   ::  both inputs already normalized
+  |=  [a=value b=value]
+  ^-  ?
+  =((ekey a) (ekey b))
+::
+++  ekey
+  ::  R4.P4 (H5): an EXACT equality key -- `(ekey a)` = `(ekey b)` iff
+  ::  `+equal-norm-ref` holds of their normal forms. It mirrors that relation
+  ::  case for case: set-likes (sets, intervals) compare as element SETS,
+  ::  fcn-likes (functions, tuples, records) as SETS of domain->value pairs,
+  ::  scalars by kind and payload. Order- and duplicate-blind, so it needs no
+  ::  normalization; building it is O(n log n). The old pairwise relation
+  ::  made `+norm-set`'s dedup and `+equal` O(n^2) in set size (measured:
+  ::  151 ms to compare two 100-sets)
+  |=  v=value
+  ^-  *
+  ?:  (set-like v)
+    [%set (key-set (turn (set-elems v) ekey))]
+  ?:  (fcn-like v)
+    :-  %fcn
+    %-  key-set
+    (turn (fcn-pairs v) |=(pr=vpair `*`[(ekey d.pr) (ekey r.pr)]))
+  ?+  -.v  !!
+    %bool   [%bool p.v]
+    %int    [%int p.v]
+    %str    [%str p.v]
+    %model  [%model p.v]
+  ==
+::
+++  key-set
+  ::  a canonical form of a set of keys: the `+silt` treap itself. A treap's
+  ::  shape is fixed by its elements (`+gor` orders keys, `+mor` priorities,
+  ::  both total), so equal key sets give identical nouns with no sort
+  |=  ks=(list *)
+  ^-  (set *)
+  (silt ks)
+::
+++  equal-norm-ref
+  ::  the PAIRWISE relation `+ekey` encodes, kept as its specification and
+  ::  for the differential test (both inputs already normalized)
   |=  [a=value b=value]
   ^-  ?
   ?:  &((set-like a) (set-like b))
@@ -212,8 +252,8 @@
   |=  [a=(list value) b=(list value)]
   ^-  ?
   ?.  =((lent a) (lent b))  |
-  ?&  (levy a |=(x=value (lien b |=(y=value (equal-norm x y)))))
-      (levy b |=(y=value (lien a |=(x=value (equal-norm x y)))))
+  ?&  (levy a |=(x=value (lien b |=(y=value (equal-norm-ref x y)))))
+      (levy b |=(y=value (lien a |=(x=value (equal-norm-ref x y)))))
   ==
 ::
 ++  fcn-equal
@@ -225,7 +265,7 @@
   |=  pa=vpair
   %+  lien  b
   |=  pb=vpair
-  &((equal-norm d.pa d.pb) (equal-norm r.pa r.pb))
+  &((equal-norm-ref d.pa d.pb) (equal-norm-ref r.pa r.pb))
 ::
 ++  rec-equal
   ::  same key set, equal value per key (field-order independent)
@@ -236,7 +276,7 @@
   |=  fa=vfield
   %+  lien  b
   |=  fb=vfield
-  &(=(k.fa k.fb) (equal-norm v.fa v.fb))
+  &(=(k.fa k.fb) (equal-norm-ref v.fa v.fb))
 ::
 ::  +|  Normalization (representation-preserving canonical form)
 ::
@@ -254,13 +294,9 @@
     %intv   v
     %seq  [%seq (turn p.v normalize)]
       %rec
-    :-  %rec
-    %+  sort  (turn p.v |=(f=vfield [k.f (normalize v.f)]))
-    |=([x=vfield y=vfield] (strlth k.x k.y))
+    [%rec (fsort (turn p.v |=(f=vfield [k.f (normalize v.f)])))]
       %fcn
-    :-  %fcn
-    %+  sort  (turn p.v |=(pr=vpair [(normalize d.pr) (normalize r.pr)]))
-    |=([x=vpair y=vpair] (vlth d.x d.y))
+    [%fcn (psort (turn p.v |=(pr=vpair [(normalize d.pr) (normalize r.pr)])))]
       %set
     ::  R2.7.2: `cls` survives normalization. Normalizing reorders and dedups
     ::  ELEMENTS; it does not change what the set was BUILT as, and resetting
@@ -269,19 +305,73 @@
   ==
 ::
 ++  norm-set
-  ::  elements already normalized: keep-first dedup by equality, then sort
-  ::  into the private storage order
+  ::  elements already normalized: dedup by equality, keeping the LAST of
+  ::  equal elements, then sort into the private storage order. R4.P4: the
+  ::  dedup walks the list backwards through a set of `+ekey`s, O(n log n);
+  ::  it was a `lien` over the rest per element, O(n^2)
   |=  vs=(list value)
   ^-  (list value)
-  =/  uniq
-    |-  ^-  (list value)
-    ?~  vs  ~
-    ?:  (lien t.vs |=(x=value (equal-norm i.vs x)))
-      $(vs t.vs)
-    [i.vs $(vs t.vs)]
-  (sort uniq vlth)
+  =/  rev  (flop vs)
+  =|  seen=(set *)
+  =|  uniq=(list value)
+  |-  ^-  (list value)
+  ?~  rev  (vsort uniq)
+  =/  k  (ekey i.rev)
+  ?:  (~(has in seen) k)  $(rev t.rev)
+  $(rev t.rev, seen (~(put in seen) k), uniq [i.rev uniq])
 ::
 ::  +|  Private Storage Order (total; distinct from TLC +compare)
+::
+++  psort
+  ::  pairs by domain point (`+vlth`), stable merge sort; see `+vsort`
+  |=  ps=(list vpair)
+  ^-  (list vpair)
+  =/  n  (lent ps)
+  ?:  (lth n 2)  ps
+  =/  h  (div n 2)
+  =/  a  $(ps (scag h ps))
+  =/  b  $(ps (slag h ps))
+  =|  out=(list vpair)
+  |-  ^-  (list vpair)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (vlth d.i.b d.i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
+::
+++  fsort
+  ::  fields by name (`+strlth`), stable merge sort; see `+vsort`
+  |=  fs=(list vfield)
+  ^-  (list vfield)
+  =/  n  (lent fs)
+  ?:  (lth n 2)  fs
+  =/  h  (div n 2)
+  =/  a  $(fs (scag h fs))
+  =/  b  $(fs (slag h fs))
+  =|  out=(list vfield)
+  |-  ^-  (list vfield)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (strlth k.i.b k.i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
+::
+++  vsort
+  ::  R4.P4: a STABLE merge sort by `+vlth`, O(n log n). The stdlib `+sort`
+  ::  with a `+vlth` gate measured 48 ms for 100 integers (about 70 us per
+  ::  comparison through the gate). Stable, like the `skid` partition of the
+  ::  stdlib quicksort it replaces, so the order of ties is unchanged
+  |=  vs=(list value)
+  ^-  (list value)
+  =/  n  (lent vs)
+  ?:  (lth n 2)  vs
+  =/  h  (div n 2)
+  =/  a  $(vs (scag h vs))
+  =/  b  $(vs (slag h vs))
+  =|  out=(list value)
+  |-  ^-  (list value)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (vlth i.b i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
 ::
 ++  vlth
   ::  a total strict order over normalized values, used only for stable
@@ -300,6 +390,9 @@
   ::  sort and dedup. Same-kind pairs are equivalent either way (a tuple's
   ::  domain is 1..n on both sides; a record's is its keys in `strlth` order),
   ::  so the fast paths below stay exact
+  ::  R4.P4: the commonest pairs first; each is exactly the arm below reaches
+  ?:  &(?=(%int -.a) ?=(%int -.b))  (slth p.a p.b)
+  ?:  &(?=(%str -.a) ?=(%str -.b))  (strlth p.a p.b)
   ?:  ?&(?!(=(-.a -.b)) (fcn-like a) (fcn-like b))
     (pair-lth (fcn-pairs a) (fcn-pairs b))
   =/  ra  (kind-rank a)

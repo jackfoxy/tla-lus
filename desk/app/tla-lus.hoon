@@ -12,22 +12,19 @@
   ::
 ::  +|  Types
 ::
-::  The agent's saved state is a VERSION-TAGGED union, which is the whole
-::  migration mechanism: to change the state's shape, add the new `state-N`
-::  here, keep the previous mold alongside it, and convert in `on-load`'s `?-`.
-::  Nothing has been released, so there is no history to carry and exactly one
-::  version exists — the one that ships. Pre-release reshapes are not versions.
-+$  versioned-state  $%(state-0 state-1)
-+$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
-::  R4.P2: `arms` is each job's CURRENT wake number. A step wake carries it in
-::  its wire, and a wake whose number is not the job's current one is stale
-::  and ignored, so re-arming a job (at `on-load`, or by the sweep) can never
-::  fork a second step chain. `sweep` is the pending sweep timer, if any: once
-::  a minute it re-arms every running job, so a job whose wake was lost (an
-::  event aborted by an interrupt consumes it) resumes within a minute
-::  instead of sitting `running` forever
-+$  state-1
-  $:  %1
+::  ONE state shape and no migrations: the project is in development, so a
+::  shape change is made in place and `on-load` resets a state that no
+::  longer fits.
+::
+::  `arms` is each job's CURRENT wake number (R4.P2). A step wake carries it
+::  in its wire, and a wake with any other number is stale and ignored, so
+::  re-arming a job (at `on-load`, or by the sweep) can never fork a second
+::  step chain. `sweep` is the pending sweep timer, if any: once a minute it
+::  re-arms every running job, so a job whose wake was lost (an event
+::  aborted by an interrupt consumes it) resumes within a minute instead of
+::  sitting `running` forever
++$  state-0
+  $:  %0
       jobs=(map req-id jobstate:job-lib)
       arms=(map req-id @ud)
       sweep=(unit @da)
@@ -74,18 +71,18 @@
 ::
 ++  next-arm
   ::  a fresh wake number for `id`, recorded as its current one
-  |=  [st=state-1 id=req-id]
-  ^-  [@ud state-1]
+  |=  [st=state-0 id=req-id]
+  ^-  [@ud state-0]
   =/  n  +((~(gut by arms.st) id 0))
   [n st(arms (~(put by arms.st) id n))]
 ::
 ++  rearm-all
   ::  a fresh wake, now, for every job the sweep may re-arm
-  |=  [st=state-1 now=@da]
-  ^-  [(list card) state-1]
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
   =/  js  ~(tap by jobs.st)
   =|  caz=(list card)
-  |-  ^-  [(list card) state-1]
+  |-  ^-  [(list card) state-0]
   ?~  js  [(flop caz) st]
   ?.  (rearmable q.i.js)  $(js t.js)
   =^  seq  st  (next-arm st p.i.js)
@@ -93,16 +90,16 @@
 ::
 ++  start-sweep
   ::  (re)start the sweep timer, superseding any pending one
-  |=  [st=state-1 now=@da]
-  ^-  [(list card) state-1]
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
   ?.  (lien ~(val by jobs.st) rearmable)  [~ st(sweep ~)]
   =/  at  (add now sweep-gap)
   [~[(sweep-card at)] st(sweep `at)]
 ::
 ++  ensure-sweep
   ::  start the sweep timer unless one is pending
-  |=  [st=state-1 now=@da]
-  ^-  [(list card) state-1]
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
   ?^  sweep.st  [~ st]
   (start-sweep st now)
 ::
@@ -254,7 +251,7 @@
   ==
 --
 %-  agent:dbug
-=|  state-1
+=|  state-0
 =*  state  -
 ^-  agent:gall
 |_  =bowl:gall
@@ -270,23 +267,14 @@
 ++  on-load
   |=  old-vase=vase
   ^-  (quip card _this)
-  =/  res=(each state-1 tang)
-    %-  mule  |.
-    ::  the stored noun is COERCED (`;;`) rather than required to nest as
-    ::  stored, so a mold change anywhere inside a request cannot throw away
-    ::  completed results. A future version adds its `state-N` to
-    ::  `versioned-state` and its conversion arm to this `?-`.
-    =/  old  ;;(versioned-state q.old-vase)
-    ?-  -.old
-      %0  [%1 jobs.old ~ ~]
-      %1  old
-    ==
-  ?.  ?=(%.y -.res)
-    %-  (slog 'tla-lus: state corrupt, unable to migrate' ~)
-    `this(state *state-1)
-  ::  R4.P2: re-arm every running job and restart the sweep. A wake that was
-  ::  pending is superseded by its new number, so nothing steps twice
-  =.  state  p.res
+  ::  the stored noun is coerced to the one state shape; one that no longer
+  ::  fits (a shape changed during development) resets the agent to empty
+  =/  res  (mule |.(;;(state-0 q.old-vase)))
+  =.  state
+    ?:  ?=(%& -.res)  p.res
+    ((slog 'tla-lus: stored state does not fit this build; reset' ~) *state-0)
+  ::  re-arm every running job and restart the sweep. A wake that was pending
+  ::  is superseded by its new number, so nothing steps twice
   =^  caz  state  (rearm-all state now.bowl)
   =^  sw   state  (start-sweep state now.bowl)
   [(weld caz sw) this]
@@ -389,7 +377,7 @@
     ::  agent's state version
     :^  ~  ~  %noun
     !>  ^-  [api=@ud state=@ud]
-    [api-version 1]
+    [api-version 0]
   ::
       [%x %jobs ~]
     :^  ~  ~  %noun
@@ -426,12 +414,10 @@
     =/  cur  (~(get by jobs.state) id)
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
-    ::  R4.P2: only the job's CURRENT wake steps it. A numberless wire is a
-    ::  wake scheduled before the numbering existed, and is honoured
-    ?.  ?|  ?=([%job @ %step ~] wire)
-            ?&  ?=([%job @ %step @ ~] wire)
-                =(`(slav %ud i.t.t.t.wire) (~(get by arms.state) id))
-        ==  ==
+    ::  only the job's CURRENT wake steps it (R4.P2)
+    ?.  ?&  ?=([%job @ %step @ ~] wire)
+            =(`(slav %ud i.t.t.t.wire) (~(get by arms.state) id))
+        ==
       `this
     =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
     =^  seq  state  (next-arm state id)
@@ -466,8 +452,7 @@
     [-.adv this]
   ::
       [%job @ %load *]
-    ::  a load wire this version does not recognise (an in-flight read
-    ::  from an older engine) is dropped, never a crashed event
+    ::  a malformed load wire is dropped, never a crashed event
     `this
   ::
       [%sweep @ ~]

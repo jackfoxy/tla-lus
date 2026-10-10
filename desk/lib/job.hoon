@@ -52,8 +52,7 @@
       artifacts=(map artifact-name artifact)
       result=(unit result)
       started=@da
-      ::  R4.P2: `k` is `[kont-tag kont]`, stored as is (no jam); an ATOM is a
-      ::  legacy jammed continuation, decoded the old way
+      ::  R4.P2: `k` is `[kont-tag kont]`, stored as is (no jam)
       cont=(unit [%1 k=*])
   ==
 +$  step-out
@@ -363,7 +362,7 @@
   |=  [c=(unit [%1 k=*]) cap=@ud]
   ^-  ?
   ?~  c  |
-  (gth (met 3 ?@(k.u.c k.u.c (jam k.u.c))) cap)
+  (gth (met 3 (jam k.u.c)) cap)
 ::
 ::  +|  Continuation Persistence
 ::
@@ -372,12 +371,10 @@
 ::  hash of the `kont` TYPE. Jamming it every slice, and `cue`-ing and then
 ::  CLAMMING it (`;;` over a recursive mold) on the next, cost O(state space)
 ::  per slice -- measured at 8k states: cue 15 ms, clam 140 ms, jam 16 ms. A
-::  matching tag means this engine wrote it, so it is loaded through `!<`
-::  (one type check, no walk of the value). A mismatched tag is a kont from
-::  another engine version and crashes, which every caller already turns into
-::  the restart notice (the Work Unit 7.7 migration contract). An atom is a
-::  legacy jammed continuation, or hostile input, and takes the old checked
-::  path
+::  matching tag means this build wrote it, so it is loaded through `!<`
+::  (one type check, no walk of the value). Anything else -- a kont from
+::  another build, or hostile input -- crashes, which every caller already
+::  turns into the restart notice; nothing is converted
 ++  kont-tag  ^~(`@uvH`(sham -:!>(*kont)))
 ++  save-kont
   |=  k=kont
@@ -387,7 +384,7 @@
 ++  load-kont
   |=  c=[%1 k=*]
   ^-  kont
-  ?@  k.c  ;;(kont (cue k.c))
+  ?>  ?=(^ k.c)
   ?>  =(kont-tag -.k.c)
   !<(kont [-:!>(*kont) +.k.c])
 ::
@@ -656,7 +653,7 @@
     (finish j [%limited %time stats.j] ~)
   ::  a continuation jammed by an incompatible engine version (e.g. an older
   ::  BFS-cursor shape) cannot be revived; fail the job with a restart notice
-  ::  rather than crash the agent event (Work Unit 7.7 migration contract)
+  ::  rather than crash the agent event (a kont from another build is refused, never converted)
   =/  lr=(each (unit kont) tang)
     ?~  cont.j  [%& ~]
     =/  m  (mule |.((load-kont u.cont.j)))

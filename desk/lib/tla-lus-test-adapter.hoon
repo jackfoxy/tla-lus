@@ -183,12 +183,15 @@
   $(caz t.caz)
 ::
 ++  wake
-  ::  one Behn wake on the job's step wire; ~ if the agent crashes
+  ::  one Behn wake on the job's step wire, under its CURRENT wake number
+  ::  (read from the agent's state; R4.P2); ~ if the agent crashes
   |=  [ag=agent:gall n=@ud id=@ta]
   ^-  (unit agent:gall)
+  =/  sav  ;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag (bowl-at n ~zod)))
+  =/  seq  (~(gut by arms.sav) id 0)
   =/  res
     %-  mule
-    |.((~(on-arvo ag (bowl-at n ~zod)) [%job id %step ~] [%behn %wake ~]))
+    |.((~(on-arvo ag (bowl-at n ~zod)) [%job id %step (scot %ud seq) ~] [%behn %wake ~]))
   ?:  ?=(%| -.res)  ~
   `+.p.res
 ::

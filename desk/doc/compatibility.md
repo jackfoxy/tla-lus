@@ -12,7 +12,7 @@ here is a deliberate, documented divergence rather than a latent bug.
 | Oracle pin (SANY/PlusCal/TLC) | `tlaplus@4ba7d8811` (MIT) |
 | Example/fixture pins | `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6` (MIT) |
 | R4 module-path pins | `CommunityModules@a20cc8eb2` (release `202604221529`, MIT), `tlapm@fd3988fc4` library (BSD-2-Clause), `apalache@a9d9f8267` (`v0.57.1`, Apache-2.0), `tlauc@a4f21b9fc` (`1.1.0`, MIT); `tools/r4-deps.sh` verifies them |
-| Agent state version | `%0` — `versioned-state` in `app/tla-lus`. Nothing has been released, so exactly one version exists: the one that ships. Pre-release reshapes are not versions and the desk carries no record of them |
+| Agent state | `state-0` in `app/tla-lus`, the ONE state shape. The project is in development, so there are no migrations: shapes change in place, and `on-load` coerces the stored noun or resets to empty |
 | Public API version | `api-version` 1 (`sur/tla-lus`, reported at `/x/version` with the state version, `[1 0]`). **Unchanged by R2.7.1's wire split**, per §10.6: pre-release reshapes are not versions. **R3 does not move it either** — nothing has shipped and no ship holds state worth preserving, so there is no migration anywhere in this project. It moves at release |
 | Kelvin | `sys.kelvin` = `[%zuse 411 410 409 408]` |
 | Scaffold gate | `tools/scaffold-gate.sh` (13 gates) — proves scaffold hygiene, not parity; passes whatever the ledger owes |
@@ -1143,42 +1143,19 @@ the counters were reset to the shipping value and the intermediate names
 retired — `state-0`/`%0` is the state, `jobstate` and `step-out` are the
 kernel's own molds, and `api-version` is 1.
 
-**What survives is the mechanism, which is the point.** The agent's saved
-state is a version-tagged union with one arm today:
+**No migrations during development (2026-10-09, the user's rule).** The
+agent has ONE state shape, `state-0`, and `on-load` **coerces** the stored
+noun to it inside `mule`, resetting to empty if it no longer fits:
 
 ```hoon
-+$  versioned-state  $%(state-0)
-+$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
+=/  res  (mule |.(;;(state-0 q.old-vase)))
 ```
 
-and `on-load` **coerces** the stored noun rather than requiring it to nest:
-
-```hoon
-=/  old  ;;(versioned-state q.old-vase)
-?-  -.old
-  %0  old
-==
-```
-
-Two properties of that shape were learned by running the old chain, and both
-are why it is written this way:
-
-- **A frozen mold must be a frozen COPY, never a reference to a live
-  `/sur` type.** The pre-release chain once defined a historical state as
-  `(map req-id job)` using the *current* `$job`; when the `%clay` bundle was
-  reshaped, every "frozen" mold silently changed with it and no longer
-  described what had actually been stored. A future `state-1` must copy the
-  molds it freezes.
-- **`!<` is the wrong tool for `on-load`.** It type-checks the vase as
-  stored, so *any* change to a mold reachable from the state fails the whole
-  load — and the fallback wipes every job, including completed results a
-  caller never collected. `;;` inside `mule` loads a merely restyled state
-  and still falls back on a genuinely unreadable one.
-
-`tools/scaffold-gate.sh` gate 6 and `tools/release-gate.sh` R5 both assert
-this mechanism — the union, the coercion, the dispatch, and a state tag
-matching the gate's own `DESK_STATE` — so the next version bump has to touch
-the gate, and the gate will say so.
+`;;` rather than `!<`, because `!<` type-checks the vase as stored, so any
+change to a mold reachable from the state would fail the load even when the
+noun still fits. There is no version union, no conversion arm, and no
+legacy-format decoding (wire or continuation); scaffold gate 6 checks
+exactly that. The release will decide what the first frozen shape is.
 
 ### 10.8 Clay write-back — at parity for the mechanism (R2.2)
 

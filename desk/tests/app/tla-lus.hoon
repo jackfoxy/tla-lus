@@ -90,9 +90,15 @@
   (~(on-poke ag bol) %tla-lus-action !>(`action`act))
 ::
 ++  do-arvo
+  ::  the job's CURRENT step wake (its number read from the agent's state)
   |=  [ag=agent:gall id=@ta]
   ^-  [(list card) agent:gall]
-  (~(on-arvo ag bol) [%job id %step ~] [%behn %wake ~])
+  (do-wake ag id (cur-arm ag id))
+::
+++  cur-arm
+  |=  [ag=agent:gall id=@ta]
+  ^-  @ud
+  (~(gut by arms:;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag bol))) id 0)
 ::
 ++  do-wake
   ::  a NUMBERED step wake (R4.P2)
@@ -170,8 +176,8 @@
   =/  saved  ~(on-save ag bol)
   =/  ag2  `agent:gall`+:(~(on-load agent bol) saved)
   %+  expect-eq
-    !>(-:+:;;([%1 * *] q:~(on-save ag bol)))
-  !>(-:+:;;([%1 * *] q:~(on-save ag2 bol)))
+    !>(-:+:;;([%0 * *] q:~(on-save ag bol)))
+  !>(-:+:;;([%0 * *] q:~(on-save ag2 bol)))
 ::
 ++  test-inflight-resume-across-reload
   ::  unit 9.4: a mid-run job's checkpointed cursor (the jammed %bfs/%sim/%live
@@ -588,7 +594,7 @@
   ::  a caller can ask what it is talking to
   =/  res  (~(on-peek agent bol) /x/version)
   %+  expect-eq
-    !>([api-version 1])
+    !>([api-version 0])
   !>(!<([api=@ud state=@ud] q:(need (need res))))
 ++  test-on-load-coerces-a-stale-type
   ::  the stored *type* may name molds this version has since changed (during
@@ -608,8 +614,8 @@
   =/  ag   `agent:gall`agent
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
   =/  ag2  `agent:gall`+:(~(on-load agent bol) ~(on-save ag bol))
-  =/  s1  ;;([%1 jobs=* arms=(map @ta @ud) *] q:~(on-save ag bol))
-  =/  s2  ;;([%1 jobs=* arms=(map @ta @ud) *] q:~(on-save ag2 bol))
+  =/  s1  ;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag bol))
+  =/  s2  ;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag2 bol))
   ;:  weld
     (expect-eq !>(jobs.s1) !>(jobs.s2))
     (expect-eq !>(`1) !>((~(get by arms.s1) ~.j1)))
@@ -669,18 +675,17 @@
     !>(?=([%pass [%job %j1 %step %'2' ~] %arvo %b %wait *] (snag 2 caz2)))
   ==
 ::
-::  a version-%0 state migrates, and loading re-arms its running job and
-::  starts the sweep: a job whose wake was lost resumes
-++  test-on-load-migrates-and-rearms
+::  loading re-arms a running job and starts the sweep, so a job whose wake
+::  was lost resumes
+++  test-on-load-rearms
   =/  ag   `agent:gall`agent
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
-  =/  s1  ;;([%1 jobs=* *] q:~(on-save ag bol))
   =/  [caz2=(list card) ag2=agent:gall]
-    (~(on-load agent bol) !>(`*`[%0 jobs.s1]))
+    (~(on-load agent bol) ~(on-save ag bol))
   ;:  weld
     (expect-eq !>(2) !>((lent caz2)))
     %-  expect
-    !>(?=([%pass [%job %j1 %step %'1' ~] %arvo %b %wait *] (snag 0 caz2)))
+    !>(?=([%pass [%job %j1 %step %'2' ~] %arvo %b %wait *] (snag 0 caz2)))
     %-  expect
     !>(?=([%pass [%sweep @ ~] %arvo %b %wait *] (snag 1 caz2)))
     (expect-eq !>(%starting) !>(stage:(need (scry-job ag2 ~.j1))))

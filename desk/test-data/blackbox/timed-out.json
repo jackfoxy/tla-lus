@@ -31,7 +31,7 @@
     "distinct": 0,
     "peak_rss_mb": 96
    },
-   "bottleneck": "H5 (R4.P0b): %config forces Can (10,201 records) and +norm-set's O(n^2) dedup makes about 1e8 record comparisons before the search -> R4.P4"
+   "bottleneck": "R4.P4 re-run: %config 29 s (was > 900 s); now H4: each of the 5,150 initial states checks TypeInvariant == can \\in Can, re-building and normalizing Can (10,201 records) per state -> R4.P3"
   },
   {
    "id": "model-0460e4666ca9",
@@ -63,7 +63,7 @@
     "distinct": 7424,
     "peak_rss_mb": 185
    },
-   "bottleneck": "H5 (R4.P0b): %config ran 170 s in +norm-set (value.hoon:277-281 -> equal-norm -> elems-equal) -> R4.P4"
+   "bottleneck": "R4.P4 re-run: 21,760 distinct in 300 s (about 73/s; was about 8/s); 65,536 needed, about 15 min -> re-run at the R4.P close"
   },
   {
    "id": "model-8f77f31129f6",
@@ -111,7 +111,7 @@
     "distinct": 199,
     "peak_rss_mb": 116
    },
-   "bottleneck": "H4 + H5 (R4.P0): PaxosTypeOK re-builds Message (about 240 records) per state and normalizes it in O(n^2): 86% of runtime, about 3.9 s per state -> R4.P3 + R4.P4"
+   "bottleneck": "R4.P4 re-run: 338 distinct in 300 s (about 5x the rate); the rest is H4 (Message re-built per state) -> R4.P3"
   },
   {
    "id": "model-d92872ffe580",
@@ -143,7 +143,7 @@
     "distinct": 20770,
     "peak_rss_mb": 104
    },
-   "bottleneck": "per-state constant (R4.P0b): steady 2.3 s per 256-unit slice, about 38 distinct/s, about 9 ms per generated state (vs 0.65 ms on the grid workload); states hold sets/records, so H5/H6 -> R4.P4, re-measure after"
+   "bottleneck": "R4.P4 re-run: 16,373 distinct in 300 s (about 55/s; was about 23/s); 54,944 needed, about 17 min -> re-run at the R4.P close"
   },
   {
    "id": "model-a32a31a8edb9",
@@ -175,7 +175,7 @@
     "distinct": 0,
     "peak_rss_mb": 421
    },
-   "bottleneck": "H5 (R4.P0b): parse 3.1 s, then +norm-set (value.hoon:277-281 -> 193-215) in %config -> R4.P4"
+   "bottleneck": "R4.P4 re-run: no longer slow; ends in 195 s with 'unsupported: ALIAS in simulation mode' -> R4.2i (a correctness row; off this list at the R4.P close)"
   },
   {
    "id": "model-855b92119d65",

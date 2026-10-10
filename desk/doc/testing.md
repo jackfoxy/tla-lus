@@ -433,10 +433,9 @@ been bitten by both:
   `jobs-0-to-1`/`jobs-1-to-2`/`jobs-2-to-3`. The gate went **red on 2026-08-17
   and stayed red through nine units** — R1.6, R1.7, R1.1.R0–R4, R1.8.0–.6 —
   because none of them ran it. R1.8.8 found it. The code was right; the gate was
-  stale, and it now checks the mechanism the design guarantees (a version-tagged
-  union, an `on-load` that *coerces* rather than nests, a `?-` dispatch, and a
-  state mold matching the script's own `DESK_STATE`) instead of one historical
-  chain.
+  stale. It now checks what the design guarantees: one state shape, an
+  `on-load` that *coerces* rather than nests, and no migration (since
+  2026-10-09, no version union at all).
 
 So a close-out unit runs, in this order:
 

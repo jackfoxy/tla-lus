@@ -1461,9 +1461,8 @@
   ?>  ?=(^ c)
   (expect-eq !>(k) !>((load-kont:job-lib u.c)))
 ::
-::  a continuation written by another engine version (its tag differs) fails
-::  the JOB with the restart notice, never the event -- the Work Unit 7.7
-::  contract the jammed form kept by clamming
+::  a continuation written by another build (its tag differs) fails the JOB
+::  with the restart notice, never the event
 ++  test-kont-foreign-tag-restarts
   =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
   =/  j   j0(stage %parse, cont `[%1 [0v0 [%parse ~['a'] ~]]])
@@ -1471,12 +1470,7 @@
   %+  expect-eq
     !>  `[%failed 'restarted: the in-flight state is from an incompatible engine version; resubmit']
   !>(?:(?=(%stop -.r) result.job.r ~))
-::
-::  a legacy JAMMED continuation (an atom) still loads, through the checked
-::  path
-++  test-kont-legacy-jam-loads
-  =/  k=kont:job-lib  [%parse ~['a'] ~]
-  (expect-eq !>(k) !>((load-kont:job-lib [%1 (jam k)])))
+
 ::
 ::  +|  Kernel Report == Console Report (R1.8.3)
 ::

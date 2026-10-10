@@ -76,7 +76,17 @@ noise. New arms in `tests/lib/job.hoon`: `test-kont-round-trip`,
 green: job 129, fuzz 14, app, clay-load, blackbox, liveness-message,
 sim-diff, dfid, generate-diff, perf.
 
-### Slice liveness: agent state `%1`, numbered wakes, the sweep
+### Slice liveness: numbered wakes, the sweep
+
+**Revised 2026-10-09 at the user's check-in: no migrations.** The `%0 → %1`
+conversion, the numberless-wire shim and the legacy jammed-kont decoder were
+REMOVED. There is one state shape, `state-0 = [%0 jobs arms sweep]`;
+`on-load` coerces it or resets to empty, then re-arms. Scaffold gate 6 now
+asserts "one shape, coerced, no version union". The tests and the adapter
+drive numbered wires only. Shards app 44, job 128, fuzz 14 (now also feeding
+foreign-tag cells) and blackbox 40 are green. The text below describes the
+first version.
+
 
 R4.0 measured that an interrupted event can consume a job's only behn wake
 and leave it `running` forever.
