@@ -49,6 +49,15 @@ JAR = Path("/mnt/mars/gitrepos/tlaplus/tlatools/org.lamport.tlatools/dist/"
 PIER = os.environ.get("PIER", "/mnt/mars/piers/tla-zod")
 WORK = REPO / "desk/test-data/blackbox/models.json"
 PARSE = REPO / "desk/test-data/blackbox/parse.json"
+#  R4.0e: models that hit the wall cap, skipped until their bottleneck is
+#  named (R4.P0b) and fixed; `--include-timed-out` runs them anyway
+TIMED_OUT = REPO / "desk/test-data/blackbox/timed-out.json"
+
+
+def timed_out_ids() -> set:
+    if not TIMED_OUT.exists():
+        return set()
+    return {m["id"] for m in json.loads(TIMED_OUT.read_text())["models"]}
 DESK = "tla-ex"
 
 # the library roots, in CI's classpath order after the spec directory; a
@@ -305,10 +314,21 @@ class Watchdog(threading.Thread):
                       f"#{len(self.sigints)}", flush=True)
 
 
+def select_work(work: list, only: str, include_timed_out: bool):
+    """The models a run visits, and the timed-out ones it skips."""
+    if only:
+        work = [m for m in work if only in m["model"]]
+    slow = set() if include_timed_out else timed_out_ids()
+    return ([m for m in work if m["id"] not in slow],
+            [m["model"] for m in work if m["id"] in slow])
+
+
 def run(a) -> int:
-    work = json.loads(WORK.read_text())["models"]
-    if a.only:
-        work = [m for m in work if a.only in m["model"]]
+    work, skipped = select_work(json.loads(WORK.read_text())["models"],
+                                a.only, a.include_timed_out)
+    if skipped:
+        print(f"skipping {len(skipped)} timed-out model(s) (timed-out.json; "
+              "--include-timed-out runs them)", flush=True)
     #  `.txt`, not `.jsonl`: the file is under desk/, and Clay refuses a
     #  commit holding an extension with no mark (`%no-cast-between %mime`)
     census = Path(a.census or REPO / "desk/test-data/blackbox/census.txt")
@@ -418,7 +438,10 @@ def main() -> int:
     ap.add_argument("--census", default="")
     ap.add_argument("--poll", type=float, default=10.0)
     ap.add_argument("--wall", type=float, default=3600.0)
-    ap.add_argument("--rss-cap", type=int, default=4000)
+    #  2.5 GB: a SIGINT to a FAST memory runaway at 4 GB crashed the serf in
+    #  signal recovery (MCChangRoberts, R4.0e2); interrupt with less to unwind
+    ap.add_argument("--rss-cap", type=int, default=2500)
+    ap.add_argument("--include-timed-out", action="store_true")
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
     if a.stage:

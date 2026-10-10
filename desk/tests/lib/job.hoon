@@ -159,9 +159,9 @@
   '''
 ++  multi-spec
   ::  the root EXTENDS a user helper module (a two-module bundle); the checked
-  ::  predicates are root-local — evaluating an operator imported from another
-  ::  *user* module is a documented unit-6 residue (only own + INSTANCE defs are
-  ::  in the evaluation defmap)
+  ::  predicates are root-local here. Imported definitions are in the
+  ::  evaluation defmap since unit 6C.1, and since R4.2l the kernel's config
+  ::  targets and VARIABLEs follow EXTENDS too (`test-extends-*`)
   ^~
   '''
   ---- MODULE spec ----
@@ -653,6 +653,116 @@
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  R4.2l: an MC-style root that only EXTENDS the module holding the
+::  variable, Init, Next and the invariant. The job kernel used to look the
+::  config targets up in the ROOT syntax tree and refused it (`no definition
+::  for INIT Init`), the cause of about 29 R4.0e census refusals. Expected
+::  values: tlc2 at the pin (`-workers 1`), 2026-10-09
+++  ext-spec
+  ^~
+  '''
+  ---- MODULE Spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Inv == x < 2
+  ====
+  '''
+++  ext-mc
+  ^~
+  '''
+  ---- MODULE MC ----
+  EXTENDS Spec
+  ====
+  '''
+++  ext-req
+  |=  cfg=@t
+  ^-  request
+  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [%inline 'MC' (malt ~[['MC' ext-mc] ['Spec' ext-spec]]) `cfg]
+      lim  ~  ~
+  ==
+++  ext-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-extends-config-targets
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ext-req ext-cfg) t0) 256)
+  %+  expect-eq
+    !>  `*`[[%invariant 'Inv' %.n] 3 3 0 3]
+  !>  ^-  *
+      ?.  ?=([~ %violated *] result.j)  result.j
+      =*  r  u.result.j
+      :*  violation.r
+          generated.stats.r  distinct.stats.r  queued.stats.r  depth.stats.r
+      ==
+::
+::  the action label names the module that DEFINES the imported Next, as
+::  tlc2 prints it, not the root
+++  test-extends-next-label
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ext-req ext-cfg) t0) 256)
+  =/  ra  (~(get by artifacts.j) %report)
+  =/  lines=wain
+    ?.  ?&(?=(^ ra) ?=(%text -.u.ra))  ~
+    (to-wain:format text.u.ra)
+  %+  expect-eq
+    !>  ^-  wain
+    :~  'State 1: <Initial predicate>'
+        'State 2: <Next line 5, col 9 to line 5, col 18 of module Spec>'
+        'State 3: <Next line 5, col 9 to line 5, col 18 of module Spec>'
+    ==
+  !>((skim lines |=(l=@t =('State ' (end [3 6] l)))))
+::
+::  a name NO module defines is still refused, by the config validator and
+::  with tlc2's own text, before the kernel's guard: so that guard only ever
+::  fired on names an EXTENDed module defines, which is the R4.2l bug
+++  test-extends-undefined-invariant
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (ext-req 'INIT Init\0aNEXT Next\0aINVARIANT Nope\0a') t0) 256)
+  %+  expect-eq
+    !>  `[%failed 'The invariant Nope specified in the configuration file\0ais not defined in the specification.']
+  !>(result.j)
+::
+::  R4.2y: a crash inside a slice seals the job %failed. Before, Gall rolled
+::  the event back with the behn wake that drove it, and the job sat
+::  `running` until the runner's wall cap (three R4.0e2 census models)
+++  test-crash-seals-job
+  ::  a stage `+run` has no arm for crashes it (`%tla-lus-unplanned-stage`)
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  r   (step:job-lib j0(pending ~[%lint], cont ~) 256 t0)
+  =/  res  ?:(?=(%stop -.r) result.job.r ~)
+  %+  expect-eq
+    !>  [%stop %.y 'internal: crashed in %lint']
+  !>  :+  -.r
+        ?=([~ %failed *] res)
+      ?.  ?=([~ %failed *] res)  ''
+      (end [3 26] reason.u.res)
+::
+::  the crash that ports tlc2's `Assert.fail(TLC_LIVE_WRONG_FORMULA_FORMAT)`
+::  (`Liveness.classifyExpr`) is that typed error, with tlc2's text and code.
+::  Expected: tlc2 at the pin (`-workers 1`), 2026-10-09 -- exit 255,
+::  `Error: Temporal formulas containing actions must be of forms <>[]A or []<>A.`
+++  wff-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLES i
+  Init == i = 0
+  Next == i < 5 /\ i' = i + 1
+  Spec == Init /\ [][Next]_i
+  Live == (<><<Next>>_i) ~> (i = 5)
+  ====
+  '''
+++  test-wrong-formula-format-typed
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req wff-spec 'SPECIFICATION Spec\0aPROPERTY Live\0a') t0) 256)
+  %+  expect-eq
+    !>  :-  `[%failed 'Temporal formulas containing actions must be of forms <>[]A or []<>A.']
+        `[%tlc 2.214]
+  !>  :-  result.j
+      =/  ds  (skim diags.j |=(d=diagnostic =(%error severity.d)))
+      ?~(ds ~ `code.i.ds)
 ::
 ::  a search whose persisted cursor is under the noun-size bound completes
 ::  normally (the limit is a defense-in-depth ceiling above max-states)
@@ -1342,6 +1452,31 @@
     (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
   ==
 
+::
+::  R4.P2 (H3): a continuation is stored as itself, tagged with its type's
+::  hash, so a slice no longer jams, cues and clams the whole search state
+++  test-kont-round-trip
+  =/  k=kont:job-lib  [%parse ~['a'] ~]
+  =/  c  (save-kont:job-lib k)
+  ?>  ?=(^ c)
+  (expect-eq !>(k) !>((load-kont:job-lib u.c)))
+::
+::  a continuation written by another engine version (its tag differs) fails
+::  the JOB with the restart notice, never the event -- the Work Unit 7.7
+::  contract the jammed form kept by clamming
+++  test-kont-foreign-tag-restarts
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  j   j0(stage %parse, cont `[%1 [0v0 [%parse ~['a'] ~]]])
+  =/  r   (step:job-lib j 256 t0)
+  %+  expect-eq
+    !>  `[%failed 'restarted: the in-flight state is from an incompatible engine version; resubmit']
+  !>(?:(?=(%stop -.r) result.job.r ~))
+::
+::  a legacy JAMMED continuation (an atom) still loads, through the checked
+::  path
+++  test-kont-legacy-jam-loads
+  =/  k=kont:job-lib  [%parse ~['a'] ~]
+  (expect-eq !>(k) !>((load-kont:job-lib [%1 (jam k)])))
 ::
 ::  +|  Kernel Report == Console Report (R1.8.3)
 ::

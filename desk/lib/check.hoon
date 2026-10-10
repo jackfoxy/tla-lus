@@ -338,7 +338,7 @@
   ::  expansion's successors
   |=  [cur=bfs-cursor lvl=@ud]
   ^-  tlc-run:so:ne
-  [| lvl `[depth.cur distinct.cur (lent queue.cur) gen.cur]]
+  [| lvl `[depth.cur distinct.cur len.queue.cur gen.cur]]
 ::
 ++  env-at
   ::  `+env-of` carrying those statistics
@@ -348,9 +348,11 @@
 ::  everything required to resume a search byte-identically
 +$  bfs-cursor
   $:  init-todo=(list state)  ::  initial states not yet registered
-      queue=(list @t)         ::  frontier fingerprints, BFS order
+      queue=fifo              ::  frontier fingerprints, BFS order
       seen=(map @t visit)
-      inits=(list @t)         ::  registered initial states, in order
+      ::  registered initial states, NEWEST FIRST (R4.P1: a `snoc` per initial
+      ::  state was O(inits)); readers `flop` it back to registration order
+      inits=(list @t)
       gen=@ud
       distinct=@ud
       depth=@ud
@@ -415,7 +417,23 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne]
+  [is *fifo ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne]
+::
+::  R4.P1 (H1/H2): the BFS frontier as a two-list FIFO with its length kept,
+::  so enqueue, dequeue and the `states left on queue` count are O(1)
+::  (amortized). A `(list @t)` made each `snoc` and each per-state `lent`
+::  O(queue), quadratic over a run (measured: c = 5.2e-8 s/state^2)
++$  fifo  [front=(list @t) back=(list @t) len=@ud]
+++  fi-put
+  |=  [q=fifo x=@t]
+  ^-  fifo
+  q(back [x back.q], len +(len.q))
+++  fi-pop
+  |=  q=fifo
+  ^-  (unit [i=@t q=fifo])
+  =?  q  ?=(~ front.q)  q(front (flop back.q), back ~)
+  ?~  front.q  ~
+  `[i.front.q [t.front.q back.q (dec len.q)]]
 ::
 ++  bfs-init-regs
   ::  a fresh cursor that INHERITS the carrier the initial-state solve already
@@ -756,13 +774,13 @@
   ^-  [out=(unit outcome) cur=bfs-cursor]
   ::  a CONSTRAINT-pruned state is not counted or entered, so the statistics it
   ::  sees are the ones standing before it (R2.6.1)
-  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?~  iv  [~ cur]
   ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
   :_  cur
   :-  ~
-  :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+  :*  %inv  gen.cur  distinct.cur  len.queue.cur  depth.cur
       (weld (trace-to seen.cur pred) ~[st])  p.u.iv  =('' pred)
   ==
 ::
@@ -804,11 +822,11 @@
     ?:  cont.o  [~ cur]
     :_  cur
     :-  ~
-    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %action  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (weld (trace-to seen.cur pred) ~[st])  p.u.ia0
     ==
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
-    [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
+    [`[%limited %depth gen.cur distinct.cur len.queue.cur depth.cur] cur]
   ::  TLC order (doNext): the state is counted distinct and its invariants are
   ::  checked BEFORE it is enqueued, so a violating state is counted but never
   ::  enqueued (fixing the states-left-on-queue count)
@@ -824,7 +842,7 @@
   ::  entered in the set, so `distinct` INCLUDES this state, which is why the
   ::  counters are read after the increments above. `level` is the state's own
   ::  depth: `isValid(inv, succState)` passes it as s0
-  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   =^  iv  rs.cur  (first-violated-rs invs.o cst ie rs.cur)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
@@ -834,12 +852,12 @@
     ::  depth 3 and again at depth 4
     ?:  cont.o
       =.  viols.cur  (snoc viols.cur [p.u.iv fp])
-      =.  queue.cur  (snoc queue.cur fp)
-      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      =.  queue.cur  (fi-put queue.cur fp)
+      =?  inits.cur  =('' pred)  [fp inits.cur]
       [~ cur]
     :_  cur
     :-  ~
-    :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %inv  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (trace-to seen.cur fp)  p.u.iv  =('' pred)
     ==
   ::  R2.7.15b: the IMPLIED ACTIONS, here and not at the caller. ORDER is
@@ -852,16 +870,16 @@
   ?^  ia0
     ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
     ?:  cont.o
-      =.  queue.cur  (snoc queue.cur fp)
-      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      =.  queue.cur  (fi-put queue.cur fp)
+      =?  inits.cur  =('' pred)  [fp inits.cur]
       [~ cur]
     :_  cur
     :-  ~
-    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %action  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (trace-to seen.cur fp)  p.u.ia0
     ==
-  =.  queue.cur  (snoc queue.cur fp)
-  =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+  =.  queue.cur  (fi-put queue.cur fp)
+  =?  inits.cur  =('' pred)  [fp inits.cur]
   [~ cur]
 ::
 ++  viols-of
@@ -916,11 +934,11 @@
     ?^  out.rr  [%done u.out.rr cur.rr]
     $(cur cur.rr, spent +(spent))
   ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
-    [%done [%limited %states gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
-  =/  q  queue.cur
+    [%done [%limited %states gen.cur distinct.cur len.queue.cur depth.cur] cur]
+  =/  q  (fi-pop queue.cur)
   ?~  q
     [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
-  =/  fp   i.q
+  =/  fp   i.u.q
   =/  vis  (~(got by seen.cur) fp)
   ::  the statistics `TLCGet` reads are those standing BEFORE this expansion,
   ::  so the environment is built once for the whole state and not per action
@@ -944,7 +962,7 @@
   =/  rr
     =/  as  acts
     =/  ix  0
-    =/  c2  cur(queue t.q)
+    =/  c2  cur(queue q.u.q)
     |-  ^-  [out=(unit outcome) cur=bfs-cursor]
     ?~  as  [~ c2]
     ::  R2.7.4.3: the expansion reads AND writes the run-scoped store, so a
@@ -976,7 +994,7 @@
     =.  outdeg.cur.rr  (~(put by outdeg.cur.rr) 0 +((~(gut by outdeg.cur.rr) 0 0)))
     ?.  deadlock.o  $(cur cur.rr, spent +(spent))
     :+  %done
-      :*  %deadlock  gen.cur.rr  distinct.cur.rr  (lent queue.cur.rr)
+      :*  %deadlock  gen.cur.rr  distinct.cur.rr  len.queue.cur.rr
           depth.cur.rr  (trace-to seen.cur.rr fp)
       ==
     cur.rr
@@ -1537,7 +1555,7 @@
   |-  ^-  graph
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+    [seen.cur.r (flop inits.cur.r) gen.cur.r distinct.cur.r depth.cur.r]
   $(cur cur.r)
 ::
 ++  live-graph-cap
@@ -1576,7 +1594,7 @@
   |-  ^-  [g=graph capped=? out=outcome rs=rst:ne]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    :^    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+    :^    [seen.cur.r (flop inits.cur.r) gen.cur.r distinct.cur.r depth.cur.r]
         ?=(%limited -.out.r)
       out.r
     rs.cur.r
@@ -5398,6 +5416,6 @@
   =/  o=bfs-opts
     [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~]
   =/  cur  (explore-cursor is.c o budget)
-  [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
+  [gen.cur distinct.cur len.queue.cur depth.cur (od-stats outdeg.cur)]
 --
 

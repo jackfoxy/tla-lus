@@ -111,7 +111,9 @@
   ?:  =(0 n)  (crip acc)
   $(n (div n 10), acc [(add '0' (mod n 10)) acc])
 ::
-++  read-dec  |=(t=@t `@ud`(slav %ud t))
+::  plain decimal digits: `slav %ud` wants Hoon's dotted form (`1.000`), so a
+::  cfg integer of 1000 or more crashed the parser (R4.2y)
+++  read-dec  |=(t=@t `@ud`(rash t dem))
 ::
 ++  unquote
   ::  strip the surrounding quotes of a STRING_LITERAL image

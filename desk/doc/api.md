@@ -119,7 +119,7 @@ is idempotent. Subscribing to an unknown id fails the watch.
 
 | Path | Returns |
 |---|---|
-| `/x/version` | `[api=@ud state=@ud]` — the public API revision and the agent's state version (`[1 0]`) |
+| `/x/version` | `[api=@ud state=@ud]` — the public API revision and the agent's state version (`[1 1]`; state %1 since R4.P2 added wake numbering) |
 | `/x/jobs` | `(list [req-id stage])` — all jobs and their current stage |
 | `/x/job/<id>` | `(unit job)` — the public job projection (internal cursors are never exposed) |
 | `/x/job/<id>/artifact/<name>` | `artifact` — a terminal job's artifact (`%report` text; `%trace` on a violation) |

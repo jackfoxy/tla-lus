@@ -52,7 +52,9 @@
       artifacts=(map artifact-name artifact)
       result=(unit result)
       started=@da
-      cont=(unit [%1 k=@])
+      ::  R4.P2: `k` is `[kont-tag kont]`, stored as is (no jam); an ATOM is a
+      ::  legacy jammed continuation, decoded the old way
+      cont=(unit [%1 k=*])
   ==
 +$  step-out
   $%  [%more events=(list event) job=jobstate]
@@ -124,7 +126,7 @@
       bytes=@ud
       next=@ud
   ==
-::  in-flight pipeline state; versioned via the [%1 k=@] wrapper above
+::  in-flight pipeline state; versioned by the `kont-tag` in its `cont` wrapper
 +$  kont
   $%  ::  asynchronous Clay source load
       [%load cur=lcur]
@@ -356,24 +358,38 @@
   $(js (~(put by js) id.i.cands jr), cands t.cands)
 ::
 ++  noun-over
-  ::  has a persisted continuation outgrown the in-flight noun bound?
-  |=  [c=(unit [%1 k=@]) cap=@ud]
+  ::  has a persisted continuation outgrown the in-flight noun bound? The
+  ::  measure is its jam size, as before R4.P2, so the bound is unchanged
+  |=  [c=(unit [%1 k=*]) cap=@ud]
   ^-  ?
   ?~  c  |
-  (gth (met 3 k.u.c) cap)
+  (gth (met 3 ?@(k.u.c k.u.c (jam k.u.c))) cap)
 ::
 ::  +|  Continuation Persistence
 ::
 ::
+::  R4.P2 (H3): a continuation is stored as the noun itself, tagged with a
+::  hash of the `kont` TYPE. Jamming it every slice, and `cue`-ing and then
+::  CLAMMING it (`;;` over a recursive mold) on the next, cost O(state space)
+::  per slice -- measured at 8k states: cue 15 ms, clam 140 ms, jam 16 ms. A
+::  matching tag means this engine wrote it, so it is loaded through `!<`
+::  (one type check, no walk of the value). A mismatched tag is a kont from
+::  another engine version and crashes, which every caller already turns into
+::  the restart notice (the Work Unit 7.7 migration contract). An atom is a
+::  legacy jammed continuation, or hostile input, and takes the old checked
+::  path
+++  kont-tag  ^~(`@uvH`(sham -:!>(*kont)))
 ++  save-kont
   |=  k=kont
-  ^-  (unit [%1 k=@])
-  `[%1 (jam k)]
+  ^-  (unit [%1 k=*])
+  `[%1 [kont-tag k]]
 ::
 ++  load-kont
-  |=  c=[%1 k=@]
+  |=  c=[%1 k=*]
   ^-  kont
-  ;;(kont (cue k.c))
+  ?@  k.c  ;;(kont (cue k.c))
+  ?>  =(kont-tag -.k.c)
+  !<(kont [-:!>(*kont) +.k.c])
 ::
 ::  +|  Validation
 ::
@@ -651,7 +667,7 @@
   =/  own=(unit stage)  ?~(k ~ (kont-stage u.k))
   ::  mid-stage resume: no entry events
   ?:  ?&(?=(^ own) =(u.own stage.j))
-    (run j k budget ~)
+    (run-safe j k budget ~)
   ::  stage entry
   ?~  pending.j
     (finish j [%failed 'no pending work'] ~)
@@ -660,7 +676,32 @@
   =/  j
     ^-  jobstate
     j(stage s, pending t.pending.j, progress prog)
-  (run j k budget ~[[%stage s] [%progress prog]])
+  (run-safe j k budget ~[[%stage s] [%progress prog]])
+::
+++  run-safe
+  ::  R4.2y: a crash in a slice seals the job %failed. Uncaught, Gall rolls
+  ::  the whole event back, the behn wake that drove it is gone, and the job
+  ::  sits `running` forever (three census models, 16 min each)
+  |=  [j=jobstate k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-out
+  =/  m  (mule |.((run j k budget pre)))
+  ?:  ?=(%& -.m)  p.m
+  (crash-fail j p.m pre)
+::
+++  crash-fail
+  ::  the crash tags with a tlc2 error behind them become that typed error;
+  ::  any other crash is an internal failure naming the stage
+  |=  [j=jobstate tan=tang pre=(list event)]
+  ^-  step-out
+  =/  txt=tape  (zing (turn tan |=(t=tank ~(ram re t))))
+  ?^  (find "tlc-live-wrong-formula-format" txt)
+    =/  msg=@t  'Temporal formulas containing actions must be of forms <>[]A or []<>A.'
+    =/  r  (add-diags j ~[[[%tlc 2.214] %error %liveness msg ~ ~]])
+    (finish j.r [%failed msg] (weld pre evs.r))
+  =/  top=tape  ?~(tan "" ~(ram re i.tan))
+  %^  finish  j
+    [%failed (crip "internal: crashed in %{(trip stage.j)}: {top}")]
+  pre
 ::
 ++  run
   ::  execute one bounded slice of the active stage
@@ -1367,12 +1408,35 @@
     =/  nx  next.mode.rs
     ?~  in  (finish j [%failed 'no INIT in config'] pre)
     ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
-    =/  ib  (body-of-def:check tree u.in)
-    ?~  ib  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
-    =/  nb  (body-of-def:check tree u.nx)
-    ?~  nb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+    ::  R4.2l: resolved through the semantic graph, which holds what EXTENDS
+    ::  imports; the root's syntax tree alone refused every MC-style model
+    ::  whose Init/Next live in the module it extends
+    =/  dm  (defmap-of:ne u.mo)
+    ?.  (~(has by dm) u.in)
+      (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
+    ?.  (~(has by dm) u.nx)
+      (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
     (config-run j tree src rs iv pp u.mo pre)
   (config-run j tree src rs iv pp u.mo pre)
+::
+++  def-node
+  ::  the syntax node of definition `nm` and the module that holds it: the
+  ::  root's own, else the module the semantic graph says defines it (an
+  ::  EXTENDS import), parsed from the bundle (R4.2l)
+  |=  [tree=node:check modn=@t defs=(map @t sem-def:semantic) src=srcs nm=@t]
+  ^-  (unit [nod=node:check mod=@t])
+  =/  own  (body-of-def:check tree nm)
+  ?^  own  `[u.own modn]
+  =/  d  (~(get by defs) nm)
+  ?~  d  ~
+  =/  text  (~(get by modules.src) origin.u.d)
+  ?~  text  ~
+  =/  pr  (mule |.((parse-typed:syntax u.text)))
+  ?:  ?=(%| -.pr)  ~
+  ?~  tree.p.pr  ~
+  =/  b  (body-of-def:check u.tree.p.pr nm)
+  ?~  b  ~
+  `[u.b origin.u.d]
 ::
 ++  config-run
   ::  the mode-independent half of +do-config: everything from the resolved
@@ -1411,8 +1475,11 @@
     %^  finish  j
       [%failed 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
     pre
-  =/  vars  (var-names:check tree)
-  =/  order  (var-order:check tree)
+  ::  R4.2l: the VARIABLEs of the whole EXTENDS closure, from the semantic
+  ::  graph (the root's own first, in declaration order, then the imported
+  ::  ones); the root tree alone dropped an extended module's variables
+  =/  order  (turn vars.mo head)
+  =/  vars   (silt order)
   =/  modn  (module-name-of:check tree)
   =/  defs    (defmap-of:ne mo)
   ::  R2.7.7.4b: `_POSSIBLE`'s predicates with their levels, resolved the same
@@ -1447,8 +1514,7 @@
   =/  xpc  (cli-postconditions:check postconditions.opts.op.request.j defs)
   ?:  ?=(%| -.xpc)  (finish j [%failed p.xpc] pre)
   =/  pcs=(list @t)  (weld postconditions.rs p.xpc)
-  =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
-  ?:  &(?=(^ iv) ?=(~ ivb))
+  ?:  ?&(?=(^ iv) !(~(has by defs) u.iv))
     %^  finish  j
       [%failed (rap 3 ~['no definition for INVARIANT ' u.iv])]
     pre
@@ -1479,12 +1545,15 @@
     ?~  sname  ~
     =/  d  (~(get by defs) u.sname)
     ?~(d ~ at.u.d)
-  =/  nb  ?~(nname ~ (body-of-def:check tree u.nname))
-  =/  nl    ?~(nb '' (next-span-label:check aname u.nb modn))
+  ::  the NEXT body's syntax node and the module that holds it, so the
+  ::  action label names an imported Next's own module (R4.2l)
+  =/  nd=(unit [nod=node:check mod=@t])
+    ?~(nname ~ (def-node tree modn defs src u.nname))
+  =/  nl  ?~(nd '' (next-span-label:check aname nod.u.nd mod.u.nd))
   =/  act=next-act
-    ?~  nb  ~
-    =/  sp  (span-of:ast u.nb)
-    `[?~(nname '' u.nname) ?~(sp ~ `[modn u.sp])]
+    ?~  nd  ~
+    =/  sp  (span-of:ast nod.u.nd)
+    `[?~(nname '' u.nname) ?~(sp ~ `[mod.u.nd u.sp])]
   ::  safety, liveness, and simulation all run on the Work Unit 3 SEMANTIC
   ::  graph via node-eval (unit 9.2 retired simulation's CST solver).
   =/  consts  (consts-of:check constants.rs)
@@ -1757,7 +1826,7 @@
       ::  live statistics at the slice boundary (deterministic, resumable): the
       ::  public view reflects search progress, not just the final report
       =.  stats.j
-        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+        :*  gen.cur.r  distinct.cur.r  len.queue.cur.r  depth.cur.r
             (od-stats:check outdeg.cur.r)
         ==
       =.  cont.j  (save-kont kk(cur cur.r))
@@ -1777,7 +1846,7 @@
       ::  partial statistics at the slice boundary (as in do-explore), so a
       ::  max-time interruption of the graph build reports progress (9.5)
       =.  stats.j
-        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+        :*  gen.cur.r  distinct.cur.r  len.queue.cur.r  depth.cur.r
             (od-stats:check outdeg.cur.r)
         ==
       =.  cont.j  (save-kont kk(cur cur.r))
@@ -1969,8 +2038,8 @@
     ?~  tf.o
       :-  %done
       %+  lasso-of-product:lv  o
-      (labeled-product:lv o states inits.cur.kk next.o.kk env order.o.kk)
-    =/  pc  ?~(pcur.kk (product-init:lv o states inits.cur.kk env) u.pcur.kk)
+      (labeled-product:lv o states (flop inits.cur.kk) next.o.kk env order.o.kk)
+    =/  pc  ?~(pcur.kk (product-init:lv o states (flop inits.cur.kk) env) u.pcur.kk)
     =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget)
     ?.  done.r  [%more cur.r]
     [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]

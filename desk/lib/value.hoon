@@ -859,8 +859,9 @@
 ::  a resumable, jam-safe enumeration cursor (WU1 continuation state). Every
 ::  sub-enumeration is a finite value's element list, so the cursor is flat.
 +$  ecur
-  $%  ::  a precomputed ordered element list at index `i` (linear
-      ::  constructors: explicit set, interval, cup, cap, diff, union)
+  $%  ::  a precomputed ordered element list; `es` is the not-yet-taken rest
+      ::  and `i` counts the elements taken (linear constructors: explicit
+      ::  set, interval, cup, cap, diff, union)
       [%elems es=(list value) i=@ud]
       ::  an odometer over per-dimension element lists (exponential
       ::  constructors: product, set-of-functions, set-of-records);
@@ -1097,8 +1098,11 @@
   ^-  [estep ecur]
   ?-  -.cur
       %elems
-    ?:  (gte i.cur (lent es.cur))  [[%done ~] cur]
-    [[%item (snag i.cur es.cur)] cur(i +(i.cur))]
+    ::  R4.P1 (H11): consume the list; `(lent es)` + `(snag i es)` per element
+    ::  made enumerating an explicit set O(n^2). `es` is the REMAINDER, `i`
+    ::  still counts the elements taken
+    ?~  es.cur  [[%done ~] cur]
+    [[%item i.es.cur] cur(es t.es.cur, i +(i.cur))]
   ::
       %odo
     ?:  done.cur  [[%done ~] cur]

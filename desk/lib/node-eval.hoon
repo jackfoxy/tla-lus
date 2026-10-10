@@ -2154,15 +2154,18 @@
   $(cs t.cs, acc p.step)
 ::
 ++  solve-each
-  ::  solve `n` from every partial state, concatenating results in order
+  ::  solve `n` from every partial state, concatenating results in order.
+  ::  R4.P1 (H10): the three solvers here accumulate REVERSED and flop once;
+  ::  `(weld out p.r)` copied the whole accumulator per step, O(n^2) in the
+  ::  states produced (ElevatorSafetyMedium: 19,683 initial states)
   |=  [n=sem:sm mode=?(%init %next) cur=state parts=(list state) e=eenv s=rst]
   ^-  sout
   =|  out=(list state)
   |-  ^-  sout
-  ?~  parts  [[%& out] s]
+  ?~  parts  [[%& (flop out)] s]
   =^  r  s  (solve n mode cur i.parts e s)
   ?:  ?=(%| -.r)  [r s]
-  $(parts t.parts, out (weld out p.r))
+  $(parts t.parts, out (weld (flop p.r) out))
 ::
 ++  solve-disj
   ::  branch: each disjunct solved from the same partial state, in order
@@ -2170,10 +2173,10 @@
   ^-  sout
   =|  out=(list state)
   |-  ^-  sout
-  ?~  ds  [[%& out] s]
+  ?~  ds  [[%& (flop out)] s]
   =^  r  s  (solve i.ds mode cur part e s)
   ?:  ?=(%| -.r)  [r s]
-  $(ds t.ds, out (weld out p.r))
+  $(ds t.ds, out (weld (flop p.r) out))
 ::
 ++  solve-ite
   |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
@@ -2197,10 +2200,10 @@
   =|  out=(list state)
   =/  rows  (bind-rows p.ds)
   |-  ^-  sout
-  ?~  rows  [[%& out] s]
+  ?~  rows  [[%& (flop out)] s]
   =^  r  s  (solve body mode cur part (bind-vals e bs i.rows) s)
   ?:  ?=(%| -.r)  [r s]
-  $(rows t.rows, out (weld out p.r))
+  $(rows t.rows, out (weld (flop p.r) out))
 ::
 ++  solve-forall
   ::  \A x \in S : A — a bounded universal in action position is the

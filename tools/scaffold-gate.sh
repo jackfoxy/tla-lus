@@ -22,7 +22,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DESK="$REPO/desk"
 TLA_REPO="${TLA_REPO:-/mnt/mars/gitrepos/tlaplus}"
 PIN="4ba7d8811289fb8e95dac4d5e554c05216ba3100"
-DESK_STATE="%0"           # agent state version (app/tla-lus.hoon)
+DESK_STATE="%1"           # agent state version (app/tla-lus.hoon)
 FAIL=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }
@@ -78,8 +78,11 @@ grep -q ';;(versioned-state' "$DESK/app/tla-lus.hoon" \
   || { MIGOK=0; MIGWHY="on-load does not coerce the stored noun"; }
 grep -q '?-  -.old' "$DESK/app/tla-lus.hoon" \
   || { MIGOK=0; MIGWHY="on-load has no version dispatch"; }
-grep -q "^+\$  state-${DESK_STATE#%}  \[${DESK_STATE} " "$DESK/app/tla-lus.hoon" \
+# the current state mold, single-line or multi-line (`+$  state-N` then `$:  %N`)
+grep -A1 "^+\$  state-${DESK_STATE#%}\b" "$DESK/app/tla-lus.hoon" | grep -qE "\[${DESK_STATE} |\\$:  ${DESK_STATE}\b" \
   || { MIGOK=0; MIGWHY="state mold is not ${DESK_STATE}"; }
+grep -q "=|  state-${DESK_STATE#%}\b" "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="the agent does not run state-${DESK_STATE#%}"; }
 [ "$MIGOK" -eq 1 ] && pass "on-load coerces + dispatches a version-tagged state ($DESK_STATE)" \
   || fail "state migration mechanism: $MIGWHY"
 
@@ -139,6 +142,15 @@ done)
 [ -z "$UNMARKED" ] && pass "every file under desk/ names a mark" \
   || { fail "$(printf '%s\n' "$UNMARKED" | wc -l) file(s) with no mark:"; \
        printf '%s\n' "$UNMARKED" | sed "s|$DESK/|    |" | head -20; }
+
+echo "== gate 13: Examples runner logic =="
+# R4.0d/e: the stop that works (max-time = wall), the census classes, the
+# timed-out skip list. Offline -- no ship
+if python3 "$REPO/tools/test-examples.py" >/tmp/tla-examples.log 2>&1; then
+  pass "$(tail -1 /tmp/tla-examples.log)"
+else
+  fail "runner checks failed — see /tmp/tla-examples.log"; grep FAIL /tmp/tla-examples.log | head
+fi
 
 echo
 if [ "$FAIL" -eq 0 ]; then

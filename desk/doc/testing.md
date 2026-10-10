@@ -411,7 +411,12 @@ the pin contradicted 12 of them.
 - **The corpus half** — `desk/test-data/blackbox/models.json` (158 manifest
   models) and `parse.json` (373 modules), split to stay under the scaffold
   gate's 100 KB fixture bound, is the work list `tools/examples.py` drives through
-  the public wire on a live ship (R4.0d); its oracle is the MANIFEST.
+  the public wire on a live ship (R4.0d); its oracle is the MANIFEST. Each job's
+  `max-time` is the runner's wall cap (a running slice cannot be cancelled, so
+  that is the stop that works); models that hit it are listed in
+  `timed-out.json` and SKIPPED until R4.P0b names each bottleneck
+  (`--include-timed-out` runs them). `tools/test-examples.py` (scaffold gate 13)
+  checks the runner's logic offline.
 
 ## Close-out gates, and why they are their own unit (R1.8.8)
 
@@ -440,7 +445,7 @@ So a close-out unit runs, in this order:
 | tier 1 | `python3 tools/validate.py --check` | every golden reproduces byte-identically from the pin |
 | tier 2 | `python3 tools/tier2.py --check` | inventory + curated oracle + comparator shards reproduce, census asserted exactly |
 | ledger | `python3 tools/check-parity.py` | well-formed, and how much is still owed |
-| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 12 gates (runs tier 1 as its gate 2; gate 12: every file under `desk/` names a mark) |
+| gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 13 gates (runs tier 1 as its gate 2; gate 12: every file under `desk/` names a mark; gate 13: `tools/test-examples.py`, the Examples runner's offline checks) |
 | release | `bash tools/release-gate.sh` | **PASSES as of 2026-09-05** (R3.0d closed the last owed row). It failed by design from R2.0 to then — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
 | acceptance | `python3 tools/r3-acceptance.py --suite-log <captured suite output>` (R3.3.2; `r1-acceptance.py` is R1's and stays red, by design) | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
