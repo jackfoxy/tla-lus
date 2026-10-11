@@ -430,6 +430,28 @@
     !>((clay-result multi-fs req))
   ==
 ::
+::  R4.1a: SANY looks in the SPEC directory, then the StandardModules, and
+::  only then the library roots. A library root's copy of a standard module
+::  (tlapm's `FiniteSets`, CommunityModules' `Json`) is never read: the run
+::  takes the vendored one, and asks the second root for nothing
+++  test-clay-standard-module-before-library-roots
+  =/  f
+    %-  mk-fs
+    :~  [/src/spec/tla spec-mod]
+        [/src/helper/tla helper-mod]
+        [/src/cfg/txt mc-cfg]
+        [/lib/naturals/tla '---- MODULE Naturals ----\0aBOGUS ==\0a====\0a']
+    ==
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src /lib])
+  =/  paths  (read-paths f req 256)
+  ;:  weld
+    (expect !>((lien paths |=(p=path =(p /src/naturals/tla)))))
+    (expect !>(!(lien paths |=(p=path =(p /lib/naturals/tla)))))
+    %+  expect-eq
+      !>(`[%ok [5 4 0 4 [0 1 1 1]]])
+    !>((clay-result f req))
+  ==
+::
 ::  +|  Typed Failures At The %modules Stage
 ::
 ::

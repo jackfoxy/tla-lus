@@ -434,20 +434,39 @@
   ::  non-local symbols) with the same computed levels.
   |=  [tree=node deps=(map @t ctx)]
   ^-  [full=ctx exported=ctx]
+  (build-ctx-upto tree deps ~)
+::
+++  build-ctx-upto
+  ::  +build-ctx, stopping at the nested module named `stop` (R4.1c): the
+  ::  context that nested module is built in
+  |=  [tree=node deps=(map @t ctx) stop=(unit @t)]
+  ^-  [full=ctx exported=ctx]
   ::  EXTENDS re-exports the whole exported context (declarations and
   ::  definitions); INSTANCE imports only definitions, handled per unit
   ::  by +inst-syms below, so its module is NOT folded in here (its raw
   ::  VARIABLE/CONSTANT declarations must not leak into this module)
+  ::  R4.1c: an INNER module starts from its enclosing module's EXTENDS
+  ::  context (+analyze stores it under +encl-key), as SANY builds a nested
+  ::  module inside its parent's context
+  =/  encl=ctx
+    =/  nm  (module-name-of:modules tree)
+    ?~(nm ~ (~(gut by deps) (encl-key u.nm) ~))
   =/  imports=ctx
     %+  roll  (extends-of tree)
     |=  [r=@t acc=ctx]
     (~(uni by acc) (~(gut by deps) r ~))
+  =.  imports  (~(uni by encl) imports)
   =/  full=ctx  (~(uni by builtins) imports)
   =/  exported=ctx  imports
   =/  units  (body-of-module tree)
   |-  ^-  [ctx ctx]
   ?~  units  [full exported]
   =/  u  i.units
+  ?:  ?&  ?=(^ stop)
+          (is-kind u %n-module)
+          =(stop (module-name-of:modules u))
+      ==
+    [full exported]
   =/  dsyms  (decl-syms u)
   =.  full  (add-decls full dsyms)
   =.  exported  (add-decls exported dsyms)
@@ -466,7 +485,7 @@
   =/  ds  (def-signature u)
   ?^  ds
     =/  s2=sym  s.u.ds
-    =.  level.s2  (def-level u full)
+    =.  level.s2  (def-level u (put-syms full (let-inst-syms u deps full)))
     =.  full  (~(put by full) name.u.ds s2)
     =?  exported  !local.u.ds  (~(put by exported) name.u.ds s2)
     $(units t.units)
@@ -495,7 +514,33 @@
   ^-  (map @t ctx)
   =/  ld  (~(get by mods) nm)
   ?~  ld  acc
+  =?  acc  ?=(%inner src.u.ld)  (put-encl nm mods acc)
   (~(put by acc) nm (export-ctx tree.u.ld acc))
+::
+++  encl-key
+  ::  R4.1c: where +analyze keeps an inner module's enclosing context. The
+  ::  `!` cannot begin a module name, so the key never meets one
+  |=  nm=@t
+  ^-  @t
+  (cat 3 '!encl:' nm)
+::
+++  put-encl
+  ::  R4.1c: an inner module's enclosing context -- its parent's EXTENDS
+  ::  context, plus the parent's own enclosing context when it is nested in
+  ::  turn, and the parent's declarations and definitions that come before
+  ::  it: SANY builds a nested module inside its parent's context
+  |=  [nm=@t mods=(map @t loaded:modules) acc=(map @t ctx)]
+  ^-  (map @t ctx)
+  =/  par
+    %+  skim  ~(tap by mods)
+    |=  [p=@t l=loaded:modules]
+    (lien (inner-modules:modules tree.l) |=([n=@t *] =(n nm)))
+  ?~  par  acc
+  ::  the parent's full context at the nested module: its EXTENDS, its own
+  ::  enclosing context (via +encl-key), and its declarations and
+  ::  definitions BEFORE the nested module
+  =/  pt  tree.q.i.par
+  (~(put by acc) (encl-key nm) full:(build-ctx-upto pt acc `nm))
 ::
 ::  +|  Root Dump (normalized SemDump format)
 ::
@@ -1931,16 +1976,31 @@
       ==
     [~ ~]
   ?~  sels  [~ ~]
-  =/  base-parg
-    =/  bs  (~(get by c) nm.i.sels)
-    ?~(bs ~ parg.u.bs)
+  ::  a selector's args are HO-aware when the selector names an operator:
+  ::  the base, or an instance member through a leading %name chain
+  ::  (`L!Op(Foo, 9)!lab`, R4.1c). A parametrized instance's member
+  ::  carries the instance parameters first (+g-instance), and the
+  ::  prefix's own args (`I(55)!Op(Foo, 9)`) fill them
   =/  gen
-    =/  first  &
+    =/  pre=@t  ''
+    =/  nia=@ud  0
+    =/  live  &
     =/  sl=(list sel-item)  sels
     |-  ^-  [out=(list sem) ds=(list sdiag)]
     ?~  sl  [~ ~]
-    =/  ga  (gen-sel-args args.i.sl ?:(first base-parg ~) c)
-    =/  rest  $(sl t.sl, first |)
+    =/  nam  &(live ?=(%name kind.i.sl))
+    =/  parg=(list @ud)
+      ?.  nam  ~
+      =/  bs  (~(get by c) (rap 3 ~[pre nm.i.sl]))
+      ?~(bs ~ (slag nia parg.u.bs))
+    =/  ga  (gen-sel-args args.i.sl parg c)
+    =/  rest
+      ?.  nam  $(sl t.sl, live |)
+      %=  $
+        sl   t.sl
+        pre  (rap 3 ~[pre nm.i.sl '!'])
+        nia  (add nia (lent args.i.sl))
+      ==
     [(weld-sems out.ga out.rest) (weld ds.ga ds.rest)]
   =/  ub=(list sbind)
     =/  uq=(list sel-item)  sels
@@ -2085,6 +2145,14 @@
     ::  against the member's maxLevels (SANY: EC 4205 when a variable-
     ::  substituting argument exceeds them).  R1.3.7.1b
     =/  pargs  (genid-prefix-args n)
+    ::  R4.1c: a bare reference to an operator that takes arguments, in
+    ::  expression position, is SANY's 4204 (an operator argument never
+    ::  reaches here: +oparg-of takes it first)
+    ?:  &(?=(~ pargs) (gth arity.u.s 0) !variadic.u.s)
+      :-  `[%nullodn ~]
+      :_  ~
+      %^  derr  4.204  (span-of:ast n)
+      "The operator {(trip nm)} requires {(a-co arity.u.s)} arguments."
     ?~  pargs
       [`[%apply [nm kind.u.s] (expr-level n c) (span-of:ast n) ~ ~ ~] ~]
     =/  ga  (gen-sel-args pargs parg.u.s c)
@@ -2835,6 +2903,90 @@
     "The only expression allowed as a fact in a HIDE is "
   (weld ds.g bad)
 ::
+++  let-mod-defs
+  ::  R4.1c: every LET in `u` that defines a module instance, as the LET's
+  ::  ordinary definitions (in scope for the instance's substitutions) and
+  ::  its module-definition units, outermost LET first
+  |=  u=node
+  ^-  (list [ldefs=(list node) mds=(list node)])
+  ?.  ?=(%node -.u)  ~
+  =/  here=(list [ldefs=(list node) mds=(list node)])
+    ?.  (is-kind u %n-letin)  ~
+    =/  dn  (skim (kids-of u) |=(k=node (is-kind k %n-letdefinitions)))
+    ?~  dn  ~
+    =/  ks  (skim (kids-of i.dn) |=(k=node ?=(%node -.k)))
+    =/  mds  (skim ks |=(k=node (is-kind k %n-moduledefinition)))
+    ?~  mds  ~
+    ~[[(skip ks |=(k=node (is-kind k %n-moduledefinition))) mds]]
+  ::  hand-rolled over the kids: a wet `turn`/`zing` re-entering this arm
+  ::  fuse-loops the compiler
+  =/  ks  kids.u
+  =/  sub
+    |-  ^-  (list [ldefs=(list node) mds=(list node)])
+    ?~  ks  ~
+    (weld (let-mod-defs i.ks) $(ks t.ks))
+  (weld here sub)
+::
+++  let-ctx
+  ::  the scope a LET's instance substitutions see: `c` plus that LET's own
+  ::  ordinary definitions
+  |=  [c=ctx ldefs=(list node)]
+  ^-  ctx
+  %+  roll  ldefs
+  |=  [d=node acc=_c]
+  =/  sig  (def-signature d)
+  ?~(sig acc (~(put by acc) name.u.sig s.u.sig))
+::
+++  let-scoped
+  ::  R4.1c: each LET module definition in `u` with the scope its LET gives
+  ::  it. Hand-rolled: wet `turn`/`zing` over these molds fuse-loop the
+  ::  compiler
+  |=  [u=node c=ctx]
+  ^-  (list [c2=ctx md=node])
+  =/  lm  (let-mod-defs u)
+  =|  out=(list [c2=ctx md=node])
+  |-  ^-  (list [c2=ctx md=node])
+  ?~  lm  (flop out)
+  =/  c2  (let-ctx c ldefs.i.lm)
+  =/  ms  mds.i.lm
+  =.  out
+    |-  ^-  (list [c2=ctx md=node])
+    ?~  ms  out
+    $(ms t.ms, out [[c2 i.ms] out])
+  $(lm t.lm)
+::
+++  let-inst-syms
+  ::  R4.1c: the `G!op` symbols of the instances inside LETs in `u`
+  |=  [u=node deps=(map @t ctx) c=ctx]
+  ^-  (list [@t sym])
+  =/  ps  (let-scoped u c)
+  =|  out=(list [@t sym])
+  |-  ^-  (list [@t sym])
+  ?~  ps  out
+  =/  iu  (unit-instance md.i.ps)
+  ?~  iu  $(ps t.ps)
+  $(ps t.ps, out (weld out (inst-syms u.iu deps c2.i.ps)))
+::
+++  let-insts
+  ::  R4.1c: the symbols, definitions and diagnostics of the instances inside
+  ::  LETs in `u`, generated with the module graph +gen-module holds
+  |=  [u=node c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  [syms=(list [@t sym]) defs=(list sem-def) thms=(list sem-thm) ds=(list sdiag)]
+  =/  ps  (let-scoped u c)
+  =|  out=[syms=(list [@t sym]) defs=(list sem-def) thms=(list sem-thm) ds=(list sdiag)]
+  |-  ^-  [syms=(list [@t sym]) defs=(list sem-def) thms=(list sem-thm) ds=(list sdiag)]
+  ?~  ps  out
+  =/  iu  (unit-instance md.i.ps)
+  ?~  iu  $(ps t.ps)
+  =/  gi  (g-instance md.i.ps u.iu c2.i.ps ctxs mods)
+  %=  $
+    ps         t.ps
+    syms.out   (weld syms.out (inst-syms u.iu ctxs c2.i.ps))
+    defs.out   (weld defs.out defs.gi)
+    thms.out   (weld thms.out thms.gi)
+    ds.out     (weld ds.out ds.gi)
+  ==
+::
 ++  g-instance
   ::  an INSTANCE unit: one imported definition per (non-local) operator
   ::  defined in the instanced module, its body wrapped in $substin over
@@ -2925,10 +3077,7 @@
     ::  IMPLICIT substitution: an operator constant takes a same-named
     ::  operator of exactly its arity. The port had no such check, so
     ::  `sany/Github723` (`C(_)` substituted by `C(x, y)`) was a wrong
-    ::  accept. The EXPLICIT path (`WITH C <- F`) reports through
-    ::  generateOpArg first at the pin (`Expected arity 1 but found ...`,
-    ::  then a 4243 located in --TLA+ BUILTINS--) and is not yet measured
-    ::  against the port
+    ::  accept
     =/  want=@ud  ?~(bs 0 arity.u.bs)
     =/  arity-err
       |=  [have=@ud at=sspan]
@@ -2940,7 +3089,47 @@
       "and it must have arity {(a-co want)}."
     =/  ex=(unit node)  ex.i.pl
     ?^  ex
-      =/  oa  (oparg-of u.ex c)
+      ::  R4.1c: the EXPLICIT path (`WITH C <- F`) for an operator
+      ::  constant goes through generateOpArg: an operator of the wrong
+      ::  arity is a 4271, an expression a 4004, and either leaves the
+      ::  nullOpArg, whose 4243 is located in --TLA+ BUILTINS-- (0.0-0.0).
+      ::  A constant of arity 0 takes an expression, so a bare operator
+      ::  name there is generateExpression's 4204, not an $OpArg
+      =/  bad=(unit sdiag)
+        ?:  =(0 want)  ~
+        ?:  (is-kind u.ex %n-lambda)  ~
+        =/  ai  (arg-op-info u.ex c)
+        ?^  ai
+          ?:  =(want arity.s.u.ai)  ~
+          :-  ~
+          %^  derr  4.271  (span-of:ast u.ex)
+          %+  weld  "Expected arity {(a-co want)} but found operator "
+          "of arity {(a-co arity.s.u.ai)}."
+        ?:  ?|  (is-kind u.ex %n-generalid)
+                (is-kind u.ex %n-geninfixop)
+                (is-kind u.ex %n-genprefixop)
+                (is-kind u.ex %n-genpostfixop)
+                (is-kind u.ex %n-gennonexpprefixop)
+            ==
+          ~
+        :-  ~
+        %^  derr  4.004  (span-of:ast u.ex)
+        %+  weld  "Arity {(a-co want)} operator (not an expression) is expected "
+        "\0ato substitute for CONSTANT '{(trip pn)}'."
+      ?^  bad
+        =/  nul=sem
+          :*  %apply  ['$OpArg' %builtin]  0  `[[0 0] [0 0]]
+              [['nullOpArg' | ~] ~]  ~
+              [[%lit %num '-2' ~] ~]
+          ==
+        %=  $
+          pl     t.pl
+          nms    [pn nms]
+          exs    [nul exs]
+          isubs  [[pn pkind `nul] isubs]
+          ds     (weld ds [u.bad (arity-err 0 `[[0 0] [0 0]])])
+        ==
+      =/  oa  ?:(&(?=(^ bs) =(0 want)) ~ (oparg-of u.ex c))
       ?^  oa
         %=  $
           pl     t.pl
@@ -3550,12 +3739,19 @@
                 "Multiple declarations or definitions for symbol {(trip name.u.dsg)}.  "
             ==
       ==
-    =/  gd  (g-def u c)
+    ::  R4.1c: an INSTANCE inside a LET of this definition (`G == INSTANCE
+    ::  Graphs`, Examples' EWD687a) needs the module graph, which expression
+    ::  generation does not carry; its `G!op` definitions are generated here
+    ::  and made visible while this definition is generated
+    =/  li  (let-insts u c ctxs mods)
+    =/  gd  (g-def u (put-syms c syms.li))
     %=  $
       us      t.us
       seen    (~(put in seen) name.u.dsg)
-      defs    ?~(r.gd defs [u.r.gd defs])
-      ds      (weld ds ds.gd)
+      defs    =.  defs  (weld (flop defs.li) defs)
+              ?~(r.gd defs [u.r.gd defs])
+      thmdefs  (weld (flop thms.li) thmdefs)
+      ds      :(weld ds ds.li ds.gd)
       snames  ?.(&(secopen ?=(^ r.gd)) snames [name.u.dsg snames])
     ==
   =/  wk  walk
@@ -6141,9 +6337,11 @@
       =/  ary=@t
         ?~  args.s  '0'
         ?:(?=(%lit -.i.args.s) val.i.args.s '0')
+      ::  generateOpArg's nullOpArg has no operator
+      =/  opt=tape  ?:(=('nullOpArg' nm) "" " op={(trip nm)}")
       :_  ~
       %+  line  d
-      "oparg {(trip nm)} op={(trip nm)} arity={(trip ary)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
+      "oparg {(trip nm)}{opt} arity={(trip ary)} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
     ?:  =('$Label' name.op.s)
       ::  reserved $Label %apply: name in the ubound, labeled body the arg
       ::  (R1.3.5.3.1)
@@ -6195,8 +6393,10 @@
       ::
         ~[(line +(d) "in")]
       ::
+        ::  the body is the instancee's node, already level-checked
+        ::  (unmasked under an error in the instancing root, as SANY)
         =/  body  (slag nsubs args.s)
-        ?~(body ~ (render-sem i.body (add d 2) mask))
+        ?~(body ~ (render-sem i.body (add d 2) |))
       ==
     :-  %+  line  d
         "apply {(trip name.op.s)} opkind={(trip (kind-tag kind.op.s))} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
@@ -6242,6 +6442,14 @@
     ==
   ==
 ::
+++  inst-body
+  ::  a def body that is an instance substitution wrapper
+  |=  b=(unit sem)
+  ^-  ?
+  ?~  b  |
+  ?.  ?=(%apply -.u.b)  |
+  ?=(^ (anysubstin-mod name.op.u.b))
+::
 ++  render-def
   |=  [df=sem-def d=@ud mask=?]
   ^-  wain
@@ -6251,7 +6459,10 @@
     ^-  wain
     %+  turn  params.df
     |=  p=spar
-    =/  plv  ?:(|(mask !used.p) "L-1" "L0")
+    ::  an instanced def's parameters are the instancee's nodes, level-
+    ::  checked with it, so an error in the instancing root masks none
+    =/  pm  ?.(mask | !(inst-body body.df))
+    =/  plv  ?:(|(pm !used.p) "L-1" "L0")
     (line +(d) "param {(trip name.p)} arity={(a-co arity.p)} {plv} {(sspan-tape at.p)}")
   ?~(body.df ~ (render-sem u.body.df +(d) mask))
 ::
@@ -6334,7 +6545,7 @@
     |=  it=sem-inst
     %+  line  1
     %+  weld  "instance"
-    "{?~(name.it "" " name={(trip u.name.it)}")} module={(trip mod.it)} local={(yn local.it)} {(rlvl mask 0)} {(sspan-tape at.it)}"
+    "{?~(name.it "" " name={(trip u.name.it)}")} module={(trip mod.it)} local={(yn local.it)} L0 {(sspan-tape at.it)}"
   ::
     ^-  wain
     ?~  diags.m  ~

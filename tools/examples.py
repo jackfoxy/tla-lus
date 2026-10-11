@@ -157,6 +157,60 @@ def request(m: dict, case_ud: int, budget: int, wall: float):
     return u.tup(op, src, limits, 0, 0)
 
 
+def request_parse(mod: str, case_ud: int):
+    """R4.1: an `%analyze` of one module (SANY's parse + semantic + level +
+    lint), its imports resolved from the module's own directory and then the
+    three library roots, as CI's classpath orders them"""
+    sdir = low(os.path.dirname(mod))
+    root = Path(mod).stem
+    op = u.tup(u.cord("analyze"), u.tup(YES, YES, YES, YES))
+    roots = u.lst([u.path(*sdir.split("/"))] + [u.path(r) for r in ROOTS])
+    src = u.tup(u.cord("clay"), 0, u.cord(DESK), (u.cord("ud"), case_ud),
+                u.cord(root), 0, roots)
+    limits = u.tup(3_000_000, 1024, 10**9, 10**7, 600 << 64, 4_000_000, 0)
+    return u.tup(op, src, limits, 0, 0)
+
+
+def run_parse(a) -> int:
+    """R4.1: the parse census -- every module of `parse.json` through
+    `%analyze`; the pin's SANY accepts all 373 (tier2/examples/sany)"""
+    work = json.loads(PARSE.read_text())["parse"]
+    if a.only:
+        work = [m for m in work if a.only in m["module"]]
+    census = Path(a.census or REPO / "desk/test-data/blackbox/parse-census.txt")
+    done = set()
+    if census.exists():
+        done = {json.loads(l)["module"] for l in census.read_text().splitlines() if l}
+    case = desk_case(1)
+    print(f"%{DESK} at revision {case}; {len(work)} modules, {len(done)} done", flush=True)
+    rid = 2
+    for m in work:
+        if STOP.is_set():
+            print("stopped by SIGTERM, between modules", flush=True)
+            return 0
+        if m["module"] in done:
+            continue
+        jid = "p-" + re.sub(r"[^a-z0-9-]", "-", low(m["module"]))[-60:]
+        t0 = time.time()
+        submit(rid, jid, request_parse(m["module"], case))
+        rid += 1
+        while True:
+            row = summarize(peek_job(rid, jid))
+            rid += 1
+            if row["status"] != "running":
+                break
+            time.sleep(a.poll)
+        row.update({"module": m["module"], "proof": m["proof"],
+                    "secs": round(time.time() - t0, 1)})
+        row["class"] = "agree" if row["status"] == "success" else "disagree"
+        with census.open("a") as f:
+            f.write(json.dumps(row) + "\n")
+        poke(rid, jid, u.tup(u.cord("delete-result"), u.cord(jid)))
+        rid += 1
+        print(f"{m['module']}: {row['class']} {row.get('reason') or row.get('error', {}).get('message', '')}"[:200], flush=True)
+    return 0
+
+
 # ------------------------------------------------------------------- wire ---
 def poke(rid: int, jid: str, act):
     """Gall `%raw-poke`: the agent's own mark clams the noun."""
@@ -245,6 +299,14 @@ def summarize(ujob) -> dict:
         row["violation"] = v
         row.update(st_of(s))
     return row
+
+
+#  R4.1 (crash #7): killing this process with a conn exchange outstanding
+#  breaks the king's pipe and takes the ship down -- and a SUSPENDED client
+#  stops reading, which does the same. SIGTERM instead asks for a stop: the
+#  run finishes the model in hand and exits between models
+STOP = threading.Event()
+signal.signal(signal.SIGTERM, lambda *_: STOP.set())
 
 
 def serf_pid() -> int:
@@ -339,6 +401,9 @@ def run(a) -> int:
     print(f"%{DESK} at revision {case}; {len(work)} models, {len(done)} done")
     rid = 2
     for m in work:
+        if STOP.is_set():
+            print("stopped by SIGTERM, between models", flush=True)
+            return 0
         if m["id"] in done:
             continue
         jid = re.sub(r"[^a-z0-9-]", "-", m["id"])
@@ -433,6 +498,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage")
     ap.add_argument("--run", action="store_true")
+    ap.add_argument("--parse", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--budget", type=int, default=20_000)
     ap.add_argument("--census", default="")
@@ -449,6 +515,8 @@ def main() -> int:
         return 0
     if a.run:
         return run(a)
+    if a.parse:
+        return run_parse(a)
     if a.report:
         return report(a)
     ap.print_help()

@@ -24,8 +24,7 @@
 ++  test-sany-sub-1
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'EWD998/EWD998_TTrace -> hoon=reject'
-    ==
+    ~
   !>
   %-  sub-batch-run
   ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])
@@ -285,8 +284,7 @@
 ++  test-sany-sub-5
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'suite/test59 -> hoon=reject'
-    ==
+    ~
   !>
   %-  sub-batch-run
   ^-  (list [@t @t ?(%accept %reject) (list [@t @t])])

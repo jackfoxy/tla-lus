@@ -261,8 +261,7 @@
 ++  test-sany-batch
   %+  expect-eq
     !>  ^-  (list @t)
-    :~  'Github725b:hoon=reject'  'Github725f:hoon=reject'  'Github687spec:hoon=reject'  'CyclicRedefineInstance:hoon=reject'
-    ==
+    ~
   !>
   %-  sany-batch-run
   ^-  (list [@t ?(%accept %reject) (list [@t @t])])

@@ -624,12 +624,49 @@
   ?.(-.o 0 +.o)
 ::
 ++  find-image
-  ::  the image of x under function pairs (domain compared with +equal)
+  ::  the image of x under function pairs (domain compared with +equal);
+  ::  R4.P3: a large function is looked up through its memoized key index
   |=  [ps=(list vpair) x=value]
   ^-  (unit value)
+  ?:  (gth-n ps 8)  (~(get by (fcn-index ps)) (ekey x))
+  |-  ^-  (unit value)
   ?~  ps  ~
   ?:  (equal d.i.ps x)  `r.i.ps
   $(ps t.ps)
+::
+++  gth-n
+  ::  has the list more than n elements? (stops after n+1)
+  |=  [l=(list) n=@ud]
+  ^-  ?
+  |-  ^-  ?
+  ?~  l  |
+  ?:  =(0 n)  &
+  $(l t.l, n (dec n))
+::
+++  fcn-index
+  ::  R4.P3: domain key -> image, the FIRST pair winning as in the scan.
+  ::  `~+`: a function value reused across states (a constant definition, a
+  ::  state component that did not change) is indexed once
+  |=  ps=(list vpair)
+  ^-  (map * value)
+  ~+
+  (malt (flop (turn ps |=(pr=vpair `[* value]`[(ekey d.pr) r.pr]))))
+::
+++  set-index
+  ::  R4.P3: a set's element keys, and whether any element is a TYPED model
+  ::  value -- the only case in which `+val-eq` can fail rather than answer.
+  ::  `~+`, as `+fcn-index`
+  |=  s=value
+  ^-  [keys=(set *) typed=?]
+  ~+
+  =/  es  (set-elems s)
+  :-  (silt (turn es ekey))
+  (lien es typed-mv)
+::
+++  typed-mv
+  |=  v=value
+  ^-  ?
+  &(?=(%model -.v) !=(0 (mv-type p.v)))
 ::
 ++  int-dom-msg
   ::  tlc2's wording when a function whose domain is all integers is applied to
@@ -875,6 +912,15 @@
   ^-  (each ? eval-err)
   ?.  (set-like s)
     [%| 0 (rap 3 ~['Attempted to check membership in the non-set value ' (crip (render s)) '.'])]
+  ::  R4.P3: an integer in an interval is a range check, and a set holding no
+  ::  typed model value (with `x` not one) answers through its key index --
+  ::  exactly the scan's answer, since `+val-eq` cannot fail there
+  ?:  &(?=(%intv -.s) ?=(%int -.x))
+    [%& &(!(slth p.x lo.s) !(slth hi.s p.x))]
+  =/  ix=(unit [keys=(set *) typed=?])
+    ?.  ?&(?=(%set -.s) !(typed-mv x) (gth-n p.s 8))  ~
+    `(set-index s)
+  ?:  &(?=(^ ix) !typed.u.ix)  [%& (~(has in keys.u.ix) (ekey x))]
   =/  es  (set-elems s)
   |-  ^-  (each ? eval-err)
   ?~  es  [%& |]
@@ -1000,6 +1046,10 @@
   ::  structural membership of x in a set-like value (equality-based)
   |=  [x=value s=value]
   ^-  ?
+  ?:  &(?=(%intv -.s) ?=(%int -.x))
+    &(!(slth p.x lo.s) !(slth hi.s p.x))
+  ?:  &(?=(%set -.s) (gth-n p.s 8))
+    (~(has in keys:(set-index s)) (ekey x))
   (lien (set-elems s) |=(e=value (equal x e)))
 ::
 ::  +|  Cursor Construction (sexp -> ecur)

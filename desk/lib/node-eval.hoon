@@ -84,6 +84,11 @@
       ::  answers with the empty one either way, and `CounterExample.state = {}`
       ::  stays the idiom `_JsonTrace`/`_DotTrace` use to detect "no violation"
       ce=(unit value:v)
+      ::  R4.P3 (H4): zero-arity CONSTANT-level definitions evaluated ONCE,
+      ::  tlc2's `SpecProcessor.processConstantDefns`. Keyed by name, holding
+      ::  the definition the value came from, so a LET of the same name (a
+      ::  different `sem-def`) is never answered from here
+      cdefs=(map @t [def=sem-def:sm val=value:v])
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -1131,6 +1136,9 @@
           !(body-allowed:so ov.e origin.def nm)
       ==
     [[%| (unsupported:so key)] rs]
+  ::  R4.P3: a constant definition already evaluated once (`+with-cdefs`)
+  =/  cd  ?~(args.n (~(get by cdefs.e) nm) ~)
+  ?:  &(?=(^ cd) =(def.u.cd def))  [[%& val.u.cd] rs]
   ?:  =(0 fuel.e)  [[%| 0 'evaluation recursion/resource limit exceeded.'] rs]
   ?~  body.def  [[%| 0 (rap 3 ~['operator has no evaluable body: ' nm])] rs]
   ?.  =((lent params.def) (lent args.n))
@@ -2314,7 +2322,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -2368,7 +2376,48 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~]
+  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~])
+::
+++  with-cdefs
+  ::  R4.P3 (H4): tlc2's `SpecProcessor.processConstantDefns` -- every
+  ::  arity-0 definition whose body is CONSTANT-level is evaluated once,
+  ::  before the search, and references read the value. Measured: Paxos's
+  ::  `PaxosTypeOK` re-built `Message` (about 240 records) per state, 86% of
+  ::  the run, and CoffeeCan's `TypeInvariant` re-built `Can` (10,201 records)
+  ::  per initial state. As in tlc2:
+  ::  - a definition that FAILS to evaluate is left lazy (the error, if it
+  ::    matters, surfaces where it is referenced);
+  ::  - an overridden operator is not a definition here (`+lookup:so` /
+  ::    `+node-op:so` answer it);
+  ::  - StandardModule definitions are skipped (their bodies are dummies).
+  ::  Not as in tlc2, deliberately: a definition whose evaluation TOUCHES THE
+  ::  RUN STATE (a random draw, `TLCSet`) stays per-reference, so this unit
+  ::  changes no observable behaviour; tlc2 evaluates those once at startup
+  ::  too, which is a divergence to measure separately.
+  ::  `~+`: the environment is rebuilt per expansion (`+env-of`), and the
+  ::  memo cache answers every rebuild after the first from the same inputs
+  |=  e=eenv
+  ^-  eenv
+  ~+
+  =/  ds  ~(tap by ops.e)
+  =|  acc=(map @t [def=sem-def:sm val=value:v])
+  |-  ^-  eenv
+  ?~  ds  e(cdefs acc)
+  =/  nm  p.i.ds
+  =/  d   q.i.ds
+  ?.  ?&  ?=(~ params.d)
+          =(0 lvl.d)
+          ?=(^ body.d)
+          !(is-standard:so ov.e origin.d)
+          ?=(~ (lookup:so ov.e [origin.d nm 0]))
+          ?=(~ (node-op:so [origin.d nm 0]))
+      ==
+    $(ds t.ds)
+  =/  r  (mule |.((eval-rs u.body.d e empty-rst)))
+  ?.  ?=(%& -.r)  $(ds t.ds)
+  =/  [res=eres rs=rst]  p.r
+  ?.  &(?=(%& -.res) =(empty-rst rs))  $(ds t.ds)
+  $(ds t.ds, acc (~(put by acc) nm [d p.res]))
 ::
 ++  empty-counter-example
   ::  `new CounterExample()` -- the value a run with no violation evaluates

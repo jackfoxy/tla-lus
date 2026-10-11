@@ -5,11 +5,7 @@
 
 
 # batch (R1.1.3): 162 flat single-file in-scope test-model specs run through +sany-verdict
-# in one mule-isolated arm; 4 disagree with Java (158/162 agree):
-batch	Github725b:hoon=reject	NESTED module only (no trailing one), which lib/modules registers; the reject cause is UNMEASURED -- R4.1c
-batch	Github725f:hoon=reject	NESTED module only (no trailing one), which lib/modules registers; the reject cause is UNMEASURED -- R4.1c
-batch	Github687spec:hoon=reject	NESTED module only (no trailing one), which lib/modules registers; the reject cause is UNMEASURED -- R4.1c
-batch	CyclicRedefineInstance:hoon=reject	INSTANCE inside LET (`LET B == INSTANCE Base IN ...`), as `suite/test59`; its trailing module now resolves (R4.1c). `semantic-graph`; R4.1c
+# in one mule-isolated arm; 0 disagree with Java (162/162 agree):
 
 # tlc-batch (R1.1.5): 15 clean single-file test-model safety specs run through check:check;
 # 0 disagree with TLC (15/15 agree):
@@ -21,6 +17,4 @@ batch	CyclicRedefineInstance:hoon=reject	INSTANCE inside LET (`LET B == INSTANCE
 # 0 disagree with TLC (3/3 agree):
 
 # subdir-batch (R1.1.6-.9, completed R1.1.R2): 329 in-scope test-model subdir specs -- EVERY one whose closure resolves -- through +sany-verdict;
-# 2 disagree with Java (327/329 agree):
-subdir-batch	suite/test59 -> hoon=reject	INSTANCE inside LET (`LET M == INSTANCE test59a IN ...`); the comment saying so made the old classifier exclude it. `semantic-graph` demoted by R4.0b; R4.1c
-subdir-batch	EWD998/EWD998_TTrace -> hoon=reject	INSTANCE inside LET (`LET EWD998_TE == INSTANCE EWD998_TE IN ...`), as `suite/test59`; its trailing modules resolve since R4.1c. `semantic-graph`
+# 0 disagree with Java (329/329 agree):

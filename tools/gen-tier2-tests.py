@@ -351,10 +351,10 @@ def sany_batch_modules() -> list:
 # (`(sort out lte)`, atom order), copied from the ship run.
 SANY_BATCH_DIVERGENCES = [
     # R4.1c (2026-10-08): the monolith fallback (`tlc-monolith`) closed 14 of
-    # the 15 trailing-module specs. CyclicRedefineInstance stays, for a
-    # different reason: its INSTANCE is inside a LET.
-    "Github725b:hoon=reject", "Github725f:hoon=reject",
-    "Github687spec:hoon=reject", "CyclicRedefineInstance:hoon=reject",
+    # the 15 trailing-module specs.
+    # R4.1c (2026-10-10): a nested inner module's context is its parent's up
+    # to it (closes Github725b/f, Github687spec), and an INSTANCE inside a
+    # LET is generated (closes CyclicRedefineInstance). The batch agrees.
 ]
 _TRAILING = ("a TRAILING module after the root's `====`: SANY resolves a "
              "module with no file of its own from the ROOT file "
@@ -372,9 +372,6 @@ BATCH_REASONS = {
         "UndeclaredRecursion", "NoFairnessButLiveProp",
         "CyclicRedefineInstance")},
     **{m: _NESTED for m in ("Github725b", "Github725f", "Github687spec")},
-    "CyclicRedefineInstance": "INSTANCE inside LET (`LET B == INSTANCE Base "
-                              "IN ...`), as `suite/test59`; its trailing module "
-                              "now resolves (R4.1c). `semantic-graph`; R4.1c",
 }
 
 
@@ -664,8 +661,8 @@ SUB_BATCH_DIVERGENCES = [
     # `ActionCompositionDistributive`; EWD998_TTrace's trailing modules now
     # resolve too, and what is left of it is an INSTANCE inside LET.
     # R4.1c closed sany/Github723 (EC 4243 on an implicit substitution).
-    "suite/test59 -> hoon=reject",
-    "EWD998/EWD998_TTrace -> hoon=reject",
+    # R4.1c (2026-10-10) closed suite/test59 and EWD998/EWD998_TTrace
+    # (INSTANCE inside LET).
 ]
 _LAM = "LAMBDA not in the WU3 graph (unit-3 residue, R1.3)"
 _HO = "higher-order operator parameters (`_++_`/`Plus(_,_)`/`PLen(_)`) — R1.3"
@@ -673,17 +670,11 @@ _CONF = "SANY conformance edge (front-end semantic/level residue, R1.3)"
 _INST = "INSTANCE ... WITH substitution edge (R1.3)"
 SUB_BATCH_REASONS = {
     # R4.0b (2026-10-08): hidden from the batch by the old classifier.
-    "suite/test59": "INSTANCE inside LET (`LET M == INSTANCE test59a IN ...`); "
-                    "the comment saying so made the old classifier exclude it. "
-                    "`semantic-graph` demoted by R4.0b; R4.1c",
     "sany/Github723": "WRONG ACCEPT: an implicit INSTANCE substitution of the "
                       "operator constant `C(_)` by a same-named `C(x, y)` of "
                       "arity 2 -- SANY: `An operator must be substituted for "
                       "symbol 'C', and it must have arity 1.` `semantic-graph` "
                       "demoted by R4.0b; R4.1c",
-    "EWD998/EWD998_TTrace": "INSTANCE inside LET (`LET EWD998_TE == INSTANCE "
-                            "EWD998_TE IN ...`), as `suite/test59`; its trailing "
-                            "modules resolve since R4.1c. `semantic-graph`",
     # R1.3.1 closed the LAMBDA specs (ModuleOverwrites, coverage/F,K,L,
     # EWD840/Error02,Error03,MC02,MC02Sim, suite/test201).
     # test203 closed by R1.3.3.1 (parametrized instance `foo(n)`, Gap A).

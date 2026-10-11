@@ -1,4 +1,4 @@
-# R4.1c: front-end residue named by R4.0b (in progress)
+# R4.1c: front-end residue named by R4.0b
 
 ```text
 Sub-unit: R4.1c (started early: R4.1 does not depend on the census)
@@ -69,21 +69,95 @@ missing, and `missing-two` agrees.
 `gen-modres-tests.py` reduced `Parsing file B.tla (/path/A.tla)` to `A`. It
 now takes the module before the parenthesis.
 
-## 4. Still open in R4.1c
+## 4. Closed 2026-10-10
 
-- **INSTANCE inside LET.** Affects `suite/test59`, `CyclicRedefineInstance`
-  and `EWD998/EWD998_TTrace`. The parser already accepts `M == INSTANCE ...`
-  in a LET, via `finish-def`. The gap is semantic generation: `g-letin`
-  binds only operator signatures, never a scoped instance's `M!` members.
-- ~~`sany/Github723`, a WRONG ACCEPT~~ **CLOSED.** The port now runs
-  SANY's `checkSubstitutionForCorrectArity` (EC 4243) on an IMPLICIT
-  substitution, located at the INSTANCE unit (pin: `line 3, col 1 to line 3,
-  col 10`). New sem case: `subst-arity`. The EXPLICIT path (`WITH C <- F`) is
-  different at the pin: `generateOpArg` reports `Expected arity 1 but found
-  operator of arity 2.` first, then a 4243 located in `--TLA+ BUILTINS--`,
-  and a value substituted for an operator constant draws `Arity 1 operator
-  (not an expression) is expected...`. It is unmeasured against the port and
-  is a residue of this row.
-- **The 3 nested-only rejects** (`Github725b`, `Github725f`,
-  `Github687spec`): cause unmeasured.
-- **The monolith CONFIG half** (§1).
+### Nested inner module context (`Github725b`, `Github725f`, `Github687spec`)
+
+**Cause, measured.** A nested `---- MODULE Inner ----` sees the parent's
+context UP TO the point where the inner module appears: the parent's
+EXTENDS, declarations and definitions before it (SANY generates the inner
+module in the parent's symbol table). The port built every module's context
+from its own EXTENDS only, so `Inner725b`'s `x < 3` had no `<`.
+
+**Port (`lib/semantic`).**
+- `+build-ctx-upto tree deps stop` builds a module's context and stops at the
+  nested module named `stop`. `+build-ctx` is the `stop = ~` case.
+- `+analyze` stores, for each `%inner` module, its parent's partial context
+  under `+encl-key` (`+put-encl`); the inner module's imports start from it.
+
+### INSTANCE inside LET (`suite/test59`, `CyclicRedefineInstance`, `EWD998/EWD998_TTrace`)
+
+**Cause.** `g-letin` bound operator signatures only, never a scoped
+instance's `M!` members, so `M!xplus1` was undefined.
+
+**Port (`lib/semantic`).** Expression generators lack the module graph, so
+the instance is HOISTED to module level, which is where the graph is:
+- `+let-mod-defs` finds the `M == INSTANCE ...` defs inside a definition's
+  LETs; `+let-scoped` pairs each with the LET-scope context (`+let-ctx`:
+  the enclosing LET's definitions in scope, so a LET-local name can be
+  substituted, e.g. `WITH N <- k`).
+- `+let-insts` generates each with `+g-instance` under that context; the
+  `M!` defs and theorems are hoisted, and their symbols (`+let-inst-syms`)
+  are put into the context of the definition that contains the LET.
+- Evaluation needs nothing new: the LET-local names a substitution uses are
+  resolved through the dynamic LET scope.
+- Hoon note: wet `turn`/`zing` over these molds inside the recursion is a
+  `fuse-loop` compile error; the helpers hand-roll their loops.
+
+### Explicit substitution arity (`WITH C <- F`), the `Github723` residue
+
+Measured at the pin with SemDump (six new sem cases, all byte-exact on the ship):
+
+| case | `WITH C <- …` for `CONSTANT C(_)` | pin DIAGS |
+|---|---|---|
+| `subst-explicit-ok` | `F(y)` | none |
+| `subst-explicit-arity` | `F(x, y)` | 4271 `Expected arity 1 but found operator of arity 2.` at the RHS, then 4243 at 0.0-0.0 (`--TLA+ BUILTINS--`) |
+| `subst-explicit-zarg` | `N` (arity 0) | 4271 `... of arity 0.`, then 4243 at 0.0-0.0 |
+| `subst-explicit-expr` | `3` | 4004 `Arity 1 operator (not an expression) is expected`, then 4243 at 0.0-0.0 |
+| `subst-explicit-appl` | `F(1)` | the same 4004 over the application's span |
+| `subst-explicit-zero` | `F(y)` for `CONSTANT C` (arity 0) | 4204 `The operator F requires 1 arguments.` (generateExpression; no 4243) |
+
+`generateSubst` → `generateOpArg` → `checkSubstitutionForCorrectArity`: on
+an error `generateOpArg` returns `nullOpArg` (located in the builtins, arity
+-2), so the 4243 always follows. The port (`+g-instance` `gsubs`) now does
+the same and renders `oparg nullOpArg arity=-2 … 0.0-0.0`; a bare operator
+name for an arity-0 constant is no longer an `$OpArg`.
+
+### Found on the way: a bare operator reference (a WRONG ACCEPT)
+
+`G == F` with `F(y) == y` is SANY's 4204 `The operator F requires 1
+arguments.` at the reference; the port accepted it. `+g-genid` now reports
+it and generates nullODN. An operator ARGUMENT never reaches `+g-genid`
+(`+oparg-of` takes it first). New sem case `bare-op-ref`;
+`subst-explicit-zero` is the same check inside a substitution.
+
+The check exposed a latent gap in `+g-sel`: only the selector BASE's
+arguments were generated against the operator's per-position arities, so
+`Foo` in `L!Op(Foo, 9)!lab(1,2,3)` and `I(55)!Op(Foo, 9)!…` (`suite/test219`)
+was generated as an expression (formerly a silent `apply Foo`, now the 4204).
+`+g-sel` now looks up the qualified member through a leading `%name` chain
+(`L!Op`, `I!Op`), and drops the parametrized instance's leading parameters
+(`I(55)` fills them) from its `parg`.
+
+### Renderer: the instancee's nodes under an error
+
+Under a generation error SemDump masks the instancing root's levels to L-1,
+but NOT the instancee's own nodes: an instanced def's parameters, the
+substin body and the `instance` line keep their levels. The port masked
+them too, which is why `subst-arity` was withheld. Fixed in the renderer
+(`+inst-body`); `subst-arity` is un-withheld and passes.
+
+### Evidence
+
+- tier2 batch 162/162 and subdir batch 329/329 agree; `divergences.txt`
+  has no `batch` or `subdir-batch` rows.
+- New arms in `tests/lib/neval-mc`: `test-nested-inner-sees-parent` (verdict
+  and successors through `S!Step`), `test-instance-inside-let` (verdict and
+  successors, with a LET-local `k` substituted for a CONSTANT).
+- Examples: `EWD687a` (with its CommunityModules) accepts.
+
+## 5. Still open
+
+- **The monolith CONFIG half** (§1): 10+ test-model specs, no Examples
+  manifest model. A decision for the R4.1 close: port it, or approve the
+  difference.

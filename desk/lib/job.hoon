@@ -914,6 +914,16 @@
   ::
       %module
     ?:  ?=(%| -.res.r)
+      ::  R4.1a: SANY's order is the SPEC directory (the first root), then
+      ::  the StandardModules, then the library roots (`SimpleFilenameToStream`
+      ::  over CI's classpath; measured in R4.0a). So a standard name missing
+      ::  from the spec directory is the vendored module, and never a library
+      ::  root's copy (tlapm's `FiniteSets`/`Bags`, CommunityModules' `Json`)
+      ?:  ?&  (~(has by standard-modules:stdmods) name.u.p)
+              =(try.u.p (slag 1 roots.c))
+          ==
+        =.  have.c  (~(put in have.c) name.u.p)
+        $
       ::  not under this search root: try the next one
       =/  tr  try.u.p
       ?^  tr
