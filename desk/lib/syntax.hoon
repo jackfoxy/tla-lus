@@ -2333,9 +2333,27 @@
     ?~  sk  [%| (perr-enc s 1)]
     ?:  =(%lbr kind.u.sk)  (paren-expr s)
     ?:  =(%lab kind.u.sk)  (tuple-expr s)
+    ::  NoOpExtension: (ident [(args)] !)* ident, an instance-qualified
+    ::  subject such as `WF_R!vars(R!Next)` (R4.1b, the parse census)
+    =|  elems=(list node)
+    |-  ^-  (pres node)
     =/  ir  (eat s %identifier)
     ?:  ?=(%| -.ir)  [%| p.ir]
-    [%& (general-id v.p.ir) s.p.ir]
+    =/  idl  (leaf:ast v.p.ir)
+    =/  nk  (peek s.p.ir)
+    ?:  &(?=(^ nk) =(%bang kind.u.nk))
+      =/  elem  (mk-node:ast %n-idprefixelement ~[idl (leaf:ast u.nk)])
+      $(s (advance s.p.ir), elems [elem elems])
+    ?:  &(?=(^ nk) =(%lbr kind.u.nk) (bang-after-parens rest.s.p.ir))
+      =/  ar  (op-args-tail s.p.ir)
+      ?:  ?=(%| -.ar)  [%| p.ar]
+      =/  bk  (peek s.p.ar)
+      ?.  &(?=(^ bk) =(%bang kind.u.bk))  [%| (perr-enc s.p.ar 1)]
+      =/  elem
+        (mk-node:ast %n-idprefixelement ~[idl v.p.ar (leaf:ast u.bk)])
+      $(s (advance s.p.ar), elems [elem elems])
+    =/  pfx  ?~(elems empty-idprefix (mk-node:ast %n-idprefix (flop elems)))
+    [%& (mk-node:ast %n-generalid ~[pfx idl]) s.p.ir]
   ?:  ?=(%| -.subj)  [%| p.subj]
   =.  s  s.p.subj(stk stk0, exp '')
   =/  lr  (eat s %lbr)

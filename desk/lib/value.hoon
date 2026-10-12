@@ -311,6 +311,7 @@
   ::  it was a `lien` over the rest per element, O(n^2)
   |=  vs=(list value)
   ^-  (list value)
+  ?:  (sorted-scalars vs)  vs
   =/  rev  (flop vs)
   =|  seen=(set *)
   =|  uniq=(list value)
@@ -319,6 +320,23 @@
   =/  k  (ekey i.rev)
   ?:  (~(has in seen) k)  $(rev t.rev)
   $(rev t.rev, seen (~(put in seen) k), uniq [i.rev uniq])
+::
+++  sorted-scalars
+  ::  R4.P5: integers only, or strings only, already strictly increasing in
+  ::  storage order -- so distinct and in place, which is +norm-set's
+  ::  answer. A re-normalized set (every fingerprint) skips the sort
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  =/  k  -.i.vs
+  ?.  ?=(?(%int %str) k)  |
+  =/  prev=value  i.vs
+  =/  rest=(list value)  t.vs
+  |-  ^-  ?
+  ?~  rest  &
+  ?.  =(k -.i.rest)  |
+  ?.  (vlth prev i.rest)  |
+  $(prev i.rest, rest t.rest)
 ::
 ::  +|  Private Storage Order (total; distinct from TLC +compare)
 ::
@@ -1889,9 +1907,17 @@
   ::  ints; Extend folds the low byte first)
   |=  n=@sd
   ^-  (list @D)
-  =/  o  (old:si n)
-  =/  u  (mod ?:(-.o +.o (sub (bex 32) (mod +.o (bex 32)))) (bex 32))
+  =/  u  (i32 n)
   ~[(cut 3 [0 1] u) (cut 3 [1 1] u) (cut 3 [2 1] u) (cut 3 [3 1] u)]
+::
+++  i32
+  ::  the low 32 bits of a Java int's two's complement. An @sd is 2a for
+  ::  +a and 2a-1 for -a, so bit 0 is the sign (R4.P5: bit arithmetic in
+  ::  place of +old:si and +bex per integer)
+  |=  n=@sd
+  ^-  @
+  ?:  =(0 (end 0 n))  (end 5 (rsh 0 n))
+  (end 5 (sub 0x1.0000.0000 (end 5 (rsh 0 +(n)))))
 ::
 ++  fp-input
   ::  the canonical fingerprint-input byte stream for a value

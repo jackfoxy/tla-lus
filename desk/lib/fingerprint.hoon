@@ -48,6 +48,11 @@
 --
 ::
 =/  mod=(map @ @ux)  build-mod
+::  R4.P5 (H6): the same table as one atom, entry j at 64-bit word j, read
+::  with +cut (jetted) instead of a map lookup per byte
+=/  tab=@
+  %+  rep  6
+  (turn (gulf 0 255) |=(j=@ (~(got by mod) j)))
 ::
 |%
 +$  fp      @ux                                  ::  a 64-bit fingerprint
@@ -58,7 +63,7 @@
 ++  fp-byte
   |=  [f=fp b=@D]
   ^-  fp
-  (mix (rsh [0 8] f) (~(got by mod) (dis 0xff (mix b f))))
+  (mix (rsh [0 8] f) (cut 6 [(dis 0xff (mix b f)) 1] tab))
 ::  advance a fingerprint by a byte stream
 ++  fp-bytes
   |=  [f=fp bs=(list @D)]
@@ -69,7 +74,85 @@
 ++  fp-value
   |=  x=value:vl
   ^-  fp
-  (fp-bytes fp-new (fp-input:vl x))
+  (fp-walk fp-new (normalize:vl x))
+::
+++  fp-walk
+  ::  FP64 extended over a NORMALIZED value's fp-input bytes, folded in as
+  ::  they are produced: no byte list and no nested +weld (R4.P5, H6).
+  ::  (fp-walk f v) = (fp-bytes f (fp-enc:vl v)) byte for byte; the
+  ::  differential arm in tests/lib/value checks it
+  |=  [f=fp v=value:vl]
+  ^-  fp
+  ?-  -.v
+      %bool   (fp-byte (fp-byte f k-bool:vl) ?:(p.v 't' 'f'))
+      %int    (fp-i32 (fp-byte f k-int:vl) p.v)
+      %str    (fp-str f p.v)
+      %model
+    =/  g  (fp-i32 (fp-byte f k-model:vl) (sun:si (met 3 p.v)))
+    (fp-word g p.v (met 3 p.v))
+  ::
+      %intv
+    =/  els  (expand-intv:vl lo.v hi.v)
+    (fp-elems (fp-count f k-set:vl (lent els)) els)
+  ::
+      %set    (fp-elems (fp-count f k-set:vl (lent p.v)) p.v)
+      %seq
+    =/  g  (fp-count f k-fcn:vl (lent p.v))
+    =/  i  1
+    |-  ^-  fp
+    ?~  p.v  g
+    =.  g  (fp-i32 (fp-byte g k-int:vl) (sun:si i))
+    $(p.v t.p.v, i +(i), g (fp-walk g i.p.v))
+  ::
+      %rec
+    =/  g  (fp-count f k-fcn:vl (lent p.v))
+    |-  ^-  fp
+    ?~  p.v  g
+    $(p.v t.p.v, g (fp-walk (fp-str g k.i.p.v) v.i.p.v))
+  ::
+      %fcn
+    =/  g  (fp-count f k-fcn:vl (lent p.v))
+    |-  ^-  fp
+    ?~  p.v  g
+    $(p.v t.p.v, g (fp-walk (fp-walk g d.i.p.v) r.i.p.v))
+  ==
+::
+++  fp-count
+  ::  a set or function header: kind tag, then the element count
+  |=  [f=fp k=@D n=@ud]
+  ^-  fp
+  (fp-i32 (fp-byte f k) (sun:si n))
+::
+++  fp-i32
+  ::  a Java int's four little-endian bytes, fed straight from its bits
+  |=  [f=fp n=@sd]
+  ^-  fp
+  (fp-word f (i32:vl n) 4)
+::
+++  fp-word
+  ::  feed the `n` low-order bytes of `u`, least significant first: one
+  ::  loop in place of a gate call (and, for a string, a +rip) per byte
+  |=  [f=fp u=@ n=@ud]
+  ^-  fp
+  ?:  =(0 n)  f
+  %=  $
+    f  (mix (rsh 3 f) (cut 6 [(dis 0xff (mix u f)) 1] tab))
+    u  (rsh 3 u)
+    n  (dec n)
+  ==
+::
+++  fp-elems
+  |=  [f=fp vs=(list value:vl)]
+  ^-  fp
+  ?~  vs  f
+  $(vs t.vs, f (fp-walk f i.vs))
+::
+++  fp-str
+  ::  a STRINGVALUE field: tag, length, chars
+  |=  [f=fp s=@t]
+  ^-  fp
+  =/  g  (fp-i32 (fp-byte f k-str:vl) (sun:si (met 3 s)))
+  (fp-word g s (met 3 s))
 ::  the fingerprint of a state: FP64 over each variable's value bytes in
 ::  TLC's canonical variable order (`order`). A missing binding contributes
 ::  no bytes; solve() only yields complete states, so this is defensive.
@@ -81,7 +164,7 @@
   ?~  order  acc
   =/  v  (~(get by st) i.order)
   ?~  v  $(order t.order)
-  $(order t.order, acc (fp-bytes acc (fp-input:vl u.v)))
+  $(order t.order, acc (fp-walk acc (normalize:vl u.v)))
 ::
 ::  Symmetry reduction (Work Unit 7.5): a state's fingerprint is taken over its
 ::  orbit representative — the lexicographically smallest state reachable by

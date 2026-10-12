@@ -371,7 +371,7 @@
   ?:  (is-kind k %n-newsymb)
     =/  nn  (newsymb-name k)
     ?~  nn  $(ks t.ks)
-    $(ks t.ks, c2 (~(put by c2) nm.u.nn [%new-constant 0 | 0 ~ ~]))
+    $(ks t.ks, c2 (~(put by c2) nm.u.nn [%new-constant ar.u.nn | 0 ~ ~]))
   $(ks t.ks, lvl (max lvl (expr-level k c2)))
 ::
 ++  put-syms
@@ -2787,15 +2787,16 @@
   ds.gb
 ::
 ++  newsymb-name
-  ::  the declared identifier of an N_NewSymb (inside its ident-decl)
+  ::  the declared identifier of an N_NewSymb (inside its ident-decl) and
+  ::  its arity: `NEW op(_,_)` declares an operator (R4.1b, EWD998_proof)
   |=  u=node
-  ^-  (unit [nm=@t at=sspan])
+  ^-  (unit [nm=@t at=sspan ar=@ud])
   =/  decls  (skim (kids-of u) |=(k=node (is-kind k %n-identdecl)))
   ?~  decls  ~
   =/  ik  (kids-of i.decls)
   ?~  ik  ~
   ?.  &(?=(%leaf -.i.ik) =(%identifier (leaf-kind i.ik)))  ~
-  `[(leaf-text i.ik) (span-of:ast u)]
+  `[(leaf-text i.ik) (span-of:ast u) (us-arity i.decls)]
 ::
 ++  g-assumeprove
   ::  ASSUME items PROVE goal: NEW symbols scope over later items and
@@ -2824,7 +2825,7 @@
       %=  $
         ks   t.ks
         out  [node out]
-        c2   (~(put by c2) nm.u.nn [%new-constant 0 | 0 ~ ~])
+        c2   (~(put by c2) nm.u.nn [%new-constant ar.u.nn | 0 ~ ~])
       ==
     =/  g  (g-x k c2)
     %=  $

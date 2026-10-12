@@ -508,6 +508,18 @@
     !>(`'path /secrets/cfg/txt is not under a declared search root')
   !>((validate:job-lib (clay-req 'spec' `/secrets/cfg/txt ~[/src])))
 ::
+++  test-clay-tla-config-rejected
+  ::  R4.1c approved difference: tlc2 would read a `---- CONFIG spec ----`
+  ::  block from the module (MonolithSpecExtractor.config)
+  =/  want=@t
+    %+  rap  3
+    :~  'config path /src/spec/tla is a .tla module; a CONFIG block '
+        'inside a module is not supported, give a .cfg'
+    ==
+  %+  expect-eq
+    !>(`want)
+  !>((validate:job-lib (clay-req 'spec' `/src/spec/tla ~[/src])))
+::
 ++  test-clay-bad-module-name-rejected
   %+  expect-eq
     !>(`'invalid module name \'a b\'')

@@ -37,6 +37,10 @@
       ::  a write target that overlaps the run's own read roots: a run must
       ::  not be able to overwrite the sources it is checking (R2.2)
       [%write-over-source at=path]
+      ::  a `.tla` given as the config: tlc2 reads a `---- CONFIG <name>
+      ::  ----` block from it (MonolithSpecExtractor.config), an approved
+      ::  difference (R4.1c, `tlc-monolith`)
+      [%tla-config at=path]
   ==
 ::
 ::  +|  Rendering
@@ -77,6 +81,13 @@
   ::
       %out-of-root
     (rap 3 ~['path ' (spat at.e) ' is not under a declared search root'])
+  ::
+      %tla-config
+    %+  rap  3
+    :~  'config path '  (spat at.e)
+        ' is a .tla module; a CONFIG block inside a module is not '
+        'supported, give a .cfg'
+    ==
   ==
 ::
 ::  +|  Segments
@@ -248,6 +259,7 @@
   =/  ce  (check-path u.cfg (file-dirs u.cfg))
   ?^  ce  ce
   ?.  (under-root roots u.cfg)  `[%out-of-root u.cfg]
+  ?:  &(?=(^ u.cfg) =(%tla (rear u.cfg)))  `[%tla-config u.cfg]
   ~
 ::
 ++  check-roots

@@ -9,6 +9,7 @@
 ::  never cross a boundary there.
 /+  *test
 /=  v  /lib/value
+/=  fpl  /lib/fingerprint
 |%
 ++  test-value-render-smoke
   (expect-eq !>("42") !>((render:v (vin:v 42))))
@@ -29,6 +30,41 @@
   =^  b  rng  ?:(=(0 m) [a rng] ?:(=(1 m) [(twist a) rng] (rand-val rng 3)))
   =/  ref  (equal-norm-ref:v (normalize:v a) (normalize:v b))
   $(i +(i), bad ?:(=(ref (equal:v a b)) bad +(bad)))
+::
+::  R4.P5: +fp-walk folds FP64 over a normalized value with no byte list;
+::  on random values it must equal FP64 over the +fp-enc byte list. The
+::  generator draws no model values or negative integers, so those start
+::  the count
+++  test-fp-walk-matches-bytes
+  =/  rng  ~(. og 0xbeef.0045)
+  =/  bad=@ud
+    %+  roll  `(list value:v)`~[[%model 'm1'] [%int -5] [%str 'hello']]
+    |=  [x=value:v n=@ud]
+    =/  w  (fp-walk:fpl fp-new:fpl x)
+    ?:(=(w (fp-bytes:fpl fp-new:fpl (fp-enc:v x))) n +(n))
+  =/  i  0
+  |-  ^-  tang
+  ?:  =(i 400)  (expect-eq !>(0) !>(bad))
+  =^  a  rng  (rand-val rng 3)
+  =/  n  (normalize:v a)
+  =/  w  (fp-walk:fpl fp-new:fpl n)
+  $(i +(i), bad ?:(=(w (fp-bytes:fpl fp-new:fpl (fp-enc:v n))) bad +(bad)))
+::
+::  R4.P5: +i32 (bit arithmetic) against the +old:si formula it replaced,
+::  across the sign, the 32-bit boundary and wrap-around
+++  test-i32-matches-reference
+  =/  ref
+    |=  n=@sd
+    ^-  @
+    =/  o  (old:si n)
+    (mod ?:(-.o +.o (sub (bex 32) (mod +.o (bex 32)))) (bex 32))
+  =/  ns=(list @sd)
+    :~  --0  --1  -1  --255  -256  --2.147.483.647  -2.147.483.648
+        --4.294.967.296  -4.294.967.296  --4.294.967.297  -4.294.967.297
+        --12.345.678.901  -12.345.678.901
+    ==
+  %+  expect-eq  !>(`(list @sd)`~)
+  !>((skip ns |=(n=@sd =((ref n) (i32:v n)))))
 ::
 ++  twist
   ::  an EQUAL value in another representation: reversed and duplicated

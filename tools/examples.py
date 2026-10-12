@@ -157,7 +157,7 @@ def request(m: dict, case_ud: int, budget: int, wall: float):
     return u.tup(op, src, limits, 0, 0)
 
 
-def request_parse(mod: str, case_ud: int):
+def request_parse(mod: str, case_ud: int, secs: int = 600):
     """R4.1: an `%analyze` of one module (SANY's parse + semantic + level +
     lint), its imports resolved from the module's own directory and then the
     three library roots, as CI's classpath orders them"""
@@ -167,7 +167,7 @@ def request_parse(mod: str, case_ud: int):
     roots = u.lst([u.path(*sdir.split("/"))] + [u.path(r) for r in ROOTS])
     src = u.tup(u.cord("clay"), 0, u.cord(DESK), (u.cord("ud"), case_ud),
                 u.cord(root), 0, roots)
-    limits = u.tup(3_000_000, 1024, 10**9, 10**7, 600 << 64, 4_000_000, 0)
+    limits = u.tup(3_000_000, 1024, 10**9, 10**7, secs << 64, 4_000_000, 0)
     return u.tup(op, src, limits, 0, 0)
 
 
@@ -192,7 +192,7 @@ def run_parse(a) -> int:
             continue
         jid = "p-" + re.sub(r"[^a-z0-9-]", "-", low(m["module"]))[-60:]
         t0 = time.time()
-        submit(rid, jid, request_parse(m["module"], case))
+        submit(rid, jid, request_parse(m["module"], case, a.parse_secs))
         rid += 1
         while True:
             row = summarize(peek_job(rid, jid))
@@ -500,6 +500,7 @@ def main() -> int:
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--parse", action="store_true")
     ap.add_argument("--only", default="")
+    ap.add_argument("--parse-secs", type=int, default=600)
     ap.add_argument("--budget", type=int, default=20_000)
     ap.add_argument("--census", default="")
     ap.add_argument("--poll", type=float, default=10.0)

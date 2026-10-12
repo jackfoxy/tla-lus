@@ -1,0 +1,27 @@
+ACCEPT
+MODULE A 1.1-6.4
+  var x L1 2.10-2.10
+  def R!Next arity=0 local=n L2 3.1-3.27
+    substin subs=1 L2 3.1-3.27
+      sub y <-
+        apply x opkind=VariableDeclKind L1 3.27-3.27
+      in
+        apply = opkind=BuiltInKind L2 4.9-4.14
+          apply ' opkind=BuiltInKind L2 4.9-4.10
+            apply y opkind=VariableDeclKind L1 4.9-4.9
+          apply y opkind=VariableDeclKind L1 4.14-4.14
+  def R!vars arity=0 local=n L1 3.1-3.27
+    substin subs=1 L1 3.1-3.27
+      sub y <-
+        apply x opkind=VariableDeclKind L1 3.27-3.27
+      in
+        apply y opkind=VariableDeclKind L1 3.9-3.9
+  def F arity=0 local=n L3 4.1-4.22
+    apply $WF opkind=BuiltInKind L3 4.6-4.22
+      apply R!vars opkind=UserDefinedOpKind L1 4.9-4.14
+      apply R!Next opkind=UserDefinedOpKind L2 4.16-4.21
+  def G arity=0 local=n L3 5.1-5.22
+    apply $SF opkind=BuiltInKind L3 5.6-5.22
+      apply R!vars opkind=UserDefinedOpKind L1 5.9-5.14
+      apply R!Next opkind=UserDefinedOpKind L2 5.16-5.21
+  instance name=R module=B local=n L0 3.1-3.27
