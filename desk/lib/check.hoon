@@ -832,10 +832,15 @@
   ::  enqueued (fixing the states-left-on-queue count)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
-  =.  seen.cur      (~(put by seen.cur) fp [d pred cst])
-  ::  the invariant is checked on the orbit representative (sound for the
-  ::  symmetry-invariant predicates TLC requires; identical to `st` when there
-  ::  is no symmetry group)
+  ::  R4.P6a: the ACTUAL state is stored and later expanded, as tlc2 enqueues
+  ::  `succState`; only the identity (`fp`, and a VIEW's `minVals`) uses the
+  ::  orbit representative. Successors register in action order from their
+  ::  stored predecessor, so `+trace-to` walks the very trace tlc2 rebuilds
+  ::  (`TLCTrace.getTrace`: first match in action order). Storing the
+  ::  representative printed it in symmetry traces, with `<unknown action>`
+  =.  seen.cur      (~(put by seen.cur) fp [d pred st])
+  ::  the invariant is checked on the actual state (`isValid(inv,
+  ::  succState)`); identical to the representative without a symmetry group
   ::  R2.6.1/R2.6.3: the INVARIANT is evaluated here, so it needs the run
   ::  statistics too -- `TLCGet("distinct")` in an invariant is as legal as in a
   ::  next-state relation. tlc2 checks the invariant right after the state is
@@ -843,7 +848,7 @@
   ::  counters are read after the increments above. `level` is the state's own
   ::  depth: `isValid(inv, succState)` passes it as s0
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
-  =^  iv  rs.cur  (first-violated-rs invs.o cst ie rs.cur)
+  =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?^  iv
     ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is

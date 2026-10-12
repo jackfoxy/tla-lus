@@ -1,5 +1,5 @@
 {
- "why": "R4.0e (2026-10-08/09): models that hit the 900 s wall cap. SKIPPED by tools/examples.py --run until R4.P0b names each bottleneck and an R4.P unit fixes it; --include-timed-out runs them. Remove an entry once its model finishes under the cap. R4.0e2 added 4 slow models (its 3 crash-orphans left again after R4.2y: they now fail typed in about 11 s).",
+ "why": "R4.0e (2026-10-08/09): models that hit the 900 s wall cap. SKIPPED by tools/examples.py --run until R4.P0b names each bottleneck and an R4.P unit fixes it; --include-timed-out runs them. Remove an entry once its model finishes under the cap. R4.0e2 added 4 slow models (its 3 crash-orphans left again after R4.2y: they now fail typed in about 11 s). R4.P7 (2026-10-12): CoffeeCan100Beans removed -- success in 786 s.",
  "models": [
   {
    "id": "model-001d09121b38",
@@ -16,22 +16,6 @@
     "peak_rss_mb": 107
    },
    "bottleneck": "NOT perf (R4.P0b): fails in 6 s, 'set with too many elements (>1,000,000)': the port MATERIALIZES Can = [black: 0..1000, white: 0..1000] (1M records) where tlc2 enumerates it lazily. The first census's timeout was a pre-R4.2y crash-orphan. -> R4.2i (lazy record-set membership / maxSetSize parity)"
-  },
-  {
-   "id": "model-adad5884f179",
-   "model": "specifications/CoffeeCan/CoffeeCan100Beans.cfg",
-   "size": "small",
-   "expected": "success",
-   "tlc_runtime": "00:00:05",
-   "manifest_distinct": 5150,
-   "census": {
-    "status": "limited time",
-    "secs": 1030.6,
-    "stage": "terminal",
-    "distinct": 0,
-    "peak_rss_mb": 96
-   },
-   "bottleneck": "R4.P4 re-run: %config 29 s (was > 900 s); now H4: each of the 5,150 initial states checks TypeInvariant == can \\in Can, re-building and normalizing Can (10,201 records) per state -> R4.P3"
   },
   {
    "id": "model-0460e4666ca9",

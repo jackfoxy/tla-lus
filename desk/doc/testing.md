@@ -514,6 +514,14 @@ What R2 built:
   **exits nonzero only when the shard itself fails** — that is a changed work
   profile, an ordinary test failure, not a performance signal.
 
+* **R4.P9 (2026-10-12) — two Examples-derived workloads and a warm re-measure.**
+  `ex-coffeecan` (CoffeeCan, 135 states, four temporal properties: the
+  liveness benchmark R2.8.1b lacked) and `ex-gameoflife` (GameOfLife N = 2).
+  The R2 workloads keep their work profiles and run ×1.7–×3.7 faster than
+  the R2.8.1a baseline after R4.P. The warm leg passes the criterion (median
+  workload ±5.3%); the fresh-boot leg that failed in R2 was not re-run, so
+  tier 3 stays report-only. `tools/notes/plan2-R4.P9-tier3-notes.md`.
+
 **`release-gate.sh` gets NO tier-3 clause**, deliberately. R2.8.1a's own
 criterion decided it: a threshold a single ordinary run can cross is the flaky
 gate R1.1.R3 named below, and *a threshold nobody trusts is worse than a

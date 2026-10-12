@@ -364,6 +364,23 @@
   ?~  c  |
   (gth (met 3 (jam k.u.c)) cap)
 ::
+++  noun-due
+  ::  R4.P8: should this slice measure? A jam of the whole continuation is
+  ::  O(state space) -- 0.4-0.5 s per slice at 90k states, more than the
+  ::  slice's own work -- so a growing search measures only when its count
+  ::  (`a` before the slice, `b` after) crosses one of 16 log-spaced
+  ::  checkpoints per doubling: below 32 at every change, then about every
+  ::  4.4% of growth. The bound is still enforced, at most one checkpoint
+  ::  late
+  |=  [a=@ud b=@ud]
+  ^-  ?
+  =/  bucket
+    |=  d=@ud
+    ^-  [@ud @ud]
+    =/  m  (met 0 d)
+    [m (rsh [0 (sub m (min m 5))] d)]
+  !=((bucket a) (bucket b))
+::
 ::  +|  Continuation Persistence
 ::
 ::
@@ -1774,8 +1791,15 @@
     ::  INVARIANT alongside a PROPERTY is CHECKED rather than refused. R2.7.15a
     ::  adds the box-state properties and the implied actions to the same
     ::  build, so a spec declaring both kinds gets both checked in ONE run
+    ::  R4.P7: the console path's graph (`check.hoon` +search-ctx users):
+    ::  the CONSTRAINTs, action constraints and SYMMETRY group, and the
+    ::  safety path's deadlock flag (`deadlock && getCheckDeadlock()`). All
+    ::  four were off here, so a deadlocking spec reported its PROPERTY
+    ::  violated where tlc2 stops at `Deadlock reached`
     =/  o=bfs-opts:check
-      :*  nsb  (weld invs binvs.bins)  ~  ~  ~  vars  order  ~  defs  consts  |
+      :*  nsb  (weld invs binvs.bins)  cons  acons  ~  vars  order  perms
+          defs  consts
+          ?&(deadlock.mode deadlock.rs)
           max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
           *cov-opts:check  0  iacts
       ==
@@ -1830,6 +1854,7 @@
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
     ?:  ?=(%more -.r)
+      =/  d0  distinct.stats.j
       ::  live statistics at the slice boundary (deterministic, resumable): the
       ::  public view reflects search progress, not just the final report
       =.  stats.j
@@ -1839,7 +1864,9 @@
       =.  cont.j  (save-kont kk(cur cur.r))
       ::  bound the persisted noun: a search whose cursor outgrows the limit is
       ::  stopped %limited with the limiting resource, never carried unbounded
-      ?:  (noun-over cont.j max-noun-bytes)
+      ?:  ?&  (noun-due d0 distinct.cur.r)
+              (noun-over cont.j max-noun-bytes)
+          ==
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
     %:  finish-bfs
@@ -1867,16 +1894,19 @@
     ::  `ModelChecker.doNext` returning pre-empts tlc2's. `+finish-bfs` renders
     ::  it exactly as the plain safety path does. ALIAS is refused alongside a
     ::  temporal PROPERTY (R2.3.2), so `~` is the whole story for the alias
-    ?:  ?=(%inv -.out.r)
+    ::  R4.P7: and so does every other end of the search -- a deadlock, an
+    ::  implied-action violation, an evaluation error -- exactly as
+    ::  `ModelChecker.doNext` aborts the run before the final liveness check.
+    ::  Only `%inv` reached here before; the rest reported "unexpected graph
+    ::  outcome" (10 census models, R4.2q)
+    ?.  ?=(%ok -.out.r)
       %:  finish-bfs
         j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
         ::  the %live kont carries no postcondition names: the liveness path
-        ::  keeps them on its own kont, and this branch is the safety
-        ::  violation that pre-empts it (R2.3.4)
+        ::  keeps them on its own kont, and this branch is the search outcome
+        ::  that pre-empts it (R2.3.4)
         nl.kk  act.kk  aname.kk  ~  ~  ~  pre
       ==
-    ?.  ?=(%ok -.out.r)
-      (finish j [%failed 'internal: unexpected graph outcome'] pre)
     =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
     =.  stats.j  st
     ::  the graph is built; hand off to the 8.2–8.6 %check phase (unit 8.8)
@@ -2051,9 +2081,14 @@
     ?.  done.r  [%more cur.r]
     [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]
   ?:  ?=(%more -.res)
-    ::  bound the persisted product cursor, like the safety search
+    ::  bound the persisted product cursor, like the safety search, as its
+    ::  product node count grows
+    =/  n0  ?~(pcur.kk 0 ~(wyt by nodes.u.pcur.kk))
     =.  cont.j  (save-kont kk(pcur `cur.res))
-    ?:  (noun-over cont.j max-noun-bytes)  (finish j [%limited %noun st] pre)
+    ?:  ?&  (noun-due n0 ~(wyt by nodes.cur.res))
+            (noun-over cont.j max-noun-bytes)
+        ==
+      (finish j [%limited %noun st] pre)
     (more j pre)
   =/  l  lasso.res
   ?~  l
@@ -2194,9 +2229,12 @@
     ::  live statistics at the slice boundary. DFID reports no queue, no graph
     ::  depth and no out-degree -- its summary line carries two numbers -- so
     ::  those slots stay zero rather than holding something tlc2 never produced
+    =/  d0  distinct.stats.j
     =.  stats.j  [gen.cur.r ~(wyt by fps.cur.r) 0 0 [0 0 0 0]]
     =.  cont.j   (save-kont kk(cur cur.r))
-    ?:  (noun-over cont.j max-noun-bytes)
+    ?:  ?&  (noun-due d0 distinct.stats.j)
+            (noun-over cont.j max-noun-bytes)
+        ==
       (finish j [%limited %noun stats.j] pre)
     (more j pre)
   (finish-dfid j out.r kk pre)

@@ -1680,6 +1680,30 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
+++  test-mc-symmetry-trace
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ n = 0'
+        '/\\ x = a'
+        'State 2: <Next line 6, col 9 to line 6, col 58 of module spec>'
+        '/\\ n = 1'
+        '/\\ x = b'
+        'State 3: <Next line 6, col 9 to line 6, col 58 of module spec>'
+        '/\\ n = 2'
+        '/\\ x = a'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aCONSTANT P, a, b\0aVARIABLE n, x\0aInit == x = a /\\ n = 0\0aNext == n < 2 /\\ n\' = n + 1 /\\ x\' = IF x = a THEN b ELSE a\0aPerms == Permutations(P)\0aInv == n < 2\0a====\0a'
+  'CONSTANT a = a  b = b  P = {a, b}\0aSYMMETRY Perms\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a state
 ::  is printed -- measured, `SUBSET (1..3)` and `(1..4) \X (1..2)` stay

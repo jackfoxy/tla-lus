@@ -83,6 +83,10 @@
   ::  TBGraphNode.isConsistent: every state predicate of the node holds
   |=  [nd=tb-node:tb s0=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.P7: memoized (`~+`), as are +succ-fps, +cs-bits and +ca-bits: every
+  ::  OOS and every tableau node pairing with a state re-asked these pure
+  ::  questions of it; tlc2's LiveCheck answers them once per state/edge
+  ~+
   =/  ps  state-preds.nd
   |-  ^-  ?
   ?~  ps  &
@@ -106,6 +110,7 @@
   ::  per occurrence -- again invisible to a node-count projection (R1.6.3).
   |=  [s0=state:ne nsb=sem:sm env=eenv:ne order=(list @t) states=(map @t state:ne)]
   ^-  (list [fp=@t st=state:ne])
+  ~+
   =/  r  (next-states:ne s0 nsb env)
   ?:  ?=(%| -.r)  ~
   =|  seen=(set @t)
@@ -474,11 +479,20 @@
 ::  each step from the kont, so the persisted cursor stays small.
 +$  pcursor
   $:  tabg=tb-graph:tb
+      ::  the worklist as a FIFO: `q` the front, `qb` the back REVERSED.
+      ::  `edges` is REVERSED until the build completes. R4.P7: both were
+      ::  welded per step, O(n) each, so the build was quadratic
       q=(list pg-key)
+      qb=(list pg-key)
       seen=(set pg-key)
       nodes=(map pg-key pnode)
       edges=(list pedge)
       inits=(list pg-key)
+      ::  R4.P7: per-STATE results, shared by every tableau node the state
+      ::  pairs with: its successor fingerprints and its checkState bits.
+      ::  tlc2's LiveCheck records both once, while the BFS runs
+      sc=(map @t (list @t))
+      cb=(map @t (list ?))
   ==
 ::  the bounded/resumable Tarjan SCC cursor (unit 8.8.2b): the roots still to
 ::  start, the index/lowlink/on-stack/SCC-stack state, an EXPLICIT DFS frame
@@ -504,10 +518,10 @@
           env=eenv:ne
       ==
   ^-  pcursor
-  ?~  tf.o  [*tb-graph:tb ~ ~ ~ ~ ~]
+  ?~  tf.o  [*tb-graph:tb ~ ~ ~ ~ ~ ~ ~ ~]
   =/  tabg  (build-tableau:tb u.tf.o)
   =/  ik    (init-keys states inits tabg env)
-  [tabg ik (silt ik) ~ ~ ik]
+  [tabg ik ~ (silt ik) ~ ~ ik ~ ~]
 ::
 ++  product-step
   ::  advance a product-build cursor by at most `budget` worklist keys; `done`
@@ -519,28 +533,40 @@
   ^-  [done=? cur=pcursor]
   =/  spent  0
   |-  ^-  [done=? cur=pcursor]
-  ?~  q.pc  [& pc]
+  =?  pc  &(?=(~ q.pc) ?=(^ qb.pc))  pc(q (flop qb.pc), qb ~)
+  ?~  q.pc  [& pc(edges (flop edges.pc))]
   ?:  =(spent budget)  [| pc]
   =/  k   i.q.pc
   =/  s0  (~(got by states) fp.k)
   =/  t0  (snag-node:tb tidx.k nodes.tabg.pc)
-  =.  nodes.pc  (~(put by nodes.pc) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  succs  (succ-fps s0 nsb env order states)
+  =/  bits=(list ?)
+    =/  c  (~(get by cb.pc) fp.k)
+    ?^  c  u.c
+    (cs-bits check-state.o s0 env)
+  =.  cb.pc     (~(put by cb.pc) fp.k bits)
+  =.  nodes.pc  (~(put by nodes.pc) k [bits par.t0])
+  =/  succs=(list [fp=@t st=state:ne])
+    =/  c  (~(get by sc.pc) fp.k)
+    ?^  c  (turn u.c |=(f=@t [f (~(got by states) f)]))
+    (succ-fps s0 nsb env order states)
+  =.  sc.pc  (~(put by sc.pc) fp.k (turn succs |=([f=@t *] f)))
   =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env)
   =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen.pc) x)))
   =.  seen.pc  (~(gas in seen.pc) fresh)
-  =.  edges.pc  (weld edges.pc es.out)
-  $(q.pc (weld t.q.pc fresh), spent +(spent))
+  =.  edges.pc  (weld (flop es.out) edges.pc)
+  $(q.pc t.q.pc, qb.pc (weld (flop fresh) qb.pc), spent +(spent))
 ::
 ++  cs-bits
   |=  [xs=(list live-expr) s0=state:ne env=eenv:ne]
   ^-  (list ?)
+  ~+
   ?~  xs  ~
   [(cs-eval i.xs s0 env) $(xs t.xs)]
 ::
 ++  ca-bits
   |=  [xs=(list live-expr) s0=state:ne s1=state:ne env=eenv:ne]
   ^-  (list ?)
+  ~+
   ?~  xs  ~
   [(ca-eval i.xs s0 s1 env) $(xs t.xs)]
 ::
@@ -866,11 +892,54 @@
         (~(has in members) to.e)
         (levy eaa |=(i=@ud (bit-at i ca.e)))
     ==
+  (scc-accepting-in scc pm promises nodes internal)
+::
+++  scc-accepting-in
+  ::  +scc-accepting given the component's INTERNAL edges, as +scc-internal
+  ::  computes them for every component in one pass
+  |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
+          nodes=(map pg-key pnode)  internal=(list pedge)
+      ==
+  ^-  ?
   ?.  ?|((gth (lent scc) 1) (lien internal |=(e=pedge =(from.e to.e))))  |
   =/  node-cs   (turn scc |=(k=pg-key cs:(~(got by nodes) k)))
   =/  node-par  (turn scc |=(k=pg-key par:(~(got by nodes) k)))
   =/  edge-ca   (turn internal |=(e=pedge ca.e))
   (pem-accepting pm promises [node-cs node-par edge-ca])
+::
+++  scc-internal
+  ::  each component's internal EAAction-holding edges, in edge order, aligned
+  ::  with `sccs`. R4.P7: +scc-accepting filtered the WHOLE edge list once per
+  ::  component, O(components x edges); this is one pass
+  |=  [sccs=(list (list pg-key)) edges=(list pedge) eaa=(list @ud)]
+  ^-  (list (list pedge))
+  =/  cid=(map pg-key @ud)
+    =|  m=(map pg-key @ud)
+    =/  i  0
+    =/  cs  sccs
+    |-  ^-  (map pg-key @ud)
+    ?~  cs  m
+    =/  ks  i.cs
+    =.  m
+      |-  ^-  (map pg-key @ud)
+      ?~  ks  m
+      $(ks t.ks, m (~(put by m) i.ks i))
+    $(cs t.cs, i +(i))
+  =/  bk=(map @ud (list pedge))
+    =|  b=(map @ud (list pedge))
+    =/  es  edges
+    |-  ^-  (map @ud (list pedge))
+    ?~  es  b
+    =/  f  (~(get by cid) from.i.es)
+    ?~  f  $(es t.es)
+    ?.  =(f (~(get by cid) to.i.es))  $(es t.es)
+    ?.  (levy eaa |=(j=@ud (bit-at j ca.i.es)))  $(es t.es)
+    $(es t.es, b (~(put by b) u.f [i.es (~(gut by b) u.f ~)]))
+  =/  n  (lent sccs)
+  =|  out=(list (list pedge))
+  |-  ^-  (list (list pedge))
+  ?:  =(0 n)  out
+  $(n (dec n), out [(flop (~(gut by bk) (dec n) ~)) out])
 ::
 ++  oos-violated
   ::  whether any pem of an OrderOfSolution has an accepting SCC in the product
@@ -885,11 +954,13 @@
   ?~  pms  |
   =/  adj   (adj-of edges.lp ea-action.i.pms)
   =/  sccs  (tarjan verts adj)
+  =/  ins   (scc-internal sccs edges.lp ea-action.i.pms)
   =/  hit
     |-  ^-  ?
     ?~  sccs  |
-    ?:  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)  &
-    $(sccs t.sccs)
+    ?~  ins  |
+    ?:  (scc-accepting-in i.sccs i.pms promises.o nodes.lp i.ins)  &
+    $(sccs t.sccs, ins t.ins)
   ?:(hit & $(pms t.pms))
 ::
 ++  live-verdict
@@ -1008,6 +1079,7 @@
   ?~  pms  ~
   =/  adj   (adj-of edges.lp ea-action.i.pms)
   =/  sccs  (tarjan verts adj)
+  =/  ins   (scc-internal sccs edges.lp ea-action.i.pms)
   ::  a stuttering counterexample is preferred over a back-to-state one, so
   ::  collect every accepting stutter lasso and pick among them, falling back
   ::  to the first back-to-state cycle. Which one is picked is keyed on
@@ -1048,12 +1120,13 @@
       =/  b  (lent prefix.best)
       =?  best  ?:(finite (lth a b) (gth a b))  i.more
       $(more t.more)
-    ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
-      $(sccs t.sccs)
+    ?~  ins  $(sccs ~)
+    ?.  (scc-accepting-in i.sccs i.pms promises.o nodes.lp i.ins)
+      $(sccs t.sccs, ins t.ins)
     =/  st  (stutter-lasso i.sccs i.pms promises.o nodes.lp edges.lp init-set ea-action.i.pms)
     =?  stutters  ?=(^ st)  [u.st stutters]
     =?  bt  &(?=(~ bt) ?=(~ st))  (bts-lasso i.sccs edges.lp init-set ea-action.i.pms)
-    $(sccs t.sccs)
+    $(sccs t.sccs, ins t.ins)
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso

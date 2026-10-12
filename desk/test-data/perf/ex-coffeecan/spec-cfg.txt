@@ -1,0 +1,4 @@
+CONSTANTS MaxBeanCount = 15
+SPECIFICATION Spec
+PROPERTY EventuallyTerminates MonotonicDecrease LoopInvariant TerminationHypothesis
+INVARIANTS TypeInvariant

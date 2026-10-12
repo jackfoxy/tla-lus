@@ -33,7 +33,7 @@ from pathlib import Path
 SESSION = "tla-zod"
 SHARD = "/=tla-lus=/tests/lib/perf"
 CMD = f"-test {SHARD} ~"
-TOOK = re.compile(r"^>\s+(test-perf-[a-z]+):\s+took\s+\S+?/([\d.]+)\s*$")
+TOOK = re.compile(r"^>\s+(test-perf-[a-z-]+):\s+took\s+\S+?/([\d.]+)\s*$")
 
 
 def pane(lines: int = 4000) -> str:

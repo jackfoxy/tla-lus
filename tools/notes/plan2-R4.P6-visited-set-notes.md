@@ -1,7 +1,30 @@
-# R4.P6: visited set without states (H8): measured, a decision (2026-10-11)
+# R4.P6: visited set without states (H8): measured; R4.P6a done (2026-10-11)
 
-**Status: MEASURED. The measurement changes the unit; the build waits for
-the check-in.**
+**Status:** MEASURED, then split at the check-in (approved). **R4.P6a is
+DONE** (below). R4.P6b is deferred to R4.P8's memory numbers.
+
+## R4.P6a: done, smaller than proposed
+
+No re-execution was needed. Within one expansion the port registers
+successors in action order, and every stored state was generated FROM its
+stored predecessor. So once the stored state is the ACTUAL one, walking
+`seen` yields exactly the trace tlc2 rebuilds, with the same first match in
+action order. `+register-in` changes in two places:
+- `seen` stores `st`, not the representative `cst`;
+- the invariant is checked on `st` (`isValid(inv, succState)`).
+
+The identity is unchanged: the fingerprint is still the orbit
+representative's, and a VIEW is still evaluated on it (`minVals`). Without a
+symmetry group, `st` IS `cst`, so nothing else moves.
+
+Evidence:
+- new mc case `symmetry-trace` (the `SymTr` spec below; pin golden): the
+  port now prints `x = b` and the `Next` label;
+- mc 107/107 and symmetry 3/3;
+- the full suite re-run (tracker).
+
+R4.P6b (dropping states) would still need tlc2's re-execution, because
+then nothing would be stored to walk.
 
 ## tlc2 at the pin (read)
 

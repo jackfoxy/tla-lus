@@ -923,6 +923,32 @@
     !>(`[%violated [%property 'Lead' %.n] [5 4 0 4 [0 1 1 1]]])
   !>(result.j)
 ::
+::  R4.P7: an end of the search other than an invariant violation pre-empts
+::  the temporal check on the kernel path too. tlc2 reports `Deadlock
+::  reached` (3 generated, 3 distinct, depth 3) and never runs the liveness
+::  check; the kernel reported `internal: unexpected graph outcome`
+++  live-deadlock-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 2 /\ x' = x + 1
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+::
+++  test-live-deadlock-preempts
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req live-deadlock-spec lead-cfg) t0) 256)
+  ?>  ?=([~ %violated *] result.j)
+  =/  r  u.result.j
+  =/  s  stats.r
+  %+  expect-eq
+    !>([[%deadlock ~] 3 3 0 3])
+  !>([violation.r generated.s distinct.s queued.s depth.s])
+::
 ++  test-pause-resume-every-boundary-liveness
   (every-boundary (check-req live-spec live-bad-cfg) 1)
 ::  the sliced 8.2-8.6 %check path (unit 8.8.2a): the leads-to property runs the
@@ -1450,6 +1476,19 @@
     (expect-eq !>(%.n) !>((noun-over:job-lib ~ 10)))
     (expect-eq !>(%.n) !>((noun-over:job-lib small 1.000)))
     (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
+  ==
+::
+++  test-noun-due-checkpoints
+  ::  R4.P8: every change below 32; above it, 16 checkpoints per doubling
+  ::  (a crossing measures, a slice inside one bucket does not); no growth
+  ::  never measures
+  ;:  weld
+    (expect-eq !>(%.y) !>((noun-due:job-lib 3 4)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 7 7)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 1.024 1.055)))
+    (expect-eq !>(%.y) !>((noun-due:job-lib 1.024 1.088)))
+    (expect-eq !>(%.y) !>((noun-due:job-lib 1.000 2.000)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 90.000 90.100)))
   ==
 
 ::

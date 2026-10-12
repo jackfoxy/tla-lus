@@ -116,6 +116,32 @@ so far, never a crash. Cancel any active job with `[%cancel <id>]`; it is
 idempotent. Remove a finished job's stored result with `[%delete-result
 <id>]`.
 
+## Runtime envelope
+
+Measured on a fake ship, vere 4.6 (R4.P8, 2026-10-12). Workloads: a
+two-integer grid, and the Examples' GameOfLife, whose 16-cell states each
+carry a function.
+
+- **Loom.** Run the ship with `--loom 33` (8 GiB). The serf's resident
+  memory stays far below it: a 90,000-state grid search adds about 30 MB,
+  and GameOfLife (65,536 initial states) peaks at about 410 MB.
+- **The binding limit is the persisted search, not memory.** A running
+  check's continuation (visited set, queue) is bounded at 16 MB, measured
+  as its `jam` size. Past it the check stops `%limited %noun` with its
+  statistics. That is about 25 bytes per state for small states and 30 for
+  GameOfLife-sized ones, so roughly **500,000 to 650,000 distinct states**
+  per check. The bound is checked at 16 points per doubling of the state
+  count, so it is enforced within about 4%.
+- **Gall turn length.** A check advances 256 units of work per Behn wake (a
+  "slice"). One turn therefore lasts 256 times the per-state cost: about
+  0.4 s for the grid (1.4 ms per state), and about 2–3 s for GameOfLife (9
+  ms per state). The ship serves other agents between slices; a `%cancel`
+  lands at the next slice boundary.
+- **Throughput** depends on the spec. The grid reaches 90,000 states in
+  about 130 s, and GameOfLife 34,000 in 300 s. Temporal properties add a
+  product build per property; CoffeeCan with 100 beans (5,150 states, four
+  properties) takes about 13 minutes.
+
 ## Reading results and traces
 
 - Subscribe to `/job/<id>` (mark `%tla-lus-update`) to stream ordered
