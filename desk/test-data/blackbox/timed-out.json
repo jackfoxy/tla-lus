@@ -1,38 +1,6 @@
 {
- "why": "R4.0e (2026-10-08/09): models that hit the 900 s wall cap. SKIPPED by tools/examples.py --run until R4.P0b names each bottleneck and an R4.P unit fixes it; --include-timed-out runs them. Remove an entry once its model finishes under the cap. R4.0e2 added 4 slow models (its 3 crash-orphans left again after R4.2y: they now fail typed in about 11 s). R4.P7 (2026-10-12): CoffeeCan100Beans removed -- success in 786 s.",
+ "why": "R4.0e (2026-10-08/09): models that hit the 900 s wall cap. SKIPPED by tools/examples.py --run until R4.P0b names each bottleneck and an R4.P unit fixes it; --include-timed-out runs them. Remove an entry once its model finishes under the cap. R4.0e2 added 4 slow models (its 3 crash-orphans left again after R4.2y: they now fail typed in about 11 s). R4.P7 (2026-10-12): CoffeeCan100Beans removed -- success in 786 s. R4.P re-run (2026-10-12, after R4.P5c/P11/P12/P13; plan r14): removed ACP_SB_TLC (success in 453 s, 54,944 = manifest), CoffeeCan1000/3000Beans (typed error in 10 s, maxSetSize divergence -> R4.2i) and EWD840_anim (typed refusal in 157 s, ALIAS in simulation -> R4.2 residue). Still over the cap: GameOfLife, ElevatorSafetyLarge/Medium, SimplifiedFastPaxos/Paxos (901 of 1,207), bosco, PaxosCommit (0 states at 900 s); MCChangRoberts crashed the ship again (runaway -> R4.2q). Each kept entry carries `rerun_r4p`.",
  "models": [
-  {
-   "id": "model-001d09121b38",
-   "model": "specifications/CoffeeCan/CoffeeCan1000Beans.cfg",
-   "size": "small",
-   "expected": "success",
-   "tlc_runtime": "00:00:15",
-   "manifest_distinct": 501500,
-   "census": {
-    "status": "too slow",
-    "secs": 904.0,
-    "stage": "parse",
-    "distinct": 0,
-    "peak_rss_mb": 107
-   },
-   "bottleneck": "NOT perf (R4.P0b): fails in 6 s, 'set with too many elements (>1,000,000)': the port MATERIALIZES Can = [black: 0..1000, white: 0..1000] (1M records) where tlc2 enumerates it lazily. The first census's timeout was a pre-R4.2y crash-orphan. -> R4.2i (lazy record-set membership / maxSetSize parity)"
-  },
-  {
-   "id": "model-0460e4666ca9",
-   "model": "specifications/CoffeeCan/CoffeeCan3000Beans.cfg",
-   "size": "large",
-   "expected": "success",
-   "tlc_runtime": "00:02:30",
-   "manifest_distinct": null,
-   "census": {
-    "status": "cancelled",
-    "secs": 1114.9,
-    "stage": "terminal",
-    "distinct": null,
-    "peak_rss_mb": 79
-   },
-   "bottleneck": "NOT perf (R4.P0b): same as CoffeeCan1000Beans (materialized Can > maxSetSize) -> R4.2i"
-  },
   {
    "id": "model-dbaeab68bb35",
    "model": "specifications/GameOfLife/GameOfLife.cfg",
@@ -47,7 +15,15 @@
     "distinct": 7424,
     "peak_rss_mb": 185
    },
-   "bottleneck": "R4.P4 re-run: 21,760 distinct in 300 s (about 73/s; was about 8/s); 65,536 needed, about 15 min -> re-run at the R4.P close"
+   "bottleneck": "R4.P4 re-run: 21,760 distinct in 300 s (about 73/s; was about 8/s); 65,536 needed, about 15 min -> re-run at the R4.P close",
+   "rerun_r4p": {
+    "status": "limited time",
+    "secs": 1033.2,
+    "distinct": 65536,
+    "generated": 66816,
+    "depth": 1,
+    "peak_rss_mb": 263
+   }
   },
   {
    "id": "model-8f77f31129f6",
@@ -63,7 +39,15 @@
     "distinct": 0,
     "peak_rss_mb": 297
    },
-   "bottleneck": "H3 (R4.P0b): stuck in load-kont (cue + ;; clam, job.hoon:375-376) on the continuation %config built; plus H10 below -> R4.P2"
+   "bottleneck": "H3 (R4.P0b): stuck in load-kont (cue + ;; clam, job.hoon:375-376) on the continuation %config built; plus H10 below -> R4.P2",
+   "rerun_r4p": {
+    "status": "limited time",
+    "secs": 945.8,
+    "distinct": 1536,
+    "generated": 390625,
+    "depth": 1,
+    "peak_rss_mb": 832
+   }
   },
   {
    "id": "model-a5b54b4bcaca",
@@ -79,7 +63,15 @@
     "distinct": 2048,
     "peak_rss_mb": 157
    },
-   "bottleneck": "H10 (R4.P0b): parse 6.7 s, config 12.4 s; the first explore slice took 112 s (19,683 generated / 256 distinct), then +solve-each's (weld out p.r) (node-eval.hoon:2165) is O(n^2) in the states produced -> R4.P1"
+   "bottleneck": "H10 (R4.P0b): parse 6.7 s, config 12.4 s; the first explore slice took 112 s (19,683 generated / 256 distinct), then +solve-each's (weld out p.r) (node-eval.hoon:2165) is O(n^2) in the states produced -> R4.P1",
+   "rerun_r4p": {
+    "status": "limited time",
+    "secs": 915.1,
+    "distinct": 12800,
+    "generated": 19683,
+    "depth": 1,
+    "peak_rss_mb": 397
+   }
   },
   {
    "id": "model-0d22f637d5d7",
@@ -95,7 +87,15 @@
     "distinct": 199,
     "peak_rss_mb": 116
    },
-   "bottleneck": "R4.P4 re-run: 338 distinct in 300 s (about 5x the rate); the rest is H4 (Message re-built per state) -> R4.P3"
+   "bottleneck": "R4.P4 re-run: 338 distinct in 300 s (about 5x the rate); the rest is H4 (Message re-built per state) -> R4.P3",
+   "rerun_r4p": {
+    "status": "limited time",
+    "secs": 911.5,
+    "distinct": 901,
+    "generated": 6787,
+    "depth": 17,
+    "peak_rss_mb": 180
+   }
   },
   {
    "id": "model-d92872ffe580",
@@ -111,23 +111,11 @@
     "distinct": null,
     "peak_rss_mb": 4001
    },
-   "bottleneck": "MEMORY RUNAWAY (about 80 MB/s; tlc2 1 s, 137 distinct): an engine bug, not cost. Not probed in R4.P0b (a SIGINT to a fast runaway crashed the serf in R4.0e2); needs a budget-1 probe under a 1 GB cap -> R4.2q"
-  },
-  {
-   "id": "model-fa3107cc70e0",
-   "model": "specifications/acp/ACP_SB_TLC.cfg",
-   "size": "small",
-   "expected": "success",
-   "tlc_runtime": "00:00:01",
-   "manifest_distinct": 54944,
-   "census": {
-    "status": "limited time",
-    "secs": 913.1,
-    "stage": "terminal",
-    "distinct": 20770,
-    "peak_rss_mb": 104
-   },
-   "bottleneck": "R4.P4 re-run: 16,373 distinct in 300 s (about 55/s; was about 23/s); 54,944 needed, about 17 min -> re-run at the R4.P close"
+   "bottleneck": "MEMORY RUNAWAY (about 80 MB/s; tlc2 1 s, 137 distinct): an engine bug, not cost. Not probed in R4.P0b (a SIGINT to a fast runaway crashed the serf in R4.0e2); needs a budget-1 probe under a 1 GB cap -> R4.2q",
+   "rerun_r4p": {
+    "status": "crash",
+    "note": "2026-10-12: behn bail %meme in a job slice; vere exited; boot-time cancel"
+   }
   },
   {
    "id": "model-a32a31a8edb9",
@@ -143,23 +131,15 @@
     "distinct": 240,
     "peak_rss_mb": 126
    },
-   "bottleneck": "UNATTRIBUTED (R4.P0b): parse 5.0 s, config 8.6 s, then the first explore slice ran more than 170 s; the interrupt trace was lost in dojo frames. Re-probe with budget 1 after R4.P1/P4"
-  },
-  {
-   "id": "model-ce855d0f7961",
-   "model": "specifications/ewd840/EWD840_anim.cfg",
-   "size": "small",
-   "expected": "safety failure",
-   "tlc_runtime": "00:00:01",
-   "manifest_distinct": null,
-   "census": {
+   "bottleneck": "UNATTRIBUTED (R4.P0b): parse 5.0 s, config 8.6 s, then the first explore slice ran more than 170 s; the interrupt trace was lost in dojo frames. Re-probe with budget 1 after R4.P1/P4",
+   "rerun_r4p": {
     "status": "limited time",
-    "secs": 1033.8,
-    "stage": "terminal",
-    "distinct": 0,
-    "peak_rss_mb": 421
-   },
-   "bottleneck": "R4.P4 re-run: no longer slow; ends in 195 s with 'unsupported: ALIAS in simulation mode' -> R4.2i (a correctness row; off this list at the R4.P close)"
+    "secs": 952.5,
+    "distinct": 2528,
+    "generated": 4208,
+    "depth": 3,
+    "peak_rss_mb": 173
+   }
   },
   {
    "id": "model-855b92119d65",
@@ -175,7 +155,15 @@
     "distinct": 0,
     "peak_rss_mb": 111
    },
-   "bottleneck": "H11 + H5 (R4.P0b): parse 4.7 s, config 7.4 s, then enumeration (node-eval.hoon:1985-1990 -> value.hoon enum-next/odo-build): %elems enumeration does (lent es) + (snag i es) per element, O(n^2), and odo-build normalizes every record -> R4.P1 (H11) + R4.P4"
+   "bottleneck": "H11 + H5 (R4.P0b): parse 4.7 s, config 7.4 s, then enumeration (node-eval.hoon:1985-1990 -> value.hoon enum-next/odo-build): %elems enumeration does (lent es) + (snag i es) per element, O(n^2), and odo-build normalizes every record -> R4.P1 (H11) + R4.P4",
+   "rerun_r4p": {
+    "status": "limited time",
+    "secs": 1034.0,
+    "distinct": 0,
+    "generated": 0,
+    "depth": 0,
+    "peak_rss_mb": 233
+   }
   }
  ]
 }

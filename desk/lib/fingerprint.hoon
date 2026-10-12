@@ -165,6 +165,27 @@
   =/  v  (~(get by st) i.order)
   ?~  v  $(order t.order)
   $(order t.order, acc (fp-walk acc (normalize:vl u.v)))
+::  R4.P5c: the IDENTITY KEY, used in place of FP64 where no output reads a
+::  fingerprint (the safety search of a spec that never draws, and DFID).
+::  `+ekey` is canonical for equality (equal values give identical nouns,
+::  whatever their representation: interval or enumerated set, tuple or
+::  function), so `+sham` of the per-variable keys identifies a state as FP64
+::  does, about 9x cheaper (R4.P5b). A missing binding is `~`; a key is
+::  always a cell. The NORMALIZED value is not canonical (it keeps intervals,
+::  set classes and tuples as built), so it cannot serve as the key
+++  state-key
+  |=  [order=(list @t) st=(map @t value:vl)]
+  ^-  @
+  %-  sham
+  |-  ^-  (list *)
+  ?~  order  ~
+  =/  v  (~(get by st) i.order)
+  [?~(v ~ (ekey:vl u.v)) $(order t.order)]
+::  a VIEW value's identity key
+++  view-key
+  |=  v=value:vl
+  ^-  @
+  (sham (ekey:vl v))
 ::
 ::  Symmetry reduction (Work Unit 7.5): a state's fingerprint is taken over its
 ::  orbit representative — the lexicographically smallest state reachable by

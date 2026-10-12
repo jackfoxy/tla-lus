@@ -1061,7 +1061,13 @@
   ::  the typed semantic graph for later units (B5 consumes this)
   |=  [root=@t src=(map @t @t)]
   ^-  (unit sem-module)
-  =/  r  (resolve:modules root (inline-resolver:modules src) ~)
+  (generate-with root src ~)
+::
+++  generate-with
+  ::  +generate over a parse cache of already-parsed module texts (R4.P12)
+  |=  [root=@t src=(map @t @t) cache=pcache:modules]
+  ^-  (unit sem-module)
+  =/  r  (resolve:modules root (inline-resolver:modules src) cache)
   ?:  ?=(%| -.out.r)  ~
   =/  g  p.out.r
   =/  ctxs  (analyze sem-order.g mods.g deps.g)
@@ -1226,7 +1232,13 @@
   ::  diagnostics from its own %parse/%modules stages)
   |=  [root=@t src=(map @t @t)]
   ^-  (unit [sem=(list sdiag) lvl=(list sdiag) lint=(list sdiag)])
-  =/  r  (resolve:modules root (inline-resolver:modules src) ~)
+  (analyze-graph-with root src ~)
+::
+++  analyze-graph-with
+  ::  +analyze-graph over a parse cache (R4.P12)
+  |=  [root=@t src=(map @t @t) cache=pcache:modules]
+  ^-  (unit [sem=(list sdiag) lvl=(list sdiag) lint=(list sdiag)])
+  =/  r  (resolve:modules root (inline-resolver:modules src) cache)
   ?:  ?=(%| -.out.r)  ~
   =/  g  p.out.r
   =/  ctxs  (analyze sem-order.g mods.g deps.g)

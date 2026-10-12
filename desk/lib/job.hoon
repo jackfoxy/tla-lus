@@ -70,6 +70,9 @@
   $:  root=module-name
       modules=(map module-name @t)
       cfg=(unit @t)
+      ::  R4.P12: the trees the %clay loader already parsed, by text hash,
+      ::  so no later stage parses a module again (`~` for an inline bundle)
+      pc=pcache:mod
   ==
 ::  one Clay read in flight: the module it stands for (the path being
 ::  tried and the search roots left after it) or the config file
@@ -124,6 +127,8 @@
       asked=(set module-name)
       bytes=@ud
       next=@ud
+      ::  R4.P12: every module parsed so far, by text hash (`+parse-cached`)
+      pc=pcache:mod
   ==
 ::  in-flight pipeline state; versioned by the `kont-tag` in its `cont` wrapper
 +$  kont
@@ -246,8 +251,9 @@
 ::  the largest a persisted continuation (jammed BFS or source-load cursor)
 ::  may grow before a run is stopped %limited — a defense-in-depth bound on
 ::  the in-flight noun, above what max-states already implies, checked at
-::  each slice boundary
-++  max-noun-bytes  16.000.000
+::  each slice boundary. R4.P13: 256 MB, since the continuation is no longer
+::  jammed per slice (R4.P2, R4.P8) and so bounds only loom growth
+++  max-noun-bytes  256.000.000
 ::  agent-wide bounds, across all jobs. A request's own `limits` bound one job;
 ::  these bound the ship, so one caller cannot starve it by submitting many
 ::  small jobs or by never collecting its results. Engine configuration, like
@@ -594,7 +600,7 @@
   |=  req=request
   ^-  ?
   ?.  ?=(%inline -.src.req)  |
-  =/  ct  (cfg-of req [root.src.req modules.src.req cfg.src.req])
+  =/  ct  (cfg-of req [root.src.req modules.src.req cfg.src.req ~])
   ?~  ct  |
   =/  pr  (parse-cfg:config u.ct)
   ?&(?=(%& -.pr) ?=(^ properties.p.pr))
@@ -645,7 +651,16 @@
   ^-  (unit srcs)
   ?^  s  s
   ?.  ?=(%inline -.src.request.j)  ~
-  `[root.src.request.j modules.src.request.j cfg.src.request.j]
+  `[root.src.request.j modules.src.request.j cfg.src.request.j ~]
+::
+++  parse-typed-cached
+  ::  R4.P12: `+parse-typed` answered from the loader's parse cache when it
+  ::  holds the text; a cached tree parsed cleanly, so it has no diagnostics
+  |=  [text=@t pc=pcache:mod]
+  ^-  [tree=(unit node:check) diags=(list diagnostic) fatal=?]
+  =/  hit  (~(get by pc) (shax text))
+  ?^  hit  [hit ~ |]
+  (parse-typed:syntax text)
 ::
 ++  carry
   ::  loaded Clay sources travel with the continuation; an inline bundle
@@ -875,6 +890,7 @@
       asked=(silt ~[root.s])
       bytes=0
       next=0
+      pc=~
   ==
 ::
 ++  load-ask
@@ -980,9 +996,10 @@
     ::  an unparsable module is registered as it arrived and contributes
     ::  no references: the %parse stage then reports SANY's own error
     ::  text, exactly as it does for an inline bundle
-    =/  pr  (mule |.((parse:syntax txt)))
-    ?.  ?&(?=(%& -.pr) ?=(%& -.p.pr))  $
-    =/  tree  p.p.pr
+    =/  pr  (mule |.((parse-cached:mod txt pc.c)))
+    ?.  ?&(?=(%& -.pr) ?=(%& -.res.p.pr))  $
+    =.  pc.c  cache.p.pr
+    =/  tree  p.res.p.pr
     ::  SANY's file-name check: the file is named for the lowercased
     ::  module, but the declared name must match the requested one
     =/  dec  (module-name-of:mod tree)
@@ -1181,7 +1198,7 @@
     (load-fail j 'Cannot find the config file.' pre)
   ::  `j` is narrowed to the %clay bundle here, so the hand-off happens
   ::  in a gate of its own rather than by writing back into it
-  (close-load j (clay-provs c) [root.c mods.c cfg.c] pre)
+  (close-load j (clay-provs c) [root.c mods.c cfg.c pc.c] pre)
 ::
 ::  +|  Stage: %parse
 ::
@@ -1210,7 +1227,7 @@
     =/  text  (~(get by modules.src) root.src)
     ?~  text
       (finish j [%failed 'root module not in bundle'] pre)
-    =/  pr  (mule |.((parse-typed:syntax u.text)))
+    =/  pr  (mule |.((parse-typed-cached u.text pc.src)))
     ?:  ?=(%| -.pr)
       (finish j [%failed 'parse error: parser crashed'] pre)
     =/  pt  p.pr
@@ -1241,7 +1258,7 @@
     (more j evs)
   =/  nm  i.todo.kk
   =/  ds=(list diagnostic)
-    =/  pr  (mule |.((parse-typed:syntax (~(got by modules.src) nm))))
+    =/  pr  (mule |.((parse-typed-cached (~(got by modules.src) nm) pc.src)))
     ?:  ?=(%| -.pr)
       [[%lus 400] %error %parse (rap 3 ~['parser crashed in ' nm]) ~ ~]~
     diags.p.pr
@@ -1296,7 +1313,7 @@
     (finish j [%failed 'internal: %semantic without loaded sources'] pre)
   =/  src    u.so
   =/  flags  flags.op.request.j
-  =/  ag  (analyze-graph:semantic root.src modules.src)
+  =/  ag  (analyze-graph-with:semantic root.src modules.src pc.src)
   ?~  ag
     ::  resolution failed. If the parse stage already reported errors,
     ::  they drive the terminal verdict; otherwise surface a resolution
@@ -1310,7 +1327,7 @@
     ::  module keeps the generic text, the parse stage having reported
     ::  the latter already
     =/  why=@t
-      =/  rr  (resolve:mod root.src (inline-resolver:mod modules.src) ~)
+      =/  rr  (resolve:mod root.src (inline-resolver:mod modules.src) pc.src)
       ?.  ?=(%| -.out.rr)  'module resolution failed'
       =/  e  p.out.rr
       ?+  -.e  'module resolution failed'
@@ -1401,7 +1418,7 @@
   ::  the semantic graph is generated once and reused by the config
   ::  assembly and the checker (it used to be built twice, reparsing
   ::  every module both times)
-  =/  mo  (generate:semantic root.src modules.src)
+  =/  mo  (generate-with:semantic root.src modules.src pc.src)
   ?~  mo  (config-fail j [0 'internal: module generation failed'] pre)
   =/  rso  (run-spec-with:config u.mo cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
@@ -1455,7 +1472,7 @@
   ?~  d  ~
   =/  text  (~(get by modules.src) origin.u.d)
   ?~  text  ~
-  =/  pr  (mule |.((parse-typed:syntax u.text)))
+  =/  pr  (mule |.((parse-typed-cached u.text pc.src)))
   ?:  ?=(%| -.pr)  ~
   ?~  tree.p.pr  ~
   =/  b  (body-of-def:check u.tree.p.pr nm)
@@ -1802,6 +1819,8 @@
           ?&(deadlock.mode deadlock.rs)
           max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
           *cov-opts:check  0  iacts
+          ::  R4.P5c: a temporal graph keeps FP64 (lasso choice reads map order)
+          |
       ==
     =.  cont.j
       %-  save-kont
@@ -1837,6 +1856,8 @@
         seed.mode
         ::  R2.7.15a: the IMPLIED ACTIONS, checked on every transition
         iacts
+        ::  R4.P5c: the identity key, unless the spec can draw
+        !(draws:check defs)
     ==
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`

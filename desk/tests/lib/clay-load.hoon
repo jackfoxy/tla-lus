@@ -322,6 +322,28 @@
     (expect-eq !>([5 5]) !>(progress.j))
   ==
 ::
+::  R4.P12: the loader's trees travel with the sources, keyed by text hash,
+::  and the later stages answer a parse from them
+++  test-clay-load-carries-parse-cache
+  =/  k  1
+  |-  ^-  tang
+  ?:  (gth k 12)  ~['no %src hand-off within 12 slices']
+  =/  j  +:(run-clay-k multi-fs (clay-req 'spec' `/src/cfg/txt ~[/src]) 256 k)
+  ?~  cont.j  $(k +(k))
+  =/  kk  (load-kont:job-lib u.cont.j)
+  ?.  ?=(%src -.kk)  $(k +(k))
+  =/  pc  pc.s.kk
+  =/  t  (~(got by pc) (shax spec-mod))
+  ;:  weld
+    %+  expect-eq
+      !>(`(list @)`(sort ~[(shax spec-mod) (shax helper-mod)] lth))
+    !>(`(list @)`(sort ~(tap in ~(key by pc)) lth))
+    ::  a cache hit is answered without parsing (the text here is not TLA+)
+    %+  expect-eq
+      !>(`(unit node:mod)``t)
+    !>(tree:(parse-typed-cached:job-lib 'not a module' (malt ~[[(shax 'not a module') t]])))
+  ==
+::
 ::  +|  The Await Protocol
 ::
 ::

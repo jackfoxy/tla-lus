@@ -4,6 +4,7 @@
 /=  ne  /lib/node-eval
 /=  v   /lib/value
 /=  sm  /lib/semantic
+/=  ck  /lib/check
 |%
 ++  cyc
   ^-  @t
@@ -123,5 +124,25 @@
     (expect-eq !>(%accept) !>((sany-verdict:sm 'spec' let-src)))
     (expect-eq !>(`(list tape)`~["x=3"]) !>((nexts let-src ~[['x' 1]])))
     (expect-eq !>(`(list tape)`~["x=3"]) !>((nexts let-src ~[['x' 5]])))
+  ==
+::
+::  R4.P5c: `+draws` decides whether the safety search may use the identity
+::  key; a spec that can draw keeps FP64 (its reseed reads the fingerprint)
+++  draws-of
+  |=  [ext=tape nx=tape]
+  ^-  ?
+  =/  src=@t
+    %-  crip
+    ;:  weld
+      "---- MODULE spec ----\0a"  "EXTENDS Naturals, "  ext  "\0a"
+      "VARIABLE x\0a"  "Init == x = 1\0a"  "Next == "  nx  "\0a"  "====\0a"
+    ==
+  (draws:ck (defmap-of:ne (need (generate:sm 'spec' (malt ~[['spec' src]])))))
+++  test-draws-static
+  ;:  weld
+    (expect-eq !>(&) !>((draws-of "TLC" "x' = RandomElement(1..3)")))
+    (expect-eq !>(|) !>((draws-of "TLC" "x' = x")))
+    (expect-eq !>(&) !>((draws-of "Randomization" "x' \\in RandomSubset(1, 1..3)")))
+    (expect-eq !>(|) !>((draws-of "Randomization" "x' = x")))
   ==
 --

@@ -125,20 +125,25 @@ carry a function.
 - **Loom.** Run the ship with `--loom 33` (8 GiB). The serf's resident
   memory stays far below it: a 90,000-state grid search adds about 30 MB,
   and GameOfLife (65,536 initial states) peaks at about 410 MB.
-- **The binding limit is the persisted search, not memory.** A running
-  check's continuation (visited set, queue) is bounded at 16 MB, measured
-  as its `jam` size. Past it the check stops `%limited %noun` with its
-  statistics. That is about 25 bytes per state for small states and 30 for
-  GameOfLife-sized ones, so roughly **500,000 to 650,000 distinct states**
-  per check. The bound is checked at 16 points per doubling of the state
-  count, so it is enforced within about 4%.
+- **The persisted search is bounded.** A running check's continuation
+  (visited set, queue) is bounded at 256 MB, measured as its `jam` size.
+  Past it the check stops `%limited %noun` with its statistics. That is
+  about 25 bytes per state for small states and 30 for GameOfLife-sized
+  ones, so roughly **8 to 10 million distinct states** per check. The bound
+  is checked at 16 points per doubling of the state count, so it is
+  enforced within about 4%. Each check jams the continuation, about 0.16 s
+  per MB (4.5 s at 28 MB), so past a few million states a measuring turn
+  lasts tens of seconds. Large states reach the loom first: GameOfLife holds
+  about 3.6 KB resident per state, about 2 million states in 8 GiB. Runs
+  past about 1 million states have not been measured.
+  (Until R4.P13 the bound was 16 MB, about 500,000 to 650,000 states.)
 - **Gall turn length.** A check advances 256 units of work per Behn wake (a
   "slice"). One turn therefore lasts 256 times the per-state cost: about
   0.4 s for the grid (1.4 ms per state), and about 2–3 s for GameOfLife (9
   ms per state). The ship serves other agents between slices; a `%cancel`
   lands at the next slice boundary.
 - **Throughput** depends on the spec. The grid reaches 90,000 states in
-  about 130 s, and GameOfLife 34,000 in 300 s. Temporal properties add a
+  about 130 s, and GameOfLife 59,000 in 300 s (R4.P5c). Temporal properties add a
   product build per property; CoffeeCan with 100 beans (5,150 states, four
   properties) takes about 13 minutes.
 

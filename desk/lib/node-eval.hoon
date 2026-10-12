@@ -1143,9 +1143,67 @@
   ?~  body.def  [[%| 0 (rap 3 ~['operator has no evaluable body: ' nm])] rs]
   ?.  =((lent params.def) (lent args.n))
     [[%| 0 (rap 3 ~['wrong number of arguments to ' nm])] rs]
+  ::  R4.P11: a module-level, STATE-level arity-0 definition is memoized
+  ::  (`+eval-sdef`), so the references made while one state is expanded
+  ::  share one evaluation. GameOfLife's `sc[<<x, y>> \in ...] == ...` was
+  ::  re-materialized at every one of its 18 references per state
+  ?:  ?&(?=(~ args.n) =(1 lvl.def) !=('' origin.def))
+    (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e))) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
   (eval-rs u.body.def p.e2(fuel (dec fuel.e)) rs)
+::
+++  eval-sdef
+  ::  R4.P11: `+eval-rs` memoized with `~+`. The key is the whole sample --
+  ::  body, environment and carrier -- so a hit is exact: the evaluation is
+  ::  a pure function of them, whatever the body does (a draw or a `TLCSet`
+  ::  is part of the memoized carrier). What makes references HIT is
+  ::  `+sdef-env`, which cuts the environment to what the body can read
+  |=  [b=sem:sm e=eenv rs=rst]
+  ^-  eout
+  ~+
+  (eval-rs b e rs)
+::
+++  sdef-env
+  ::  the environment a module-level arity-0 definition can observe: the
+  ::  `vals`/`psub` bindings named anywhere in its body or in the bodies it
+  ::  reaches (`+reach-names`; constants, and any INSTANCE substitution
+  ::  read through a reached member), never the call site's other locals;
+  ::  the successor state only where it can be read (primed or ENABLED)
+  |=  [b=sem:sm e=eenv]
+  ^-  eenv
+  =/  ns  (reach-names b ops.e)
+  =.  vals.e
+    %-  malt
+    ^-  (list [@t value:v])
+    (skim ~(tap by vals.e) |=([k=@t *] (~(has in ns) k)))
+  =.  psub.e
+    %-  malt
+    ^-  (list [@t sem:sm])
+    (skim ~(tap by psub.e) |=([k=@t *] (~(has in ns) k)))
+  ?:  |(primed.e enabled.e)  e
+  e(s1 ~)
+::
+++  reach-names
+  ::  every atom in `b` and in the body of every operator it reaches by
+  ::  name, transitively -- a superset of the names its evaluation can look
+  ::  up. `~+`: once per body and operator table
+  |=  [b=sem:sm ops=(map @t sem-def:sm)]
+  ^-  (set @)
+  ~+
+  =|  out=(set @)
+  =|  seen=(set @t)
+  =/  stk=(list *)  ~[b]
+  |-  ^-  (set @)
+  ?~  stk  out
+  =/  x  i.stk
+  ?^  x  $(stk [-.x +.x t.stk])
+  =.  out  (~(put in out) x)
+  ?:  (~(has in seen) x)  $(stk t.stk)
+  =/  d  (~(get by ops) x)
+  ?~  d  $(stk t.stk)
+  ?~  body.u.d  $(stk t.stk, seen (~(put in seen) x))
+  $(stk [u.body.u.d t.stk], seen (~(put in seen) x))
 ::
 ++  eval-node-op
   ::  StandardModule overrides that take an operator argument. tlc2 receives

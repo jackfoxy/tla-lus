@@ -286,6 +286,12 @@
       ::  the transition, an implied action REPORTS it. Same hook, opposite
       ::  answer to a false predicate
       iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
+      ::  R4.P5c: key `seen` on the identity key (`+state-key:fp`) rather than
+      ::  FP64. Only where no output reads a fingerprint: set for the safety
+      ::  search of a spec that never draws (`+draws`), never for a temporal
+      ::  graph build (lasso choice follows map order) or a spec whose
+      ::  per-state reseed is `fingerPrint ^ seed`. `_|`: off unless asked
+      hkey=_|
   ==
 ::
 +$  cov-opts
@@ -795,16 +801,16 @@
   ^-  [out=(unit outcome) cur=bfs-cursor]
   ::  the state's identity is its symmetry-orbit representative (7.5); with no
   ::  symmetry group `canon` is `st` and `fp` is the plain FP64 state fingerprint
-  =/  ob   (orbit-fp:fp perms.o order.o st)
-  =/  cst  canon.ob
+  =/  cst  (canonicalize:fp perms.o order.o st)
   ::  under a VIEW the identity is the view's VALUE, evaluated on the
   ::  symmetry representative — tlc2's order exactly (R2.3.1). A view that
   ::  fails to evaluate falls back to the plain fingerprint rather than
   ::  silently conflating states
   =/  fp=@t
-    ?~  view.o  (@t fp.ob)
+    ?~  view.o  (state-id o cst)
     =/  vr  (eval:ne u.view.o e(s0 cst, s1 cst, primed |))
-    ?:  ?=(%| -.vr)  (@t fp.ob)
+    ?:  ?=(%| -.vr)  (state-id o cst)
+    ?:  hkey.o  (@t (view-key:fp p.vr))
     (@t (view-fp:fp p.vr))
   ::  R2.7.15b: the IMPLIED ACTIONS are checked on EVERY TRANSITION, whether or
   ::  not the successor is new -- tlc2's DFID comment says so in as many words
@@ -887,6 +893,64 @@
   =?  inits.cur  =('' pred)  [fp inits.cur]
   [~ cur]
 ::
+++  state-id
+  ::  a state's identity in `seen`: FP64, or the identity key (R4.P5c)
+  |=  [o=bfs-opts st=state]
+  ^-  @t
+  ?:  hkey.o  (@t (state-key:fp order.o st))
+  (@t (state-fp:fp order.o st))
+::
+++  draws
+  ::  R4.P5c: may the search draw a random value? Then the per-state reseed
+  ::  (`fingerPrint ^ seed`) is observable and FP64 must stay the key.
+  ::  Static and conservative: a drawing operator (`+draw-op`) is in scope
+  ::  and its name, or its base name, appears anywhere in another
+  ::  definition's body. A false positive only keeps FP64
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  ?
+  =/  ds  ~(tap by defs)
+  =/  dn=(list @t)
+    %-  zing
+    %+  murn  ds
+    |=  [nm=@t d=sem-def:sem-lib]
+    ^-  (unit (list @t))
+    ?.  (draw-op origin.d nm)  ~
+    `~[nm (base-name nm)]
+  ?~  dn  |
+  %+  lien  ds
+  |=  [nm=@t d=sem-def:sem-lib]
+  ?~  body.d  |
+  ?:  (draw-op origin.d nm)  |
+  (lien `(list @t)`dn |=(x=@t (has-atom u.body.d x)))
+::
+++  draw-op
+  ::  the StandardModule operators that spend the enumeration RNG
+  ::  (`+eval-node-op-rs`: %random-element, %random-subset,
+  ::  %random-set-of-subsets, %test-rsos)
+  |=  [origin=@t nm=@t]
+  ^-  ?
+  =/  b  (base-name nm)
+  ?|  &(=('TLC' origin) =('RandomElement' b))
+      ?&  =('Randomization' origin)
+          ?|  =('RandomSubset' b)
+              =('RandomSetOfSubsets' b)
+              =('TestRandomSetOfSubsets' b)
+      ==  ==
+  ==
+::
+++  base-name
+  ::  an instance-qualified name without its prefixes: `R!S!Op` -> `Op`
+  |=  nm=@t
+  ^-  @t
+  =/  t  (flop (trip nm))
+  (crip (flop (scag (fall (find "!" t) (lent t)) t)))
+::
+++  has-atom
+  |=  [n=* a=@]
+  ^-  ?
+  ?@  n  =(n a)
+  |($(n -.n) $(n +.n))
+::
 ++  viols-of
   ::  the recorded `-continue` violations with their traces rebuilt from
   ::  `seen` (R2.4.2). Done at the DONE boundary rather than as they are found,
@@ -958,7 +1022,8 @@
   ::  produce two DIFFERENT values, which a fresh-per-evaluation RNG cannot
   ::  through `+scramble:rng`, because `es` is the RAW 48-bit LCG state and
   ::  `Random.setSeed` stores `(seed ^ multiplier) & (2^48-1)`, not the seed
-  =.  es.rs.cur  (scramble:rng (mix `@`fp seed.o))
+  ::  R4.P5c: under the identity key the spec never draws, so no reseed
+  =?  es.rs.cur  !hkey.o  (scramble:rng (mix `@`fp seed.o))
   =/  before  distinct.cur
   ::  each action's successors are registered as they are generated, so a
   ::  violation found under an earlier action pre-empts a later one -- tlc2's
@@ -3156,7 +3221,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3199,7 +3264,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3237,7 +3302,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3255,7 +3320,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3658,7 +3723,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (make-env:ne defs.c consts.c vars.c)
@@ -3836,9 +3901,11 @@
   ?:(=(0 setmax.o) e (with-setmax:ne e setmax.o))
 ::
 ++  dfid-fp
+  ::  R4.P5c: DFID reads no fingerprint (no reseed, no graph, no symmetry),
+  ::  so its visited set is keyed on the identity key
   |=  [o=dfid-opts st=state]
   ^-  @t
-  (@t (state-fp:fp order.o st))
+  (@t (state-key:fp order.o st))
 ::
 ++  dfid-trace
   ::  the behavior the DFS stack currently holds, oldest first, extended by
@@ -4830,7 +4897,7 @@
     =/  o=bfs-opts
       :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c
           vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
-          ~  *cov-opts  0  iacts.c
+          ~  *cov-opts  0  iacts.c  !(draws defs.c)
       ==
     =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
     =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -5100,7 +5167,7 @@
   ::  running it. `+bfs-step` already checks `invs` and stops at the first
   ::  violation, so no new checking machinery was needed here, only the list
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  bg    (build-graph-out is.c o)
   =/  modn  (module-name-of tree.c)
   ?:  capped.bg
@@ -5175,6 +5242,7 @@
   =/  o=bfs-opts
     :*  nsb.c  invs.c  cons.c  acons.c  poss.c  vars.c  order.c  perms.c  defs.c
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed  ~
+        !(draws defs.c)
     ==
   =/  r  (explore-full-regs is.c irs.c o)
   ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
@@ -5368,7 +5436,7 @@
   =/  o=bfs-opts
     :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c  vars.c  order.c
         perms.c  defs.c  consts.c  ddl.c  cap  0  view.c  0  |  ~  *cov-opts  0
-        iacts.c
+        iacts.c  !(draws defs.c)
     ==
   =/  er  (explore is.c o)
   ?.  ?=(%ok -.out.er)  (explore-outcome out.er od.er)
@@ -5378,7 +5446,7 @@
   ::  (R1.5.5): a capped build yields %limited rather than a lasso verdict on a
   ::  partial graph
   =/  lo=bfs-opts
-    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  bg  (build-graph-cap is.c lo)
   ::  the liveness graph build samples no out-degree (no BFS frontier)
   =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -5419,7 +5487,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~ !(draws defs.c)]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur len.queue.cur depth.cur (od-stats outdeg.cur)]
 --
