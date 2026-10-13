@@ -21,13 +21,20 @@
   ::  operator's call — carries the formals of the expansion it came from, and
   ::  they must win over the run env, being locals. tlc2 keeps the same thing
   ::  as the `Context` it hands to `tool.eval`
+  ::  R4.2n: `%act` and `%enabled` leaves carry bindings too (a bounded
+  ::  quantifier's variables, an INSTANCE's substitutions, expanded formals)
   |=  [x=live-expr:tp env=eenv:ne]
   ^-  eenv:ne
-  ?>  ?=(%state -.x)
-  ?:  &(=(~ ctx.x) =(~ nsub.x))  env
+  =/  b=[ctx=(map @t value:vl) nsub=(map @t sem:sm)]
+    ?+  -.x  [~ ~]
+      %state    ?>(?=(%state -.x) [ctx.x nsub.x])
+      %act      ?>(?=(%act -.x) [ctx.x nsub.x])
+      %enabled  ?>(?=(%enabled -.x) [ctx.x nsub.x])
+    ==
+  ?:  &(=(~ ctx.b) =(~ nsub.b))  env
   %=  env
-    vals  (~(uni by vals.env) ctx.x)
-    psub  (~(uni by psub.env) nsub.x)
+    vals  (~(uni by vals.env) ctx.b)
+    psub  (~(uni by psub.env) nsub.b)
   ==
 ::
 ++  st-pred-bool
@@ -66,7 +73,7 @@
   ::  ENABLED is `LNStateEnabled extends LNState`, so its level is VARIABLE and
   ::  `+state-preds-of` keeps it -- tlc2 evaluates it here through
   ::  `LNStateEnabled.eval` -> `tool.enabled`, and so must the port (R1.2.7)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::
   ::  the rest are above state level -- `%act` and `%next` are ActionLevel,
   ::  `%all`/`%even` TemporalLevel -- so `+state-preds-of`'s `le-level <= 1`
@@ -307,7 +314,7 @@
   ::
   ::  ENABLED is state-level (`LNStateEnabled extends LNState`), so it can be a
   ::  checkState entry and tlc2 evaluates it (R1.2.7)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::
   ::  the rest are above state level, and a checkState entry is level <= 1 by
   ::  construction (`+classify` bins `[]<>S` with `le-level <= 1` here and
@@ -340,8 +347,8 @@
     ::  reported, never answered
     ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
-    %act      (act-eval box.x sub.x a.x s0 s1 env)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %act      (act-eval box.x sub.x a.x s0 s1 (leaf-env x env))
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::  `LNNext.eval(tool, s1, s2)` is `body.eval(tool, s2, Empty)` -- the body at
   ::  the SUCCESSOR state. `()P` is ActionLevel, so it can be a checkAction
   ::  entry and must be evaluated rather than refused (R1.2.7)
@@ -387,13 +394,13 @@
     ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
   ::  `LNStateEnabled extends LNState`, so it evaluates at `sts[pos]` too
-    %enabled  (enabled-eval box.x sub.x p.x (snag pos sts) env)
+    %enabled  (enabled-eval box.x sub.x p.x (snag pos sts) (leaf-env x env))
   ::
       %act
     ::  `LNAction.eval(s1, s2)` with s2 the successor -- `sts[cyc]` at the end
     =/  s0  (snag pos sts)
     =/  s1  (snag ?:((lth +(pos) len) +(pos) cyc) sts)
-    (act-eval box.x sub.x a.x s0 s1 env)
+    (act-eval box.x sub.x a.x s0 s1 (leaf-env x env))
   ::
   ::  `astToLive` rewrites `()` away, so tlc2 asserts here; the body is ported
   ::  as written so a shape that does reach it behaves rather than bails

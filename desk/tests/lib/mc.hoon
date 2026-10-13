@@ -28,6 +28,31 @@
       !=(~ (find "states generated" (trip l)))
   ==
 ::
+++  test-mc-act-label-params
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = <<0, 0>>'
+        'State 2: <Inc(1) line 8, col 11 to line 8, col 53 of module spec>'
+        'x = <<1, 0>>'
+        'State 3: <Inc(1) line 8, col 11 to line 8, col 53 of module spec>'
+        'x = <<2, 0>>'
+        'State 4: <Op(1,"a") line 9, col 13 to line 9, col 78 of module spec>'
+        'x = <<2, 1>>'
+        'State 5: <Op(1,"a") line 9, col 13 to line 9, col 78 of module spec>'
+        'x = <<2, 2>>'
+        '5 states generated, 5 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: a trace step through a parametrized action is labelled with the\0a\\* action operator\'s arguments, `<Inc(1) ...>` and `<Op(1,"a") ...>`\0a\\* (`Action.getLocation`); the port printed `<Inc ...>`.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aInc(p) == x[p] < 2 /\\ x\' = [x EXCEPT ![p] = x[p] + 1]\0aOp(n, s) == x[1] = 2 /\\ x[2] < 2 /\\ s = "a" /\\ x\' = [x EXCEPT ![2] = x[2] + n]\0aNext == (\\E p \\in {1} : Inc(p)) \\/ (\\E s \\in {"a"} : Op(1, s))\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
 ++  test-mc-alias
   %+  expect-eq
     !>  ^-  wain
@@ -124,6 +149,62 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.14b: THE OTHER DIRECTION -- identical to `ce-lasso` but asserting\0a\\* three actions where there are two, so the postcondition must FAIL. A\0a\\* silent pass proves nothing unless a deliberate break is pinned beside it\0a\\* (the both-directions discipline R2.7.6.1\'s APPROVED map established).\0a\\*\0a\\* A deterministic two-state back-to-state lasso,\0a\\* so the counter-example graph is exactly 2 states and 2 actions -- one\0a\\* forward edge and one edge closing the lasso -- and both endpoints are\0a\\* pinned by state NUMBER. `gh1389-violc` pins the same shape, but its witness\0a\\* varies at the pin; this one does not.\0a\\*\0a\\* Endpoints are compared as `a[1][1]` rather than against a record literal\0a\\* on purpose: a record field named after a declared VARIABLE draws six lines\0a\\* of SANY lint per occurrence, which would bury the assertion in the golden.\0aEXTENDS Naturals, FiniteSets, TLCExt\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = 1 - x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aLive == <>[](x = 1)\0aPostCondition ==\0a    LET S == CounterExample.state\0a        A == CounterExample.action\0a    IN\0a    /\\ Cardinality(S) = 2\0a    /\\ Cardinality(A) = 3\0a    /\\ \\A s \\in S : s[1] \\in 1..2 /\\ s[2].x = (s[1] - 1)\0a    /\\ \\A a \\in A : a[2].name = "Next"\0a    /\\ \\E a \\in A : a[1][1] = 1 /\\ a[3][1] = 2\0a    /\\ \\E a \\in A : a[1][1] = 2 /\\ a[3][1] = 1\0a====\0a'
   'SPECIFICATION Spec\0aPROPERTY Live\0aPOSTCONDITION PostCondition\0a'
+::
+++  test-mc-cfg-def-value
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'c = Faded'
+        'State 2: <Next line 11, col 12 to line 11, col 36 of module spec>'
+        'c = c1'
+        'State 3: <Next line 12, col 12 to line 12, col 37 of module spec>'
+        'c = L'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2u/v: a config VALUE for a DEFINITION (`Faded = Faded`) replaces it, so\0a\\* `Faded == CHOOSE c : c \\notin Color` -- an unbounded CHOOSE tlc2 refuses --\0a\\* is never evaluated (Chameneos, Paxos\'s `None`); and `Leader <- L` gives a\0a\\* CONSTANT the value of another constant (EWD687a).\0aEXTENDS Naturals\0aCONSTANTS Color, Leader, L\0aVARIABLE c\0aFaded == CHOOSE x : x \\notin Color\0aInit == c = Faded\0aNext == \\/ c = Faded /\\ c\' \\in Color\0a        \\/ c \\in Color /\\ c\' = Leader\0aTypeOK == c \\in Color \\cup {Faded, Leader}\0a====\0a'
+  'CONSTANTS\0a  Color = {c1, c2}\0a  Faded = Faded\0a  L = L\0a  Leader <- L\0aINIT Init\0aNEXT Next\0aINVARIANT TypeOK\0a'
+::
+++  test-mc-cfg-override-nat
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 11, col 24 to line 11, col 52 of module spec>'
+        'x = 2'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2m: a config `<-` override of a StandardModule set (`Nat <- NatOverride`,\0a\\* MCBakery / MCLamportMutex), and of a CONSTANT by a definition\0a\\* (`Limit <- MCLimit`). Both were validated and then IGNORED.\0aEXTENDS Naturals\0aCONSTANT Limit\0aVARIABLE x\0aNatOverride == 0..2\0aMCLimit == 2\0aInit == x = 0\0aNext == \\E k \\in Nat : k > x /\\ k <= Limit /\\ x\' = k\0aTypeOK == x \\in Nat\0a====\0a'
+  'CONSTANTS\0a  Nat <- NatOverride\0a  Limit <- MCLimit\0aINIT Init\0aNEXT Next\0aINVARIANT TypeOK\0a'
+::
+++  test-mc-cfg-override-seq
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Computed 2 initial states...'
+        'Computed 4 initial states...'
+        'Model checking completed. No error has been found.'
+        '12 states generated, 6 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2m: `Seq <- LimitedSeq` (LoopInvariance\'s MCQuicksort/MCBinarySearch):\0a\\* the overridden `Seq(S)` is the finite definition, so it enumerates.\0aEXTENDS Naturals, Sequences\0aVARIABLE s\0aLimitedSeq(S) == UNION {[1 .. n -> S] : n \\in 1 .. 2}\0aInit == s \\in Seq({0, 1})\0aNext == UNCHANGED s\0a====\0a'
+  'CONSTANT Seq <- LimitedSeq\0aINIT Init\0aNEXT Next\0a'
 ::
 ++  test-mc-cfg-periodic-arg
   %+  expect-eq
@@ -568,6 +649,33 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {0, 3}\0aNext == x\' = x\0aSpec == Init /\\ [][Next]_x\0aImpInit == x = 0\0a====\0a'
   'SPECIFICATION Spec\0aPROPERTY ImpInit\0a'
 ::
+++  test-mc-inf-member-shapes
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ f = <<<<0, 0>>, <<0, 0>>>>'
+        '/\\ r = [a |-> -1, b |-> 1]'
+        '/\\ s = <<0, 1>>'
+        'State 2: <Next line 13, col 9 to line 15, col 29 of module spec>'
+        '/\\ f = <<<<1, 0>>, <<0, 0>>>>'
+        '/\\ r = [a |-> -1, b |-> 1]'
+        '/\\ s = <<0, 1>>'
+        'State 3: <Next line 13, col 9 to line 15, col 29 of module spec>'
+        '/\\ f = <<<<2, 0>>, <<0, 0>>>>'
+        '/\\ r = [a |-> -1, b |-> 1]'
+        '/\\ s = <<0, 1>>'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2m: membership in a set built from an INFINITE standard set is decided\0a\\* on its structure, as tlc2\'s lazy values decide it: `N \\in Nat \\ {0}` (the\0a\\* Examples\' ASSUME idiom), `[P -> [P -> Nat]]`, `[a : Int]`, `Seq(Nat)`.\0aEXTENDS Naturals, Integers, Sequences\0aCONSTANT N\0aASSUME N \\in Nat \\ {0}\0aASSUME N \\notin Int \\ Nat\0aVARIABLE f, r, s\0aInit == /\\ f = [p \\in 1..2 |-> [q \\in 1..2 |-> 0]]\0a        /\\ r = [a |-> -1, b |-> 1]\0a        /\\ s = <<0, 1>>\0aNext == /\\ f[1][1] < 2\0a        /\\ f\' = [f EXCEPT ![1][1] = @ + 1]\0a        /\\ UNCHANGED <<r, s>>\0aTypeOK == /\\ f \\in [1..2 -> [1..2 -> Nat]]\0a          /\\ r \\in [a : Int, b : Nat \\ {0}]\0a          /\\ s \\in Seq(Nat)\0a====\0a'
+  'CONSTANT N = 3\0aINIT Init\0aNEXT Next\0aINVARIANT TypeOK\0a'
+::
 ++  test-mc-inst-keys
   %+  expect-eq
     !>  ^-  wain
@@ -609,6 +717,50 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.8 (R2.3.5\'s residue): an INSTANCE member that references a LOCAL SIBLING\0a\\* member of its own module. `SpecI`\'s body carries a BARE `InitI`, while the\0a\\* root defs map holds instanced members QUALIFIED as `I!InitI`.\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE inner ----\0aEXTENDS Naturals\0aVARIABLE v\0aCONSTANT k\0aLOCAL Bound == k\0aInitI == v = 0\0aNextI == v\' = (v + 1) % Bound\0aSpecI == InitI /\\ [][NextI]_v\0a====\0aI == INSTANCE inner WITH v <- x, k <- 3\0aSpec == I!SpecI\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+++  test-mc-inst-std-local
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 14, col 9 to line 14, col 33 of module spec>'
+        'x = 1'
+        'State 3: <Next line 14, col 9 to line 14, col 33 of module spec>'
+        'x = 2'
+        'State 4: <Next line 14, col 9 to line 14, col 33 of module spec>'
+        'x = 3'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2v: a StandardModule reached through an instanced module\'s\0a\\* `LOCAL INSTANCE FiniteSets` keeps its overrides: `Cardinality`\'s vendored\0a\\* body is a dummy with an unbounded CHOOSE (Disruptor\'s RingBuffer).\0aEXTENDS Naturals\0a---- MODULE Buf ----\0aLOCAL INSTANCE FiniteSets\0aCONSTANT Slots\0aCount == Cardinality(Slots)\0a====\0aVARIABLE x\0aB == INSTANCE Buf WITH Slots <- {1, 2, 3}\0aInit == x = 0\0aNext == x < B!Count /\\ x\' = x + 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
+++  test-mc-inst-subst-infinite
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = -1'
+        'State 2: <Next line 16, col 9 to line 16, col 27 of module spec>'
+        'x = 0'
+        'State 3: <Next line 16, col 9 to line 16, col 27 of module spec>'
+        'x = 1'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2m: an INSTANCE substitution by an INFINITE set (`Values <- Int`,\0a\\* Disruptor\'s RingBuffer; `Boxes` built from `Int`, detector_chan96) is\0a\\* bound lazily: membership and `\\subseteq` decide it on its structure.\0aEXTENDS Integers\0a---- MODULE Buf ----\0aCONSTANT Values\0aVARIABLE slot\0aTypeOK == /\\ slot \\in Values\0a          /\\ {slot} \\subseteq Values\0a          /\\ {[v |-> slot]} \\subseteq [v : Values]\0a====\0aVARIABLE x\0aB == INSTANCE Buf WITH Values <- Int, slot <- x\0aInit == x = -1\0aNext == x < 1 /\\ x\' = x + 1\0aInv == B!TypeOK\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
 ++  test-mc-inv-initial
   %+  expect-eq
@@ -778,6 +930,66 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x < 3\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
+++  test-mc-label-expr
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 7, col 9 to line 8, col 29 of module spec>'
+        'x = 1'
+        'State 3: <Next line 7, col 9 to line 8, col 29 of module spec>'
+        'x = 2'
+        'State 4: <Next line 7, col 9 to line 8, col 29 of module spec>'
+        'x = 3'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2m: labeled expressions (`P :: e`, EWD840/EWD998\'s proof-ready style)\0a\\* are their bodies -- in an action, in an invariant, and in a property.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == /\\ step :: x < 3\0a        /\\ bump :: x\' = x + 1\0aInv == ok :: x <= 3\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-let-action-live
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '10 states generated, 5 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: fairness on a LET-bodied action (MultiCarElevator\'s\0a\\* `WF_Vars(CallElevator(p))`): the leaf is evaluated with the LET\'s\0a\\* definitions in scope.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA(p) == LET a == x + p\0a            b == a + 1\0a        IN x < 4 /\\ x\' = b - 1\0aNext == (\\E p \\in {1} : A(p)) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in {1} : WF_x(A(p))\0aProp == <>(x = 4)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0a'
+::
+++  test-mc-let-action-trace
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <A(1) line 10, col 12 to line 10, col 30 of module spec>'
+        'x = 1'
+        'State 3: <A(1) line 10, col 12 to line 10, col 30 of module spec>'
+        'x = 2'
+        'State 4: <A(1) line 10, col 12 to line 10, col 30 of module spec>'
+        'x = 3'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: an action whose body is a LET with sibling definitions. `+get-actions`\0a\\* descended through the LET and dropped its definitions, so `x\' = b - 1`\0a\\* failed "undefined operator: b". The trace label is the LET BODY\'s location.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA(p) == LET a == x + p\0a            b == a + 1\0a        IN x < 3 /\\ x\' = b - 1\0aNext == \\E p \\in {1} : A(p)\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
 ++  test-mc-live-after-deadlock
   %+  expect-eq
     !>  ^-  wain
@@ -919,6 +1131,64 @@
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
 ::
+++  test-mc-live-forall-prop
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '22 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: a PROPERTY quantified over a constant set, `\\A p \\in S : <>P(p)`\0a\\* (LiveHourClock\'s `AllTimes` shape), expanded by the liveness converter.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aInc(p) == x[p] < 2 /\\ x\' = [x EXCEPT ![p] = x[p] + 1]\0aNext == (\\E p \\in 1..2 : Inc(p)) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in 1..2 : WF_x(Inc(p))\0aAllReach == \\A p \\in 1..2 : <>(x[p] = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY AllReach\0a'
+::
+++  test-mc-live-forall-sf
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '22 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: strong fairness quantified over a constant set. Each SF expands to\0a\\* a disjunction, so the DNF distributes conjunctions of conjunctions;\0a\\* `LNConj.addConj` splices them, and the port\'s unspliced product raised\0a\\* EC 2214 (MultiCarElevator, the allocator specs).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aInc(p) == x[p] < 2 /\\ x\' = [x EXCEPT ![p] = x[p] + 1]\0aNext == (\\E p \\in 1..2 : Inc(p)) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in 1..2 : SF_x(Inc(p))\0aDone == \\A p \\in 1..2 : (x[p] = 0) ~> (x[p] = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Done\0a'
+::
+++  test-mc-live-forall-wf
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '22 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: fairness quantified over a constant set (`\\A p \\in S : WF_v(A(p))`),\0a\\* the shape of most Examples liveness specs. tlc2 expands it per element\0a\\* (`Liveness.astToLiveAppl` OPCODE_bf); the port refused it (EC 2213).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aInc(p) == x[p] < 2 /\\ x\' = [x EXCEPT ![p] = x[p] + 1]\0aNext == (\\E p \\in 1..2 : Inc(p)) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in 1..2 : WF_x(Inc(p))\0aDone == <>(\\A p \\in 1..2 : x[p] = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Done\0a'
+::
+++  test-mc-live-forall-wf-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Done was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        '22 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  verdict-only
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: the quantified fairness covers only p = 1, so p = 2 may stutter\0a\\* forever and `Done` is violated; the per-element leaves must stay distinct.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aInc(p) == x[p] < 2 /\\ x\' = [x EXCEPT ![p] = x[p] + 1]\0aNext == (\\E p \\in 1..2 : Inc(p)) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in {1} : WF_x(Inc(p))\0aDone == <>(\\A p \\in 1..2 : x[p] = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Done\0a'
+::
 ++  test-mc-live-rec-holds
   %+  expect-eq
     !>  ^-  wain
@@ -932,6 +1202,20 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.6.3 probe: the same recursive shape as `live-witness-rec`, but the\0a\\* property HOLDS. If the expanded leaf (the recursive CALL, evaluated as a\0a\\* state predicate) is evaluated wrongly, this flips the VERDICT rather than\0a\\* just the witness -- a stronger and deterministic check.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN (x = 0) ELSE <>(R(n - 1))\0aInit == x = 0\0aNext == x\' \\in {0, 1}\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == R(1)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-wf-statearg
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '22 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: fairness on an action whose ARGUMENT reads the state,\0a\\* `WF_x(Up(p, x[p]))` (the allocator specs\' `Return(c, alloc[c])`). The\0a\\* solver evaluated such an argument with no current state; ENABLED read the\0a\\* failure as FALSE, so the fairness was silently vacuous and `Done` was\0a\\* reported violated. It holds.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = [p \\in 1..2 |-> 0]\0aUp(p, v) == v < 2 /\\ x\' = [x EXCEPT ![p] = v + 1]\0aNext == (\\E p \\in 1..2 : Up(p, x[p])) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ \\A p \\in 1..2 : WF_x(Up(p, x[p]))\0aDone == <>(\\A p \\in 1..2 : x[p] = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Done\0a'
 ::
 ++  test-mc-live-witness
   %+  expect-eq
@@ -1290,6 +1574,27 @@
     '---- MODULE spec ----\0a\\* R2.7.15: the same two properties in the OPPOSITE order. tlc2\'s routing is\0a\\* order-independent -- each property is binned on its own shape -- so the\0a\\* verdict is identical to `prop-box-viol`. The port routed on the HEAD of the\0a\\* list, which made these two cases disagree.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aLive   == <>(x = 9)\0aBoxBad == [](x < 2)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Live\0aPROPERTY BoxBad\0a'
 ::
+++  test-mc-prop-box-named
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 7, col 9 to line 7, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 7, col 9 to line 7, col 27 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: a `[]P` PROPERTY whose P is a bare operator name joins the\0a\\* invariants under P\'s own name (`processConfigProps` OPCODE_box).\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aInv == x < 2\0aP == []Inv\0a====\0a'
+  'INIT Init\0aNEXT Next\0aPROPERTY P\0a'
+::
 ++  test-mc-prop-box-then-live
   %+  expect-eq
     !>  ^-  wain
@@ -1332,6 +1637,41 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.15: `processConfigProps` routes EVERY property. A `[]P` box-state\0a\\* PROPERTY joins the INVARIANT vector and a genuine temporal one goes to the\0a\\* liveness engine, in the SAME run -- and the safety violation pre-empts the\0a\\* temporal verdict exactly as an INVARIANT does (R2.3.4). Note the box-state\0a\\* property is reported as an `Invariant`, not as a `Temporal property`.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aBoxBad  == [](x < 2)\0aLive    == <>(x = 9)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY BoxBad\0aPROPERTY Live\0a'
+::
+++  test-mc-prop-conj-decomp
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Computed 2 initial states...'
+        'Model checking completed. No error has been found.'
+        '6 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: `processConfigProps` decomposes a PROPERTY through a definition\0a\\* and `/\\`: `HCini` is an implied init and `[][HCnxt]_hr` an implied action\0a\\* (HourClock2\'s shape). The port binned the conjunction whole and refused it.\0aEXTENDS Naturals\0aVARIABLE hr\0aHCini == hr \\in 1..3\0aHCnxt == hr\' = IF hr = 3 THEN 1 ELSE hr + 1\0aHC == HCini /\\ [][HCnxt]_hr\0a====\0a'
+  'INIT HCini\0aNEXT HCnxt\0aPROPERTY HC\0a'
+::
+++  test-mc-prop-conj-viol
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Computed 2 initial states...'
+        'Error: Action property line 8, col 16 to line 8, col 34 of module spec is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'hr = 3'
+        'State 2: <HCnxt line 7, col 10 to line 7, col 43 of module spec>'
+        'hr = 1'
+        '6 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: the implied-action part of a decomposed PROPERTY is violated on the\0a\\* 3 -> 1 step; reported as tlc2 reports an action property.\0aEXTENDS Naturals\0aVARIABLE hr\0aHCini == hr \\in 1..3\0aHCnxt == hr\' = IF hr = 3 THEN 1 ELSE hr + 1\0aUp == HCini /\\ [][hr\' = hr + 1]_hr\0a====\0a'
+  'INIT HCini\0aNEXT HCnxt\0aPROPERTY Up\0a'
 ::
 ++  test-mc-prop-init-live
   %+  expect-eq
@@ -1380,6 +1720,48 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.15: a level-1 PROPERTY is an IMPLIED INIT, checked while computing the\0a\\* initial states -- so it pre-empts everything, including the temporal\0a\\* property declared beside it, and prints NO state-graph counts.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ (x < 3 /\\ x\' = x + 1)\0aInitBad == x = 5\0aLive    == <>(x = 9)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY InitBad\0aPROPERTY Live\0a'
+::
+++  test-mc-prop-instance-nested
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '8 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: a property reached through TWO instances (glowingRaccoon\'s\0a\\* `stagesInstance!primerDepleted == cleanInstance!primerDepleted`). The\0a\\* nested member `M!L!Reach` was never generated, so `M!P` named nothing.\0aEXTENDS Naturals\0a---- MODULE Mid ----\0aVARIABLE m\0a---- MODULE Low ----\0aVARIABLE l\0aReach == <>(l = 3)\0a====\0aL == INSTANCE Low WITH l <- m\0aP == L!Reach\0a====\0aVARIABLE x\0aInit == x = 0\0aNext == (x < 3 /\\ x\' = x + 1) \\/ UNCHANGED x\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aM == INSTANCE Mid WITH m <- x\0aProp == M!P\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0a'
+::
+++  test-mc-prop-instance-refine
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: a refinement PROPERTY through an INSTANCE (`A!ASpec`), decomposed\0a\\* through the substitution wrapper into an implied init, an implied action\0a\\* and a fairness formula (YoYo/LockHS/AlternatingBit\'s shape).\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE Abs ----\0aVARIABLE y\0aAInit == y \\in {0, 1}\0aANext == y\' = 1 - y\0aASpec == AInit /\\ [][ANext]_y /\\ WF_y(ANext)\0a====\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aA == INSTANCE Abs WITH y <- x % 2\0aRefines == A!ASpec\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Refines\0a'
+::
+++  test-mc-prop-instance-same-names
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2n: an unnamed INSTANCE substitutes the instanced module\'s variable BY\0a\\* NAME (`x <- x`). Chasing that call-by-name binding re-read it forever: an\0a\\* infinite recursion that exhausted the loom in one event and took the ship\0a\\* down (MCAlternatingBit\'s shape).\0aEXTENDS Naturals\0a---- MODULE Abs ----\0aVARIABLE x\0aAInit == x \\in 0..3\0aANext == x\' = (x + 1) % 4\0aAFair == WF_x(ANext)\0aASpec == AInit /\\ [][ANext]_x /\\ AFair\0a====\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 4\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aINSTANCE Abs\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY ASpec\0a'
 ::
 ++  test-mc-prop-plural
   %+  expect-eq

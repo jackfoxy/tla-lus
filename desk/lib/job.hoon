@@ -1440,6 +1440,13 @@
   ::  resolve through the SAME +resolve-targets the console path uses, so a
   ::  SPECIFICATION decomposes here exactly as it does there (R1.8.3 --
   ::  this branch used to be a flat typed rejection)
+  ::  R4.2k: NO behaviour spec at all (`SpecifyingSystems/SimpleMath`: a
+  ::  module of ASSUMEs) is not an error -- tlc2 checks the assumptions and
+  ::  completes over zero initial states, as the console path has since
+  ::  R3.0a. The kernel refused it (`no INIT in config`), an entry-point
+  ::  divergence
+  ?:  ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs) ?=(~ next.mode.rs))
+    (config-run j tree src rs iv pp u.mo pre)
   ?:  ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs))
     (finish j [%failed 'no INIT in config'] pre)
   ?:  ?&(?=(%init-next -.mode.rs) ?=(~ next.mode.rs))
@@ -1522,7 +1529,9 @@
   =/  order  (turn vars.mo head)
   =/  vars   (silt order)
   =/  modn  (module-name-of:check tree)
-  =/  defs    (defmap-of:ne mo)
+  ::  R4.2m: the config's `<-` overrides, applied
+  =/  defs
+    (apply-overrides:check (defmap-of:ne mo) overrides.rs mod-overrides.rs)
   ::  R2.7.7.4b: `_POSSIBLE`'s predicates with their levels, resolved the same
   ::  way the console resolves them
   =/  poss
@@ -1570,7 +1579,13 @@
   ::  `order` goes in so the SPECIFICATION decomposition can raise the EC 2145
   ::  subscript-coverage warning here too (R2.3.5) -- the kernel's report is
   ::  compared to the console's, so a warning on one path must appear on both
-  =/  rt  (resolve-targets:check tg defs order)
+  =/  nospec
+    ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs) ?=(~ next.mode.rs))
+  =/  rt
+    ?:  nospec
+      ::  R4.2k: the console's no-behaviour marker (`+search-ctx-seed`)
+      `(each [init=sem:semantic next=sem:semantic fair=(list sem:semantic) nname=(unit @t) warn=(list @t)] @t)`[%& [%nullodn ~] [%nullodn ~] ~ ~ ~]
+    (resolve-targets:check tg defs order)
   ?:  ?=(%| -.rt)  (finish j [%failed p.rt] pre)
   =.  swarn.j  warn.p.rt
   =/  isb=sem:semantic  init.p.rt
@@ -1597,7 +1612,9 @@
     `[?~(nname '' u.nname) ?~(sp ~ `[mod.u.nd u.sp])]
   ::  safety, liveness, and simulation all run on the Work Unit 3 SEMANTIC
   ::  graph via node-eval (unit 9.2 retired simulation's CST solver).
-  =/  consts  (consts-of:check constants.rs)
+  =/  consts
+    %-  ~(uni by (override-consts:check (consts-of:check constants.rs) overrides.rs))
+    (mod-const-vals:check defs mod-constants.rs)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
   =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn)
@@ -1611,11 +1628,9 @@
   ::  a `[]P` box-state PROPERTY is folded into the invariants and never
   ::  reaches the liveness checker, so it draws no warning -- same test the
   ::  console path uses (`+search-ctx-seed`'s `genuine-temporal`)
-  =/  genuine-temporal
-    ?.  ?=(^ pp)  |
-    =/  psb  (sem-body:check defs u.pp)
-    ?.  ?=(^ psb)  |
-    ?=(~ (box-state-inner:tp u.psb))
+  ::  R4.2n: the temporal bin being non-empty (`+bin-properties`)
+  =/  gbins  (bin-properties:check properties.rs defs)
+  =/  genuine-temporal  ?=(^ temps.gbins)
   =?  swarn.j  &(?=(^ symmetry.rs) genuine-temporal)
     :_  swarn.j
     %^    cat  3
@@ -1651,7 +1666,10 @@
       %dfid        0
     ==
   =/  rs0=rst:ne  empty-rst:ne
-  =/  isc
+  =/  isc=sout:ne
+    ::  R4.2k/R3.2: nothing to solve -- no behaviour spec, or a SPECIFICATION
+    ::  with no initial predicate: zero initial states
+    ?:  ?=(%nullodn -.isb)  [[%& ~] rs0(es (scramble:rng eseed))]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
     rs0(es (scramble:rng eseed))
   =/  isr  -.isc
@@ -1751,7 +1769,7 @@
   ::  its own implied inits state-major in `+dfid-cursor-init`, so reaching it
   ::  from here would check them twice
   =.  swarn.j
-    (weld swarn.j (turn iinits.bins |=([n=@t *] (state-level-warn:check n))))
+    (weld swarn.j (turn (swarn-names:check properties.rs defs) state-level-warn:check))
   =/  ib=(unit (each [kind=?(%inv %prop) name=@t st=state:check] @t))
     ?~  iinits.bins  ~
     %-  first-bad-init:check

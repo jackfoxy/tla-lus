@@ -1359,7 +1359,7 @@ Differences that remain in this area, all failures rather than wrong values:
 | case | TLC | here |
 |---|---|---|
 | `Nat`/`Int` in a value position (`Expr == Nat`, `Cardinality(Nat)`) | a `UserValue` rendering `Nat`; `Cardinality(Nat)` is EC 2181 | typed rejection `unsupported StandardModule operator: Naturals!Nat/0` — there is no UserValue kind |
-| `S \cap Nat`, `S \cup Int`, `Seq(Nat)` | evaluated lazily | rejected: set algebra and a descriptor's range take value operands, and the infinite sets are descriptors |
+| `S \cap Nat`, `S \cup Int`, `Seq(Nat)` as a VALUE (enumerated, `Cardinality`, a function's range) | evaluated lazily | rejected: set algebra and a descriptor's range take value operands, and the infinite sets are descriptors. **Membership is lazy since R4.2m**: `\in`, `\notin` and `\subseteq` decide `N \in Nat \ {0}`, `f \in [P -> [P -> Nat]]`, `r \in [a : Int]` and `s \in Seq(Nat)` on the set's structure (`+memb-node`), as tlc2's lazy values do |
 | quantifying over `Nat` | a long non-enumerable-quantifier-bound message naming the bound | `Attempted to enumerate the non-enumerable set Nat.` |
 | a non-integer argument to `+ - * ^ \div %` | fails inside the Java `MethodValue` cast, naming the method signature | the same EC (2154) with a normalized message: `The second argument of + should be an integer, but instead it is:` |
 

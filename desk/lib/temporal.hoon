@@ -21,7 +21,12 @@
 ::  (R1.6.1). `modn` renders the module in a Location leaf (EC 2213's message
 ::  is the expression's `toString`, i.e. its location); `dep` counts nested
 ::  user-operator expansions.
-+$  actx  [modn=@t dep=@ud]
+::  R4.2n: `lv`/`ls` are the bindings the translation itself introduced (a
+::  bounded quantifier's variables, an INSTANCE's substitutions, an expanded
+::  operator's formals) -- tlc2's `Context con1` -- which every leaf built
+::  under them carries, so the leaf evaluates later and two expansions of one
+::  node stay distinct leaves
++$  actx  [modn=@t dep=@ud lv=(map @t value:vl) ls=(map @t sem:sm)]
 ::
 ++  expand-cap
   ::  the nested user-operator expansion bound. tlc2 has none — it expands
@@ -89,6 +94,9 @@
       box=?
       sub=(unit sem:sm)
       a=sem:sm
+      ::  R4.2n: the translation-time bindings, as `le-state`'s
+      ctx=(map @t value:vl)
+      nsub=(map @t sem:sm)
   ==
 +$  le-state
   $+  le-state
@@ -117,6 +125,9 @@
       box=?
       sub=(unit sem:sm)
       p=sem:sm
+      ::  R4.2n: the translation-time bindings, as `le-state`'s
+      ctx=(map @t value:vl)
+      nsub=(map @t sem:sm)
   ==
 +$  le-bool
   $+  le-bool
@@ -236,13 +247,24 @@
   ?.  =(-.a -.b)  |
   ?-  -.a
       %bool     ?>(?=(%bool -.b) =(b.a b.b))
-      %state    ?>(?=(%state -.b) =((sspan-of p.a) (sspan-of p.b)))
+  ::  R4.2n: a leaf is its span AND its translation-time bindings. tlc2 tags
+  ::  every leaf occurrence (`tagExpr`), so the per-element copies of one node
+  ::  under a bounded quantifier are distinct; comparing spans alone merged
+  ::  them
+      %state
+    ?>  ?=(%state -.b)
+    ?&  =((sspan-of p.a) (sspan-of p.b))
+        =(ctx.a ctx.b)
+        =(nsub.a nsub.b)
+    ==
   ::
       %enabled
     ?>  ?=(%enabled -.b)
     ?&  =(box.a box.b)
         =((sub-span sub.a) (sub-span sub.b))
         =((sspan-of p.a) (sspan-of p.b))
+        =(ctx.a ctx.b)
+        =(nsub.a nsub.b)
     ==
   ::
       %act
@@ -250,6 +272,8 @@
     ?&  =(box.a box.b)
         =((sub-span sub.a) (sub-span sub.b))
         =((sspan-of a.a) (sspan-of a.b))
+        =(ctx.a ctx.b)
+        =(nsub.a nsub.b)
     ==
   ::
       %neg   ?>(?=(%neg -.b) (le-equal b.a b.b))
@@ -326,8 +350,8 @@
       ?~  bat  (ast u.body.s c env)
       ::  keep the LET's bindings but render at the body's span (matching TLC,
       ::  which keeps the body node with its bindings resolved)
-      (leaf s(at bat) (sem-lvl s) env)
-    (leaf s (sem-lvl s) env)
+      (leaf s(at bat) (sem-lvl s) c env)
+    (leaf s (sem-lvl s) c env)
   =/  op  name.op.s
   =/  as  args.s
   ::  A JUNCTION IS KEPT ONLY IF IT IS ABOVE ACTION LEVEL. tlc2 builds the
@@ -344,13 +368,13 @@
     ?:  ?=(%| -.r)  r
     =/  j=live-expr  [%conj p.r]
     =/  l  (le-level j)
-    ?:((gth l 2) [%& j] (leaf s l env))
+    ?:((gth l 2) [%& j] (leaf s l c env))
   ?:  |(=(op '$DisjList') =(op '\\lor'))
     =/  r  (ast-list as c env)
     ?:  ?=(%| -.r)  r
     =/  j=live-expr  [%disj p.r]
     =/  l  (le-level j)
-    ?:((gth l 2) [%& j] (leaf s l env))
+    ?:((gth l 2) [%& j] (leaf s l c env))
   ?:  =(op '[]')
     =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%all p.r]])
@@ -358,6 +382,8 @@
     =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%even p.r]])
   ?:  =(op '$Nop')  (ast (hd as) c env)
+  ::  R4.2m: a label is its body (`astToLive` LabelKind)
+  ?:  =(op '$Label')  (ast (hd as) c env)
   ?:  |(=(op '~>') =(op '-+->'))
     ::  P ~> Q  ==  [](-P \/ <>Q)
     =/  rp  (ast (hd as) c env)
@@ -369,18 +395,28 @@
     ::  WF_e(A) == []<>(-ENABLED<A>_e \/ <A>_e); args = [e A]
     =/  e  (hd as)
     =/  a  (hd (tl as))
-    [%& [%all [%even [%disj ~[[%neg [%enabled | `e a]] [%act | `e a]]]]]]
+    :+  %&  %all
+    [%even [%disj ~[[%neg [%enabled | `e a lv.c ls.c]] [%act | `e a lv.c ls.c]]]]
   ?:  =(op '$SF')
     ::  SF_e(A) == <>[]-ENABLED<A>_e \/ []<><A>_e
     =/  e  (hd as)
     =/  a  (hd (tl as))
-    [%& [%disj ~[[%even [%all [%neg [%enabled | `e a]]]] [%all [%even [%act | `e a]]]]]]
+    :+  %&  %disj
+    :~  [%even [%all [%neg [%enabled | `e a lv.c ls.c]]]]
+        [%all [%even [%act | `e a lv.c ls.c]]]
+    ==
   ?:  =(op '$AngleAct')
     ::  <A>_e ; args = [A e]
-    [%& [%act | `(hd (tl as)) (hd as)]]
+    [%& [%act | `(hd (tl as)) (hd as) lv.c ls.c]]
   ?:  =(op '$SquareAct')
-    [%& [%act & `(hd (tl as)) (hd as)]]
-  ?:  =(op '\'')      [%& [%act | ~ s]]
+    [%& [%act & `(hd (tl as)) (hd as) lv.c ls.c]]
+  ?:  =(op '\'')      [%& [%act | ~ s lv.c ls.c]]
+  ::  R4.2n: bounded quantifiers (`Liveness.astToLiveAppl` OPCODE_bf/be)
+  ?:  =(op '$BoundedForall')  (quant-of & s c env)
+  ?:  =(op '$BoundedExists')  (quant-of | s c env)
+  ::  R4.2n: an INSTANCE member's body (`astToLive` SubstInKind): bind the
+  ::  substitutions and translate the body under them
+  ?^  (anysubstin-mod:sm op)  (substin-of s c env)
   ?:  =(op '\\lnot')  (neg-of (ast (hd as) c env) s c env)
   ?:  =(op '\\neg')   (neg-of (ast (hd as) c env) s c env)
   ?:  =(op '=>')      (implies-of as s c env)
@@ -419,7 +455,94 @@
   =/  res=live-expr
     [%disj ~[[%conj ~[p.rg p.r1]] [%conj ~[[%neg p.rg] p.r2]]]]
   ?:  (gth (le-level res) 2)  [%& res]
-  (leaf s (le-level res) env)
+  (leaf s (le-level res) c env)
+::
+++  quant-of
+  ::  R4.2n: `Liveness.astToLiveAppl` OPCODE_bf / OPCODE_be. The domain is
+  ::  enumerated with no state (`tool.contexts(..., TLCState.Empty, ...)`), the
+  ::  body translated once per binding under it, and the kids conjoined (\A)
+  ::  or disjoined (\E). An empty domain is TRUE / FALSE. At or below action
+  ::  level the result is discarded for a leaf of the whole quantifier, as for
+  ::  every junction. Any failure -- the domain does not enumerate without a
+  ::  state, or a kid does not translate -- is tlc2's `catch (Exception e)`:
+  ::  EC 2213 above action level (with the cause, for \A), else a leaf
+  |=  [all=? s=sem:sm c=actx env=eenv:ne]
+  ^-  (each live-expr aerr)
+  ?>  ?=(%apply -.s)
+  =/  l  (sem-lvl s)
+  =/  fail
+    |=  why=(unit @t)
+    ^-  (each live-expr aerr)
+    ?.  (gth l 2)  (leaf s l c env)
+    =/  where  (crip (loc-leaf modn.c s))
+    :-  %|
+    :-  2.213
+    ?~  why  (rap 3 ~['TLC cannot handle the temporal formula ' where])
+    (rap 3 ~['TLC cannot handle the temporal formula ' where ':\0a' u.why])
+  =/  bs  (flatten-bound:ne bound.s)
+  ?~  bs  (fail ~)
+  =/  ds  (bound-domains:ne bs env(s0 ~, s1 ~, primed |))
+  ?:  ?=(%| -.ds)  (fail ?:(all `msg.p.ds ~))
+  =/  body  (hd args.s)
+  =/  rows  (bind-rows:ne p.ds)
+  =|  kids=(list live-expr)
+  |-  ^-  (each live-expr aerr)
+  ?~  rows
+    =/  ks  (flop-le kids)
+    ?~  ks  [%& [%bool all]]
+    =/  res=live-expr  ?:(all [%conj ks] [%disj ks])
+    ?:  (gth (le-level res) 2)  [%& res]
+    (leaf s (le-level res) c env)
+  =/  e2  (bind-vals:ne env bs i.rows)
+  =/  r  (ast body (with-locals c e2 (bound-names bs)) e2)
+  ?:  ?&(?=(%| -.r) =(cap-ec ec.p.r))  r
+  ?:  ?=(%| -.r)  (fail ?:(all `msg.p.r ~))
+  $(rows t.rows, kids [p.r kids])
+::
+++  bound-names
+  |=  bs=(list bgroup:ne)
+  ^-  (list @t)
+  ?~  bs  ~
+  (weld nms.i.bs $(bs t.bs))
+::
+++  with-locals
+  ::  R4.2n: record in the translation context the bindings `env` now holds
+  ::  for `ns` -- a value in `lv`, a call-by-name node in `ls`, never both
+  |=  [c=actx env=eenv:ne ns=(list @t)]
+  ^-  actx
+  ?~  ns  c
+  =/  v  (~(get by vals.env) i.ns)
+  =/  n  (~(get by psub.env) i.ns)
+  =.  c
+    ?^  v  c(lv (~(put by lv.c) i.ns u.v), ls (~(del by ls.c) i.ns))
+    ?^  n  c(ls (~(put by ls.c) i.ns u.n), lv (~(del by lv.c) i.ns))
+    c
+  $(ns t.ns)
+::
+++  substin-of
+  ::  R4.2n: `astToLive` SubstInKind -- each substitution bound with
+  ::  `tool.getVal(expr, con, false)`, LAZILY: a value when it evaluates in
+  ::  the caller's context, else the expression itself (call-by-name, the
+  ::  port's `psub`), exactly `+bind-formals`' rule; then the body
+  |=  [s=sem:sm c=actx env=eenv:ne]
+  ^-  (each live-expr aerr)
+  =/  sp  (substin-parts:sm s)
+  ?~  sp  (leaf s (sem-lvl s) c env)
+  =/  ns=(list @t)  (turn names.u.sp |=(b=sbind:sm name.b))
+  =/  e2
+    =/  e  env
+    =/  ns  ns
+    =/  xs  exprs.u.sp
+    |-  ^-  eenv:ne
+    ?~  ns  e
+    ?~  xs  e
+    =/  r  (eval:ne i.xs env)
+    =/  e3=eenv:ne
+      ?:  ?=(%& -.r)
+        e(vals (~(put by vals.e) i.ns p.r), psub (~(del by psub.e) i.ns))
+      e(psub (~(put by psub.e) i.ns i.xs), vals (~(del by vals.e) i.ns))
+    $(ns t.ns, xs t.xs, e e3)
+  (ast inner.u.sp (with-locals c e2 ns) e2)
 ::
 ++  user-op
   ::  Liveness.astToLiveAppl with opcode == 0: a USER-DEFINED operator. tlc2
@@ -460,7 +583,10 @@
     ::  the level of its definition -- and needs no `recursive` flag.
     ?.  (gth (sem-lvl s) 2)  fall
     ?:  (gte dep.c expand-cap)  capped
-    =/  r  (ast u.body.u.d c(dep +(dep.c)) (bind-formals params.u.d as env))
+    =/  e2  (bind-formals params.u.d as env)
+    =/  c2
+      (with-locals c(dep +(dep.c)) e2 (turn params.u.d |=(p=spar:sm name.p)))
+    =/  r  (ast u.body.u.d c2 e2)
     ::  a FAILURE inside the expansion falls through rather than propagating:
     ::  tlc2 swallows it for a non-recursive operator and re-throws for a
     ::  recursive one, and the re-throw exists ONLY to stop an enclosing
@@ -483,7 +609,7 @@
     ::  expands to a level-1 state predicate although `Reach` is temporal.
     ::  R2.7.6.3: the leaf CARRIES the expansion's bindings — the call names
     ::  formals that live nowhere else
-    (leaf-ctx s (le-level p.r) env)
+    (leaf-ctx s (le-level p.r) c env)
   ::  no expansion was made (unresolved, level-gated, capped, or failed):
   ::  Liveness.java:295-300. Above action level there is nothing to build, and
   ::  tlc2 raises EC 2213 rather than making an LNAction of a temporal formula
@@ -511,7 +637,7 @@
   ++  fall
     ^-  (each live-expr aerr)
     =/  l  (sem-lvl s)
-    ?.  (gth l 2)  (leaf s l env)
+    ?.  (gth l 2)  (leaf s l c env)
     :-  %|
     :-  2.213
     %+  rap  3
@@ -566,11 +692,11 @@
   ::  Recomputing from the node broke `Github1389ViolatedB`, whose `Reach(0)`
   ::  expands to a level-1 state predicate although the recursive definition it
   ::  came from is temporal.
-  |=  [s=sem:sm l=@ud env=eenv:ne]
+  |=  [s=sem:sm l=@ud c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  =(0 l)     (eval-const s env)
-  ?:  (lte l 1)  [%& [%state s ~ ~]]
-  [%& [%act | ~ s]]
+  ?:  (lte l 1)  [%& [%state s lv.c ls.c]]
+  [%& [%act | ~ s lv.c ls.c]]
 ::
 ++  leaf-ctx
   ::  `+leaf` for an EXPANDED user-operator call (R2.7.6.3): identical, except
@@ -590,11 +716,11 @@
   ::  Both maps are needed: `+bind-formals` puts a formal in `vals` when its
   ::  argument evaluated in this scope and in `psub` when it reads a state
   ::  variable.
-  |=  [s=sem:sm l=@ud env=eenv:ne]
+  |=  [s=sem:sm l=@ud c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  =(0 l)     (eval-const s env)
   ?:  (lte l 1)  [%& [%state s vals.env psub.env]]
-  [%& [%act | ~ s]]
+  [%& [%act | ~ s lv.c ls.c]]
 ::
 ++  eval-const
   ::  a constant-level leaf folded to LNBool via node-eval; an evaluation error
@@ -612,7 +738,7 @@
   ^-  (each live-expr aerr)
   ?:  ?=(%| -.lr)  lr
   ?:  (gth (le-level p.lr) 2)  [%& [%neg p.lr]]
-  (leaf s (le-level p.lr) env)
+  (leaf s (le-level p.lr) c env)
 ::
 ++  implies-of
   |=  [as=(list sem:sm) s=sem:sm c=actx env=eenv:ne]
@@ -623,7 +749,7 @@
   ?:  ?=(%| -.rr)  rr
   =/  l  (max (le-level p.lr) (le-level p.rr))
   ?:  (gth l 2)  [%& [%disj ~[[%neg p.lr] p.rr]]]
-  (leaf s l env)
+  (leaf s l c env)
 ::
 ::  +|  parseLiveness: negate the properties, conjoin the fairness
 ::
@@ -878,7 +1004,20 @@
   |=  l=(list (list live-expr))
   ^-  (list live-expr)
   ?~  l  ~
-  [[%conj i.l] $(l t.l)]
+  [[%conj (splice-conj i.l)] $(l t.l)]
+::
+++  splice-conj
+  ::  R4.2n: `LNConj.addConj` SPLICES a conjunction kid into its parent, so a
+  ::  DNF product never holds a nested `%conj`. Distributing a factor whose
+  ::  disjuncts are themselves conjunctions (the expansion of
+  ::  `\A c \in S : SF_v(A(c))`) appended them whole, and `+classify`, which
+  ::  splits only the top level, met `<>[]-EN /\ []<>A` as ONE conjunct
+  ::  and raised EC 2214
+  |=  l=(list live-expr)
+  ^-  (list live-expr)
+  ?~  l  ~
+  ?:  ?=(%conj -.i.l)  (weld-le (splice-conj cs.i.l) (splice-conj t.l))
+  [i.l (splice-conj t.l)]
 ::
 ::  +|  classifyExpr + the OrderOfSolution / PossibleErrorModel decomposition
 ::
@@ -1086,7 +1225,7 @@
   ::  typed rejection (a non-boolean constant leaf). `env` folds constant leaves
   |=  [props=(list sem:sm) modn=@t fair=(list sem:sm) env=eenv:ne]
   ^-  (each (list oos) aerr)
-  =/  c=actx  [modn 0]
+  =/  c=actx  [modn 0 ~ ~]
   =/  lr  (parse-liveness (drop-box-state props) fair c env)
   ?:  ?=(%| -.lr)  lr
   ?~  p.lr  [%& ~]

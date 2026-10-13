@@ -125,10 +125,11 @@
 ++  test-seq-member-empty  (ex '<<>> \\in Seq(1..3)' "TRUE")
 ++  test-seq-non-member  (ex '<<4>> \\in Seq(1..3)' "FALSE")
 ++  test-seq-over-nat
-  ::  a descriptor over a descriptor: Seq's range is a VALUE here, and Nat
-  ::  is not one, so this is a typed rejection (compatibility.md)
+  ::  a descriptor over a descriptor. R4.2m: membership is decided on the
+  ::  set's structure (`+memb-node`), so `Seq(Nat)` needs no value for Nat;
+  ::  until then this was a typed rejection
   %+  ex  '<<1, 2>> \\in Seq(Nat)'
-  "ERR: unsupported StandardModule operator: Naturals!Nat/0"
+  "TRUE"
 
 ::
 ++  test-seq-member-not-sequence

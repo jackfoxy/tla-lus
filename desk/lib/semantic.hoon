@@ -1078,17 +1078,22 @@
   =/  mo  (level-module (gen-module tree.u.rt fc ctxs mods.g) fc ctxs mods.g dv)
   =.  defs.mo  (stamp-origin root defs.mo)
   =.  mo  mo(imports (ext-defs root sem-order.g ctxs mods.g))
+  ::  R4.2n: the root's nested-instance members resolve through `imports`
+  =.  imports.mo  (weld imports.mo (nested-defs tree.u.rt fc ctxs mods.g))
   `mo(modops (mod-opdefs root sem-order.g ctxs mods.g))
 ::
 ++  stamp-origin
   ::  record the defining module on each definition (unit 6C.1). Explicit
   ::  loop: a wet +turn over the recursive sem-def mold fuse-loops here
+  ::  R4.2v: only where no origin is recorded -- an INSTANCE-imported member
+  ::  keeps the module it was instanced from (`+g-instance`), so a
+  ::  StandardModule's overrides still apply to it
   |=  [mod=@t ds=(list sem-def)]
   ^-  (list sem-def)
   =|  out=(list sem-def)
   |-  ^-  (list sem-def)
   ?~  ds  (flop out)
-  $(ds t.ds, out [i.ds(origin mod) out])
+  $(ds t.ds, out [?.(=('' origin.i.ds) i.ds i.ds(origin mod)) out])
 ::
 ++  ext-reach
   ::  the modules the root reaches through EXTENDS, transitively, in the
@@ -3000,6 +3005,20 @@
     ds.out     (weld ds.out ds.gi)
   ==
 ::
+++  nested-defs
+  ::  R4.2n: the nested-instance members of every INSTANCE unit of a module
+  ::  (see `+g-instance`'s `nds`)
+  |=  [tree=node c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (list sem-def)
+  =/  us  (body-of-module tree)
+  =|  out=(list sem-def)
+  |-  ^-  (list sem-def)
+  ?~  us  out
+  =/  iu  (unit-instance i.us)
+  ?~  iu  $(us t.us)
+  =/  gi  (g-instance i.us u.iu c ctxs mods)
+  $(us t.us, out (weld out nds.gi))
+::
 ++  g-instance
   ::  an INSTANCE unit: one imported definition per (non-local) operator
   ::  defined in the instanced module, its body wrapped in $substin over
@@ -3017,6 +3036,11 @@
           thms=(list sem-thm)
           inst=sem-inst
           ds=(list sdiag)
+          ::  R4.2n: the nested instances' members (`I!J!Op`), apart from
+          ::  `defs`: they resolve (`+generate` puts them in `imports`) but are
+          ::  not definitions of the importing module -- SANY's SemDump lists
+          ::  none of them, and the level check does not visit them
+          nds=(list sem-def)
       ==
   ::  a parametrized instance `I(x) == INSTANCE M` binds `x` in scope for
   ::  the WITH expressions and prepends it to every imported definition
@@ -3029,7 +3053,7 @@
   =/  ip  (inst-parts nl.iu)
   =/  irec=sem-inst  [name.iu mod.ip local.iu (span-of:ast u) ~]
   =/  bt  (~(get by mods) mod.ip)
-  ?~  bt  [~ ~ irec ~]
+  ?~  bt  [~ ~ irec ~ ~]
   =/  bctx  (full-ctx tree.u.bt ctxs)
   ::  one substitution per parameter of the instanced module, in its
   ::  declaration order: the WITH expression when given, else the
@@ -3181,6 +3205,21 @@
     |=  [[param=@t expr=node] acc=@ud]
     (max acc (expr-level expr c))
   =/  bunits  (body-of-module tree.u.bt)
+  ::  R4.2n: the instanced module's OWN instance units, imported recursively
+  ::  in its context. SANY exposes a nested instance's members through the
+  ::  outer one (`stagesInstance!cleanInstance!primerDepleted`); importing
+  ::  only operator definitions left them unresolvable, and a member of the
+  ::  instanced module that names one (`primerDepleted ==
+  ::  cleanInstance!primerDepleted`) referenced nothing
+  =/  ninst=(list sem-def)
+    =|  out=(list sem-def)
+    =/  bus  bunits
+    |-  ^-  (list sem-def)
+    ?~  bus  (flop out)
+    =/  niu  (unit-instance i.bus)
+    ?~  niu  $(bus t.bus)
+    =/  ngi  (g-instance i.bus u.niu bctx ctxs mods)
+    $(bus t.bus, out (weld (flop (weld defs.ngi nds.ngi)) out))
   ::  R2.7.8: the instanced module's own NON-LOCAL member names -- the set a
   ::  sibling reference inside one of their bodies can name. Collected in a
   ::  first pass, since a member may reference a sibling defined LATER
@@ -3205,6 +3244,12 @@
       ?:  local.u.r.gd  (local-inst-name name.iu name.u.r.gd)
       (inst-op-name name.iu name.u.r.gd)
     $(bus t.bus, acc (~(put by acc) name.u.r.gd qn))
+  ::  R4.2n: and the nested instances' members, under their names here
+  =.  sibs
+    %+  roll  ninst
+    |=  [d=sem-def acc=_sibs]
+    %+  ~(put by acc)  name.d
+    ?:(local.d (local-inst-name name.iu name.d) (inst-op-name name.iu name.d))
   =/  idefs
     =|  out=(list sem-def)
     =|  ds=(list sdiag)
@@ -3243,9 +3288,39 @@
           (span-of:ast u)
           (weld isps params.base)
           `subw
-          ''
+          ::  R4.2v: the instanced module, so its overrides apply
+          mod.ip
       ==
     $(bus t.bus, out [wrapped out], ds (weld ds ds.gd))
+  ::  R4.2n: the nested instances' members, wrapped in THIS instance's
+  ::  substitution around their own (`$SubstIn:stages` around
+  ::  `$SubstIn:clean`), so the inner WITH expressions -- written in the
+  ::  instanced module's scope -- read this instantiation's bindings
+  =/  ndefs=(list sem-def)
+    %+  turn  ninst
+    |=  base=sem-def
+    ^-  sem-def
+    =/  ilvl  (max lvl.base sub-lvl)
+    =/  subw=sem
+      :*  %apply  [(cat 3 '$SubstIn:' mod.ip) %builtin]  ilvl  (span-of:ast u)
+          (turn nms.gsubs |=(nm=@t `sbind`[nm | ~]))
+          ~
+          %+  weld  exs.gsubs
+          ^-  (list sem)
+          ?~  body.base  ~
+          [(qualify-siblings u.body.base name.iu sibs) ~]
+      ==
+    :*  %sdef
+        ?:  local.base  (local-inst-name name.iu name.base)
+        (inst-op-name name.iu name.base)
+        (add (lent iparams) arity.base)
+        ?|(local.iu local.base)
+        ilvl
+        (span-of:ast u)
+        (weld isps params.base)
+        `subw
+        origin.base
+    ==
   ::  named theorems/assumptions import as theorem definitions with the
   ::  body wrapped in $APSubstIn (APSubstInNode)
   =/  ithms
@@ -3285,6 +3360,7 @@
       -.ithms
       irec(subs isubs.gsubs)
       :(weld ds.gsubs +.idefs +.ithms)
+      ndefs
   ==
 ::
 ++  own-decls

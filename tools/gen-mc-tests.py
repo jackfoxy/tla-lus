@@ -151,6 +151,8 @@ VARIES = {
     #  their arms are emitted rather than withheld.
     "live-witness-rec": "witness choice; pin drew 8/5/1/4/3/5 -- all sound",
     "gh1389-violc": "witness choice; pin drew 6/64/11/3/21/11 -- all sound",
+    #  R4.2n: two runs drew <<0,1>>,<<1,1>>,<<2,1>> and <<1,0>>,<<1,1>>,<<2,1>>
+    "live-forall-wf-viol": "witness choice; pin drew two different lassos in two runs",
 }
 TRACE_LINE = re.compile(r"^(State \d+:|Back to state \d+:|[A-Za-z_][A-Za-z0-9_]* = |/\\ )")
 

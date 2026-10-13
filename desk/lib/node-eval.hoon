@@ -229,18 +229,64 @@
     ::  a param bound call-by-name (a substituted argument node) is evaluated
     ::  in place; otherwise it is a value parameter resolved from `vals`
     =/  sb  (~(get by psub.e) nm)
-    ?~(sb [(lookup-val nm e) rs] (eval-rs u.sb e rs))
+    ?~  sb  [(lookup-val nm e) rs]
+    ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
+    (eval-rs u.sb e rs)
   ::
     ::  a substituted name resolves to the node it was bound to, in the
     ::  OUTER scope -- `v <- x` makes the inner module's `v` read the outer
     ::  state's `x`. Same call-by-name shape `%formal-param` uses (R2.3.5)
       %variable
     =/  sb  (~(get by psub.e) nm)
-    ?~(sb [(lookup-var nm e) rs] (eval-rs u.sb e rs))
+    ?~  sb  [(lookup-var nm e) rs]
+    ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
+    (eval-rs u.sb e rs)
   ::
     %thm-assump       [[%| 0 'a theorem/assumption is not an evaluable value.'] rs]
     %module-instance  [[%| 0 'a module instance is not an evaluable value.'] rs]
   ==
+::
+++  by-name
+  ::  R4.2m: the expression a bare CONSTANT or VARIABLE reference is bound to
+  ::  call-by-name (`psub`), when it has no value of its own
+  |=  [n=sem:sm e=eenv]
+  ^-  (unit sem:sm)
+  ?.  ?=(%apply -.n)  ~
+  ?.  ?=(~ args.n)  ~
+  ?.  ?=(?(%constant %new-constant %variable %formal-param) kind.op.n)  ~
+  ?:  (~(has by vals.e) name.op.n)  ~
+  =/  sb  (~(get by psub.e) name.op.n)
+  ?~  sb  ~
+  ?:  (self-ref u.sb name.op.n)  ~
+  sb
+::
+++  bnm
+  ::  R4.2v: an operator's name WITHOUT its instance qualification
+  ::  (`Buffer!Cardinality`, `$Local:I!Op` -> the last `!`-segment). The
+  ::  StandardModule override registry is keyed by the operator's own name in
+  ::  its own module; an instance-imported member carries a qualified one
+  |=  nm=@t
+  ^-  @t
+  =/  t  (trip nm)
+  =/  r  (flop t)
+  =/  i  (find "!" r)
+  ?~  i  nm
+  (crip (flop (scag u.i r)))
+::
+++  self-ref
+  ::  R4.2n: is a call-by-name binding of `nm` a bare reference to `nm`
+  ::  itself? An unnamed `INSTANCE M` substitutes M's variables by NAME
+  ::  (`sBit <- sBit`), and an operator may be called with a variable of its
+  ::  formal's name; chasing such a binding re-reads the same binding forever,
+  ::  an infinite recursion that exhausts the loom inside one event (it took
+  ::  the ship down on MCAlternatingBit). `+deref-sem` has had this guard
+  ::  since R2.3.5; the evaluator's lookups did not
+  |=  [s=sem:sm nm=@t]
+  ^-  ?
+  ?.  ?=(%apply -.s)  |
+  ?.  ?=(~ args.s)  |
+  ?.  ?=(?(%variable %formal-param) kind.op.s)  |
+  =(nm name.op.s)
 ::
 ++  lookup-val
   |=  [nm=@t e=eenv]
@@ -256,6 +302,14 @@
   ::  as a function value (tlc2's OpRcdValue), so application is `F[args]`
   |=  [nm=@t n=sem-apply:sm e=eenv rs=rst]
   ^-  eout
+  ::  R4.2m: a CONSTANT the config overrides (`C <- D`) has no value; it
+  ::  denotes `D`'s definition, which `+apply-overrides:check` bound to its
+  ::  name in `ops`
+  ?:  ?&(!(~(has by vals.e) nm) (~(has by ops.e) nm))
+    (eval-user n e rs)
+  ::  R4.2m: a CONSTANT an INSTANCE substitution bound by name (`+bind-substs`)
+  =/  sb  ?.(?=(~ args.n) ~ ?:((~(has by vals.e) nm) ~ (~(get by psub.e) nm)))
+  ?:  &(?=(^ sb) !(self-ref u.sb nm))  (eval-rs u.sb e rs)
   ?~  args.n  [(lookup-val nm e) rs]
   =/  fv  (~(get by vals.e) nm)
   ?~  fv  [[%| 0 (rap 3 ~['undefined identifier: ' nm])] rs]
@@ -336,6 +390,9 @@
   |=  [n=sem:sm e=eenv]
   ^-  (each sexp:v eval-err:v)
   ?.  ?=(%apply -.n)  (as-sexp (eval n e))
+  ::  R4.2m: a name bound call-by-name denotes its expression's set
+  =/  sb  (by-name n e)
+  ?^  sb  $(n u.sb)
   =/  nm  name.op.n
   ?:  =(nm 'SUBSET')      (un-sexp %subset args.n e)
   ?:  =(nm 'UNION')       (un-sexp %union args.n e)
@@ -349,7 +406,7 @@
   ::  has a lazy descriptor here, though it is not a value (unit 6C.2)
   =/  d  (~(get by ops.e) nm)
   ?~  d  (as-sexp (eval n e))
-  =/  key=op-key:so  [origin.u.d nm (lent args.n)]
+  =/  key=op-key:so  [origin.u.d (bnm nm) (lent args.n)]
   ?.  (is-descriptor:so key)  (as-sexp (eval n e))
   ::  Seq(S) carries its range, so the arguments are evaluated first
   =/  as  (eval-args args.n e)
@@ -439,6 +496,8 @@
   ^-  eout
   =/  nm  name.op.n
   =/  as  args.n
+  ::  R4.2m: a labeled expression `P :: e` is its body (tlc2 LabelKind)
+  ?:  &(=(nm '$Label') ?=(^ as))  (eval-rs i.as e rs)
   ::  arity-0 constants
   ?:  =(nm 'TRUE')     [[%& [%bool &]] rs]
   ?:  =(nm 'FALSE')    [[%& [%bool |]] rs]
@@ -587,11 +646,113 @@
   ^-  eout
   =^  x  rs  (eval-rs (snag 0 as) e rs)
   ?:  ?=(%| -.x)  [x rs]
-  =/  s  (eval-domain (snag 1 as) e)
-  ?:  ?=(%| -.s)  [s rs]
-  =/  m  (set-member:v p.x p.s)
+  =/  m  (memb-node p.x (snag 1 as) e)
   ?:  ?=(%| -.m)  [m rs]
   [[%& [%bool ?:(neg !p.m p.m)]] rs]
+::
+++  memb-node
+  ::  R4.2m: membership decided on the STRUCTURE of the set expression, as
+  ::  tlc2's lazy values decide it (SetDiffValue, SetCupValue, SetCapValue,
+  ::  SetOfFcnsValue, SetOfRcdsValue, SubsetValue each delegate `member`
+  ::  to their operands). The flat `sexp` forces every operand to a value,
+  ::  so an infinite operand -- `N \in Nat \ {0}` (12 Examples ASSUMEs),
+  ::  `req \in [Proc -> [Proc -> Nat]]`, `[age : Int]` -- failed
+  ::  "unsupported StandardModule operator". Anything else is the existing
+  ::  lazy descriptor path, so finite membership is unchanged
+  |=  [x=value:v n=sem:sm e=eenv]
+  ^-  (each ? eval-err:v)
+  =/  sb  (by-name n e)
+  ?^  sb  $(n u.sb)
+  =/  dflt
+    |.  ^-  (each ? eval-err:v)
+    =/  sd  (eval-domain n e)
+    ?:  ?=(%| -.sd)  sd
+    (set-member:v x p.sd)
+  ?.  ?=(%apply -.n)  $:dflt
+  =/  nm  name.op.n
+  =/  as  args.n
+  ?:  ?&(=(nm '\\') ?=([* * ~] as))
+    =/  a  $(n i.as)
+    ?:  |(?=(%| -.a) !p.a)  a
+    =/  b  $(n i.t.as)
+    ?:  ?=(%| -.b)  b
+    [%& !p.b]
+  ?:  ?&(=(nm '\\union') ?=([* * ~] as))
+    =/  a  $(n i.as)
+    ?:  |(?=(%| -.a) p.a)  a
+    $(n i.t.as)
+  ?:  ?&(=(nm '\\intersect') ?=([* * ~] as))
+    =/  a  $(n i.as)
+    ?:  |(?=(%| -.a) !p.a)  a
+    $(n i.t.as)
+  ?:  ?&(=(nm 'SUBSET') ?=([* ~] as))
+    ?.  (set-like:v x)  [%& |]
+    =/  els  (set-elems:v (normalize:v x))
+    |-  ^-  (each ? eval-err:v)
+    ?~  els  [%& &]
+    =/  r  ^$(x i.els, n i.as)
+    ?:  |(?=(%| -.r) !p.r)  r
+    $(els t.els)
+  ?:  ?&(=(nm '$SetOfFcns') ?=([* * ~] as))
+    ?.  (fcn-like:v x)  [%& |]
+    =/  ps  (fcn-pairs:v x)
+    =/  d  (eval i.as e)
+    ?:  ?=(%| -.d)  d
+    =/  dom-x  (normalize:v [%set %set-enum (turn ps |=(pr=vpair:v d.pr))])
+    ?.  (equal:v dom-x p.d)  [%& |]
+    |-  ^-  (each ? eval-err:v)
+    ?~  ps  [%& &]
+    =/  r  ^$(x r.i.ps, n i.t.as)
+    ?:  |(?=(%| -.r) !p.r)  r
+    $(ps t.ps)
+  ?:  =(nm '$SetOfRcds')
+    ?.  ?=(%rec -.x)  [%& |]
+    ?.  =((lent p.x) (lent as))  [%& |]
+    |-  ^-  (each ? eval-err:v)
+    ?~  as  [%& &]
+    =/  pr  i.as
+    ?.  ?=(%apply -.pr)  [%| 0 'malformed set-of-records field.']
+    =/  k  (lit-str (snag 0 args.pr))
+    =/  hit  (skim p.x |=(fd=vfield:v =(k k.fd)))
+    ?~  hit  [%& |]
+    =/  r  ^$(x v.i.hit, n (snag 1 args.pr))
+    ?:  |(?=(%| -.r) !p.r)  r
+    $(as t.as)
+  ::  `Seq(R)`: a sequence whose every element is in R (tlc2
+  ::  Sequences.member), when `Seq` is still the StandardModule's
+  =/  d  (~(get by ops.e) nm)
+  ::  a zero-arity user DEFINITION (`Message == TokenMsg \cup BasicMsg`,
+  ::  EWD998Chan) is its body: tlc2's value for it is the same lazy set.
+  ::  A StandardModule operator keeps its own handling (the descriptor or
+  ::  override path below), and the fuel bounds a definition that names
+  ::  itself
+  ::  (a constant definition R4.P3 already evaluated answers from its value)
+  =/  cd  ?.(?=(~ as) ~ (~(get by cdefs.e) nm))
+  ?:  &(?=(^ cd) ?=(^ d) =(def.u.cd u.d))
+    (set-member:v x [%set val.u.cd])
+  ?:  ?&  ?=(^ d)
+          ?=(~ as)
+          ?=(%user-op kind.op.n)
+          ?=(~ params.u.d)
+          ?=(^ body.u.d)
+          !(is-standard:so ov.e origin.u.d)
+          (gth fuel.e 0)
+      ==
+    $(n u.body.u.d, fuel.e (dec fuel.e))
+  ?:  ?&  ?=(^ d)
+          ?=([* ~] as)
+          =('Seq' (bnm nm))
+          (is-descriptor:so [origin.u.d (bnm nm) 1])
+      ==
+    =/  tp  (to-tuple:v x)
+    ?~  tp  $:dflt
+    =/  els  u.tp
+    |-  ^-  (each ? eval-err:v)
+    ?~  els  [%& &]
+    =/  r  ^$(x i.els, n i.as)
+    ?:  |(?=(%| -.r) !p.r)  r
+    $(els t.els)
+  $:dflt
 ::
 ++  subset-arg
   ::  the argument of a `SUBSET _` application, if `n` is one
@@ -620,7 +781,19 @@
   =/  sa  (eval-domain ln e)
   ?:  ?=(%| -.sa)  sa
   =/  sb  (eval-domain rn e)
-  ?:  ?=(%| -.sb)  sb
+  ?:  ?=(%| -.sb)
+    ::  R4.2m: B has no lazy descriptor (`[content : M, age : Int]`): tlc2's
+    ::  `isSubsetEq` streams A and asks B's lazy `member` per element, which
+    ::  `+memb-node` decides on B's structure
+    =/  els  (drain-sexp p.sa)
+    ?:  ?=(%| -.els)  els
+    =/  es  p.els
+    |-  ^-  eres
+    ?~  es  [%& [%bool &]]
+    =/  m  (memb-node i.es rn e)
+    ?:  ?=(%| -.m)  m
+    ?.  p.m  [%& [%bool |]]
+    $(es t.es)
   =/  r  (sexp-subseteq:v p.sa p.sb)
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
@@ -1115,11 +1288,17 @@
   |=  [n=sem-apply:sm e=eenv rs=rst]
   ^-  eout
   =/  nm  name.op.n
+  ::  R4.2u: a config may assign a VALUE to a zero-arity DEFINITION
+  ::  (`Faded = Faded`, `NULL = NULL`), and tlc2 then uses the value -- the
+  ::  idiom that keeps `Faded == CHOOSE c : c \notin Color`, an unbounded
+  ::  CHOOSE tlc2 refuses to evaluate, from ever being evaluated. The value
+  ::  was bound (`+consts-of:check`) and never read
+  ?:  &(?=(~ args.n) (~(has by vals.e) nm))  [[%& (~(got by vals.e) nm)] rs]
   =/  d   (~(get by ops.e) nm)
   ?~  d
     [[%| 0 (rap 3 ~['undefined operator: ' nm])] rs]
   =/  def  u.d
-  =/  key=op-key:so  [origin.def nm (lent args.n)]
+  =/  key=op-key:so  [origin.def (bnm nm) (lent args.n)]
   =/  ov  (lookup:so ov.e key)
   ?^  ov
     =^  as  rs  (eval-args-rs args.n e rs)
@@ -1133,7 +1312,7 @@
   =/  nop  (node-op:so key)
   ?^  nop  (eval-node-op-rs tag.u.nop n e rs)
   ?:  ?&  (is-standard:so ov.e origin.def)
-          !(body-allowed:so ov.e origin.def nm)
+          !(body-allowed:so ov.e origin.def (bnm nm))
       ==
     [[%| (unsupported:so key)] rs]
   ::  R4.P3: a constant definition already evaluated once (`+with-cdefs`)
@@ -1847,12 +2026,12 @@
   ^-  ?(%override %body %none)
   =/  d  (~(get by ops.e) nm)
   ?~  d  %none
-  =/  key=op-key:so  [origin.u.d nm ar]
+  =/  key=op-key:so  [origin.u.d (bnm nm) ar]
   ?^  (lookup:so ov.e key)  %override
   ?^  (node-op:so key)  %override
   ?:  (is-descriptor:so key)  %override
   ?:  ?&  (is-standard:so ov.e origin.u.d)
-          !(body-allowed:so ov.e origin.u.d nm)
+          !(body-allowed:so ov.e origin.u.d (bnm nm))
       ==
     %none
   ?~(body.u.d %none %body)
@@ -2079,16 +2258,44 @@
   ?~  as  [%& e]
   ?:  (state-var-ref i.as e)
     $(ns t.ns, as t.as, e e(psub (~(put by psub.e) name.i.ns i.as)))
+  ::  R4.2n: a STATE-DEPENDENT expression (`y <- x % 2`) is bound LAZILY as
+  ::  well, as tlc2's `getVal(expr, con, false)` does (a LazyValue): an inner
+  ::  VARIABLE reads it through `psub`, so `y'` evaluates `(x % 2)'` in the
+  ::  successor. Bound eagerly, `y'` found no `y` in the successor state. An
+  ::  inner CONSTANT still reads the value from `vals`
+  =?  psub.e  (gth (sem-level i.as) 0)  (~(put by psub.e) name.i.ns i.as)
   =/  av  (eval i.as e)
-  ?:  ?=(%| -.av)  av
+  ::  R4.2m: an expression with no VALUE -- `Values <- Int`, an infinite
+  ::  set (Disruptor's RingBuffer) -- is bound by name too, as tlc2 binds
+  ::  the lazy value; a reference reads it where it is used (membership,
+  ::  `+eval-domain`), and a genuine error surfaces there
+  ?:  ?=(%| -.av)
+    $(ns t.ns, as t.as, psub.e (~(put by psub.e) name.i.ns i.as))
   $(ns t.ns, as t.as, e e(vals (~(put by vals.e) name.i.ns p.av)))
+::
+++  sem-level
+  |=  s=sem:sm
+  ^-  @ud
+  ?-  -.s
+    %apply    lvl.s
+    %letin    lvl.s
+    %atref    lvl.s
+    %lit      0
+    %nullodn  0
+  ==
 ::
 ++  bind-psub
   ::  bind an operator's parameters for solving: a bare state-variable argument
   ::  is kept as a NODE (call-by-name, so it stays assignable in the body); an
   ::  operator argument resolves through `ops`; any other value argument is
-  ::  evaluated once in the caller env and bound through `vals`
-  |=  [e=eenv ps=(list spar:sm) as=(list sem:sm)]
+  ::  evaluated once in the caller env and bound through `vals`.
+  ::  R4.2n: `ev` is the env a value argument is EVALUATED in -- the solving
+  ::  env (`+senv`), which holds the current state. Evaluated in `e`, whose
+  ::  state is not the one being solved from, a state-dependent argument
+  ::  failed (`Return(c, alloc[c])`: "variable is unassigned in the current
+  ::  state"), and an ENABLED test reads a failure as FALSE -- so a fairness
+  ::  condition on such an action was silently vacuous
+  |=  [e=eenv ev=eenv ps=(list spar:sm) as=(list sem:sm)]
   ^-  (each eenv eval-err:v)
   ?~  ps  [%& e]
   ?~  as  [%& e]
@@ -2100,7 +2307,7 @@
     $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
   ?.  used.i.ps
     $(ps t.ps, as t.as)
-  =/  av  (eval i.as e)
+  =/  av  (eval i.as ev)
   ?:  ?=(%| -.av)  av
   $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
 ::
@@ -2111,6 +2318,8 @@
     ?:  ?=(%letin -.n)  (solve-letin n mode cur part e s)
     (solve-filter n mode cur part e s)
   =/  nm  name.op.n
+  ::  R4.2m: a labeled action `P :: A` is solved as `A`
+  ?:  &(=(nm '$Label') ?=(^ args.n))  $(n i.args.n)
   ?:  |(=(nm '$ConjList') =(nm '\\land'))
     (solve-conj args.n mode cur part e s)
   ?:  |(=(nm '$DisjList') =(nm '\\lor'))
@@ -2169,7 +2378,7 @@
     ?.  =((lent params.u.d) (lent args.n))  (solve-filter n mode cur part e s)
     ?:  =(0 fuel.e)
       [[%| 0 'evaluation recursion/resource limit exceeded.'] s]
-    =/  e2  (bind-psub e(fuel (dec fuel.e)) params.u.d args.n)
+    =/  e2  (bind-psub e(fuel (dec fuel.e)) (senv mode cur part e) params.u.d args.n)
     ?:  ?=(%| -.e2)  [e2 s]
     (solve u.body.u.d mode cur part p.e2 s)
   (solve-filter n mode cur part e s)
@@ -2467,8 +2676,8 @@
           =(0 lvl.d)
           ?=(^ body.d)
           !(is-standard:so ov.e origin.d)
-          ?=(~ (lookup:so ov.e [origin.d nm 0]))
-          ?=(~ (node-op:so [origin.d nm 0]))
+          ?=(~ (lookup:so ov.e [origin.d (bnm nm) 0]))
+          ?=(~ (node-op:so [origin.d (bnm nm) 0]))
       ==
     $(ds t.ds)
   =/  r  (mule |.((eval-rs u.body.d e empty-rst)))
@@ -2710,6 +2919,7 @@
       $(ls t.ls, os (~(put by os) name.i.ls i.ls))
     (psolve u.body.n cur part e2 acts p fil)
   =/  nm  name.op.n
+  ?:  &(=(nm '$Label') ?=(^ args.n))  $(n i.args.n)
   ?:  |(=(nm '$ConjList') =(nm '\\land'))
     ?~  args.n  (pnext cur part acts p fil)
     (psolve i.args.n cur part e (weld (pitems t.args.n e) acts) p fil)
@@ -2814,7 +3024,7 @@
     ?:  ?|(?=(~ d) ?=(~ body.u.d))  (pfilter n cur part e acts p fil)
     ?.  =((lent params.u.d) (lent args.n))  (pfilter n cur part e acts p fil)
     ?:  =(0 fuel.e)  [[%err 0 'evaluation recursion/resource limit exceeded.'] p]
-    =/  e2  (bind-psub e(fuel (dec fuel.e)) params.u.d args.n)
+    =/  e2  (bind-psub e(fuel (dec fuel.e)) (senv %next cur part e) params.u.d args.n)
     ?:  ?=(%| -.e2)  [[%err p.e2] p]
     (psolve u.body.u.d cur part p.e2 acts p fil)
   (pfilter n cur part e acts p fil)

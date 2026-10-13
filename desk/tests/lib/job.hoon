@@ -1994,4 +1994,29 @@
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>((validate:job-lib req))
+::
+::  R4.2k: a module of ASSUMEs with NO behaviour spec (SimpleMath's shape)
+::  completes over zero initial states through the kernel, as the console
+::  path has since R3.0a; a false ASSUME is still the assumption verdict
+++  asm-only
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE spec ----\0a"  "EXTENDS Naturals\0a"
+    "ASSUME 1 + 1 = 2\0a"  "====\0a"
+  ==
+++  asm-false
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE spec ----\0a"  "EXTENDS Naturals\0a"
+    "ASSUME 1 + 1 = 3\0a"  "====\0a"
+  ==
+++  test-no-behaviour-spec
+  =/  ok  +:(run-all (init:job-lib (check-req asm-only '') t0) 256)
+  =/  bad  +:(run-all (init:job-lib (check-req asm-false '') t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [0 0 0 0 [0 0 0 0]]]) !>(result.ok))
+    (expect-eq !>(%.y) !>(?=([~ %violated [%assumption *] *] result.bad)))
+  ==
 --

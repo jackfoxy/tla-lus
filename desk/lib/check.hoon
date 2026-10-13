@@ -2612,7 +2612,7 @@
   ?^  kwd  [%| msg.u.kwd]
   =/  ukw  (unsupported-kw:config ca)
   ?^  ukw  [%| u.ukw]
-  =/  defs  (defmap-of:ne u.mo)
+  =/  defs  (apply-overrides (defmap-of:ne u.mo) overrides.ca mod-overrides.ca)
   ::  R3.0a: a config that declares NO behaviour spec AT ALL -- neither an
   ::  INIT/NEXT pair nor a SPECIFICATION -- is not an error. tlc2 runs it as an
   ::  ordinary breadth-first search over ZERO initial states and reports
@@ -2640,7 +2640,9 @@
   =/  noinit  ?=(%nullodn -.isb)
   =/  nsb   next.p.rt
   =/  fair  fair.p.rt
-  =/  consts  (const-map cfg)
+  =/  consts
+    %-  ~(uni by (override-consts (const-map cfg) overrides.ca))
+    (mod-const-vals defs mod-constants.ca)
   =/  nb  ?~(nname.p.rt ~ (body-of-def tree u.nname.p.rt))
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY now WARNS AND CONTINUES, as
   ::  tlc2 does (EC 2279), instead of type-rejecting.
@@ -2665,11 +2667,10 @@
   ::  `Prop == []Inv` under `SYMMETRY Perms`: no warning, `ok`, 1 distinct. The
   ::  guard therefore asks for a GENUINE temporal property, the same test
   ::  `+check` uses to route between the safety and liveness engines
-  =/  genuine-temporal
-    ?.  ?=(^ pp)  |
-    =/  psb  (sem-body defs u.pp)
-    ?.  ?=(^ psb)  |
-    ?=(~ (box-state-inner:tp u.psb))
+  ::  R4.2n: "genuine" is the temporal bin being non-empty, now that a
+  ::  property is binned part by part
+  =/  gbins  (bin-properties properties.ca defs)
+  =/  genuine-temporal  ?=(^ temps.gbins)
   =/  symwarn=(list @t)
     ?.  &(?=(^ symmetry.ca) genuine-temporal)  ~
     :_  ~
@@ -2819,6 +2820,57 @@
   ^-  (each (list oos:tp) aerr:tp)
   (normalize:tp pbods modn fair env)
 ::
+++  apply-overrides
+  ::  R4.2m: the config's `lhs <- rhs` substitutions, which were validated
+  ::  (EC 2223-2226) and then IGNORED: `Nat <- NatOverride`,
+  ::  `Seq <- LimitedSeq`, `Acceptor <- MCAcceptor` (123 in the Examples
+  ::  corpus). tlc2 makes the name `lhs` denote `rhs`'s definition
+  ::  (`SpecProcessor`'s override of the OpDefNode, and of a CONSTANT's
+  ::  value -- `processConstantDefns` then evaluates a constant-level one
+  ::  once). Here `lhs` is rebound to `rhs`'s definition in the operator
+  ::  map; a CONSTANT reference with no value reads it (`+apply-const:ne`),
+  ::  and R4.P3's `+with-cdefs` evaluates it once when it is constant-level.
+  ::  `lhs <-[M] rhs` overrides a definition `lhs` that module `M` supplies
+  |=  $:  defs=(map @t sem-def:sem-lib)
+          ov=(map @t @t)
+          mov=(map @t (map @t @t))
+      ==
+  ^-  (map @t sem-def:sem-lib)
+  =/  os  ~(tap by ov)
+  =/  out  defs
+  =.  out
+    |-  ^-  (map @t sem-def:sem-lib)
+    ?~  os  out
+    =/  d  (~(get by defs) q.i.os)
+    ?~  d  $(os t.os)
+    $(os t.os, out (~(put by out) p.i.os u.d))
+  =/  ms  ~(tap by mov)
+  |-  ^-  (map @t sem-def:sem-lib)
+  ?~  ms  out
+  =/  ps  ~(tap by q.i.ms)
+  =.  out
+    |-  ^-  (map @t sem-def:sem-lib)
+    ?~  ps  out
+    =/  d  (~(get by defs) q.i.ps)
+    =/  l  (~(get by out) p.i.ps)
+    ?~  d  $(ps t.ps)
+    ?.  &(?=(^ l) =(p.i.ms origin.u.l))  $(ps t.ps)
+    $(ps t.ps, out (~(put by out) p.i.ps u.d))
+  $(ms t.ms)
+::
+++  override-consts
+  ::  R4.2v: `lhs <- rhs` where `rhs` is itself a CONSTANT with a value
+  ::  (`Leader <- L`, `L = L`): `lhs` takes that value
+  |=  [consts=(map @t value) ov=(map @t @t)]
+  ^-  (map @t value)
+  =/  os  ~(tap by ov)
+  =/  out  consts
+  |-  ^-  (map @t value)
+  ?~  os  out
+  =/  v  (~(get by consts) q.i.os)
+  ?~  v  $(os t.os)
+  $(os t.os, out (~(put by out) p.i.os u.v))
+::
 ++  consts-of
   ::  config constant assignments as an evaluation binding map (WU6.9 task 1).
   ::  An arity-0 assignment binds a value directly; `F(a,..) = v` assignments (a
@@ -2848,6 +2900,29 @@
   ^-  (map @t value)
   =/  pr  (parse-cfg:config cfg)
   ?:(?=(%| -.pr) ~ (consts-of constants.p.pr))
+::
+++  mod-const-vals
+  ::  R4.2u: module-scoped value assignments (`NoBlock = [Nano]NoBlockVal`),
+  ::  parsed into `mod-constants` and never applied. Each definition module
+  ::  `M` supplies under that name -- `NoBlock` when EXTENDed, `N!NoBlock`
+  ::  through `N == INSTANCE Nano` (an instance member keeps its module as
+  ::  origin) -- takes the value, as a root `NoBlock = v` does
+  |=  [defs=(map @t sem-def:sem-lib) mc=(map @t (list cfg-const:config))]
+  ^-  (map @t value)
+  =/  ds  ~(tap by defs)
+  =/  ms  ~(tap by mc)
+  =|  out=(map @t value)
+  |-  ^-  (map @t value)
+  ?~  ms  out
+  =/  vs  (consts-of q.i.ms)
+  =/  hits
+    %+  murn  ds
+    |=  [k=@t d=sem-def:sem-lib]
+    ^-  (unit [@t value])
+    ?.  =(p.i.ms origin.d)  ~
+    =/  v  (~(get by vs) (bnm:ne k))
+    ?~(v ~ `[k u.v])
+  $(ms t.ms, out (~(uni by out) (malt hits)))
 ::
 ++  kind-name
   ::  the tlc2 value class a value corresponds to, the stable kind
@@ -3405,7 +3480,7 @@
   =|  out=(list @t)
   |-  ^-  (list @t)
   ?~  props  (flop out)
-  =/  lr  (ast:tp body.i.props [modn 0] env)
+  =/  lr  (ast:tp body.i.props [modn 0 ~ ~] env)
   ?:  ?=(%| -.lr)  $(props t.props)
   ?:  (eval-on-lasso:lv p.lr sts cyc 0 env)  $(props t.props)
   ?:  (lien out |=(n=@t =(n name.i.props)))  $(props t.props)
@@ -4201,7 +4276,7 @@
   =/  bins  (bin-properties props defs)
   ?^  temps.bins  [%| dfid-refusal]
   :-  %&
-  :_  (turn iinits.bins |=([n=@t *] (state-level-warn n)))
+  :_  (turn (swarn-names props defs) state-level-warn)
   %=  base
     invs    (weld invs binvs.bins)
     iinits  iinits.bins
@@ -4444,7 +4519,19 @@
           e=eenv:ne  ctx=(map @t value)
       ==
   ^-  (list act)
-  ?:  ?=(%letin -.n)  ?~(body.n ~[[nm n ctx]] $(n u.body.n))
+  ?:  ?=(%letin -.n)
+    ?~  body.n  ~[[nm n ctx]]
+    ::  R4.2n: descend, as `getActions` does, but put each action back under
+    ::  the LET. tlc2's nodes LINK to the LET's definitions; the port names
+    ::  them, so a stripped LET left `x' = b` with no `b` ("undefined
+    ::  operator", MultiCarElevator's `CallElevator`). The wrapper takes the
+    ::  body's span, which is the action's location at the pin
+    =/  as  $(n u.body.n)
+    =|  out=(list act)
+    |-  ^-  (list act)
+    ?~  as  (flop out)
+    =/  w=sem:sem-lib  n(body `body.i.as, at (sspan-of:tp body.i.as))
+    $(as t.as, out [[name.i.as w ctx.i.as] out])
   ?.  ?=(%apply -.n)  ~[[nm n ctx]]
   =/  op  name.op.n
   ::  operator inlining is BOUNDED by the environment's `fuel`, the same
@@ -4606,8 +4693,33 @@
   =/  r  (next-states:ne s0 body.i.actions (act-env e ctx.i.actions))
   ?:  ?=(%| -.r)  $(actions t.actions)
   ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
-    (action-label name.i.actions (sem-span:config body.i.actions) modn)
+    =/  nm  (cat 3 name.i.actions (act-sig i.actions e))
+    (action-label nm (sem-span:config body.i.actions) modn)
   $(actions t.actions)
+::
+++  act-sig
+  ::  R4.2n: tlc2 `Action.getLocation` prints the action operator's FORMAL
+  ::  PARAMETERS bound in its context, `Inc(1)` or `Op(1,"a")` (joined by `,`
+  ::  with no space, each value's `toString`), and nothing when there are none.
+  ::  A trace through a parametrized action was labelled `Inc` here. (The
+  ::  coverage block's labels carry no arguments at the pin, and use their
+  ::  own arm.)
+  |=  [a=act e=eenv:ne]
+  ^-  @t
+  =/  d  (~(get by ops.e) name.a)
+  ?~  d  ''
+  =/  vs=(list tape)
+    %+  murn  params.u.d
+    |=  p=spar:sem-lib
+    ^-  (unit tape)
+    =/  v  (~(get by ctx.a) name.p)
+    ?~(v ~ `(render:vl u.v))
+  ?~  vs  ''
+  =/  out=tape  i.vs
+  =/  rest  t.vs
+  |-  ^-  @t
+  ?~  rest  (crip :(weld "(" out ")"))
+  $(out :(weld out "," i.rest), rest t.rest)
 ::
 ++  edge-action
   ::  the STRUCTURED form of +edge-action-label: the action that generates
@@ -4767,7 +4879,7 @@
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
-  =/  defs  (defmap-of:ne u.mo)
+  =/  defs  (apply-overrides (defmap-of:ne u.mo) overrides.ca mod-overrides.ca)
   ::  the raw oos path needs no subscript warning -- it renders the temporal
   ::  decomposition, never a verdict
   =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs ~)
@@ -4821,6 +4933,19 @@
   ^-  wain
   (check-in spec cfg | seed)
 ::
+++  init-progress
+  ::  R4.2n: `DoInitFunctor.addElement` prints EC 2269 `Computed N initial
+  ::  states...` before adding a state when the count so far is a power of two
+  ::  above 1 -- so for each power of two p with 2 <= p < n. Always ahead of
+  ::  any verdict: the initial states are all generated before it
+  |=  n=@ud
+  ^-  wain
+  =/  p  2
+  |-  ^-  wain
+  ?:  (gte p n)  ~
+  :-  (rap 3 ~['Computed ' (crip ((d-co:co 1) p)) ' initial states...'])
+  $(p (mul 2 p))
+::
 ++  check-in
   ::  `+check` carrying the coverage flag and the run's `-seed`
   |=  [spec=@t cfg=@t cvg=? seed=@ud]
@@ -4847,6 +4972,8 @@
   ::  change it — today the EC 2145 subscript-coverage one (R2.3.5). tlc2
   ::  emits them while processing the config, ahead of every run line
   %+  weld  swarn.c
+  ::  R4.2n: EC 2269, printed while the initial states are computed
+  %+  weld  (init-progress (lent is.c))
   ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
   ::  through the safety terminal output; every other form runs the 8.2–8.6
   ::  engine and renders tlc2.TLC's temporal console diagnostic (unit 8.9)
@@ -4867,7 +4994,7 @@
   ::  tlc2 never tests. The EC 2255 state-level warning is emitted for EVERY one
   ::  of them, in config order, whether or not it holds; measured at the pin
   ::  (`prop-init-second`), where the FAILING implied init is declared SECOND
-  =/  iwarn  (turn iinits.c |=([n=@t *] (state-level-warn n)))
+  =/  iwarn  (turn (swarn-names pnames.c defs.c) state-level-warn)
   =/  ilines=(unit wain)
     ?~  iinits.c  ~
     =/  b
@@ -4922,20 +5049,28 @@
   ::  verdict, while the port -- which routed on the HEAD of the list -- gave
   ::  two different ones.
   ::
+  ::  R4.2n: and binned PART BY PART. tlc2 first decomposes a property
+  ::  (`+prop-parts`) through INSTANCE substitutions, LET, zero-arity
+  ::  definitions and conjunctions, and bins each part; the port binned each
+  ::  property whole, so `HCini /\ [][HCnxt]_hr` or a refinement `P!Spec`
+  ::  (`Init /\ [][Next]_v /\ WF_v(Next)`) reached the liveness converter
+  ::  as one formula and was refused there.
+  ::
   ::  The four bins, in tlc2's own order of preference:
   ::
   ::    `[]P` with a state-level P  -> the INVARIANT vector (and it is reported
   ::                                   as an `Invariant`, not as a temporal
-  ::                                   property -- measured)
+  ::                                   property -- measured); named for `P`
+  ::                                   when `P` is a bare operator name
   ::    level <= 1                  -> an IMPLIED INIT, checked while computing
-  ::                                   the initial states, and warned about
+  ::                                   the initial states
   ::    `[][A]_v`                   -> an IMPLIED ACTION, checked on every
   ::                                   transition
   ::    anything else               -> the liveness engine
   ::
-  ::  A name with no definition is DROPPED here, as `+implied-temporals` and
-  ::  `+resolve-invs` already drop theirs -- the config validator owns that
-  ::  diagnostic and reports it before any of this runs
+  ::  A name with no definition is DROPPED here, as `+resolve-invs` already
+  ::  drops its own -- the config validator owns that diagnostic and reports
+  ::  it before any of this runs
   |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
   ^-  $:  binvs=(list [name=@t body=sem:sem-lib])
           iinits=(list [name=@t body=sem:sem-lib])
@@ -4946,35 +5081,120 @@
   =/  rest  $(props t.props)
   =/  b  (sem-body defs i.props)
   ?~  b  rest
-  =/  binner  (box-state-inner:tp u.b)
+  =/  ps  (flop (prop-parts i.props u.b defs))
+  |-
+  ?~  ps  rest
+  =/  nm  name.i.ps
+  =/  x   body.i.ps
+  =/  ws  ws.i.ps
+  =/  binner  (box-state-inner:tp x)
   ?^  binner
-    rest(binvs [[i.props u.binner] binvs.rest])
-  ?:  (lte (sem-lvl:sem-lib u.b) 1)
-    rest(iinits [[i.props u.b] iinits.rest])
-  =/  iact  (implied-action-parts u.b)
+    =/  bn=@t
+      ?.  ?&(?=(%apply -.u.binner) ?=(~ args.u.binner) ?=(%user-op kind.op.u.binner))
+        nm
+      name.op.u.binner
+    $(ps t.ps, binvs.rest [[bn (rewrap ws u.binner)] binvs.rest])
+  ?:  (lte (sem-lvl:sem-lib x) 1)
+    $(ps t.ps, iinits.rest [[nm (rewrap ws x)] iinits.rest])
+  =/  iact  (implied-action-parts x)
   ?^  iact
-    rest(iacts [[i.props body.u.iact sub.u.iact] iacts.rest])
-  rest(temps [[i.props u.b] temps.rest])
+    =/  ia=[name=@t body=sem:sem-lib sub=(unit sem:sem-lib)]
+      :+  nm  (rewrap ws body.u.iact)
+      ?~(sub.u.iact ~ `(rewrap ws u.sub.u.iact))
+    $(ps t.ps, iacts.rest [ia iacts.rest])
+  $(ps t.ps, temps.rest [[nm (rewrap ws x)] temps.rest])
+::
+++  prop-parts
+  ::  R4.2n: `SpecProcessor.processConfigProps`' structural decomposition of
+  ::  one PROPERTY, in source order. Each part is the conjunct, its name, and
+  ::  the INSTANCE-substitution / LET wrappers it was found under
+  ::  (innermost first), which `+rewrap` puts back so the part evaluates as it
+  ::  did inside the whole -- tlc2's `Specs.addSubsts(pred, subs)`. Through:
+  ::  a substitution wrapper, a LET, a zero-arity definition (renaming the
+  ::  part, as tlc2 does), `/\` (infix and bulleted) and `$Nop`. A
+  ::  conjunction member is named by its location (`conj.toString()`, a
+  ::  SemanticNode's Location), in the module that defines it -- which is
+  ::  why `mo` is threaded: a span carries no module.
+  ::  Not ported: tlc2 also unrolls a `\A` over a constant set into per-element
+  ::  parts, and inlines a parameterized instance's arguments; such a
+  ::  property stays whole here and its parts reach the liveness converter,
+  ::  which expands the quantifier itself (`+quant-of:tp`)
+  |=  [name=@t s=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  =|  ws=(list sem:sem-lib)
+  =|  seen=(set @t)
+  =/  mo=@t
+    =/  d  (~(get by defs) name)
+    ?~(d '' origin.u.d)
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  ?:  ?=(%letin -.s)
+    ?~  body.s  ~[[name s ws]]
+    $(s u.body.s, ws [s ws])
+  ?.  ?=(%apply -.s)  ~[[name s ws]]
+  ?^  (anysubstin-mod:sem-lib name.op.s)
+    =/  sp  (substin-parts:sem-lib s)
+    ?~  sp  ~[[name s ws]]
+    $(s inner.u.sp, ws [s ws], mo mod.u.sp)
+  ?:  ?&  ?=(~ args.s)
+          ?=(%user-op kind.op.s)
+          !(~(has in seen) name.op.s)
+      ==
+    =/  d  (~(get by defs) name.op.s)
+    ?~  d  ~[[name s ws]]
+    ?~  body.u.d  ~[[name s ws]]
+    ?.  ?=(~ params.u.d)  ~[[name s ws]]
+    %=  $
+      name  name.op.s
+      s     u.body.u.d
+      seen  (~(put in seen) name.op.s)
+      mo    ?:(=('' origin.u.d) mo origin.u.d)
+    ==
+  ?:  =('$Nop' name.op.s)
+    ?~  args.s  ~[[name s ws]]
+    $(s i.args.s)
+  ?.  |(=('$ConjList' name.op.s) =('\\land' name.op.s))
+    ~[[name s ws]]
+  =/  as=(list sem:sem-lib)  args.s
+  =|  out=(list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  ?~  as  out
+  =/  nm  (loc-str:config mo (sspan-of:tp i.as))
+  $(as t.as, out (weld out ^$(s i.as, name nm)))
+::
+++  rewrap
+  ::  put a part back under the wrappers it was found in (innermost first);
+  ::  each wrapper takes the part's own level, so a part binned as an
+  ::  implied init still reads as state level
+  |=  [ws=(list sem:sem-lib) x=sem:sem-lib]
+  ^-  sem:sem-lib
+  ?~  ws  x
+  =/  w  i.ws
+  =/  lv  (sem-lvl:sem-lib x)
+  =/  y=sem:sem-lib
+    ?:  ?=(%letin -.w)  w(body `x, lvl lv)
+    ?.  ?=(%apply -.w)  x
+    w(args (snoc (scag (lent ubound.w) `(list sem:sem-lib)`args.w) x), lvl lv)
+  $(ws t.ws, x y)
+::
+++  swarn-names
+  ::  EC 2255's subjects: tlc2 warns for a PROPERTY whose DEFINITION is state
+  ::  level, once per property, before any decomposition -- so a state-level
+  ::  part of a temporal property (a spec's `Init`) draws no warning
+  |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
+  ^-  (list @t)
+  %+  skim  props
+  |=  p=@t
+  =/  b  (sem-body defs p)
+  ?~(b | (lte (sem-lvl:sem-lib u.b) 1))
 ::
 ++  implied-temporals
-  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTIES that reach the
-  ::  liveness engine, with their bodies, in declaration order. The three
-  ::  exclusions are `SpecProcessor.processConfigProps`': a `[]P` box-state
-  ::  goes to the INVARIANT vector, a level<=1 predicate is an IMPLIED INIT and
-  ::  a `[][A]_v` an IMPLIED ACTION. Same three tests `+check`'s routing uses,
-  ::  applied to EVERY property rather than to the first.
-  ::
-  ::  This is what post-hoc attribution asks about (`+violated-props`), so both
-  ::  the console and the job kernel build it here rather than each their own
+  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTY parts that reach
+  ::  the liveness engine, with their bodies, in declaration order: the
+  ::  temporal bin of `+bin-properties`, which is what post-hoc attribution
+  ::  asks about (`+violated-props`)
   |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
   ^-  (list [name=@t body=sem:sem-lib])
-  ?~  props  ~
-  =/  b  (sem-body defs i.props)
-  ?~  b  $(props t.props)
-  ?^  (box-state-inner:tp u.b)  $(props t.props)
-  ?:  (lte (sem-lvl:sem-lib u.b) 1)  $(props t.props)
-  ?^  (implied-action-inner u.b)  $(props t.props)
-  [[i.props u.b] $(props t.props)]
+  temps:(bin-properties props defs)
 ::
 ++  implied-action-parts
   ::  R2.7.15b: BOTH halves of a `[][A]_v` implied action -- the action AND its
