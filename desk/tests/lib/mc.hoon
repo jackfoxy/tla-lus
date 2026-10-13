@@ -95,6 +95,25 @@
     '---- MODULE spec ----\0aVARIABLE i\0aInit == i = 1\0aNext == UNCHANGED i\0aSpec == Init /\\ [][Next]_i\0aInv == i = 2\0aAlias == [ i |-> i, foo |-> "bar", j |-> i = i\' ]\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANTS Inv\0aALIAS Alias\0a'
 ::
+++  test-mc-args-caller-env
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 10, col 9 to line 11, col 65 of module spec>'
+        'x = 7'
+        '2 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2: every argument is evaluated in the CALLER\'s env. `F`\'s formal is\0a\\* named `q`, like the bound variable its later argument reads; binding the\0a\\* formals one by one and evaluating `Len(q) + 1` after the first made it\0a\\* see the formal (N-Queens: "index 3 of tuple <<1, 1>>").\0aEXTENDS Naturals, Sequences\0aF(q, n) == q[n]\0aVARIABLE x\0aInit == x = 0\0aNext == /\\ x = 0\0a        /\\ \\E q \\in {<<5, 6>>} : x\' = F(Append(q, 7), Len(q) + 1)\0aInv == x \\in {0, 7}\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-mc-ce-empty
   %+  expect-eq
     !>  ^-  wain
@@ -676,6 +695,20 @@
     '---- MODULE spec ----\0a\\* R4.2m: membership in a set built from an INFINITE standard set is decided\0a\\* on its structure, as tlc2\'s lazy values decide it: `N \\in Nat \\ {0}` (the\0a\\* Examples\' ASSUME idiom), `[P -> [P -> Nat]]`, `[a : Int]`, `Seq(Nat)`.\0aEXTENDS Naturals, Integers, Sequences\0aCONSTANT N\0aASSUME N \\in Nat \\ {0}\0aASSUME N \\notin Int \\ Nat\0aVARIABLE f, r, s\0aInit == /\\ f = [p \\in 1..2 |-> [q \\in 1..2 |-> 0]]\0a        /\\ r = [a |-> -1, b |-> 1]\0a        /\\ s = <<0, 1>>\0aNext == /\\ f[1][1] < 2\0a        /\\ f\' = [f EXCEPT ![1][1] = @ + 1]\0a        /\\ UNCHANGED <<r, s>>\0aTypeOK == /\\ f \\in [1..2 -> [1..2 -> Nat]]\0a          /\\ r \\in [a : Int, b : Nat \\ {0}]\0a          /\\ s \\in Seq(Nat)\0a====\0a'
   'CONSTANT N = 3\0aINIT Init\0aNEXT Next\0aINVARIANT TypeOK\0a'
 ::
+++  test-mc-inst-ext-closure
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2o: `INSTANCE M` brings what M EXTENDS. The root does not extend\0a\\* Naturals; the instanced module does, and its body uses `%` and `+`\0a\\* (TwoPhase under MCTwoPhase).\0a---- MODULE Counter ----\0aEXTENDS Naturals\0aVARIABLE n\0aCInit == n = 0\0aCNext == n\' = (n + 1) % 3\0a====\0aVARIABLE n\0aINSTANCE Counter\0aInv == CInit \\/ n \\in {1, 2}\0a====\0a'
+  'INIT CInit\0aNEXT CNext\0aINVARIANT Inv\0a'
+::
 ++  test-mc-inst-keys
   %+  expect-eq
     !>  ^-  wain
@@ -689,6 +722,30 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE inner ----\0aEXTENDS Naturals\0aVARIABLE v\0aCONSTANT k\0aInitI == v = 0\0aNextI == v\' = (v + 1) % k\0a====\0aI == INSTANCE inner WITH v <- x, k <- 3\0aInit2 == I!InitI\0aNext2 == I!NextI\0aInv == x < 9\0a====\0a'
   'INIT Init2\0aNEXT Next2\0aINVARIANT Inv\0a'
+::
+++  test-mc-inst-oparg
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ p = 0'
+        '/\\ x = 0'
+        'State 2: <Next line 15, col 1 to line 15, col 12 of module spec>'
+        '/\\ p = 1'
+        '/\\ x = 0'
+        'State 3: <Next line 15, col 1 to line 15, col 12 of module spec>'
+        '/\\ p = 2'
+        '/\\ x = 1'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2o: CONSTANT operators substituted through an INSTANCE by operators\0a\\* (`$OpArg`; TwoPhase\'s `XInit(_)`, `XAct(_, _, _)`): the instanced action\0a\\* `XAct(0, x, x\')` expands the substituted operator, so `x\'` is assigned.\0aEXTENDS Naturals\0a---- MODULE Two ----\0aCONSTANT XInit(_), XAct(_, _, _)\0aVARIABLE p, x\0aInit == p = 0 /\\ XInit(x)\0aNext == p < 2 /\\ XAct(p, x, x\') /\\ p\' = p + 1\0a====\0aXInit(v) == v = 0\0aXAct(i, xInit, xNext) == xNext = xInit + i\0aVARIABLES p, x\0aINSTANCE Two\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
 ::
 ++  test-mc-inst-sibling
   %+  expect-eq
@@ -1131,6 +1188,20 @@
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == \\/ x\' = x\0a        \\/ x\' = 1\0aProp == <>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aPROPERTY Prop\0a'
 ::
+++  test-mc-live-enabled-partial
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '7 states generated, 6 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 6.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2s: ENABLED needs no complete successor. `Move` assigns `x` only, so\0a\\* requiring every variable read `ENABLED Move` as FALSE, `WF_x(Move)` was\0a\\* vacuous, and a stuttering counter-example was reported where tlc2 finds\0a\\* none (Moving_Cat_Puzzle).\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aMove == x\' = (x + 1) % 3\0aOther == y\' = 1 - y\0aNext == Move /\\ Other\0aSpec == Init /\\ [][Next]_<<x, y>> /\\ WF_x(Move)\0aProp == <>(x = 2)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0a'
+::
 ++  test-mc-live-forall-prop
   %+  expect-eq
     !>  ^-  wain
@@ -1202,6 +1273,20 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.6.3 probe: the same recursive shape as `live-witness-rec`, but the\0a\\* property HOLDS. If the expanded leaf (the recursive CALL, evaluated as a\0a\\* state predicate) is evaluated wrongly, this flips the VERDICT rather than\0a\\* just the witness -- a stronger and deterministic check.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE R(_)\0aR(n) == IF n = 0 THEN (x = 0) ELSE <>(R(n - 1))\0aInit == x = 0\0aNext == x\' \\in {0, 1}\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == R(1)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
+::
+++  test-mc-live-view
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2e: VIEW with a temporal PROPERTY. States are identified by the VIEW\'s\0a\\* value in the graph, so the liveness product must key a successor the same\0a\\* way; it recomputed the plain fingerprint and was refused for that reason.\0aEXTENDS Naturals\0aVARIABLES x, t\0aInit == x = 0 /\\ t = 0\0aNext == \\/ x < 3 /\\ x\' = x + 1 /\\ t\' = t + 1\0a        \\/ x = 3 /\\ x\' = 0 /\\ t\' = t + 1\0aSpec == Init /\\ [][Next]_<<x, t>> /\\ WF_<<x, t>>(Next)\0aView == x\0aBack == []<>(x = 0)\0a====\0a'
+  'SPECIFICATION Spec\0aVIEW View\0aPROPERTY Back\0a'
 ::
 ++  test-mc-live-wf-statearg
   %+  expect-eq
@@ -2273,6 +2358,49 @@
   %-  trim
   %+  check:check
     '---- MODULE spec ----\0aVARIABLES a, b\0aInit == a = FALSE /\\ b = FALSE\0aNext == \\/ a\' = ~a /\\ b\' = b\0a        \\/ b\' = ~b /\\ a\' = a\0aInv == TRUE\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-unchanged-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2p: UNCHANGED of a DEFINITION naming variables (`UNCHANGED rest`) and\0a\\* of a NESTED tuple assigns every variable it names; both left variables\0a\\* unassigned ("incomplete next state", 8 Examples rows).\0aEXTENDS Naturals\0aVARIABLES x, y, z\0arest == <<y, z>>\0aInit == x = 0 /\\ y = 1 /\\ z = 2\0aNext == \\/ x < 2 /\\ x\' = x + 1 /\\ UNCHANGED rest\0a        \\/ x = 2 /\\ z\' = 3 /\\ UNCHANGED <<x, <<y>>>>\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
+::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
+::  not the pin's. R4.2t: tlc2 orders a state's variables by the java.util.Hashtable
+::  enumeration of the module's SANY Context -- String.hashCode, the table's
+::  capacity and rehash history and the insertion order of EVERY symbol in
+::  the context -- a layout artifact of SANY's symbol table, as string order
+::  is of its intern table (`tlc-value-order`). The port keeps declaration
+::  order (root first, then EXTENDS). Verdicts and counts are unaffected;
+::  traces differ in binding order, and so do the consumers of FP64's byte
+::  order (the RNG reseed, liveness lasso choice, symmetry tie-breaks)
+::  the pin (out.txt): Error: Invariant Inv is violated by the initial state: / /\ Qux = 3 / /\
+::  zeta = 0 / /\ alpha = 1 / /\ beta2 = 4 / /\ beta10 = 5 / /\ mid = 2
+++  test-mc-var-order-hashtable
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        '/\\ zeta = 0'
+        '/\\ alpha = 1'
+        '/\\ mid = 2'
+        '/\\ Qux = 3'
+        '/\\ beta2 = 4'
+        '/\\ beta10 = 5'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0a\\* R4.2t: tlc2 orders a state\'s variables by the java.util.Hashtable\0a\\* enumeration of the module\'s SANY Context (String.hashCode, capacity and\0a\\* insertion history over EVERY symbol), not by declaration. The port keeps\0a\\* declaration order: an APPROVED DIFFERENCE (`tlc-var-order`).\0aEXTENDS Naturals\0aVARIABLES zeta, alpha, mid, Qux, beta2, beta10\0aInit == zeta = 0 /\\ alpha = 1 /\\ mid = 2 /\\ Qux = 3 /\\ beta2 = 4 /\\ beta10 = 5\0aNext == UNCHANGED <<zeta, alpha, mid, Qux, beta2, beta10>>\0aInv == zeta = 1\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
 ++  test-mc-view

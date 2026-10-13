@@ -89,6 +89,10 @@
       ::  the definition the value came from, so a LET of the same name (a
       ::  different `sem-def`) is never answered from here
       cdefs=(map @t [def=sem-def:sm val=value:v])
+      ::  R4.2e: the search's state IDENTITY (symmetry group, VIEW body), so
+      ::  the liveness product keys a successor exactly as the graph build
+      ::  keyed it (`+live-key:lv`); `[~ ~]` = the plain FP64 identity
+      idk=[perms=(list (map @t @t)) view=(unit sem:sm)]
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -406,7 +410,7 @@
   ::  has a lazy descriptor here, though it is not a value (unit 6C.2)
   =/  d  (~(get by ops.e) nm)
   ?~  d  (as-sexp (eval n e))
-  =/  key=op-key:so  [origin.u.d (bnm nm) (lent args.n)]
+  =/  key=op-key:so  [origin.u.d (bnm name.u.d) (lent args.n)]
   ?.  (is-descriptor:so key)  (as-sexp (eval n e))
   ::  Seq(S) carries its range, so the arguments are evaluated first
   =/  as  (eval-args args.n e)
@@ -741,8 +745,8 @@
     $(n u.body.u.d, fuel.e (dec fuel.e))
   ?:  ?&  ?=(^ d)
           ?=([* ~] as)
-          =('Seq' (bnm nm))
-          (is-descriptor:so [origin.u.d (bnm nm) 1])
+          =('Seq' (bnm name.u.d))
+          (is-descriptor:so [origin.u.d (bnm name.u.d) 1])
       ==
     =/  tp  (to-tuple:v x)
     ?~  tp  $:dflt
@@ -1298,7 +1302,10 @@
   ?~  d
     [[%| 0 (rap 3 ~['undefined operator: ' nm])] rs]
   =/  def  u.d
-  =/  key=op-key:so  [origin.def (bnm nm) (lent args.n)]
+  ::  R4.2b: the key is the DEFINITION's own name -- a definition reached
+  ::  through an operator parameter (`MapThenFoldSet(op(_,_), …)` given `+`)
+  ::  is named `op` where it is referenced and `+` in its module
+  =/  key=op-key:so  [origin.def (bnm name.def) (lent args.n)]
   =/  ov  (lookup:so ov.e key)
   ?^  ov
     =^  as  rs  (eval-args-rs args.n e rs)
@@ -1312,7 +1319,7 @@
   =/  nop  (node-op:so key)
   ?^  nop  (eval-node-op-rs tag.u.nop n e rs)
   ?:  ?&  (is-standard:so ov.e origin.def)
-          !(body-allowed:so ov.e origin.def (bnm nm))
+          !(body-allowed:so ov.e origin.def (bnm name.def))
       ==
     [[%| (unsupported:so key)] rs]
   ::  R4.P3: a constant definition already evaluated once (`+with-cdefs`)
@@ -2026,29 +2033,35 @@
   ^-  ?(%override %body %none)
   =/  d  (~(get by ops.e) nm)
   ?~  d  %none
-  =/  key=op-key:so  [origin.u.d (bnm nm) ar]
+  =/  key=op-key:so  [origin.u.d (bnm name.u.d) ar]
   ?^  (lookup:so ov.e key)  %override
   ?^  (node-op:so key)  %override
   ?:  (is-descriptor:so key)  %override
   ?:  ?&  (is-standard:so ov.e origin.u.d)
-          !(body-allowed:so ov.e origin.u.d (bnm nm))
+          !(body-allowed:so ov.e origin.u.d (bnm name.u.d))
       ==
     %none
   ?~(body.u.d %none %body)
 ::
 ++  bind-params
+  ::  R4.2: every argument is evaluated in the CALLER's env (`e0`), never in
+  ::  the env being extended -- else `Attacks(Append(queens, c), i,
+  ::  Len(queens) + 1)` read `queens` as the formal the FIRST argument had
+  ::  just bound (N-Queens: "index 3 of tuple <<1, 1>>")
   |=  [e=eenv ps=(list spar:sm) as=(list sem:sm)]
   ^-  (each eenv eval-err:v)
+  =/  e0  e
+  |-  ^-  (each eenv eval-err:v)
   ?~  ps  [%& e]
   ?~  as  [%| 0 'argument count mismatch.']
   ?:  (gth arity.i.ps 0)
-    =/  od  (resolve-oparg i.as e)
+    =/  od  (resolve-oparg i.as e0)
     ?~  od  [%| 0 'unsupported operator-valued argument.']
     $(ps t.ps, as t.as, e e(ops (~(put by ops.e) name.i.ps u.od)))
   ?.  used.i.ps
     ::  an unused expression parameter is not evaluated (lazy argument)
     $(ps t.ps, as t.as)
-  =/  av  (eval i.as e)
+  =/  av  (eval i.as e0)
   ?:  ?=(%| -.av)  av
   $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
 ::
@@ -2203,16 +2216,33 @@
   ::  the variable names of UNCHANGED e (a variable or a tuple of variables).
   ::  `psub` is consulted so a SUBSTITUTED variable names its outer target --
   ::  `UNCHANGED v` under `v <- x` is `UNCHANGED x` (R2.3.5)
-  |=  [n=sem:sm psub=(map @t sem:sm)]
+  ::  R4.2p: RECURSIVELY, as tlc2's `processUnchanged` is -- a tuple element
+  ::  that is itself a tuple, and a zero-arity DEFINITION naming variables
+  ::  (`UNCHANGED vars` with `vars == <<x, y>>`, `UNCHANGED <<cycle, doubles>>`),
+  ::  were dropped, so those variables went unassigned and the successor was
+  ::  "incomplete" (8 Examples rows). `ops` resolves the definitions; the
+  ::  fuel bounds a definition that names itself
+  |=  [n=sem:sm psub=(map @t sem:sm) ops=(map @t sem-def:sm)]
   ^-  (list @t)
+  =/  fuel  64
+  |-  ^-  (list @t)
+  ?:  =(0 fuel)  ~
   =.  n  (deref-sem n psub)
+  =.  n  (deref-letin n)
   ?.  ?=(%apply -.n)  ~
   ?:  ?=(%variable kind.op.n)  ~[name.op.n]
-  ?.  =('$Tuple' name.op.n)  ~
-  %+  murn  args.n
-  |=  a=sem:sm
-  =.  a  (deref-sem a psub)
-  ?:(&(?=(%apply -.a) ?=(%variable kind.op.a)) `name.op.a ~)
+  ?:  =('$Tuple' name.op.n)
+    =/  as  args.n
+    |-  ^-  (list @t)
+    ?~  as  ~
+    (weld ^$(n i.as, fuel (dec fuel)) $(as t.as))
+  ?:  &(?=(%user-op kind.op.n) ?=(~ args.n))
+    =/  d  (~(get by ops) name.op.n)
+    ?~  d  ~
+    ?~  body.u.d  ~
+    ?.  ?=(~ params.u.d)  ~
+    $(n u.body.u.d, fuel (dec fuel))
+  ~
 ::
 ++  complete
   |=  [st=state vars=(set @t)]
@@ -2252,11 +2282,23 @@
   ::  module's `v'` is still an assignment to the outer `x`, while a value
   ::  substitution (`k <- 3`) is evaluated once and bound through `vals`, which
   ::  is where a CONSTANT reference reads from
+  ::  R4.2: each substitution is evaluated in the INSTANTIATING env (`e0`),
+  ::  as tlc2's `getVal(sub.getExpr(), c, ...)` uses `c`, not the context
+  ::  being extended
   |=  [e=eenv ns=(list sbind:sm) as=(list sem:sm)]
   ^-  (each eenv eval-err:v)
+  =/  e0  e
+  |-  ^-  (each eenv eval-err:v)
   ?~  ns  [%& e]
   ?~  as  [%& e]
-  ?:  (state-var-ref i.as e)
+  ::  R4.2o: an OPERATOR-valued substitution (`XInit <- XInit` for a
+  ::  `CONSTANT XInit(_)`, a `$OpArg`) binds the operator, as `+bind-psub`
+  ::  binds an operator parameter: the inner `XInit(x)` then expands it
+  ?:  &(?=(%apply -.i.as) =('$OpArg' name.op.i.as))
+    =/  od  (resolve-oparg i.as e0)
+    ?~  od  $(ns t.ns, as t.as)
+    $(ns t.ns, as t.as, e e(ops (~(put by ops.e) name.i.ns u.od)))
+  ?:  (state-var-ref i.as e0)
     $(ns t.ns, as t.as, e e(psub (~(put by psub.e) name.i.ns i.as)))
   ::  R4.2n: a STATE-DEPENDENT expression (`y <- x % 2`) is bound LAZILY as
   ::  well, as tlc2's `getVal(expr, con, false)` does (a LazyValue): an inner
@@ -2264,7 +2306,7 @@
   ::  successor. Bound eagerly, `y'` found no `y` in the successor state. An
   ::  inner CONSTANT still reads the value from `vals`
   =?  psub.e  (gth (sem-level i.as) 0)  (~(put by psub.e) name.i.ns i.as)
-  =/  av  (eval i.as e)
+  =/  av  (eval i.as e0)
   ::  R4.2m: an expression with no VALUE -- `Values <- Int`, an infinite
   ::  set (Disruptor's RingBuffer) -- is bound by name too, as tlc2 binds
   ::  the lazy value; a reference reads it where it is used (membership,
@@ -2300,10 +2342,20 @@
   ?~  ps  [%& e]
   ?~  as  [%& e]
   ?:  (gth arity.i.ps 0)
-    =/  od  (resolve-oparg i.as e)
+    =/  od  (resolve-oparg i.as ev)
     ?~  od  [%| 0 'unsupported operator-valued argument.']
     $(ps t.ps, as t.as, e e(ops (~(put by ops.e) name.i.ps u.od)))
-  ?:  (state-var-ref i.as e)
+  ?:  (state-var-ref i.as ev)
+    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
+  ::  R4.2o: a PRIMED state variable (`XAct(0, x, x')`, TwoPhase) is bound by
+  ::  name too, as tlc2 binds every argument lazily: `xNext = xInit` in the
+  ::  body is then an assignment to `x'` (`+assignable-sem` chases it), where
+  ::  evaluating `x'` here read a successor that does not exist yet
+  ?:  ?&  ?=(%apply -.i.as)
+          =('\'' name.op.i.as)
+          ?=([* ~] args.i.as)
+          (state-var-ref i.args.i.as ev)
+      ==
     $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
   ?.  used.i.ps
     $(ps t.ps, as t.as)
@@ -2372,7 +2424,14 @@
     =/  e2  (bind-substs (senv mode cur part e) names.u.sp exprs.u.sp)
     ?:  ?=(%| -.e2)  [e2 s]
     (solve inner.u.sp mode cur part p.e2 s)
-  ?:  ?=(%user-op kind.op.n)
+  ::  R4.2o: a CONSTANT operator bound to an operator (an INSTANCE's
+  ::  `$OpArg` substitution, or a config `F <- G`) is expanded like a user
+  ::  operator, so an assignment in its body still assigns
+  ?:  ?|  ?=(%user-op kind.op.n)
+          ?&  ?=(?(%constant %new-constant) kind.op.n)
+              !(~(has by vals.e) nm)
+              (~(has by ops.e) nm)
+      ==  ==
     =/  d  (~(get by ops.e) nm)
     ?:  ?|(?=(~ d) ?=(~ body.u.d))  (solve-filter n mode cur part e s)
     ?.  =((lent params.u.d) (lent args.n))  (solve-filter n mode cur part e s)
@@ -2504,7 +2563,7 @@
   ::  UNCHANGED e assigns each named variable to its current value
   |=  [arg=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
-  =/  names  (unchanged-vars arg psub.e)
+  =/  names  (unchanged-vars arg psub.e ops.e)
   =/  out=state  part
   =.  out
     |-  ^-  state
@@ -2589,7 +2648,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~ [~ ~]]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -2643,7 +2702,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~])
+  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~]])
 ::
 ++  with-cdefs
   ::  R4.P3 (H4): tlc2's `SpecProcessor.processConstantDefns` -- every
@@ -2676,8 +2735,8 @@
           =(0 lvl.d)
           ?=(^ body.d)
           !(is-standard:so ov.e origin.d)
-          ?=(~ (lookup:so ov.e [origin.d (bnm nm) 0]))
-          ?=(~ (node-op:so [origin.d (bnm nm) 0]))
+          ?=(~ (lookup:so ov.e [origin.d (bnm name.d) 0]))
+          ?=(~ (node-op:so [origin.d (bnm name.d) 0]))
       ==
     $(ds t.ds)
   =/  r  (mule |.((eval-rs u.body.d e empty-rst)))
@@ -2703,6 +2762,12 @@
   |=  [e=eenv v=value:v]
   ^-  eenv
   e(ce `v)
+::
+++  with-idk
+  ::  R4.2e: the search identity applied to a prebuilt env (see `idk`)
+  |=  [e=eenv perms=(list (map @t @t)) view=(unit sem:sm)]
+  ^-  eenv
+  e(idk [perms view])
 ::
 ++  with-setmax
   ::  the run's `max-set-size` applied to a prebuilt env (R2.4.1). A separate
@@ -2982,7 +3047,7 @@
     =/  rest  (flop (prow-items body bs t.rows e))
     (psolve body cur part (bind-vals e bs i.rows) (weld rest acts) p fil)
   ?:  =(nm 'UNCHANGED')
-    =/  names  (unchanged-vars (snag 0 args.n) psub.e)
+    =/  names  (unchanged-vars (snag 0 args.n) psub.e ops.e)
     =/  out=state  part
     =.  out
       |-  ^-  state
@@ -3019,7 +3084,11 @@
     =/  e2  (bind-substs (senv %next cur part e) names.u.sp exprs.u.sp)
     ?:  ?=(%| -.e2)  [[%err p.e2] p]
     (psolve inner.u.sp cur part p.e2 acts p fil)
-  ?:  ?=(%user-op kind.op.n)
+  ?:  ?|  ?=(%user-op kind.op.n)
+          ?&  ?=(?(%constant %new-constant) kind.op.n)
+              !(~(has by vals.e) nm)
+              (~(has by ops.e) nm)
+      ==  ==
     =/  d  (~(get by ops.e) nm)
     ?:  ?|(?=(~ d) ?=(~ body.u.d))  (pfilter n cur part e acts p fil)
     ?.  =((lent params.u.d) (lent args.n))  (pfilter n cur part e acts p fil)

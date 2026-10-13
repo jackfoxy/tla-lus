@@ -2690,8 +2690,8 @@
   ::  fingerprints (`+succ-fps`, `+trace-graph`) that would not match a
   ::  view-keyed graph. That is the same latent mismatch symmetry+liveness is
   ::  refused for; it is narrowed, not ignored
-  ?:  &(?=(^ view.ca) ?=(^ pp))
-    [%| 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
+  ::  R4.2e: no longer refused -- the liveness product keys a state by the
+  ::  same identity the graph build used (`+live-key:lv`, the env's `idk`)
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
@@ -3299,7 +3299,7 @@
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  oss  oss.c
   |-  ^-  (list [nodes=@ud inits=@ud])
   ?~  oss  ~
@@ -3342,7 +3342,7 @@
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  ranks   (fp-ranks states)
   =/  oss  oss.c
   |-  ^-  (list wain)
@@ -3380,7 +3380,7 @@
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   ?:  (live-verdict:lv oss.c states inits.g nsb.c env order.c)
     ~['VERDICT violated-property' 'EC 2116']
   ~['VERDICT ok' 'EC 0']
@@ -3398,7 +3398,7 @@
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
   ?~  l  ~['(no lasso)']
   =/  modn     (module-name-of tree.c)
@@ -3801,7 +3801,7 @@
   =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  modn    (module-name-of tree.c)
   =/  pname   ?~(pp.c '' u.pp.c)
   =/  r
@@ -5407,7 +5407,8 @@
     =/  post=wain
       %-  post-error-live
       :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
+          (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+          order.c  modn  defs.c
           pname  props.c  aname.c
       ==
     ::  R2.7.7.3: the postconditions run here too -- measured, they run
@@ -5438,7 +5439,8 @@
   =/  r
     %-  live-report
     :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-        (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  pname
+        (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+        order.c  modn  defs.c  pname
         props.c
         gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
         pcs.c  rs.bg  poss.c
@@ -5674,7 +5676,8 @@
   =/  l
     %-  find-lasso:lv
     :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-        (make-env:ne defs.c consts.c vars.c)  order.c
+        (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+        order.c
     ==
   ?~  l  [[%ok st] st]
   ::  R2.7.12: the name is the post-hoc attribution's, `pp` only a fallback

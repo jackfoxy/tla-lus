@@ -1079,7 +1079,10 @@
   =.  defs.mo  (stamp-origin root defs.mo)
   =.  mo  mo(imports (ext-defs root sem-order.g ctxs mods.g))
   ::  R4.2n: the root's nested-instance members resolve through `imports`
-  =.  imports.mo  (weld imports.mo (nested-defs tree.u.rt fc ctxs mods.g))
+  ::  (first in the list: `+defmap-of` lets a later entry win, and the root's
+  ::  own EXTENDS must)
+  =.  imports.mo
+    (weld (nested-defs tree.u.rt fc ctxs mods.g sem-order.g) imports.mo)
   `mo(modops (mod-opdefs root sem-order.g ctxs mods.g))
 ::
 ++  stamp-origin
@@ -1155,13 +1158,24 @@
   ::  and arities only, unless the pin leaves one of its operators
   ::  un-overridden. LOCAL definitions are not exported and are skipped.
   ::  These are not level-checked: evaluation consumes bodies
+  ::  R4.2b: LOCAL definitions are imported too, AFTER every exported one and
+  ::  only under a name nothing else took. They are not exported -- no source
+  ::  can name them, SANY rejects that -- but the bodies that DO name them
+  ::  must resolve: `Functions` folds through `MapThenFoldSet` from its
+  ::  `LOCAL INSTANCE Folds`, Bitwise's `^^` through a LOCAL `Xor`
   |=  [root=@t order=(list @t) ctxs=(map @t ctx) mods=(map @t loaded:modules)]
   ^-  (list sem-def)
   =/  ms  (ext-reach root order mods)
   =|  seen=(set @t)
   =|  out=(list sem-def)
+  =|  lcl=(list sem-def)
   |-  ^-  (list sem-def)
-  ?~  ms  (flop out)
+  ?~  ms
+    =/  ls  (flop lcl)
+    |-  ^-  (list sem-def)
+    ?~  ls  (flop out)
+    ?:  (~(has in seen) name.i.ls)  $(ls t.ls)
+    $(ls t.ls, seen (~(put in seen) name.i.ls), out [i.ls out])
   =/  ld  (~(get by mods) i.ms)
   ?~  ld  $(ms t.ms)
   =/  std  (~(has by standard-modules:stdmods:modules) i.ms)
@@ -1171,11 +1185,12 @@
     =/  fc  (full-ctx tree.u.ld ctxs)
     (stamp-origin i.ms defs:(gen-module tree.u.ld fc ctxs mods))
   =/  acc
-    |-  ^-  [seen=(set @t) out=(list sem-def)]
-    ?~  ds  [seen out]
-    ?:  |(local.i.ds (~(has in seen) name.i.ds))  $(ds t.ds)
+    |-  ^-  [seen=(set @t) out=(list sem-def) lcl=(list sem-def)]
+    ?~  ds  [seen out lcl]
+    ?:  local.i.ds  $(ds t.ds, lcl [i.ds lcl])
+    ?:  (~(has in seen) name.i.ds)  $(ds t.ds)
     $(ds t.ds, seen (~(put in seen) name.i.ds), out [i.ds out])
-  $(ms t.ms, seen seen.acc, out out.acc)
+  $(ms t.ms, seen seen.acc, out out.acc, lcl lcl.acc)
 ::
 ++  mod-opdefs
   ::  every module in the spec, mapped to the operator names and arities
@@ -3008,7 +3023,14 @@
 ++  nested-defs
   ::  R4.2n: the nested-instance members of every INSTANCE unit of a module
   ::  (see `+g-instance`'s `nds`)
-  |=  [tree=node c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ::  R4.2o: and the instanced module's EXTENDS closure, under its plain
+  ::  names. SANY's `INSTANCE M` brings what M extends; M's bodies name those
+  ::  operators plainly (`(p + 1) % 2` in TwoPhase, which EXTENDS Naturals
+  ::  where MCTwoPhase does not), so the plain name must resolve. A name the
+  ::  root itself defines or extends still wins (`imports` come first)
+  |=  $:  tree=node  c=ctx  ctxs=(map @t ctx)
+          mods=(map @t loaded:modules)  order=(list @t)
+      ==
   ^-  (list sem-def)
   =/  us  (body-of-module tree)
   =|  out=(list sem-def)
@@ -3017,7 +3039,9 @@
   =/  iu  (unit-instance i.us)
   ?~  iu  $(us t.us)
   =/  gi  (g-instance i.us u.iu c ctxs mods)
-  $(us t.us, out (weld out nds.gi))
+  =/  im  mod:(inst-parts nl.u.iu)
+  =/  xs  (ext-defs im order ctxs mods)
+  $(us t.us, out :(weld out xs nds.gi))
 ::
 ++  g-instance
   ::  an INSTANCE unit: one imported definition per (non-local) operator

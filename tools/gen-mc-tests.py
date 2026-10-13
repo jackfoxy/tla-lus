@@ -62,6 +62,20 @@ SKIPS: dict = {
 #  tableau expansion and dies on the JVM stack -- and, measured, two DIFFERENT
 #  port behaviours. Neither run produces a verdict on either side.
 APPROVED = {
+    #  R4.2t (approved 2026-10-12, option B): variable ORDER
+    "var-order-hashtable": (
+        ["Error: Invariant Inv is violated by the initial state:",
+         "/\\ zeta = 0", "/\\ alpha = 1", "/\\ mid = 2", "/\\ Qux = 3",
+         "/\\ beta2 = 4", "/\\ beta10 = 5"],
+        "R4.2t: tlc2 orders a state's variables by the java.util.Hashtable "
+        "enumeration of the module's SANY Context -- String.hashCode, the "
+        "table's capacity and rehash history and the insertion order of EVERY "
+        "symbol in the context -- a layout artifact of SANY's symbol table, "
+        "as string order is of its intern table (`tlc-value-order`). The port "
+        "keeps declaration order (root first, then EXTENDS). Verdicts and "
+        "counts are unaffected; traces differ in binding order, and so do the "
+        "consumers of FP64's byte order (the RNG reseed, liveness lasso "
+        "choice, symmetry tie-breaks)"),
     "gh1389-loops": (
         ["Error: expansion bound reached (1000 nested user-operator "
          "expansions) translating the temporal formula line 7, col 37 to "

@@ -1519,10 +1519,8 @@
   ::  (simulation and the genuine temporal lasso), each at its own branch below
   ::  rather than here, because a `[]P` box-state PROPERTY runs on the SAFETY
   ::  path and does render the alias — a `?=(^ pp)` guard here would over-refuse
-  ?:  &(?=(^ view.rs) ?=(^ pp))
-    %^  finish  j
-      [%failed 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
-    pre
+  ::  R4.2e: VIEW with a temporal PROPERTY runs; the liveness product keys
+  ::  states as the graph build did (`+live-key:lv`)
   ::  R4.2l: the VARIABLEs of the whole EXTENDS closure, from the semantic
   ::  graph (the root's own first, in declaration order, then the imported
   ::  ones); the root tree alone dropped an extended module's variables
@@ -2068,7 +2066,9 @@
   ::  the first violated one render tlc2.TLC's console diagnostic + typed result.
   =/  st      stats.j
   =/  states  (states-of:check seen.cur.kk)
-  =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+  ::  R4.2e: the liveness product keys states as the graph build did
+  =/  env
+    (with-idk:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk) perms.o.kk view.o.kk)
   ::  R2.7.14a/b: the POSTCONDITION lines, in tlc2's slot (between the EC
   ::  2257/2259 hint and the counts). The run's FINAL carrier and statistics,
   ::  for the same reason R2.7.7.4a threaded them on the safety path -- a

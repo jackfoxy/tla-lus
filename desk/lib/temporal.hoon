@@ -654,11 +654,15 @@
   ::  `getVal` also declines to force) is bound as the argument NODE through
   ::  `psub`, the port's existing call-by-name device. Each binding clears the
   ::  other map so lookup order cannot matter.
+  ::  R4.2: arguments evaluate in the CALLER's env (`e0`), not in the one
+  ::  being extended
   |=  [ps=(list spar:sm) as=(list sem:sm) env=eenv:ne]
   ^-  eenv:ne
+  =/  e0  env
+  |-  ^-  eenv:ne
   ?~  ps  env
   ?~  as  env
-  =/  r  (eval:ne i.as env)
+  =/  r  (eval:ne i.as e0)
   =/  e2=eenv:ne
     ?:  ?=(%& -.r)
       %=  env

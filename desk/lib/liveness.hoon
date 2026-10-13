@@ -123,10 +123,24 @@
   =|  seen=(set @t)
   |-  ^-  (list [fp=@t st=state:ne])
   ?~  p.r  ~
-  =/  fp  `@t`(state-fp:fpl order i.p.r)
+  =/  fp  (live-key order i.p.r env)
   ?.  (~(has by states) fp)  $(p.r t.p.r)
   ?:  (~(has in seen) fp)  $(p.r t.p.r)
   [[fp i.p.r] $(p.r t.p.r, seen (~(put in seen) fp))]
+::
+++  live-key
+  ::  R4.2e: a state's key in the liveness graph, computed as the graph build
+  ::  computed it (`+register-in:check` with FP64): the symmetry
+  ::  representative, then the FP64 of the VIEW's value on it, or of the
+  ::  representative itself. Plain `state-fp` here missed every successor a
+  ::  VIEW or SYMMETRY had re-keyed, dropping its product edge
+  |=  [order=(list @t) st=state:ne env=eenv:ne]
+  ^-  @t
+  =/  cst  (canonicalize:fpl perms.idk.env order st)
+  ?~  view.idk.env  `@t`(state-fp:fpl order cst)
+  =/  vr  (eval:ne u.view.idk.env env(s0 cst, s1 cst, primed |))
+  ?:  ?=(%| -.vr)  `@t`(state-fp:fpl order cst)
+  `@t`(view-fp:fpl p.vr)
 ::
 ++  build-product
   ::  the product node count and initial-node count for one OrderOfSolution.
@@ -458,13 +472,17 @@
   ::  R2.7.4.1: an ENABLED test discards the run carrier, like +eval-enabled
   =/  r=sres:ne  -:(solve:ne a %next s0 ~ env(enabled &) empty-rst:ne)
   ?:  ?=(%| -.r)  |
-  ?~  sub
-    (lien p.r |=(st=state:ne (complete:ne st vars.env)))
+  ::  R4.2s: NO completeness requirement. tlc2's `Tool.enabled` answers as
+  ::  soon as the action's items are exhausted -- a variable the action does
+  ::  not mention is unconstrained, not "unassigned". Requiring a complete
+  ::  successor read `ENABLED Move_Cat` (which assigns `cat_box` only) as
+  ::  FALSE, so `WF_cat_box(Move_Cat)` was vacuous and Moving_Cat_Puzzle
+  ::  reported a stuttering counter-example tlc2 does not
+  ?~  sub  ?=(^ p.r)
   =/  v0  (sub-val u.sub s0 env)
   ?~  v0  |
   %+  lien  p.r
   |=  st=state:ne
-  ?.  (complete:ne st vars.env)  |
   =/  v1  (sub-val u.sub st env)
   ?&(?=(^ v1) !(equal:vl u.v0 u.v1))
 ::
@@ -729,10 +747,10 @@
   ::  that follow its occurrences — accumulated by fingerprint, matching
   ::  addNextState). The product build adds the stutter self-loop. This is the
   ::  graph tlc2 LiveCheck.checkTrace feeds the liveness checker per behavior.
-  |=  [trace=(list state:ne) order=(list @t)]
+  |=  [trace=(list state:ne) order=(list @t) env=eenv:ne]
   ^-  [states=(map @t state:ne) init=@t succ=(jar @t [fp=@t st=state:ne])]
   ?~  trace  [~ *@t ~]
-  =/  ini  `@t`(state-fp:fpl order i.trace)
+  =/  ini  (live-key order i.trace env)
   =|  states=(map @t state:ne)
   =|  succ=(jar @t [fp=@t st=state:ne])
   =.  states  (~(put by states) ini i.trace)
@@ -740,7 +758,7 @@
   =/  rest  t.trace
   |-  ^-  [states=(map @t state:ne) init=@t succ=_succ]
   ?~  rest  [states ini succ]
-  =/  fp1  `@t`(state-fp:fpl order i.rest)
+  =/  fp1  (live-key order i.rest env)
   =.  states  (~(put by states) fp1 i.rest)
   =.  succ    (~(add ja succ) fp.prev [fp1 i.rest])
   $(rest t.rest, prev [fp1 i.rest])
@@ -751,7 +769,7 @@
   ::  next-states search, so it needs no reachable-graph exploration.
   |=  [o=oos:tp trace=(list state:ne) env=eenv:ne order=(list @t)]
   ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
-  =/  g  (trace-graph trace order)
+  =/  g  (trace-graph trace order env)
   ?~  tf.o
     =/  ik=(list pg-key)  ~[[init.g 0]]
     =/  nm=(map pg-key pnode)
