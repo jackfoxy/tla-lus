@@ -134,13 +134,26 @@
       ::  still unassigned reports 2:2 (`Tool.getInitStates`'s allAssigned
       ::  branch is the only site that increments it)
       irej=@ud
+      ::  R4.2a: the lines `TLC!Print` / `TLC!PrintT` wrote, NEWEST FIRST.
+      ::  tlc2 prints at the moment of evaluation, so the output is a run-state
+      ::  effect exactly as a draw or a `TLCSet` write is, and rides the same
+      ::  carrier; the caller flops it
+      out=(list @t)
+      ::  R4.2f: the files `JsonSerialize` / `ndJsonSerialize` wrote, by the
+      ::  path the spec named; a later write to the same path replaces it, as
+      ::  the pin's `FileWriter` truncates. The job turns each into an artifact
+      files=(map @t @t)
+      ::  R4.2g: intermediate states an action composition generated
+      ::  (`A \cdot B`'s `s -A-> t`), which tlc2 counts as generated
+      ::  (`nss.incrementStatesGenerated`); `+bfs-step` adds and clears it
+      xgen=@ud
   ==
 ::  a solver result carrying the run state, and its evaluator sibling. UNFACED,
 ::  like `[pres pst]` on the `-generate` path: a face on the head leaks into
 ::  whatever `=^` binds, so `p.r` on the bound result stops resolving
 +$  sout  [sres rst]
 +$  eout  [eres rst]
-++  empty-rst  ^-(rst [~ ~ 0 0])
+++  empty-rst  ^-(rst [~ ~ 0 0 ~ ~ 0])
 ::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
 ::  and coarse category, message, source location, operator/evaluation stack,
 ::  and whether a checker may recover. Per-site emission (replacing the bare
@@ -587,6 +600,28 @@
   ::  carry one. Threading them means reshaping the whole lazy set layer, and
   ::  that is a change to `lib/value.hoon`, not to this file -- see the notes
   ::  for what R2.7.4.3/.4 must do about it
+  ::  R4.2g: `A \cdot B` as a predicate (Tool.java:2771): TRUE when some
+  ::  `s0 -A-> t` (A solved from an EMPTY successor, not `copyWith`) has
+  ::  `t -B-> s1`
+  ?:  &(=(nm '\\cdot') ?=([* * ~] as))
+    ?.  (cdot-on e)  [[%| 0 cdot-msg] rs]
+    =^  ra  rs  (solve i.as %next s0.e ~ e rs)
+    ?:  ?=(%| -.ra)  [ra rs]
+    =/  ts  p.ra
+    |-  ^-  eout
+    ?~  ts  [[%& [%bool |]] rs]
+    =^  b  rs  (eval-bool-rs i.t.as e(s0 i.ts, primed |) rs)
+    ?:  ?=(%| -.b)  [b rs]
+    ?:  p.b  [[%& [%bool &]] rs]
+    $(ts t.ts)
+  ::  R4.2a: above the boundary when the body DRAWS or PRINTS
+  ::  (`+sem-draws`): tlc2 prints at each evaluation, so `\E p \in S :
+  ::  IF Ok(p) THEN PrintT(p) ELSE FALSE` (Stones) must print per witness
+  ::  tried, and stop where the quantifier stops
+  ?:  &(=(nm '$BoundedForall') (sem-draws n e))  (eval-quant-rs n e %all rs)
+  ?:  &(=(nm '$BoundedExists') (sem-draws n e))  (eval-quant-rs n e %ex rs)
+  ?:  &(=(nm '$BoundedChoose') (sem-draws n e))  (eval-quant-rs n e %choose rs)
+  ?:  &(=(nm '$SubsetOf') (sem-draws n e))  (eval-quant-rs n e %filter rs)
   ?:  =(nm '$BoundedForall')  [(eval-forall n e) rs]
   ?:  =(nm '$BoundedExists')  [(eval-exists n e) rs]
   ?:  =(nm '$BoundedChoose')  [(eval-choose n e) rs]
@@ -1111,7 +1146,7 @@
   %=  $
     names  t.names
     vs     t.vs
-    e      e(vals (~(put by vals.e) i.names i.vs))
+    e      e(vals (~(put by vals.e) i.names i.vs), psub (~(del by psub.e) i.names))
   ==
 ::
 ++  bind-group
@@ -1122,8 +1157,13 @@
   ::  seeing the whole element (R1.3.8)
   |=  [e=eenv g=bgroup w=value:v]
   ^-  eenv
+  ::  R4.2c (TestGraphs): a binding SHADOWS a call-by-name entry of the same
+  ::  name -- an unnamed `INSTANCE TLCMC` binds its variable `i` by name, and
+  ::  `{seq[i] : i \in 1..Len(seq)}` inside it then read the STATE variable
+  ::  for its bound `i`
   ?.  tup.g
-    ?~(nms.g e e(vals (~(put by vals.e) i.nms.g w)))
+    ?~  nms.g  e
+    e(vals (~(put by vals.e) i.nms.g w), psub (~(del by psub.e) i.nms.g))
   ?.  ?=(%seq -.w)  e
   (bind-names e nms.g p.w)
 ::
@@ -1238,6 +1278,42 @@
     |=(pre=(list value:v) (eval-bool body (bind-vals e bs pre)))
   ?:(?=(%| -.r) r [%& [%bool p.r]])
 ::
+++  eval-quant-rs
+  ::  R4.2a: `\A`, `\E`, `CHOOSE` and the set filter over their bound
+  ::  domains in tlc2's enumeration order (`+bound-domains`, `+bind-rows`:
+  ::  ContextEnumerator, leading binder fastest), the body on the carrier,
+  ::  stopping where tlc2 stops (the first FALSE, the first TRUE, the first
+  ::  witness). CHOOSE and the filter take one binder group, as below the
+  ::  boundary
+  |=  [n=sem-apply:sm e=eenv k=?(%all %ex %choose %filter) rs=rst]
+  ^-  eout
+  =/  bs  (flatten-bound bound.n)
+  ?~  bs  [[%| 0 'unbounded quantifier is not enumerable.'] rs]
+  ?:  &(?=(?(%choose %filter) k) ?=(^ t.bs))
+    [[%| 0 'CHOOSE expects one bounded variable.'] rs]
+  =/  ds  (bound-domains bs e)
+  ?:  ?=(%| -.ds)  [ds rs]
+  =/  body  (snag 0 args.n)
+  =/  rows  (bind-rows p.ds)
+  =|  keep=(list value:v)
+  |-  ^-  eout
+  ?~  rows
+    :_  rs
+    ?-  k
+      %all     [%& [%bool &]]
+      %ex      [%& [%bool |]]
+      %choose  [%| 0 'CHOOSE: no element of the domain satisfies the predicate.']
+      %filter  [%& (normalize:v [%set %set-enum (flop keep)])]
+    ==
+  =^  b  rs  (eval-bool-rs body (bind-vals e bs i.rows) rs)
+  ?:  ?=(%| -.b)  [b rs]
+  ?-  k
+    %all     ?.(p.b [[%& [%bool |]] rs] $(rows t.rows))
+    %ex      ?:(p.b [[%& [%bool &]] rs] $(rows t.rows))
+    %choose  ?:(p.b [[%& (snag 0 i.rows)] rs] $(rows t.rows))
+    %filter  $(rows t.rows, keep ?:(p.b [(snag 0 i.rows) keep] keep))
+  ==
+::
 ++  eval-choose
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
@@ -1279,6 +1355,9 @@
   ^-  ?
   =/  rn  (reach-names s ops.e)
   ?|  (~(has in rn) 'RandomElement')
+      ::  R4.2a: a print is an effect on the same carrier
+      (~(has in rn) 'Print')
+      (~(has in rn) 'PrintT')
       (~(has in rn) 'RandomSubset')
       (~(has in rn) 'RandomSetOfSubsets')
       (~(has in rn) 'TestRandomSetOfSubsets')
@@ -1483,7 +1562,35 @@
     (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e))) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
-  (eval-rs u.body.def p.e2(fuel (dec fuel.e)) rs)
+  =/  ew  p.e2(fuel (dec fuel.e))
+  ::  R4.2c: an INSTANCE member's body is its `WITH` wrapper; its own
+  ::  parameters must win over a substitution of the same name
+  ::  (`+keep-params`)
+  =/  sp  (substin-parts:sm u.body.def)
+  ?~  sp  (eval-rs u.body.def ew rs)
+  =/  e3  (bind-substs ew names.u.sp exprs.u.sp)
+  ?:  ?=(%| -.e3)  [e3 rs]
+  (eval-rs inner.u.sp (keep-params p.e3 ew params.def) rs)
+::
+++  keep-params
+  ::  R4.2c (TestGraphs): re-assert an operator's own parameters over the
+  ::  INSTANCE substitutions its body's wrapper bound. tlc2 resolves a name by
+  ::  its NODE, so `SuccessorsOf(state, SG)` -- declared in TLCMC BEFORE the
+  ::  `VARIABLE state` the instance substitutes by name -- reads its PARAMETER;
+  ::  the port binds both by name, and the wrapper, bound after the
+  ::  parameters, captured `state` as the current state's variable. `ew` is the
+  ::  env with only the parameters bound
+  |=  [e=eenv ew=eenv ps=(list spar:sm)]
+  ^-  eenv
+  ?~  ps  e
+  =/  nm  name.i.ps
+  =/  v  (~(get by vals.ew) nm)
+  =/  b  (~(get by psub.ew) nm)
+  =/  o  (~(get by ops.ew) nm)
+  =?  e  ?=(^ v)  e(vals (~(put by vals.e) nm u.v), psub (~(del by psub.e) nm))
+  =?  e  ?=(^ b)  e(psub (~(put by psub.e) nm u.b), vals (~(del by vals.e) nm))
+  =?  e  &((gth arity.i.ps 0) ?=(^ o))  e(ops (~(put by ops.e) nm u.o))
+  $(ps t.ps)
 ::
 ++  eval-sdef
   ::  R4.P11: `+eval-rs` memoized with `~+`. The key is the whole sample --
@@ -1570,6 +1677,15 @@
   ?:  ?=(%tlc-eval-def tag)        (eval-tlc-eval-def n e rs)
   ::  R2.7.4.4: the DRAW. It spends `es.rs`, so it carries for the same reason
   ?:  ?=(%random-element tag)      (eval-random-element n e rs)
+  ::  R4.2a: the console WRITE, a line on the carrier
+  ?:  ?=(%print tag)               (eval-print n e | rs)
+  ?:  ?=(%print-t tag)             (eval-print n e & rs)
+  ::  R4.2c: the run's environment, a record (`$env`, the request's `env`)
+  ?:  ?=(%io-env tag)
+    [[%& (~(gut by vals.e) '$env' [%rec ~])] rs]
+  ::  R4.2f: a file WRITE, on the carrier
+  ?:  ?=(%json-serialize tag)      (eval-json-write n e | rs)
+  ?:  ?=(%nd-json-serialize tag)   (eval-json-write n e & rs)
   ::  R2.7.4.5: the `Randomization` module -- all three DRAW
   ?:  ?=(%random-subset tag)         (eval-random-subset n e rs)
   ?:  ?=(%random-set-of-subsets tag)  (eval-random-set-of-subsets n e rs)
@@ -1819,7 +1935,79 @@
   ?.  ?=([* ~] args.n)  [[%| 0 'TLCGet expects one argument.'] rs]
   =^  k  rs  (eval-rs i.args.n e rs)
   ?:  ?=(%| -.k)  [k rs]
+  ::  R4.2g: `TLCGet("-D<key>")` is the Java system property `<key>`, and the
+  ::  key string itself when it is unset (`System.getProperty(k, "-D" + k)`,
+  ::  TLCGetSet.java:485). The properties are the request's (`$props`)
+  ?:  ?&  ?=(%str -.p.k)
+          =('-D' (end [3 2] p.p.k))
+      ==
+    =/  pv  (run-prop e (rsh [3 2] p.p.k))
+    [[%& [%str ?~(pv p.p.k u.pv)]] rs]
   [(tlc-get:so ~[p.k] run.e regs.rs named.rs) rs]
+::
+++  run-prop
+  ::  R4.2g: a Java system property of this run (the request's `props`, bound
+  ::  as the record `$props` by the job kernel; none on the console path)
+  |=  [e=eenv k=@t]
+  ^-  (unit @t)
+  =/  r  (~(get by vals.e) '$props')
+  ?~  r  ~
+  ?.  ?=(%rec -.u.r)  ~
+  =/  hit  (skim p.u.r |=(f=vfield:v =(k k.f)))
+  ?~  hit  ~
+  ?.  ?=(%str -.v.i.hit)  ~
+  `p.v.i.hit
+::
+++  eval-json-write
+  ::  R4.2f: `JsonSerialize(path, v)` writes `ToJson(v)` (a sequence or a
+  ::  record) and `ndJsonSerialize(path, s)` one `ToJson` line per element of
+  ::  the sequence `s`; both are TRUE (Json.java). The file is the carrier's
+  ::  `files` entry for `path`
+  |=  [n=sem-apply:sm e=eenv nd=? rs=rst]
+  ^-  eout
+  =/  op=@t  ?:(nd 'ndJsonSerialize' 'JsonSerialize')
+  ?.  ?=([* * ~] args.n)  [[%| 0 (cat 3 op ' expects two arguments.')] rs]
+  =^  a  rs  (eval-rs i.args.n e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  =^  b  rs  (eval-rs i.t.args.n e rs)
+  ?:  ?=(%| -.b)  [b rs]
+  ?.  ?=(%str -.p.a)  [[%| (arg-error:so 2.169 1 op 'string' | p.a)] rs]
+  =/  tup  (to-tuple:v p.b)
+  =/  txt=(each tape @t)
+    ?:  nd
+      ?~  tup  [%| '']
+      =/  ls  (json-list:so u.tup)
+      ?:  ?=(%| -.ls)  ls
+      [%& (zing (turn p.ls |=(t=tape (snoc t '\0a'))))]
+    ?.  |(?=(^ tup) ?=(%rec -.p.b))  [%| '']
+    (json-node:so p.b)
+  ?:  ?=(%| -.txt)
+    ?.  =('' p.txt)  [[%| 0 p.txt] rs]
+    =/  what=@t  ?:(nd 'sequence' 'sequence or record')
+    [[%| (arg-error:so 2.169 2 op what | p.b)] rs]
+  :-  [%& [%bool &]]
+  rs(files (~(put by files.rs) p.p.a (crip p.txt)))
+::
+++  eval-print
+  ::  R4.2a: `TLC!Print(v1, v2)` writes `ppr(v1) + "  " + ppr(v2)` and is v2;
+  ::  `TLC!PrintT(v)` writes `ppr(v)` and is TRUE (TLC.java:63-101). Both
+  ::  arguments are evaluated first, in order, on the carrier; an evaluation
+  ::  failure writes nothing. `ppr`'s line wrapping of a long value is not
+  ::  reproduced: the line is the one-line rendering
+  |=  [n=sem-apply:sm e=eenv one=? rs=rst]
+  ^-  eout
+  ?:  one
+    ?.  ?=([* ~] args.n)  [[%| 0 'PrintT expects one argument.'] rs]
+    =^  a  rs  (eval-rs i.args.n e rs)
+    ?:  ?=(%| -.a)  [a rs]
+    [[%& [%bool &]] rs(out [(crip (render:v p.a)) out.rs])]
+  ?.  ?=([* * ~] args.n)  [[%| 0 'Print expects two arguments.'] rs]
+  =^  a  rs  (eval-rs i.args.n e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  =^  b  rs  (eval-rs i.t.args.n e rs)
+  ?:  ?=(%| -.b)  [b rs]
+  :-  [%& p.b]
+  rs(out [(crip :(weld (render:v p.a) "  " (render:v p.b))) out.rs])
 ::
 ++  eval-random-element
   ::  TLC!RandomElement(S) — one uniform draw from a FINITE set, ADVANCING
@@ -2209,7 +2397,14 @@
     $(ps t.ps, as t.as)
   =/  av  (eval i.as e0)
   ?:  ?=(%| -.av)  av
-  $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
+  ::  R4.2c (TestGraphs): the parameter SHADOWS a call-by-name entry of its
+  ::  name -- `RemoveAt(s, i)` inside an unnamed `INSTANCE TLCMC`, whose
+  ::  variable `i` is bound by name, read the STATE variable for `i`
+  %=  $
+    ps  t.ps
+    as  t.as
+    e   e(vals (~(put by vals.e) name.i.ps p.av), psub (~(del by psub.e) name.i.ps))
+  ==
 ::
 ++  oparg-name
   ::  the operator an argument names. A bare reference to an operator of
@@ -2377,6 +2572,18 @@
   =.  n  (deref-letin n)
   ?.  ?=(%apply -.n)  ~
   ?:  ?=(%variable kind.op.n)  ~[name.op.n]
+  ::  R4.2c (TestGraphs): an INSTANCE member (`UNCHANGED vars` with TLCMC's
+  ::  `vars` reached through `INSTANCE TLCMC`) is its wrapper: its variables
+  ::  name the substituted targets
+  ?:  ?=(^ (anysubstin-mod:sm name.op.n))
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  ~
+    =/  ns  names.u.sp
+    =/  xs  exprs.u.sp
+    =/  ps2  psub
+    |-  ^-  (list @t)
+    ?:  |(?=(~ ns) ?=(~ xs))  ^$(n inner.u.sp, psub ps2, fuel (dec fuel))
+    $(ns t.ns, xs t.xs, ps2 (~(put by ps2) name.i.ns i.xs))
   ?:  =('$Tuple' name.op.n)
     =/  as  args.n
     |-  ^-  (list @t)
@@ -2534,6 +2741,9 @@
   ?:  |(=(nm '$DisjList') =(nm '\\lor'))
     (solve-disj args.n mode cur part e s)
   ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e s)
+  ::  R4.2g: action composition `A \cdot B` -- `s -A-> t -B-> u`
+  ?:  &(=(nm '\\cdot') ?=([* * ~] args.n))
+    (solve-cdot i.args.n i.t.args.n mode cur part e s)
   ::  R4.2d: `P => A` in action position solves A when P holds and is
   ::  satisfied as-is when it does not (OPCODE_implies in both
   ::  `getInitStates` and `getNextStates`); filtering it as a boolean lost
@@ -2615,8 +2825,58 @@
       [[%| 0 'evaluation recursion/resource limit exceeded.'] s]
     =/  e2  (bind-psub e(fuel (dec fuel.e)) (senv mode cur part e) params.u.d args.n)
     ?:  ?=(%| -.e2)  [e2 s]
-    (solve u.body.u.d mode cur part p.e2 s)
+    ::  R4.2c: the member's own parameters win over its wrapper's
+    ::  substitutions (`+keep-params`)
+    =/  sp  (substin-parts:sm u.body.u.d)
+    ?~  sp  (solve u.body.u.d mode cur part p.e2 s)
+    =/  e3  (bind-substs (senv mode cur part p.e2) names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e3)  [e3 s]
+    (solve inner.u.sp mode cur part (keep-params p.e3 p.e2 params.u.d) s)
   (solve-filter n mode cur part e s)
+::
+++  cdot-msg
+  ::  the pin's refusal when the property is not set (Tool.java:1527)
+  ^-  @t
+  %+  rap  3
+  :~  'The current version of TLC does not support action composition.  '
+      'An incomplete implementation can be enabled via the '
+      'tlc2.tool.impl.Tool.cdot=true java property.'
+  ==
+::
+++  cdot-on
+  ::  R4.2g: is action composition enabled for this run?
+  |=  e=eenv
+  ^-  ?
+  =(`'true' (run-prop e 'tlc2.tool.impl.Tool.cdot'))
+::
+++  solve-cdot
+  ::  R4.2g: tlc2's experimental `\cdot` in the next-state relation
+  ::  (Tool.java:1487-1530, behind `-Dtlc2.tool.impl.Tool.cdot=true`): the
+  ::  intermediate state `t` starts as `s0.copyWith(s1)` -- the CURRENT values
+  ::  of the variables the successor has already assigned -- A is solved from
+  ::  s0 into it, and B from each such `t` into the successor. The
+  ::  intermediate states count as generated (`xgen`). Without the property
+  ::  it is the pin's refusal
+  |=  [a=sem:sm b=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
+  ?.  (cdot-on e)  [[%| 0 cdot-msg] s]
+  =/  t0=state
+    %-  malt
+    %+  murn  ~(tap by part)
+    |=  [k=@t *]
+    ^-  (unit [@t value:v])
+    =/  c  (~(get by cur) k)
+    ?~(c ~ `[k u.c])
+  =^  ra  s  (solve a mode cur t0 e s)
+  ?:  ?=(%| -.ra)  [ra s]
+  =.  xgen.s  (add xgen.s (lent p.ra))
+  =/  ts  p.ra
+  =|  out=(list state)
+  |-  ^-  sout
+  ?~  ts  [[%& (flop out)] s]
+  =^  rb  s  (solve b mode i.ts part e s)
+  ?:  ?=(%| -.rb)  [rb s]
+  $(ts t.ts, out (weld (flop p.rb) out))
 ::
 ++  solve-filter
   |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
@@ -2942,8 +3202,15 @@
   ::  tlc2's `processConstantDefns` walks `getOpDefs()`, which has none
   ?.  ?&  ?=(~ params.d)
           !=('$thm:' (end [3 5] nm))
+          ::  R4.2c: not a definition that reaches an override with a
+          ::  minLevel above 0 (`TLCGet`, `CounterExample`): SANY gives it
+          ::  level 0, but tlc2's level bound takes the override's minLevel, so
+          ::  `Lvl == TLCGet("level") < K` is STATE-level there and never
+          ::  constant-folded. Cached here it froze at its startup value, and a
+          ::  CONSTRAINT built on it pruned nothing
           =(0 lvl.d)
           ?=(^ body.d)
+          !(reaches-run-op u.body.d ops.e)
           !(is-standard:so ov.e origin.d)
           ?=(~ (lookup:so ov.e [origin.d (bnm name.d) 0]))
           ?=(~ (node-op:so [origin.d (bnm name.d) 0]))
@@ -2954,6 +3221,13 @@
   =/  [res=eres rs=rst]  p.r
   ?.  &(?=(%& -.res) =(empty-rst rs))  $(ds t.ds)
   $(ds t.ds, acc (~(put by acc) nm [d p.res]))
+::
+++  reaches-run-op
+  ::  R4.2c: does a body reach an operator whose override has minLevel > 0?
+  |=  [b=sem:sm ops=(map @t sem-def:sm)]
+  ^-  ?
+  =/  rn  (reach-names b ops)
+  |((~(has in rn) 'TLCGet') (~(has in rn) 'CounterExample'))
 ::
 ++  startup-draws
   ::  R4.2aa: the definitions `+with-cdefs` leaves per-reference because
@@ -2967,8 +3241,9 @@
   ::  reuses B's value and draws once. The ASSUMEs and then the initial-state
   ::  solve continue the SAME stream (BFS, DFID and simulate alike).
   ::
-  ::  `ord` is that order (the caller builds it from the module); `es` the
-  ::  scrambled seed. A drawn value joins `vals`, the slot a config value
+  ::  `ord` is that order (the caller builds it from the module); `rs` the
+  ::  carrier, its `es` the scrambled seed. R4.2a: a definition that PRINTS
+  ::  is evaluated here once as well, its lines on `out`. A drawn value joins `vals`, the slot a config value
   ::  for a definition uses (R4.2u), so every later env reads it. A
   ::  definition that draws and then FAILS stays lazy, but its draws are
   ::  spent, as Java's are before the exception it swallows. Not drawn
@@ -2981,13 +3256,13 @@
           defs=(map @t sem-def:sm)
           consts=(map @t value:v)
           vars=(set @t)
-          es=@
+          rs=rst
       ==
-  ^-  [vals=(map @t value:v) es=@]
+  ^-  [vals=(map @t value:v) rs=rst]
   =/  e  (make-env defs consts vars)
   =|  seen=(set @t)
-  |-  ^-  [vals=(map @t value:v) es=@]
-  ?~  ord  [vals.e es]
+  |-  ^-  [vals=(map @t value:v) rs=rst]
+  ?~  ord  [vals.e rs]
   =/  d   i.ord
   =/  nm  name.d
   ?:  (~(has in seen) nm)  $(ord t.ord)
@@ -3004,12 +3279,15 @@
           ?=(~ (node-op:so [origin.d nm 0]))
       ==
     $(ord t.ord)
-  =/  r  (mule |.((eval-rs u.body.d e `rst`[~ ~ es 0])))
+  =/  r  (mule |.((eval-rs u.body.d e rs)))
   ?.  ?=(%& -.r)  $(ord t.ord)
-  =/  [res=eres rs=rst]  p.r
-  ?:  =(es es.rs)  $(ord t.ord)
-  ?.  ?=(%& -.res)  $(ord t.ord, es es.rs)
-  $(ord t.ord, es es.rs, vals.e (~(put by vals.e) nm p.res))
+  =/  [res=eres rs2=rst]  p.r
+  ::  R4.2a: a PRINT is a run-state effect too, and tlc2 prints it here, once.
+  ::  A register write is not (it stays per-reference, as before)
+  ?:  &(=(es.rs es.rs2) =(out.rs out.rs2))  $(ord t.ord)
+  ?.  &(=(regs.rs regs.rs2) =(named.rs named.rs2))  $(ord t.ord)
+  ?.  ?=(%& -.res)  $(ord t.ord, rs rs2)
+  $(ord t.ord, rs rs2, vals.e (~(put by vals.e) nm p.res))
 ::
 ++  empty-counter-example
   ::  `new CounterExample()` -- the value a run with no violation evaluates

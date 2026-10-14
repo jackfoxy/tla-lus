@@ -740,6 +740,11 @@
   |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t prev=(unit state)]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   =/  e  (env-of o)
+  ::  R4.2c: the constraints see the run too -- `TLCGet("level")` in a
+  ::  CONSTRAINT is the level of the state being checked (measured: `Lvl ==
+  ::  TLCGet("level") < 4` keeps 3 distinct states). Without the run it read
+  ::  the constant-context 0, so such a constraint pruned nothing
+  =/  ce  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   ::  the CONSTRAINT counters are tallied where the loop runs (R2.7.4.2b):
   ::  tlc2 counts a FALSE constraint as the primary and a TRUE one as the
   ::  secondary, and its loop stops at the first false, so a later constraint
@@ -750,7 +755,7 @@
   ::  through action constraints. Tracked BEFORE the constraint check, since a
   ::  constraint-pruned state was still discovered
   =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (lte l 1))) st ~ e rs.cur)
-  =^  ch  rs.cur  (con-hold-rs cons.o st e rs.cur)
+  =^  ch  rs.cur  (con-hold-rs cons.o st ce rs.cur)
   ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
@@ -758,7 +763,7 @@
     ::  and the ACTION-level ones are action constraints, evaluated on every
     ::  transition
     =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (gth l 1))) u.prev `st e rs.cur)
-    =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st e rs.cur)
+    =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st ce rs.cur)
     ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
@@ -929,6 +934,19 @@
   ?.  (draw-op origin.d nm)  ~
   `~[nm (base-name nm)]
 ::
+++  print-names
+  ::  R4.2a: the names under which `TLC!Print` / `TLC!PrintT` are in scope
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  (list @t)
+  %-  zing
+  %+  murn  ~(tap by defs)
+  |=  [nm=@t d=sem-def:sem-lib]
+  ^-  (unit (list @t))
+  ?.  =('TLC' origin.d)  ~
+  =/  b  (base-name nm)
+  ?.  |(=('Print' b) =('PrintT' b))  ~
+  `~[nm b]
+::
 ++  may-draw
   ::  R4.2aa: may STARTUP draw -- a definition (`+draws`) or an ASSUME
   ::  naming a drawing operator? Static and conservative, as `+draws` is;
@@ -937,8 +955,15 @@
   |=  [defs=(map @t sem-def:sem-lib) asmz=(list sem-thm:sem-lib)]
   ^-  ?
   ?:  (draws defs)  &
-  =/  dn  (draw-names defs)
+  ::  R4.2a: or prints: `Print`/`PrintT` named anywhere (a definition or an
+  ::  ASSUME), whose lines must come out in startup order
+  =/  dn  (weld (draw-names defs) (print-names defs))
   ?~  dn  |
+  ?:  %+  lien  ~(tap by defs)
+      |=  [nm=@t d=sem-def:sem-lib]
+      ?~  body.d  |
+      (lien `(list @t)`dn |=(x=@t (has-atom u.body.d x)))
+    &
   %+  lien  asmz
   |=  t=sem-thm:sem-lib
   ?~  body.t  |
@@ -963,23 +988,24 @@
     (~(get by defs) u.r)
   (weld imports.mo (weld subs defs.mo))
 ::
-++  assume-es
+++  assume-rs
   ::  R4.2aa: the RNG state after the ASSUMEs, which tlc2 evaluates on the
   ::  same stream between the startup definitions and the initial-state
   ::  solve (measured: `ASSUME ... RandomElement(0..99) ...` takes the draw
   ::  after the constant definitions', and Init the next). Same walk as
   ::  `+check-assumes`: an AXIOM is skipped, the first false or failing
   ::  assumption ends it (the run stops there)
-  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne es=@]
-  ^-  @
-  ?~  asmz  es
+  ::  R4.2a: the whole carrier, so an ASSUME's PRINTS come out too
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne rs=rst:ne]
+  ^-  rst:ne
+  ?~  asmz  rs
   ?:  axiom.i.asmz  $(asmz t.asmz)
   ?~  body.i.asmz  $(asmz t.asmz)
-  =/  r  (mule |.((eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0])))
-  ?.  ?=(%& -.r)  es
-  =/  [b=bres:ne rs=rst:ne]  p.r
-  ?.  &(?=(%& -.b) p.b)  es.rs
-  $(asmz t.asmz, es es.rs)
+  =/  r  (mule |.((eval-bool-rs:ne u.body.i.asmz e rs)))
+  ?.  ?=(%& -.r)  rs
+  =/  [b=bres:ne rs2=rst:ne]  p.r
+  ?.  &(?=(%& -.b) p.b)  rs2
+  $(asmz t.asmz, rs rs2)
 ::
 ++  draw-op
   ::  the StandardModule operators that spend the enumeration RNG
@@ -1101,6 +1127,9 @@
     =/  ng  (lent p.nr)
     =/  d0  distinct.c2
     =.  gen.c2  (add gen.c2 ng)
+    ::  R4.2g: and the intermediate states an action composition generated
+    =.  gen.c2  (add gen.c2 xgen.rs.c2)
+    =.  xgen.rs.c2  0
     =/  r  (register-all o c2 p.nr +(depth.vis) fp `st.vis)
     ::  the coverage tally for THIS action: every successor it generated, and
     ::  how many of those were newly distinct. Recorded even when the
@@ -2260,6 +2289,9 @@
       ::  R4.2aa: the RNG state after the startup definitions, where the
       ::  ASSUMEs start drawing (`+check-assumes`)
       ses=@
+      ::  R4.2a: what the startup definitions and the ASSUMEs PRINTED, oldest
+      ::  first -- the whole console output of a run whose ASSUME fails
+      aout=(list @t)
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -2755,16 +2787,18 @@
   ::  same identity the graph build used (`+live-key:lv`, the env's `idk`)
   ::  R4.2aa: the drawing constant definitions, once, in tlc2's order; the
   ::  ASSUMEs and then the initial-state solve continue the same stream
-  =/  sd=[vals=(map @t value) es=@]
-    ?.  (may-draw defs assumes.u.mo)  [consts (scramble:rng seed)]
+  =/  rs00=rst:ne  empty-rst:ne
+  =.  es.rs00  (scramble:rng seed)
+  =/  sd=[vals=(map @t value) rs=rst:ne]
+    ?.  (may-draw defs assumes.u.mo)  [consts rs00]
     %:  startup-draws:ne
       (startup-order u.mo overrides.ca defs)
-      defs  consts  vars  (scramble:rng seed)
+      defs  consts  vars  rs00
     ==
   =.  consts  vals.sd
-  =/  ies=@
-    ?.  (may-draw defs assumes.u.mo)  es.sd
-    (assume-es assumes.u.mo (make-env:ne defs consts vars) es.sd)
+  =/  irs0=rst:ne
+    ?.  (may-draw defs assumes.u.mo)  rs.sd
+    (assume-rs assumes.u.mo (make-env:ne defs consts vars) rs.sd)
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
@@ -2773,9 +2807,9 @@
     ::  no behaviour spec: no initial-state solve to run, and the `%nullodn`
     ::  bodies above are never evaluated because the search has nothing to
     ::  expand from. R3.0a
-    ?:  noinit  [[%& ~] rs0(es ies)]
+    ?:  noinit  [[%& ~] irs0]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es ies)
+    irs0
   =/  ir   -.irc
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
@@ -2860,7 +2894,8 @@
       ?~  body.u.d  ~
       `[nm u.body.u.d lvl.u.d]
       +.irc
-      es.sd
+      es.rs.sd
+      (flop out.irs0)
       p.or
   ==
 ::
@@ -3167,7 +3202,7 @@
   ::  the BODY's span, not the declaration's: tlc2 locates the expression
   ::  (`col 8` past `ASSUME `), measured
   =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
-  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0])
+  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0])
   ?:  ?=(%| -.r)
     `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
   ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
@@ -4561,7 +4596,7 @@
   =/  su  (dfid-setup c maxd 0)
   ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
-  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  ?^  ae  (snoc aout.c (cat 3 'Error: ' msg.u.ae))
   =/  o   o.p.su
   =/  e   (dfid-env o)
   =/  ci  (dfid-cursor-init o is.c e)
@@ -5031,7 +5066,7 @@
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
   =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
-  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  ?^  ae  (snoc aout.c (cat 3 'Error: ' msg.u.ae))
   ::  coverage alongside a temporal PROPERTY is refused BY NAME rather than
   ::  silently dropped: the counters this port collects live on the safety
   ::  search's BFS cursor, and the liveness / implied-init / implied-action
@@ -5049,6 +5084,11 @@
   ::  change it — today the EC 2145 subscript-coverage one (R2.3.5). tlc2
   ::  emits them while processing the config, ahead of every run line
   %+  weld  swarn.c
+  ::  R4.2a: what `Print`/`PrintT` wrote while the constant definitions, the
+  ::  ASSUMEs and the initial states were evaluated, in that order (the pin
+  ::  prints at the moment of evaluation). The search's own lines follow from
+  ::  `+safety-run`
+  %+  weld  (flop out.irs.c)
   ::  R4.2n: EC 2269, printed while the initial states are computed
   %+  weld  (init-progress (lent is.c))
   ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
@@ -5558,6 +5598,11 @@
       rs.cur.r
       poss.c
     ==
+  ::  R4.2a: the search's prints (the carrier began with the initial-state
+  ::  solve's, which `+check-in` has already written), before the verdict
+  =/  sout  out.rs.cur.r
+  =/  bp=wain  (flop (scag (sub (lent sout) (lent out.irs.c)) sout))
+  %+  weld  bp
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
       (cov-report o cur.r actions)  ~  pcl

@@ -129,13 +129,13 @@
   ^-  request
   :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  ~  ~
+      lim  ~  ~  ~  ~
   ==
 ::
 ++  inline-req
   |=  [root=module-name mods=(list [module-name @t]) cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~ ~ ~]
 ::
 ::  +|  Harness
 ::

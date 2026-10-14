@@ -139,15 +139,15 @@
   %+  tlc  'Permutations(3)'
   "ERR: Applying Permutations to the following value,\0awhich is not a finite set:\0a3"
 ::
-::  +|  Side effects and engine state: typed rejections, never silent no-ops
+::  +|  Side effects and engine state (R4.2a: Print/PrintT write to the carrier)
 ::
 ++  test-print
-  %+  tlc  'Print("hello", 7)'
-  "ERR: unsupported StandardModule operator: TLC!Print; it writes to the TLC console and this engine has no output channel"
+  ::  R4.2a: `Print(v1, v2)` is v2 (the line it writes rides the carrier)
+  (tlc 'Print("hello", 7)' "7")
 ::
 ++  test-print-t
-  %+  tlc  'PrintT("hello")'
-  "ERR: unsupported StandardModule operator: TLC!PrintT; it writes to the TLC console and this engine has no output channel"
+  ::  R4.2a: `PrintT(v)` is TRUE
+  (tlc 'PrintT("hello")' "TRUE")
 ::
 ++  test-tlc-get-level-outside-a-run
   ::  R2.6.1: `level` is answered with or WITHOUT a checker. `TLCGetStringValue`

@@ -779,6 +779,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a---- MODULE inner ----\0aEXTENDS Naturals\0aVARIABLE v\0aCONSTANT k\0aInitI == v = 0\0aNextI == v\' = (v + 1) % k\0a====\0aI == INSTANCE inner WITH v <- x, k <- 3\0aInit2 == I!InitI\0aNext2 == I!NextI\0aInv == x < 9\0a====\0a'
   'INIT Init2\0aNEXT Next2\0aINVARIANT Inv\0a'
 ::
+++  test-mc-inst-lambda-subst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0a---- MODULE Inner ----\0aEXTENDS Naturals\0aCONSTANT Constraint(_, _)\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ Constraint(x, 1) /\\ x\' = x + 1\0a====\0aVARIABLE x\0aM == INSTANCE Inner WITH Constraint <- LAMBDA s, l : s < 2\0aInit == M!Init\0aNext == M!Next\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-inst-oparg
   %+  expect-eq
     !>  ^-  wain
@@ -802,6 +816,20 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R4.2o: CONSTANT operators substituted through an INSTANCE by operators\0a\\* (`$OpArg`; TwoPhase\'s `XInit(_)`, `XAct(_, _, _)`): the instanced action\0a\\* `XAct(0, x, x\')` expands the substituted operator, so `x\'` is assigned.\0aEXTENDS Naturals\0a---- MODULE Two ----\0aCONSTANT XInit(_), XAct(_, _, _)\0aVARIABLE p, x\0aInit == p = 0 /\\ XInit(x)\0aNext == p < 2 /\\ XAct(p, x, x\') /\\ p\' = p + 1\0a====\0aXInit(v) == v = 0\0aXAct(i, xInit, xNext) == xNext = xInit + i\0aVARIABLES p, x\0aINSTANCE Two\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
+::
+++  test-mc-inst-param-capture
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, Sequences, FiniteSets\0a---- MODULE Inner ----\0aEXTENDS Naturals, Sequences, FiniteSets\0aSucc(state) == state + 1\0aSeqToSet(seq) == {seq[i] : i \\in 1..Len(seq)}\0aVARIABLES state, i\0avars == <<state, i>>\0aInit == state = 0 /\\ i = 7\0aNext == \\/ /\\ state < 3\0a           /\\ state\' = Succ(state + 10) - 10\0a           /\\ i\' = Cardinality(SeqToSet(<<state, state>>)) + 3\0a        \\/ state = 3 /\\ UNCHANGED vars\0a====\0aVARIABLES state, i\0aINSTANCE Inner\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-inst-sibling
   %+  expect-eq
@@ -1056,6 +1084,19 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aInv == x < 3\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-json-tojson
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = <<"{\\"a\\":1,\\"b\\":\\"s\\\\\\"q\\"}", "[1,[],[2,3]]", "[true,true]", "{\\"1\\":\\"x\\",\\"3\\":\\"y\\"}", "[\\"p\\",\\"q\\"]", "{\\"0\\":10,\\"1\\":20}", TRUE>>'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, Sequences, TLC, Json\0aVARIABLE x\0aInit == x = << ToJson([a |-> 1, b |-> "s\\"q"]),\0a               ToJson(<<1, <<>>, {3, 2}>>),\0a               ToJson([i \\in 1..2 |-> TRUE]),\0a               ToJson((1 :> "x") @@ (3 :> "y")),\0a               ToJsonArray({"p", "q"}),\0a               ToJsonObject(<<10, 20>>),\0a               JsonSerialize("out.json", <<1, 2>>) >>\0aNext == UNCHANGED x\0aInv == x[1] = ""\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-label-expr
   %+  expect-eq
@@ -1661,6 +1702,45 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.7.4b: `_POSSIBLE` witnesses. A state-level predicate is tracked as a\0a\\* MODEL constraint (every discovered state) and an action-level one as an\0a\\* ACTION constraint (every transition), which is how the pin wires them.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0aReached == x = 2\0aMoved == x\' = x + 1\0aTemporal == []<>(x = 1)\0a====\0a'
   'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a_POSSIBLE Temporal\0a'
+::
+++  test-mc-print-exists
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        '3'
+        '<<"all", 1>>'
+        '<<"all", 2>>'
+        'Error: Assumption line 8, col 8 to line 8, col 52 of module spec is false.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = Print(<<"chosen", 3>>, 3)\0aNext == UNCHANGED x\0aASSUME \\/ \\E i \\in 1..5 : IF i > 2 THEN PrintT(i) ELSE FALSE\0a       \\/ PrintT("No solution")\0aASSUME \\A i \\in 1..3 : PrintT(<<"all", i>>) /\\ i < 2\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-print-order
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        '"const K"'
+        '"assume"  TRUE'
+        '<<"ex", 1>>'
+        '<<"ex", 2>>'
+        '<<"init", 0>>'
+        '<<"inv", 0>>'
+        '<<"next", 0, 1>>'
+        '<<"inv", 1>>'
+        '<<"next", 1, 2>>'
+        '<<"inv", 2>>'
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aK == IF PrintT("const K") THEN 7 ELSE 0\0aVARIABLE x\0aInit == x = 0 /\\ PrintT(<<"init", x>>)\0aNext == x < 2 /\\ x\' = x + 1 /\\ PrintT(<<"next", x, x\'>>)\0aInv == PrintT(<<"inv", x>>)\0aASSUME Print("assume", K = K)\0aASSUME \\E i \\in 1..3 : PrintT(<<"ex", i>>) /\\ i = 2\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-prop-act-ok
   %+  expect-eq
@@ -2457,6 +2537,20 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aNext == x < 6 /\\ x\' = x + TLCGet("level")\0aInv == x < 5\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-tlcget-level-constraint
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aCONSTANT K0\0aVARIABLE x\0aInit == x = 0\0aNext == x < 10 /\\ x\' = x + 1\0aLvl == TLCGet("level") < K0\0a====\0a'
+  'CONSTANT K0 = 4\0aINIT Init\0aNEXT Next\0aCONSTRAINT Lvl\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-tlcget-stats
   %+  expect-eq

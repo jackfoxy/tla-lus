@@ -288,6 +288,18 @@
       ::  in both. Measured: `-messagesAsErrors 2110` (an error) leaves the run
       ::  byte-identical
       promote=(set diag-code)
+      ::  R4.2c: the process ENVIRONMENT a run sees, which CommunityModules'
+      ::  `IOUtils!IOEnv` reads as a record (tlc2 hands it the JVM's own
+      ::  `System.getenv()`). A map supplied here keeps a run reproducible;
+      ::  `~` is an empty environment, and the corpus reads it guarded
+      ::  (`IF "K" \in DOMAIN IOEnv THEN ... ELSE ...`)
+      env=(map @t @t)
+      ::  R4.2g: Java SYSTEM PROPERTIES (tlc2's `-D<key>=<value>`). They are
+      ::  read back by `TLCGet("-D<key>")`, which answers the key itself when
+      ::  it is unset, as the pin does; and `tlc2.tool.impl.Tool.cdot` set to
+      ::  "true" enables action composition (`A \cdot B`), which the pin
+      ::  refuses otherwise
+      props=(map @t @t)
   ==
 ::  a write destination: the desk and the directory under it. The ship is
 ::  always our own — Clay cannot write to another ship's desk — and the

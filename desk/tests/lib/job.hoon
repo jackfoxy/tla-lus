@@ -24,24 +24,24 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  dfid-req
   ::  `tlc2.TLC -workers 1 -dfid <depth>` (R2.5)
   |=  [spec=@t cfg=@t depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  gen-req
   ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
@@ -49,21 +49,21 @@
   ^-  request
   :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  ~  ~
+      lim  ~  ~  ~  ~
   ==
 ::
 ++  analyze-req
   |=  mods=(list [module-name @t])
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~]
+  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~ ~ ~]
 ::
 ++  analyze-req-f
   ::  an %analyze request with explicit flags [syntax semantic level lint]
   |=  [mods=(list [module-name @t]) flags=analyze-flags]
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~]
+  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~ ~ ~]
 ::
 ++  cyc-spec
   ^~
@@ -311,7 +311,7 @@
         [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
         lim
         `[%base /spec]
-        ~
+        ~  ~  ~
     ==
   %+  expect-eq
     !>  `'write target /spec overlaps a module-search root; a run may not write over its own sources'
@@ -324,7 +324,7 @@
         [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
         lim
         `[%base /out]
-        ~
+        ~  ~  ~
     ==
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
@@ -332,12 +332,12 @@
   ::  an %inline bundle declares no search roots, so nothing of its own can
   ::  be written over
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~ ~ ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-write-bad-desk-rejected
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~ ~ ~]
   %+  expect-eq
     !>(`'invalid desk name \'Bad Desk\'')
   !>((validate:job-lib req))
@@ -357,7 +357,7 @@
 ::
 ++  test-validate-translate-rejected
   =/  req=request
-    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~]
+    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
   !>((validate:job-lib req))
@@ -366,33 +366,33 @@
   ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
   ::  bundle validates
   =/  req=request
-    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~]
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
+    [[%check [& | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~ ~ ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   (expect-eq !>(`'root module not in bundle') !>((validate:job-lib req)))
 ::
@@ -405,7 +405,7 @@
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   =.  max-modules.limits.req  1
   (expect-eq !>(`'too many modules') !>((validate:job-lib req)))
@@ -510,7 +510,7 @@
   ::  the lint-warning analyze request, with `codes` promoted to errors
   |=  codes=(set diag-code)
   ^-  request
-  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes]
+  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes ~ ~]
 ::
 ++  test-promote-warning-fails-the-run
   =/  req  (promote-req (silt ~[`diag-code`[%sany 4.802]]))
@@ -588,6 +588,167 @@
     (expect-eq !>(~) !>(cont.j))
   ==
 ::
+++  print-spec
+  ::  R4.2a: every print site tlc2 has -- a constant definition, an ASSUME
+  ::  (with a `\E` that prints per witness tried), Init, Next and an invariant
+  ^-  @t
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'K == IF PrintT("const K") THEN 7 ELSE 0'
+      'VARIABLE x'
+      'Init == x = 0 /\\ PrintT(<<"init", x>>)'
+      'Next == x < 2 /\\ x\' = x + 1 /\\ PrintT(<<"next", x, x\'>>)'
+      'Inv == PrintT(<<"inv", x>>)'
+      'ASSUME Print("assume", K = K)'
+      'ASSUME \\E i \\in 1..3 : PrintT(<<"ex", i>>) /\\ i = 2'
+      '===='
+  ==
+::
+++  print-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-print-output-artifact
+  ::  R4.2a: the `%output` artifact holds the pin's console lines, in the
+  ::  pin's order (measured with tla2tools.jar on this spec), whatever the
+  ::  slicing
+  =/  want=@t
+    %-  of-wain:format
+    :~  '"const K"'  '"assume"  TRUE'  '<<"ex", 1>>'  '<<"ex", 2>>'
+        '<<"init", 0>>'  '<<"inv", 0>>'  '<<"next", 0, 1>>'  '<<"inv", 1>>'
+        '<<"next", 1, 2>>'  '<<"inv", 2>>'
+    ==
+  =/  j0  (init:job-lib (check-req print-spec print-cfg) t0)
+  =/  a  (run-all j0 256)
+  =/  b  (run-all j0 1)
+  ;:  weld
+    (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.+.a))
+    (expect-eq !>(`[%text want]) !>((~(get by artifacts.+.a) %output)))
+    (expect-eq !>((~(get by artifacts.+.a) %output)) !>((~(get by artifacts.+.b) %output)))
+  ==
+::
+++  test-json-file-artifacts
+  ::  R4.2f: `JsonSerialize` / `ndJsonSerialize` are TRUE and their files are
+  ::  artifacts named for the path (`+file-art`); the text is what
+  ::  tla2tools.jar writes for the same calls (measured)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, Json'
+        'VARIABLE x'
+        'Init == x = 0 /\\ JsonSerialize("out/Trace.json", <<[a |-> 1]>>)'
+        '             /\\ ndJsonSerialize("log.ndjson", <<1, "two">>)'
+        'Next == UNCHANGED x'
+        '===='
+    ==
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec 'INIT Init\0aNEXT Next\0a') t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.j))
+    %+  expect-eq  !>(`[%text '[{"a":1}]'])
+    !>((~(get by artifacts.j) ~.file-out-trace.json))
+    %+  expect-eq  !>(`[%text '1\0a"two"\0a'])
+    !>((~(get by artifacts.j) ~.file-log.ndjson))
+  ==
+::
+++  env-req
+  ::  R4.2c/g: a check request carrying an environment and Java properties
+  |=  [spec=@t cfg=@t env=(map @t @t) props=(map @t @t)]
+  ^-  request
+  =/  r  (check-req spec cfg)
+  r(env env, props props)
+::
+++  ioutils-mini
+  ::  the one IOUtils operator under test, as a module of that name (the
+  ::  override is keyed [IOUtils IOEnv 0], as tlc2 binds it)
+  '---- MODULE IOUtils ----\0aIOEnv == CHOOSE r : TRUE\0a====\0a'
+::
+++  test-ioenv-from-request
+  ::  R4.2c: `IOEnv` is the request's environment as a record; an absent
+  ::  variable is not in its DOMAIN (the corpus's guarded reads)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, IOUtils'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME IOEnv.K = "7" /\\ "J" \\notin DOMAIN IOEnv'
+        '===='
+    ==
+  =/  b  [%inline 'spec' (malt ~[['spec' spec] ['IOUtils' ioutils-mini]]) `'INIT Init\0aNEXT Next\0a']
+  =/  r0  (check-req spec '')
+  =/  r1  r0(src b, env (malt ~[['K' '7']]))
+  =/  r2  r0(src b)
+  =/  a  (run-all (init:job-lib r1 t0) 256)
+  =/  z  (run-all (init:job-lib r2 t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.+.a))
+    ::  no K: the record has no such field, so the ASSUME fails to evaluate
+    (expect !>(?=([~ %failed *] result.+.z)))
+  ==
+::
+++  cdot-spec
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'VARIABLE x'
+      'Init == x = 1'
+      'Inc == x\' = x + 1'
+      'Dbl == x\' = x * 2'
+      'Next == x < 20 /\\ (Inc \\cdot Dbl \\/ Inc)'
+      'ASSUME TLCGet("-Dfoo") = "-Dfoo"'
+      '===='
+  ==
+::
+++  test-cdot-with-property
+  ::  R4.2g: with `tlc2.tool.impl.Tool.cdot=true` the composition runs; the
+  ::  pin (`java -Dtlc2.tool.impl.Tool.cdot=true`) reports 58 generated
+  ::  (the intermediate states of `Inc \cdot Dbl` included), 30 distinct,
+  ::  depth 7. An unset `-D` key reads back as itself
+  =/  props  (malt ~[['tlc2.tool.impl.Tool.cdot' 'true']])
+  =/  a  (run-all (init:job-lib (env-req cdot-spec 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' ~ props) t0) 256)
+  =/  st  ?.(?=([~ %ok *] result.+.a) *run-stats stats.u.result.+.a)
+  (expect-eq !>([58 30 7]) !>([generated.st distinct.st depth.st]))
+::
+++  test-cdot-refused-without-property
+  ::  R4.2g: without the property, the pin's own refusal
+  =/  a  (run-all (init:job-lib (env-req cdot-spec 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' ~ ~) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'The current version of TLC does not support action composition.  An incomplete implementation can be enabled via the tlc2.tool.impl.Tool.cdot=true java property.'])
+  !>(?.(?=([~ %failed *] result.+.a) ~ `[%failed reason.u.result.+.a]))
+::
+++  test-tlcget-d-property
+  ::  R4.2g: `TLCGet("-D<key>")` reads the request's property
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, TLC'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME TLCGet("-Dfoo") = "bar"'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (env-req spec 'INIT Init\0aNEXT Next\0a' ~ (malt ~[['foo' 'bar']])) t0) 256)
+  (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.+.a))
+::
+++  test-json-deserialize-refused
+  ::  R4.2f: the JSON readers are refused by name (approved difference)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, Json'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME ndJsonDeserialize("trace.ndjson") = <<>>'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (check-req spec 'INIT Init\0aNEXT Next\0a') t0) 256)
+  =/  why=@t  ?.(?=([~ %failed *] result.+.a) '' reason.u.result.+.a)
+  %-  expect
+  !>  ?=(^ (find "Json!ndJsonDeserialize; it reads a file" (trip why)))
+::
 ++  test-check-budget-independent
   ::  the final job is identical whatever the per-event budget
   =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
@@ -630,7 +791,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~ ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -649,7 +810,7 @@
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
@@ -682,7 +843,7 @@
   ^-  request
   :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%inline 'MC' (malt ~[['MC' ext-mc] ['Spec' ext-spec]]) `cfg]
-      lim  ~  ~
+      lim  ~  ~  ~  ~
   ==
 ++  ext-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::
@@ -1171,14 +1332,14 @@
   %+  expect-eq
     !>  `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
   !>  %-  validate:job-lib
-  [[%check [| | | & ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+  [[%check [| | | & ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-dfid-refuses-difftrace
   ::  measured at the pin, `-difftrace` changes nothing outside `-simulate`
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>  %-  validate:job-lib
-  [[%check [| | & | ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+  [[%check [| | & | ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-dfid-kernel-report-matches-console
   ::  the kernel's `%report` artifact is the CONSOLE renderer's output, so the
@@ -1724,7 +1885,7 @@
 ++  ovr-req
   |=  nm=(unit source-name)
   ^-  request
-  [[%check [| | | | nm | ~ [%exhaustive & 0]]] ovr-bundle lim ~ ~]
+  [[%check [| | | | nm | ~ [%exhaustive & 0]]] ovr-bundle lim ~ ~ ~ ~]
 ::
 ++  test-cfg-override-absent-uses-bundle-cfg
   ::  no override: the bundle's own cfg runs, Loose holds, the run completes
@@ -1753,7 +1914,7 @@
   =/  req=request
     :*  [%check [| | | | `'some-cfg' | ~ [%exhaustive & 0]]]
         [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   %+  expect-eq
     !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
@@ -1863,7 +2024,7 @@
   ^-  request
   =/  l  lim
   =.  max-set-size.l  n
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~ ~ ~]
 ::
 ++  test-max-set-size-default-runs
   ::  the matched half: the same spec under the default bound completes
@@ -1902,7 +2063,7 @@
 ++  cont-req
   |=  c=?
   ^-  request
-  [[%check [| | | c ~ | ~ [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~]
+  [[%check [| | | c ~ | ~ [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-continue-off-stops-at-first
   ::  the matched half: without the flag the run STOPS at the first violation
@@ -1955,7 +2116,7 @@
 ++  vw-req
   |=  v=?
   ^-  request
-  [[%check [| v | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~]
+  [[%check [| v | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-view-render-off-shows-bindings
   ::  the matched half: without the flag the trace prints the BINDINGS
@@ -1980,7 +2141,7 @@
 ++  test-view-render-without-view-refused
   ::  the flag with no VIEW in the config has nothing to render
   =/  req=request
-    [[%check [| & | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| & | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~ ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   %+  expect-eq
     !>(`[%failed 'unsupported: -view without a VIEW in the config (nothing to render)'])
@@ -1990,7 +2151,7 @@
   ::  measured: an exhaustive run is byte-identical with and without the flag,
   ::  so accepting it there would be accepting an option that does nothing
   =/  req=request
-    [[%check [| | & | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| | & | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>((validate:job-lib req))

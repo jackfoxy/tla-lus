@@ -529,12 +529,22 @@
   ==
 ::
 ++  esc-str
-  ::  TLC re-escapes the double quote in a string body
+  ::  tlc2's `StringValue.PrintVersion`: `"` and `\` escaped, and tab,
+  ::  newline, form feed and carriage return by name (R4.2f: the port escaped
+  ::  only the quote, so a JSON string from `ToJson` printed differently)
   |=  s=@t
   ^-  tape
   %-  zing
   %+  turn  (trip s)
-  |=(c=@tD ?:(=('"' c) "\\\"" ~[c]))
+  |=  c=@tD
+  ^-  tape
+  ?:  =('"' c)  "\\\""
+  ?:  =('\\' c)  "\\\\"
+  ?:  =('\09' c)  "\\t"
+  ?:  =('\0a' c)  "\\n"
+  ?:  =('\0c' c)  "\\f"
+  ?:  =('\0d' c)  "\\r"
+  ~[c]
 ::
 ++  sort-fields
   |=  fs=(list vfield)

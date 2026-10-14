@@ -154,7 +154,13 @@ def request(m: dict, case_ud: int, budget: int, wall: float):
                    #  the job `%limited %time` instead of re-running (R4.0e)
                    int(wall) << 64,                 # max-time (@dr)
                    4_000_000, 0)
-    return u.tup(op, src, limits, 0, 0)
+    #  R4.2c/g: `env` and `props` (Hoon maps). The environment is empty, as
+    #  the corpus reads IOEnv guarded; a model CI runs with
+    #  `-Dtlc2.tool.impl.Tool.cdot=true` ("action composition") gets that
+    #  property. A one-entry map is the single node [kv ~ ~]
+    props = (u.tup(u.tup(u.cord("tlc2.tool.impl.Tool.cdot"), u.cord("true")), 0, 0)
+             if "action composition" in m.get("features", []) else 0)
+    return u.tup(op, src, limits, 0, 0, 0, props)
 
 
 def request_parse(mod: str, case_ud: int, secs: int = 600):
@@ -168,7 +174,7 @@ def request_parse(mod: str, case_ud: int, secs: int = 600):
     src = u.tup(u.cord("clay"), 0, u.cord(DESK), (u.cord("ud"), case_ud),
                 u.cord(root), 0, roots)
     limits = u.tup(3_000_000, 1024, 10**9, 10**7, secs << 64, 4_000_000, 0)
-    return u.tup(op, src, limits, 0, 0)
+    return u.tup(op, src, limits, 0, 0, 0, 0)
 
 
 def run_parse(a) -> int:

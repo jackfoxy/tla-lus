@@ -1613,6 +1613,14 @@
   =/  consts
     %-  ~(uni by (override-consts:check (consts-of:check constants.rs) overrides.rs))
     (mod-const-vals:check defs mod-constants.rs)
+  ::  R4.2c/g: the request's environment and Java system properties, as the
+  ::  records `IOEnv` and `TLCGet("-D...")` read. `$`-names, which no source
+  ::  or config can spell
+  =.  consts
+    %-  ~(gas by consts)
+    :~  ['$env' (str-rec env.request.j)]
+        ['$props' (str-rec props.request.j)]
+    ==
   ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode.
   ::  `%dfid` carries no seed on this wire, so it runs from the 0 default
   =/  eseed=@ud
@@ -1625,16 +1633,24 @@
   ::  (`+startup-draws:ne`); the ASSUMEs and then the initial-state solve
   ::  continue the same stream
   =/  mdraw  (may-draw:check defs assumes.mo)
-  =/  sd=[vals=(map @t value:check) es=@]
-    ?.  mdraw  [consts (scramble:rng eseed)]
+  =/  rs00=rst:ne  empty-rst:ne
+  =.  es.rs00  (scramble:rng eseed)
+  =/  sd=[vals=(map @t value:check) rs=rst:ne]
+    ?.  mdraw  [consts rs00]
     %:  startup-draws:ne
       (startup-order:check mo overrides.rs defs)
-      defs  consts  vars  (scramble:rng eseed)
+      defs  consts  vars  rs00
     ==
   =.  consts  vals.sd
+  =/  irs0=rst:ne
+    ?.  mdraw  rs.sd
+    (assume-rs:check assumes.mo (make-env:ne defs consts vars) rs.sd)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
-  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn es.sd)
+  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn es.rs.sd)
+  ::  R4.2a: what the startup and the ASSUMEs printed is kept either way
+  =^  arts  irs0  (drain-output j irs0)
+  =.  artifacts.j  arts
   ?^  ae  (assume-fail j u.ae pre)
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY WARNS AND CONTINUES (EC 2279),
   ::  matching tlc2 and the console path. Unit 8.7.2's engine blocker was
@@ -1675,16 +1691,12 @@
   ::  `IdThread.getCurrentState()` is null, so `TLCStateRandom` never reseeds
   ::  and the init phase continues the main thread's `new Random(randomSeed)`
   ::  where the startup definitions and the ASSUMEs left it (R4.2aa)
-  =/  ies=@
-    ?.  mdraw  es.sd
-    (assume-es:check assumes.mo (make-env:ne defs consts vars) es.sd)
-  =/  rs0=rst:ne  empty-rst:ne
   =/  isc=sout:ne
     ::  R4.2k/R3.2: nothing to solve -- no behaviour spec, or a SPECIFICATION
     ::  with no initial predicate: zero initial states
-    ?:  ?=(%nullodn -.isb)  [[%& ~] rs0(es ies)]
+    ?:  ?=(%nullodn -.isb)  [[%& ~] irs0]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es ies)
+    irs0
   =/  isr  -.isc
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr
@@ -1899,12 +1911,71 @@
 ::  +|  Stage: %explore
 ::
 ::
+++  max-output-bytes
+  ::  R4.2a: the `Print` output a job keeps; past it one marker line ends it
+  ^-  @ud
+  1.000.000
+::
+++  file-art
+  ::  R4.2f: the artifact name for a file the spec wrote: `file-` and the
+  ::  path, lower-cased, every character a knot cannot hold made `-`
+  |=  p=@t
+  ^-  artifact-name
+  %-  crip
+  %+  weld  "file-"
+  %+  turn  (cass (trip p))
+  |=  c=@tD
+  ?:  ?|  &((gte c 'a') (lte c 'z'))
+          &((gte c '0') (lte c '9'))
+          =(c '.')  =(c '_')  =(c '~')  =(c '-')
+      ==
+    c
+  '-'
+::
+++  str-rec
+  ::  R4.2c/g: a string map as a record value
+  |=  m=(map @t @t)
+  ^-  value:check
+  %-  normalize:vl:check
+  [%rec (turn ~(tap by m) |=([k=@t w=@t] [k [%str w]]))]
+::
+++  drain-output
+  ::  R4.2a: move the lines `Print`/`PrintT` wrote (the carrier's `out`,
+  ::  newest first) into the job's `%output` text artifact, in print order, and
+  ::  empty the carrier -- so the persisted continuation never grows with the
+  ::  output, and a job that ends early still shows what it printed
+  ::  R4.2f: and each file `JsonSerialize`/`ndJsonSerialize` wrote, as the
+  ::  `%text` artifact `file-<path>` (`+file-art`), the latest write winning
+  |=  [j=jobstate rs=rst:ne]
+  ^-  [(map artifact-name artifact) rst:ne]
+  =/  fs=(list [p=@t c=@t])  ~(tap by files.rs)
+  =.  artifacts.j
+    %-  ~(gas by artifacts.j)
+    (turn fs |=([p=@t c=@t] [(file-art p) [%text c]]))
+  =.  files.rs  ~
+  ?~  out.rs  [artifacts.j rs]
+  =/  old=@t
+    =/  a  (~(get by artifacts.j) %output)
+    ?~(a '' ?:(?=(%text -.u.a) text.u.a ''))
+  =/  mark=@t  '(output truncated: max-output-bytes reached)'
+  =/  full  &(!=('' old) =(mark (rear (to-wain:format old))))
+  ?:  full  [artifacts.j rs(out ~)]
+  =/  add=@t  (of-wain:format (flop out.rs))
+  =/  new=@t  ?:(=('' old) add (rap 3 ~[old '\0a' add]))
+  =?  new  (gth (met 3 new) max-output-bytes)
+    (rap 3 ~[(end [3 max-output-bytes] new) '\0a' mark])
+  :_  rs(out ~)
+  (~(put by artifacts.j) %output [%text new])
+::
 ++  do-explore
   |=  [j=jobstate k=(unit kont) budget=@ud pre=(list event)]
   ^-  step-out
   ?:  ?&(?=(^ k) ?=(%bfs -.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
+    =/  dr  (drain-output j ?-(-.r %more rs.cur.r, %done rs.cur.r))
+    =.  artifacts.j  -.dr
+    =.  r  ?-(-.r %more r(rs.cur +.dr), %done r(rs.cur +.dr))
     ?:  ?=(%more -.r)
       =/  d0  distinct.stats.j
       ::  live statistics at the slice boundary (deterministic, resumable): the
@@ -1928,6 +1999,9 @@
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
+    =/  dr  (drain-output j ?-(-.r %more rs.cur.r, %done rs.cur.r))
+    =.  artifacts.j  -.dr
+    =.  r  ?-(-.r %more r(rs.cur +.dr), %done r(rs.cur +.dr))
     ?:  ?=(%more -.r)
       ::  partial statistics at the slice boundary (as in do-explore), so a
       ::  max-time interruption of the graph build reports progress (9.5)

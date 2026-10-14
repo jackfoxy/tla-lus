@@ -41,7 +41,7 @@
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
       default-limits:job-lib
-      ~  ~
+      ~  ~  ~  ~
   ==
 ::  the same request, but persisting its artifacts to Clay (R2.2)
 ++  demo-req-write
@@ -58,7 +58,7 @@
       :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
-      default-limits:job-lib  ~  ~
+      default-limits:job-lib  ~  ~  ~  ~
   ==
 ::
 ++  live-src
@@ -81,7 +81,7 @@
       :*  %inline  'spec'  (malt ~[['spec' live-src]])
           `'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
       ==
-      default-limits:job-lib  ~  ~
+      default-limits:job-lib  ~  ~  ~  ~
   ==
 ::
 ++  do-poke

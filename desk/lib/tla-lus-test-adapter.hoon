@@ -157,7 +157,7 @@
   =?  max-states.lim  ?=(^ max-states.over.c)  u.max-states.over.c
   =?  max-time.lim  ?=(^ max-time.over.c)  u.max-time.over.c
   =?  max-source.lim  ?=(^ max-source.over.c)  u.max-source.over.c
-  [op.c [%inline root.src.c (malt modules.src.c) cfg.src.c] lim ~ ~]
+  [op.c [%inline root.src.c (malt modules.src.c) cfg.src.c] lim ~ ~ ~ ~]
 ::
 ++  poke
   ::  one poke; ~ when the agent crashes, which Gall turns into a nack

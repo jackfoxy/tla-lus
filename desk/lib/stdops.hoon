@@ -148,9 +148,16 @@
     ::  rejections that name what they would need, never silent no-ops
     [['TLC' 'Assert' 2] [| 0 |=(a=(list value:v) (assert-op a))]]
     [['TLC' 'ToString' 1] [| 0 |=(a=(list value:v) (to-string a))]]
+    ::  R4.2f: the pure half of tla2tools' `Json` module (tlc2/module/Json.java,
+    ::  which CI's module search puts ahead of CommunityModules' copy)
+    [['Json' 'ToJson' 1] [| 0 |=(a=(list value:v) (json-str %node a))]]
+    [['Json' 'ToJsonArray' 1] [| 0 |=(a=(list value:v) (json-str %array a))]]
+    [['Json' 'ToJsonObject' 1] [| 0 |=(a=(list value:v) (json-str %object a))]]
+    ::  R4.2f (user decision 2026-10-13): the two READERS are refused by name,
+    ::  an approved difference: a file read is not part of a run's sources
+    [['Json' 'JsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'JsonDeserialize'))]]
+    [['Json' 'ndJsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'ndJsonDeserialize'))]]
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
-    [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
-    [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
     [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
@@ -366,6 +373,19 @@
   ::  the carrier holds, and its argument is a SET, so it needs both the
   ::  carrier and the lazy-domain treatment `Cardinality` gets
   ?:  =(k ['TLC' 'RandomElement' 1])        `[%random-element | 0]
+  ::  R4.2a: `Print` / `PrintT` WRITE the console at the moment of evaluation,
+  ::  which here is a line on the carrier (`out`), so they are node-ops for the
+  ::  same reason `TLCSet` is. Plain `@TLAPlusOperator`s at the pin
+  ?:  =(k ['TLC' 'Print' 2])                `[%print | 0]
+  ?:  =(k ['TLC' 'PrintT' 1])               `[%print-t | 0]
+  ::  R4.2f: `JsonSerialize` / `ndJsonSerialize` WRITE a file at the pin; here
+  ::  the file is a job artifact, written through the carrier (`files`)
+  ?:  =(k ['Json' 'JsonSerialize' 2])       `[%json-serialize | 0]
+  ::  R4.2c: CommunityModules' `IOUtils!IOEnv`, the process environment as a
+  ::  record. A node-op because the value is the RUN's (the request's `env`),
+  ::  which only the evaluator's env carries
+  ?:  =(k ['IOUtils' 'IOEnv' 0])            `[%io-env | 0]
+  ?:  =(k ['Json' 'ndJsonSerialize' 2])     `[%nd-json-serialize | 0]
   ?:  =(k ['TLC' 'TLCSet' 2])               `[%tlc-set | 0]
   ?:  =(k ['TLCExt' 'TLCGetOrDefault' 2])   `[%tlc-get-or-default | 0]
   ?:  =(k ['TLCExt' 'TLCGetAndSet' 4])      `[%tlc-get-and-set | 0]
@@ -823,6 +843,171 @@
   %^  rap  3  'The first argument of Assert evaluated to FALSE; '
   ~['the second argument was: ' (crip (render:v i.t.as))]
 ::
+++  json-read-refused
+  ::  R4.2f: `JsonDeserialize` / `ndJsonDeserialize` read a FILE by a path
+  ::  relative to tlc2's working directory. A run here reads only the sources
+  ::  its request names, so the operator is refused by name (approved
+  ::  difference, compatibility.md), never answered with an invented value
+  |=  nm=@t
+  ^-  eres
+  :-  %|
+  :-  0
+  %+  rap  3
+  :~  'unsupported StandardModule operator: Json!'  nm
+      '; it reads a file, and a run reads only the sources its request names'
+  ==
+::
+++  json-str
+  ::  R4.2f: `ToJson` / `ToJsonArray` / `ToJsonObject` -- the value as Gson's
+  ::  compact JSON text, a string value
+  |=  [k=?(%node %array %object) as=(list value:v)]
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'expects one argument.']
+  =/  r
+    ?-  k
+      %node    (json-node i.as)
+      %array   (json-array i.as)
+      %object  (json-object i.as)
+    ==
+  ?:  ?=(%| -.r)  [%| 0 p.r]
+  [%& [%str (crip p.r)]]
+::
+++  json-node
+  ::  R4.2f: `Json.getNode` -- a record is an object, a tuple an array, a
+  ::  string or model value a JSON string, an integer a number, a boolean a
+  ::  boolean, a function an object (an ARRAY when its domain is 1..n), any
+  ::  finite set an array of its normalized elements
+  |=  x=value:v
+  ^-  (each tape @t)
+  ?-  -.x
+    %rec    (json-object x)
+    %seq    (json-array x)
+    %str    [%& (json-quote p.x)]
+    %model  [%& (json-quote p.x)]
+    %int    [%& (render:v x)]
+    %bool   [%& ?:(p.x "true" "false")]
+    %fcn    (json-object x)
+    %set    (json-array x)
+    %intv   (json-array x)
+  ==
+::
+++  json-array
+  ::  R4.2f: `Json.getArrayNode`
+  |=  x=value:v
+  ^-  (each tape @t)
+  =/  els=(unit (list value:v))
+    ?+  -.x  ~
+      %seq   `p.x
+      %set   `(set-elems:v (normalize:v x))
+      %intv  `(set-elems:v (normalize:v x))
+      %fcn   ?.((json-seq-fcn x) ~ `(turn p.x |=(q=vpair:v r.q)))
+    ==
+  ?~  els
+    ?:  ?=(%fcn -.x)  (json-object x)
+    [%| (json-unsupported x)]
+  =/  ns  (json-list u.els)
+  ?:  ?=(%| -.ns)  ns
+  [%& :(weld "[" (join-json p.ns) "]")]
+::
+++  json-object
+  ::  R4.2f: `Json.getObjectNode`: a record by its fields; a TUPLE by its
+  ::  0-based positions ("0", "1", ...); a function by its domain (a string key
+  ::  as itself, any other as its `toString`), unless its domain is 1..n, in
+  ::  which case it is an array
+  |=  x=value:v
+  ^-  (each tape @t)
+  =/  kvs=(unit (list [k=tape v=value:v]))
+    ?+  -.x  ~
+        %rec
+      `(turn p.x |=(f=vfield:v [(trip k.f) v.f]))
+        %seq
+      =|  i=@ud
+      =/  es  p.x
+      =|  out=(list [k=tape v=value:v])
+      |-  ^-  (unit (list [k=tape v=value:v]))
+      ?~  es  `(flop out)
+      $(es t.es, i +(i), out [[(a-co:co i) i.es] out])
+        %fcn
+      ?:  (json-seq-fcn x)  ~
+      %-  some
+      %+  turn  p.x
+      |=  q=vpair:v
+      :_  r.q
+      ?:(?=(%str -.d.q) (trip p.d.q) (render:v d.q))
+    ==
+  ?~  kvs
+    ?:  &(?=(%fcn -.x) (json-seq-fcn x))  (json-array x)
+    [%| (json-unsupported x)]
+  =|  out=(list tape)
+  =/  ks  u.kvs
+  |-  ^-  (each tape @t)
+  ?~  ks  [%& :(weld "\{" (join-json (flop out)) "}")]
+  =/  n  (json-node v.i.ks)
+  ?:  ?=(%| -.n)  n
+  $(ks t.ks, out [:(weld (json-quote (crip k.i.ks)) ":" p.n) out])
+::
+++  json-seq-fcn
+  ::  `Json.isValidSequence`: every domain point an integer, and the domain
+  ::  exactly 1..n in order
+  |=  x=value:v
+  ^-  ?
+  ?.  ?=(%fcn -.x)  |
+  =/  i  1
+  =/  ps  p.x
+  |-  ^-  ?
+  ?~  ps  &
+  ?.  ?=(%int -.d.i.ps)  |
+  ?.  =(d.i.ps [%int (sun:si i)])  |
+  $(ps t.ps, i +(i))
+::
+++  json-list
+  |=  vs=(list value:v)
+  ^-  (each (list tape) @t)
+  =|  out=(list tape)
+  |-  ^-  (each (list tape) @t)
+  ?~  vs  [%& (flop out)]
+  =/  n  (json-node i.vs)
+  ?:  ?=(%| -.n)  n
+  $(vs t.vs, out [p.n out])
+::
+++  join-json
+  |=  ts=(list tape)
+  ^-  tape
+  ?~  ts  ~
+  ?~  t.ts  i.ts
+  :(weld i.ts "," $(ts t.ts))
+::
+++  json-unsupported
+  |=  x=value:v
+  ^-  @t
+  (rap 3 ~['Cannot convert value: unsupported value type ' (crip (render:v x))])
+::
+++  json-quote
+  ::  Gson's string escaping (`JsonWriter.string`, not HTML-safe): `"` and `\`
+  ::  escaped, \t \b \n \r \f by name, every other control character below
+  ::  0x20 as \u00XX (byte-wise: Gson's escapes of U+2028/U+2029 are not
+  ::  reproduced)
+  |=  t=@t
+  ^-  tape
+  =/  cs  (trip t)
+  =|  out=tape
+  |-  ^-  tape
+  ?~  cs  :(weld "\"" (flop out) "\"")
+  =/  c  i.cs
+  =/  rep=tape
+    ?:  =(c '"')   "\\\""
+    ?:  =(c '\\')  "\\\\"
+    ?:  =(c '\09')  "\\t"
+    ?:  =(c '\08')  "\\b"
+    ?:  =(c '\0a')  "\\n"
+    ?:  =(c '\0d')  "\\r"
+    ?:  =(c '\0c')  "\\f"
+    ?:  (lth c 0x20)
+      =/  h  ((x-co:co 4) c)
+      (weld "\\u" h)
+    [c ~]
+  $(cs t.cs, out (weld (flop rep) out))
+::
 ++  to-string
   ::  TLC!ToString: the canonical rendering, as a string value
   |=  as=(list value:v)
@@ -882,18 +1067,6 @@
     ?~  ss  acc
     $(ss t.ss, acc [[i.l i.ss] acc])
   $(l t.l, out o2)
-::
-++  print-op
-  ::  TLC!Print / TLC!PrintT write to TLC's console. Gall owns effects here
-  ::  and the evaluation path has no output channel yet, so this is a typed
-  ::  rejection naming what is missing — never a silent no-op that returns
-  ::  the value (plan-2 invariant 8)
-  |=  [nm=@t as=(list value:v)]
-  ^-  eres
-  :-  %|
-  :-  0
-  %^  rap  3  'unsupported StandardModule operator: TLC!'
-  ~[nm '; it writes to the TLC console and this engine has no output channel']
 ::
 ++  tlc-get-keys
   ::  the named TLCGet values the pin defines (tlc2.module.TLCGetSet)

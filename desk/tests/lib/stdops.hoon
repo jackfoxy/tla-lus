@@ -176,5 +176,10 @@
   ::  surfaces the inventory carried as `later:`; the third,
   ::  TLCEvalDefinition, is an `@Evaluation` override and joins the node-op
   ::  table instead. 37 -> 39.
-  (expect-eq !>(39) !>(~(wyt by registry:so)))
+  ::  R4.2a: Print and PrintT leave for the node-op table -- they WRITE a line
+  ::  on the carrier, as TLCSet writes a register. 39 -> 37.
+  ::  R4.2f adds Json's three pure encoders (ToJson, ToJsonArray,
+  ::  ToJsonObject); its two writers are node-ops. 37 -> 40. Its two readers
+  ::  are typed refusals by name (approved difference). 40 -> 42.
+  (expect-eq !>(42) !>(~(wyt by registry:so)))
 --

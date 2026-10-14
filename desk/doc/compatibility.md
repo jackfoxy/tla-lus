@@ -1267,9 +1267,10 @@ operator; the `TLC` module's pure operators (`:>`, `@@`, `Assert`,
 descriptors `Nat`, `Int`, and `Seq(S)`. SYMMETRY evaluates its definition
 through the same registry, so `Permutations` has one implementation.
 
-`Print`, `PrintT`, `TLCGet`, and `TLCSet` are **typed rejections that name
-what is missing**, never silent no-ops: the first two write to TLC's console
-and this engine has no output channel on the evaluation path; the last two
+`Print`, `PrintT`, `TLCGet`, and `TLCSet` were **typed rejections that name
+what is missing**, never silent no-ops (all four are implemented since:
+`Print`/`PrintT` in R4.2a, the other two in R2.6.1/R2.7.4.3): the first two write to TLC's console
+and this engine had no output channel on the evaluation path; the last two
 read and mutate engine state the evaluator does not own. `TLCGet` still
 reproduces the pin's EC 2145 for a key TLC itself does not define.
 
@@ -1351,7 +1352,7 @@ appear silently. The complete list of deliberate skips:
 | any `SelectSeq`/`SortSeq`/`BagOfAll` with a `LAMBDA` argument | the LAMBDA is now in the semantic graph (R1.3.1: `$OpArg`-encoded anonymous OpDefNode, level via `l-def`); *evaluating* a LAMBDA-parameterized StandardModule operator during model-checking remains deferred (`resolve-oparg`) |
 | `1 + "a"` | the pin's message names the Java method signature; normalized here |
 | `Bags!SubBag` applied | its vendored body needs recursive functions and multi-binder set constructors (unit-6.5 residue) |
-| `Print`, `PrintT`, `Any` | typed rejections here (no output channel; `Any` excluded) |
+| `Any` | excluded (`Print`/`PrintT` are implemented since R4.2a) |
 | the whole `st-string-order` case | family 5, measured and approved (above) |
 | the whole `st-big-literal` case | the pin fails the entire load on a numeral above 2^31-1; here the expression containing it fails |
 
@@ -1461,7 +1462,46 @@ function …`) and a definition's `F[9]` (`Attempted to apply function: …`), w
 because tlc2 keeps the former a lazy `FcnLambdaValue` and normalizes the latter to a
 `FcnRcdValue`.
 
+## Release R4.2f — the `Json` module
+
+tla2tools' `Json` module (CI's module search puts it ahead of
+CommunityModules' copy) is ported for its encoders and writers and REFUSED
+for its readers, by decision (2026-10-13):
+
+- `ToJson`, `ToJsonArray`, `ToJsonObject`: Json.java's rules, Gson's compact
+  text (parity; mc `json-tojson`).
+- `JsonSerialize`, `ndJsonSerialize`: TRUE, and the file they write is a job
+  artifact `file-<path>` (job `test-json-file-artifacts`). The console path
+  writes nothing.
+- **`JsonDeserialize`, `ndJsonDeserialize`: approved difference, a typed
+  refusal by name.** They read a file by a path relative to tlc2's working
+  directory; a run here reads only the sources its request names, and the
+  corpus's one reader (EWD998ChanTrace) also needs `TLCGet("config")`.
+  Message: `unsupported StandardModule operator: Json!ndJsonDeserialize; it
+  reads a file, and a run reads only the sources its request names` (job
+  `test-json-deserialize-refused`).
+
 ## Release R1.4 — `TLC!Print` and `TLC!PrintT`
+
+**R4.2a (2026-10-13) REVERSES this decision: `Print`/`PrintT` are ported.**
+The accumulator R1.4.6 costed exists now -- the R2.7.4.1 carrier `rst`, which
+already threads `TLCSet` registers and the RNG -- and gains `out`, the printed
+lines. `Print(v1, v2)` writes `ppr(v1)  ppr(v2)` and is `v2`; `PrintT(v)`
+writes `ppr(v)` and is TRUE. The console path prints the lines inline, in the
+pin's order (constant definitions, then ASSUMEs, then the initial states, then
+the search; a run whose ASSUME fails prints what came before it); the job
+stores them in its `%output` text artifact, capped at 1 MB with a marker
+line. Binders whose body prints (`\E p \in S : ... PrintT(p) ...`, Stones)
+are evaluated on the carrier and stop where tlc2 stops. Two residues, both
+output-only: `ppr`'s line wrapping of a long value is not reproduced (the line
+is the one-line rendering), and when ONE action yields several successors the
+port prints all of their `Next` lines before their invariant lines, where tlc2
+checks each successor as it is generated (R4.2ao). Verdicts, counts and values
+are unaffected by either. Evidence: `gen-mc-tests` (`print-order`,
+`print-exists`), `gen-core-eval-tests` (`ev-tlc` `Pr`/`PrT`/`PrNest`, no longer
+skipped), `tests/lib/job` (`test-print-output-artifact`), `tests/lib/tlcmod`.
+
+The original decision, kept as the record:
 
 **Decided in R1.4.6: approved difference, a typed rejection.** In tlc2 `Print(out, val)`
 returns `val` and writes `out` to the console, and `PrintT(out)` returns `TRUE`. The

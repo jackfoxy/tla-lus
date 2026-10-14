@@ -3229,6 +3229,12 @@
           ds     (weld ds [u.bad (arity-err 0 `[[0 0] [0 0]])])
         ==
       =/  oa  ?:(&(?=(^ bs) =(0 want)) ~ (oparg-of u.ex c))
+      ::  R4.2c (TestGraphs): a LAMBDA for an operator constant (`WITH
+      ::  Constraint <- LAMBDA s, l : TRUE`) is SANY's OpArgNode over a
+      ::  synthesized LAMBDA definition, as at an application argument; it
+      ::  was generated as a plain expression and the constant stayed unbound
+      =?  oa  &(?=(~ oa) (gth want 0) (is-kind u.ex %n-lambda))
+        (lambda-of u.ex c)
       ?^  oa
         %=  $
           pl     t.pl

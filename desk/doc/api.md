@@ -49,7 +49,7 @@ is not an `action`, is nacked too.
 ### `request`
 
 ```hoon
-+$  request  [=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]
++$  request  [=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code) env=(map @t @t) props=(map @t @t)]
 +$  write-target  [=desk pax=path]
 +$  op
   $%  [%translate opts=pcal-opts]      ::  PlusCal → TLA+
@@ -154,12 +154,14 @@ Inv  == x < 4
 ====
 '''
 ::  check-opts is [translate view difftrace continue cfg coverage
-::  postconditions mode]; request is [op src limits write promote]
+::  postconditions mode]; request is [op src limits write promote env props]
 =req  :*  op=[%check [| | | | ~ | ~ [%exhaustive & 0]]]
           src=[%inline 'Counter' (malt ~[['Counter' spec]]) `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a']
           limits=*limits          ::  or default-limits:job-lib
           write=~                  ::  or `[%base /tlaout] to persist artifacts
           promote=~                ::  diagnostic codes to raise to errors
+          env=~                    ::  the environment IOUtils!IOEnv reads
+          props=~                  ::  Java -D properties (TLCGet("-Dk"), \cdot)
       ==
 ::  the request id is a @ta of your choosing
 :tla-lus &tla-lus-action [%submit ~.counter req]
@@ -233,7 +235,7 @@ wire and not listed here.
 | `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
 | `limits` | six bounds | `default-limits:job-lib` = `[1.000.000 64 100.000 1.000 ~m10 1.000.000]` |
 | `write-target` | `[=desk pax=path]` | `[%base /tlaout]` — no `case`: a write lands at the head. `%report` lands at `<pax>/report/txt`, a `%trace` at `<pax>/trace/noun` |
-| `request` | `[=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]` | see the Dojo example. `promote` is tlc2's `-messagesAsErrors`: diagnostic codes to raise to errors. It is on `request` rather than `check-opts` because it applies to `%analyze` and `%check` alike, and it is **not** a display concern — promotion aborts the run at the moment the diagnostic is emitted and reports the statistics reached so far, which a caller filtering severities off a finished result cannot reproduce. Only WARNINGS are promotable, which is tlc2's rule too |
+| `request` | `[=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code) env=(map @t @t) props=(map @t @t)]` | see the Dojo example. `env` (R4.2c) is the process environment CommunityModules' `IOUtils!IOEnv` reads, as a record; `~` is an empty environment (tlc2 reads the JVM's real one, which no reproducible run may observe). `props` (R4.2g) are tlc2's `-D<key>=<value>` Java system properties: `TLCGet("-D<key>")` reads one and answers the key itself when it is unset, as the pin does, and `tlc2.tool.impl.Tool.cdot` = `"true"` enables action composition (`A \cdot B`), which is otherwise the pin's refusal. `promote` is tlc2's `-messagesAsErrors`: diagnostic codes to raise to errors. It is on `request` rather than `check-opts` because it applies to `%analyze` and `%check` alike, and it is **not** a display concern — promotion aborts the run at the moment the diagnostic is emitted and reports the statistics reached so far, which a caller filtering severities off a finished result cannot reproduce. Only WARNINGS are promotable, which is tlc2's rule too |
 
 ### Result and job
 

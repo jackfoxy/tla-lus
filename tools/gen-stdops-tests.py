@@ -104,6 +104,17 @@ CLASSIFY = {
     ("Randomization", "RandomSubset"): ("required", "R2.7.4.5: `EnumerableValue.getRandomSubset(k)` -- the SubsetEnumerator LCG over the normalized element list, seeded `nextInt(n)` and incremented by a `nextPrime` draw, both from the carrier's enumeration generator. k > |S| is not an error; it yields the whole set"),
     ("Randomization", "RandomSetOfSubsets"): ("required", "R2.7.4.5: `SubsetValue.getRandomSetOfSubsets(k, n/|S|)`, the CoinTossingSubsetEnumerator -- k picks, one IEEE-754 `nextDouble() < probability` per element per pick, collected into a set so duplicates collapse. This is the (int, double) overload; the (int, int) one is the only path to util.Combinatorics and has no caller"),
     ("Randomization", "TestRandomSetOfSubsets"): ("required", "R2.7.4.5: no Java method at the pin -- Randomization.tla defines it as `[i \\in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`, whose five draws sit inside a function constructor and under Cardinality, both below the R2.7.4.1b carrier boundary. Evaluating that body would make ONE draw sequence and report it five times, so the port implements it natively -- the same decision TLCGetAndSet got in R2.7.4.3"),
+    #  R4.2f (user decision 2026-10-13): tla2tools' Json module. The three
+    #  encoders are pure registry rows; the two writers are node-ops whose
+    #  file becomes a job artifact through the carrier. The two readers wait
+    #  for the read half (Clay)
+    ("Json", "ToJson"):          ("required", "R4.2f: Json.getNode, Gson compact text"),
+    ("Json", "ToJsonArray"):     ("required", "R4.2f: Json.getArrayNode"),
+    ("Json", "ToJsonObject"):    ("required", "R4.2f: Json.getObjectNode (a tuple keyed by 0-based position)"),
+    ("Json", "JsonSerialize"):   ("required", "R4.2f: writes ToJson(v) of a sequence or record; the file is a job artifact (carrier `files`); TRUE"),
+    ("Json", "ndJsonSerialize"): ("required", "R4.2f: one ToJson line per element of a sequence; the file is a job artifact; TRUE"),
+    ("Json", "JsonDeserialize"):   ("required", "R4.2f: a typed refusal by name (approved difference, user decision 2026-10-13): it reads a file by a working-directory path, and a run reads only the sources its request names"),
+    ("Json", "ndJsonDeserialize"): ("required", "R4.2f: a typed refusal by name, as JsonDeserialize"),
     ("Sequences", "Seq"):    ("required", "non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)"),
     # TLCExt's non-debugger operators (R2.6.3). The module-level default calls
     # every TLCExt surface `excluded`; these five are not, and `class` has to
@@ -264,6 +275,15 @@ def hoon_registry() -> tuple:
     return reg, bodies
 
 
+# R4.2c: CommunityModules operators the port overrides. Their modules are not
+# tla2tools StandardModules (the pin's inventory never lists them); each is
+# checked against the CommunityModules release jar's Java override instead
+# (IOUtils.java `@TLAPlusOperator(identifier = "IOEnv", module = "IOUtils")`).
+COMMUNITY_OVERRIDES = {
+    ("IOUtils", "IOEnv", 0): "R4.2c: the request's `env` as a record",
+}
+
+
 def check_registry(rows: list) -> list:
     """The C1.0 inventory binds the C1.1 implementation: every override row
     must be an operator the pin really declares and classifies `required`,
@@ -275,6 +295,8 @@ def check_registry(rows: list) -> list:
     problems = []
     for k in sorted(reg):
         cls = known.get(k)
+        if cls is None and k in COMMUNITY_OVERRIDES:
+            continue
         if cls is None:
             # defensive fallback: accept the same module+name at another
             # arity. No registry key needs it today — unary minus was keyed

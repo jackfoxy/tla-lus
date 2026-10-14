@@ -21,5 +21,5 @@
 :^    %submit
     id
   op
-::  request tail is [src limits write promote]
-[[%inline 'Demo' (malt ~[['Demo' demo-text]]) ~] default-limits:job-lib ~ ~]
+::  request tail is [src limits write promote env props]
+[[%inline 'Demo' (malt ~[['Demo' demo-text]]) ~] default-limits:job-lib ~ ~ ~ ~]

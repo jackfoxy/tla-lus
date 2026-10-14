@@ -314,19 +314,19 @@
   ~
 ::
 ++  test-tlc
-  ::  Pr: TLC!Print/PrintT write to tlc2's console. Gall owns effects here and the evaluator is a pure function with no output channel, so the port gives a typed rejection naming what is missing rather than a silent no-op returning the value (plan-2 invariant 8). Approved difference decided in R1.4.6 --- routing the output to a job artifact would mean threading an accumulator through every +eval return, which is not this unit's change
-  ::  PrNest: TLC!Print/PrintT write to tlc2's console. Gall owns effects here and the evaluator is a pure function with no output channel, so the port gives a typed rejection naming what is missing rather than a silent no-op returning the value (plan-2 invariant 8). Approved difference decided in R1.4.6 --- routing the output to a job artifact would mean threading an accumulator through every +eval return, which is not this unit's change
-  ::  PrT: TLC!Print/PrintT write to tlc2's console. Gall owns effects here and the evaluator is a pure function with no output channel, so the port gives a typed rejection naming what is missing rather than a silent no-op returning the value (plan-2 invariant 8). Approved difference decided in R1.4.6 --- routing the output to a job artifact would mean threading an accumulator through every +eval return, which is not this unit's change
   %+  expect-eq
     !>  ^-  (list tape)
     :~  "Ev IntValue 5"
         "EvFcn FcnRcdValue <<1, 4, 9>>"
         "EvNest IntValue 7"
         "EvSet SetEnumValue \{1, 2, 3}"
+        "Pr IntValue 42"
+        "PrNest IntValue 1"
+        "PrT BoolValue TRUE"
     ==
   !>
   %^  project-defs:check  '---- MODULE A ----\0aEXTENDS TLC, Integers, Sequences\0aEv == TLCEval(2 + 3)\0aEvSet == TLCEval({1, 2} \\cup {2, 3})\0aEvNest == TLCEval(TLCEval(7))\0aEvFcn == TLCEval([i \\in 1..3 |-> i * i])\0aPr == Print("side", 42)\0aPrT == PrintT("alone")\0aPrNest == Print("a", Print("b", 1))\0a====\0a'  ''
-  ~['Pr' 'PrNest' 'PrT']
+  ~
 ::
 ++  test-tupbind
   %+  expect-eq
