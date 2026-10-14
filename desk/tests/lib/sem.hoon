@@ -3306,6 +3306,40 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aRECURSIVE Fact(_)\0aFact(n) == IF n = 0 THEN 1 ELSE Fact(n - 1)\0aRECURSIVE Odd(_), Even(_)\0aOdd(n) == IF n = 0 THEN FALSE ELSE Even(n - 1)\0aEven(n) == IF n = 0 THEN TRUE ELSE Odd(n - 1)\0a====\0a'
   ==
 ::
+++  test-sem-sel-ext-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  const Q arity=0 L0 3.10-3.10'
+        '  def X arity=0 local=n L0 3.1-3.13'
+        '    apply LAMBDA opkind=UserDefinedOpKind L0 3.6-3.13'
+        '      num 3 L0 3.10-3.10'
+        '  def Y arity=0 local=n L0 4.1-4.16'
+        '    apply $Nop opkind=BuiltInKind L0 4.6-4.16'
+        '      apply $BoundedForall opkind=BuiltInKind L0 4.14-4.32'
+        '        bound q L0 4.17-4.17'
+        '          apply Q opkind=ConstantDeclKind L0 4.23-4.23'
+        '        apply /= opkind=BuiltInKind L0 4.27-4.32'
+        '          apply q opkind=FormalParamKind L0 4.27-4.27'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 4.31-4.32'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={Q} lc={Q<=3,n<=2,q<=3}'
+        'lvl X L0'
+        'lvl Y L0 lp={Q} lc={Q<=3,q<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aX == Pos(3)!1\0aY == QNonEmpty!:\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aEXTENDS Naturals\0aCONSTANT Q\0aQNonEmpty == \\A q \\in Q : q # {}\0aPos(n) == n > 0 /\\ n < 10\0a====\0a'
+  ==
+::
 ++  test-sem-selat
   %+  expect-eq
     !>  ^-  wain

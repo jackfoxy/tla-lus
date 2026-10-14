@@ -909,19 +909,77 @@
   |=  defs=(map @t sem-def:sem-lib)
   ^-  ?
   =/  ds  ~(tap by defs)
-  =/  dn=(list @t)
-    %-  zing
-    %+  murn  ds
-    |=  [nm=@t d=sem-def:sem-lib]
-    ^-  (unit (list @t))
-    ?.  (draw-op origin.d nm)  ~
-    `~[nm (base-name nm)]
+  =/  dn  (draw-names defs)
   ?~  dn  |
   %+  lien  ds
   |=  [nm=@t d=sem-def:sem-lib]
   ?~  body.d  |
   ?:  (draw-op origin.d nm)  |
   (lien `(list @t)`dn |=(x=@t (has-atom u.body.d x)))
+::
+++  draw-names
+  ::  the names under which a drawing operator (`+draw-op`) is in scope,
+  ::  qualified and base
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  (list @t)
+  %-  zing
+  %+  murn  ~(tap by defs)
+  |=  [nm=@t d=sem-def:sem-lib]
+  ^-  (unit (list @t))
+  ?.  (draw-op origin.d nm)  ~
+  `~[nm (base-name nm)]
+::
+++  may-draw
+  ::  R4.2aa: may STARTUP draw -- a definition (`+draws`) or an ASSUME
+  ::  naming a drawing operator? Static and conservative, as `+draws` is;
+  ::  when it says no, the startup pass and the ASSUME pre-pass are skipped
+  ::  and the initial-state solve starts from the seed, which is then exact
+  |=  [defs=(map @t sem-def:sem-lib) asmz=(list sem-thm:sem-lib)]
+  ^-  ?
+  ?:  (draws defs)  &
+  =/  dn  (draw-names defs)
+  ?~  dn  |
+  %+  lien  asmz
+  |=  t=sem-thm:sem-lib
+  ?~  body.t  |
+  (lien `(list @t)`dn |=(x=@t (has-atom u.body.t x)))
+::
+++  startup-order
+  ::  R4.2aa: the order tlc2's `processConstantDefns` reaches definitions
+  ::  in (see `+startup-draws:ne`): the EXTENDS closure dependency-first
+  ::  (`imports`), then the root's constant substitutions (`C <- R`, in
+  ::  CONSTANT declaration order), then the root's own definitions. A
+  ::  substitution for a constant an EXTENDed module declares is placed with
+  ::  the root's, ahead of the root's definitions: tlc2 would evaluate it
+  ::  with that module, so this differs only when that module also draws
+  |=  [mo=sem-module:sem-lib ov=(map @t @t) defs=(map @t sem-def:sem-lib)]
+  ^-  (list sem-def:sem-lib)
+  =/  subs=(list sem-def:sem-lib)
+    %+  murn  consts.mo
+    |=  [name=@t arity=@ud at=sspan:sem-lib]
+    ^-  (unit sem-def:sem-lib)
+    =/  r  (~(get by ov) name)
+    ?~  r  ~
+    (~(get by defs) u.r)
+  (weld imports.mo (weld subs defs.mo))
+::
+++  assume-es
+  ::  R4.2aa: the RNG state after the ASSUMEs, which tlc2 evaluates on the
+  ::  same stream between the startup definitions and the initial-state
+  ::  solve (measured: `ASSUME ... RandomElement(0..99) ...` takes the draw
+  ::  after the constant definitions', and Init the next). Same walk as
+  ::  `+check-assumes`: an AXIOM is skipped, the first false or failing
+  ::  assumption ends it (the run stops there)
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne es=@]
+  ^-  @
+  ?~  asmz  es
+  ?:  axiom.i.asmz  $(asmz t.asmz)
+  ?~  body.i.asmz  $(asmz t.asmz)
+  =/  r  (mule |.((eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0])))
+  ?.  ?=(%& -.r)  es
+  =/  [b=bres:ne rs=rst:ne]  p.r
+  ?.  &(?=(%& -.b) p.b)  es.rs
+  $(asmz t.asmz, es es.rs)
 ::
 ++  draw-op
   ::  the StandardModule operators that spend the enumeration RNG
@@ -2199,6 +2257,9 @@
       ::  happens once at %config, before any cursor exists, so it is carried
       ::  here and seeded into the cursor
       irs=rst:ne
+      ::  R4.2aa: the RNG state after the startup definitions, where the
+      ::  ASSUMEs start drawing (`+check-assumes`)
+      ses=@
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -2692,6 +2753,18 @@
   ::  refused for; it is narrowed, not ignored
   ::  R4.2e: no longer refused -- the liveness product keys a state by the
   ::  same identity the graph build used (`+live-key:lv`, the env's `idk`)
+  ::  R4.2aa: the drawing constant definitions, once, in tlc2's order; the
+  ::  ASSUMEs and then the initial-state solve continue the same stream
+  =/  sd=[vals=(map @t value) es=@]
+    ?.  (may-draw defs assumes.u.mo)  [consts (scramble:rng seed)]
+    %:  startup-draws:ne
+      (startup-order u.mo overrides.ca defs)
+      defs  consts  vars  (scramble:rng seed)
+    ==
+  =.  consts  vals.sd
+  =/  ies=@
+    ?.  (may-draw defs assumes.u.mo)  es.sd
+    (assume-es assumes.u.mo (make-env:ne defs consts vars) es.sd)
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
@@ -2700,9 +2773,9 @@
     ::  no behaviour spec: no initial-state solve to run, and the `%nullodn`
     ::  bodies above are never evaluated because the search has nothing to
     ::  expand from. R3.0a
-    ?:  noinit  [[%& ~] rs0(es (scramble:rng seed))]
+    ?:  noinit  [[%& ~] rs0(es ies)]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es (scramble:rng seed))
+    rs0(es ies)
   =/  ir   -.irc
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
@@ -2787,6 +2860,7 @@
       ?~  body.u.d  ~
       `[nm u.body.u.d lvl.u.d]
       +.irc
+      es.sd
       p.or
   ==
 ::
@@ -3082,7 +3156,10 @@
   ::  `at` is that location, which the job kernel reports as the violated
   ::  assumption's name. The module is the root's: `sem-thm` carries no
   ::  origin, so an ASSUME imported through EXTENDS is located in the root
-  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne modn=@t]
+  ::
+  ::  R4.2aa: `es` is the RNG state the startup definitions left
+  ::  (`+startup-draws:ne`); an assumption that draws continues it
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne modn=@t es=@]
   ^-  (unit [ec=@ud msg=@t at=@t])
   ?~  asmz  ~
   ?:  axiom.i.asmz  $(asmz t.asmz)
@@ -3090,11 +3167,11 @@
   ::  the BODY's span, not the declaration's: tlc2 locates the expression
   ::  (`col 8` past `ASSUME `), measured
   =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
-  =/  r  (pred-bool:ne u.body.i.asmz ~ ~ e)
+  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0])
   ?:  ?=(%| -.r)
     `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
   ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
-  $(asmz t.asmz)
+  $(asmz t.asmz, es es.rs)
 ::
 ++  out-stats
   ::  the four counters off an outcome. Each arm carries them, but `%limited`
@@ -4483,7 +4560,7 @@
   =*  c  p.sc
   =/  su  (dfid-setup c maxd 0)
   ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
   =/  o   o.p.su
   =/  e   (dfid-env o)
@@ -4953,7 +5030,7 @@
   =/  sc  (search-ctx-seed spec cfg seed)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
   ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
   ::  coverage alongside a temporal PROPERTY is refused BY NAME rather than
   ::  silently dropped: the counters this port collects live on the safety
@@ -5635,7 +5712,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [[%failed p.sc] *run-stats]
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
   ?^  ae  [[%failed msg.u.ae] *run-stats]
   ::  a temporal property: a pure []P box-state is a state invariant (checked by
   ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine

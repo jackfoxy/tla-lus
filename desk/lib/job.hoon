@@ -1613,9 +1613,28 @@
   =/  consts
     %-  ~(uni by (override-consts:check (consts-of:check constants.rs) overrides.rs))
     (mod-const-vals:check defs mod-constants.rs)
+  ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode.
+  ::  `%dfid` carries no seed on this wire, so it runs from the 0 default
+  =/  eseed=@ud
+    ?-  -.mode
+      %exhaustive  seed.mode
+      %simulate    seed.mode
+      %dfid        0
+    ==
+  ::  R4.2aa: the drawing constant definitions, once, in tlc2's order
+  ::  (`+startup-draws:ne`); the ASSUMEs and then the initial-state solve
+  ::  continue the same stream
+  =/  mdraw  (may-draw:check defs assumes.mo)
+  =/  sd=[vals=(map @t value:check) es=@]
+    ?.  mdraw  [consts (scramble:rng eseed)]
+    %:  startup-draws:ne
+      (startup-order:check mo overrides.rs defs)
+      defs  consts  vars  (scramble:rng eseed)
+    ==
+  =.  consts  vals.sd
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
-  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn)
+  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn es.sd)
   ?^  ae  (assume-fail j u.ae pre)
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY WARNS AND CONTINUES (EC 2279),
   ::  matching tlc2 and the console path. Unit 8.7.2's engine blocker was
@@ -1652,24 +1671,20 @@
   ::  R2.7.4.2b: the carrier-keeping variant, for the INIT coverage counts --
   ::  `irej` is the candidates the initial predicate rejected once they were
   ::  already fully assigned, which is the `secondary` half of the INIT line
-  ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode,
-  ::  and the INITIAL-state solve draws from that seed alone -- off a worker
+  ::  R2.7.4.4: the INITIAL-state solve runs off a worker --
   ::  `IdThread.getCurrentState()` is null, so `TLCStateRandom` never reseeds
-  ::  and the whole init phase runs from `new Random(randomSeed)`. `%dfid`
-  ::  carries no seed on this wire, so it runs from the 0 default
-  =/  eseed=@ud
-    ?-  -.mode
-      %exhaustive  seed.mode
-      %simulate    seed.mode
-      %dfid        0
-    ==
+  ::  and the init phase continues the main thread's `new Random(randomSeed)`
+  ::  where the startup definitions and the ASSUMEs left it (R4.2aa)
+  =/  ies=@
+    ?.  mdraw  es.sd
+    (assume-es:check assumes.mo (make-env:ne defs consts vars) es.sd)
   =/  rs0=rst:ne  empty-rst:ne
   =/  isc=sout:ne
     ::  R4.2k/R3.2: nothing to solve -- no behaviour spec, or a SPECIFICATION
     ::  with no initial predicate: zero initial states
-    ?:  ?=(%nullodn -.isb)  [[%& ~] rs0(es (scramble:rng eseed))]
+    ?:  ?=(%nullodn -.isb)  [[%& ~] rs0(es ies)]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es (scramble:rng eseed))
+    rs0(es ies)
   =/  isr  -.isc
   ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
   =/  is  p.isr

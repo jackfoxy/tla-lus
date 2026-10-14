@@ -1081,8 +1081,25 @@
   ::  R4.2n: the root's nested-instance members resolve through `imports`
   ::  (first in the list: `+defmap-of` lets a later entry win, and the root's
   ::  own EXTENDS must)
+  ::  R4.2ah: and those of every EXTENDed module (`P(Succ) == INSTANCE
+  ::  ReachabilityProofs` sits in ReachabilityTest, which MCReachabilityTest
+  ::  extends; the instanced theorems name `ReachableFrom`, which
+  ::  ReachabilityProofs inherits from Reachability)
+  =/  xnest=(list sem-def)
+    %-  zing
+    %+  turn  (ext-reach root sem-order.g mods.g)
+    |=  nm=@t
+    ^-  (list sem-def)
+    ?:  (~(has by standard-modules:stdmods:modules) nm)  ~
+    =/  ld  (~(get by mods.g) nm)
+    ?~  ld  ~
+    (nested-defs tree.u.ld (full-ctx tree.u.ld ctxs) ctxs mods.g sem-order.g)
   =.  imports.mo
-    (weld (nested-defs tree.u.rt fc ctxs mods.g sem-order.g) imports.mo)
+    ;:  weld
+      (nested-defs tree.u.rt fc ctxs mods.g sem-order.g)
+      xnest
+      imports.mo
+    ==
   `mo(modops (mod-opdefs root sem-order.g ctxs mods.g))
 ::
 ++  stamp-origin
@@ -1183,7 +1200,8 @@
     ?:  &(std !(~(has in body-modules) i.ms))
       (ctx-defs i.ms (~(gut by ctxs) i.ms ~))
     =/  fc  (full-ctx tree.u.ld ctxs)
-    (stamp-origin i.ms defs:(gen-module tree.u.ld fc ctxs mods))
+    =/  gm  (gen-module tree.u.ld fc ctxs mods)
+    (weld (stamp-origin i.ms defs.gm) (thm-defs i.ms thmdefs.gm))
   =/  acc
     |-  ^-  [seen=(set @t) out=(list sem-def) lcl=(list sem-def)]
     ?~  ds  [seen out lcl]
@@ -1191,6 +1209,26 @@
     ?:  (~(has in seen) name.i.ds)  $(ds t.ds)
     $(ds t.ds, seen (~(put in seen) name.i.ds), out [i.ds out])
   $(ms t.ms, seen seen.acc, out out.acc, lcl lcl.acc)
+::
+++  thm-defs
+  ::  R4.2ah: the NAMED theorems and assumptions of module `mod` as
+  ::  definitions an expression can reference. tlc2 evaluates a reference
+  ::  to one (`ASSUME \A i \in DOMAIN Test : Test[i]`, where `Test` names
+  ::  `P(Succ)!Reachable0`, a LEMMA of a parametrized instance) by
+  ::  evaluating its body. Keyed `$thm:<name>`, a name no source or config
+  ::  can spell, so they never shadow a definition and nothing that walks
+  ::  definitions by name (config targets, overrides) sees them
+  |=  [mod=@t ts=(list sem-thm)]
+  ^-  (list sem-def)
+  =|  out=(list sem-def)
+  |-  ^-  (list sem-def)
+  ?~  ts  (flop out)
+  ?~  name.i.ts  $(ts t.ts)
+  =/  d=sem-def
+    :*  %sdef  (cat 3 '$thm:' u.name.i.ts)  (lent params.i.ts)  local.i.ts
+        lvl.i.ts  at.i.ts  params.i.ts  body.i.ts  mod
+    ==
+  $(ts t.ts, out [d out])
 ::
 ++  mod-opdefs
   ::  every module in the spec, mapped to the operator names and arities
@@ -3702,9 +3740,11 @@
   ::  module's def/theorem bodies with every $Sel placeholder resolved.
   ::  Runs at the end of +gen-module so all callers (render, level-check)
   ::  see resolved graphs (R1.3.5.3.2)
-  |=  m=sem-module
+  ::  R4.2am: `ext` is the inherited bodies (`+ext-bodies`); the module's
+  ::  own shadow them
+  |=  [m=sem-module ext=(map @t defentry)]
   ^-  sem-module
-  =/  reg  (bodymap m)
+  =/  reg  (~(uni by ext) (bodymap m))
   =/  ndefs=(list sem-def)
     |-  ^-  (list sem-def)
     ?~  defs.m  ~
@@ -3717,6 +3757,32 @@
     :_  $(l t.l)
     i.l(body ?~(body.i.l ~ `(rsel-sem u.body.i.l reg)))
   m(defs ndefs, thmdefs (do-thm thmdefs.m), assumes (do-thm assumes.m), theorems (do-thm theorems.m))
+::
+++  has-sel
+  ::  R4.2am: does the module still hold a `$Sel` placeholder?
+  |=  m=sem-module
+  ^-  ?
+  =/  n=*  [defs.m thmdefs.m assumes.m theorems.m]
+  |-  ^-  ?
+  ?@  n  =('$Sel' n)
+  |($(n -.n) $(n +.n))
+::
+++  ext-bodies
+  ::  R4.2am: the definition and theorem bodies a module inherits through
+  ::  EXTENDS, transitively (`+bodymap` of each user module, generated in
+  ::  its own context). StandardModule bodies are dummies and are skipped
+  |=  [tree=node ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (map @t defentry)
+  =|  acc=(map @t defentry)
+  =/  ex  (extends-of tree)
+  |-  ^-  (map @t defentry)
+  ?~  ex  acc
+  ?:  (~(has by standard-modules:stdmods:modules) i.ex)  $(ex t.ex)
+  =/  ld  (~(get by mods) i.ex)
+  ?~  ld  $(ex t.ex)
+  =/  gm  (gen-module tree.u.ld (full-ctx tree.u.ld ctxs) ctxs mods)
+  =/  sub  (~(uni by (ext-bodies tree.u.ld ctxs mods)) (bodymap gm))
+  $(ex t.ex, acc (~(uni by sub) acc))
 ::
 ++  gen-module
   ::  the root module's semantic graph, with duplicate-definition
@@ -3868,7 +3934,7 @@
       snames  ?.(&(secopen ?=(^ r.gd)) snames [name.u.dsg snames])
     ==
   =/  wk  walk
-  %-  resolve-sels
+  =/  m0=sem-module
   :*  (module-name tree)
       (span-of:ast tree)
       consts
@@ -3885,6 +3951,12 @@
       ~
       ~
   ==
+  ::  R4.2am: a selector may name a definition or theorem the module
+  ::  INHERITS (`ASSUME QuorumNonEmpty!:` in MCVoting, a theorem of the
+  ::  EXTENDed Voting); generate those bodies only when a selector exists
+  %+  resolve-sels  m0
+  ?.  (has-sel m0)  ~
+  (ext-bodies tree ctxs mods)
 ::
 ::  +|  Level Checking (unit 4: LevelNode/OpDefNode/OpApplNode.levelCheck)
 ::

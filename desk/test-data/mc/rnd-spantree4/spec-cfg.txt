@@ -1,0 +1,7 @@
+CONSTANTS
+  Nodes = {n1, n2, n3, n4}
+  MaxCardinality = 4
+  Root = n1
+INVARIANT TypeOK
+SPECIFICATION Spec
+CHECK_DEADLOCK FALSE

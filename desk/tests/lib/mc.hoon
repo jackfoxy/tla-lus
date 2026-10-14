@@ -407,6 +407,62 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x\0aFalsy == FALSE\0aSpec == Falsy /\\ Init /\\ [][Next]_x\0a====\0a'
   'SPECIFICATION Spec\0a'
 ::
+++  test-mc-gen-allassigned-disj
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ x\' = x + 1 /\\ (TRUE \\/ TRUE)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-gen-allassigned-exists
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == /\\ x < 2\0a        /\\ x\' = x + 1\0a        /\\ \\E q \\in {1, 2, 3} : q > 0\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-gen-cdef-value
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aOk(Q) == \\E c \\in {1, 2} : c > 0\0aOk2 == \\E c \\in {1, 2} : c > 0\0aInit == x = 0\0aNext == x < 2 /\\ Ok2 /\\ x\' = x + 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-gen-implies-enum
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ (TRUE => \\E a \\in {1, 2} : a > 0) /\\ x\' = x + 1\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-gh1389-counting
   %+  expect-eq
     !>  ^-  wain
@@ -818,6 +874,20 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R4.2m: an INSTANCE substitution by an INFINITE set (`Values <- Int`,\0a\\* Disruptor\'s RingBuffer; `Boxes` built from `Int`, detector_chan96) is\0a\\* bound lazily: membership and `\\subseteq` decide it on its structure.\0aEXTENDS Integers\0a---- MODULE Buf ----\0aCONSTANT Values\0aVARIABLE slot\0aTypeOK == /\\ slot \\in Values\0a          /\\ {slot} \\subseteq Values\0a          /\\ {[v |-> slot]} \\subseteq [v : Values]\0a====\0aVARIABLE x\0aB == INSTANCE Buf WITH Values <- Int, slot <- x\0aInit == x = -1\0aNext == x < 1 /\\ x\' = x + 1\0aInv == B!TypeOK\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-inst-subst-samename
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0a---- MODULE Cons ----\0aCONSTANT Value\0aVARIABLE chosen\0aInit == chosen = {}\0aNext == chosen = {} /\\ \\E v \\in Value : chosen\' = {v}\0aSpec == Init /\\ [][Next]_chosen\0a====\0aCONSTANT Value\0aVARIABLE x\0achosen == IF x = 0 THEN {} ELSE {x}\0aInit == x = 0\0aNext == x = 0 /\\ x\' \\in Value\0aC == INSTANCE Cons\0aProp == C!Spec\0a====\0a'
+  'CONSTANT Value = {1, 2}\0aINIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-inv-initial
   %+  expect-eq
@@ -1390,6 +1460,25 @@
     '---- MODULE spec ----\0a\\* R2.7.6.2 probe: `live-witness-nested-many` with the nested eventualities\0a\\* reached through RECURSIVE OPERATOR EXPANSION instead of written literally\0a\\* -- the one structural difference left between the passing probes and\0a\\* upstream\'s Github1389ViolatedC.\0aEXTENDS Naturals\0aVARIABLE x\0aRECURSIVE Reach(_)\0aReach(n) == IF n = 0 THEN (x = 9) ELSE <>(Reach(n - 1))\0aInit == x = 0\0aNext == x\' \\in 0..9\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == Reach(3)\0a====\0a'
   'SPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0aPROPERTY Prop\0a'
 ::
+++  test-mc-memb-filter-lazy
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'U = {{3}, {4}, {1, 2}}'
+        'State 2: <Next line 8, col 9 to line 8, col 70 of module spec>'
+        'U = {{1, 2}, {2, 3, 4}}'
+        '4 states generated, 4 distinct states found, 2 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets\0aVARIABLE U\0aDPs(n) == {D \\in SUBSET SUBSET (1..n) :\0a             /\\ (UNION D) = 1..n\0a             /\\ \\A I, J \\in D : (I # J) => (I \\cap J = {}) }\0aInit == U = {{1, 2}, {3}, {4}}\0aNext == U\' \\in {{{1, 2, 3, 4}}, {{1}, {2, 3, 4}}, {{1, 2}, {2, 3, 4}}}\0aInv == U \\in DPs(4)\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-multibind
   %+  expect-eq
     !>  ^-  wain
@@ -1898,6 +1987,21 @@
     '---- MODULE spec ----\0aEXTENDS TLC, Integers\0a\0a\\* In TLA+ a RECORD is a function whose domain is a set of strings, and tlc2\0a\\* compares the two representations equal (RecordValue vs FcnRcdValue). The\0a\\* port keeps `%rec` outside `+fcn-like`, so these are FALSE here and TRUE at\0a\\* the pin -- the whole of BagsTest\'s divergence, and nothing to do with Bags.\0aASSUME([a |-> 1] = ("a" :> 1))\0aASSUME([a |-> 1, b |-> 2] = ("a" :> 1) @@ ("b" :> 2))\0aASSUME([x \\in {"a"} |-> 1] = [a |-> 1])\0a\0a\\* this one AGREES, which is what makes the diagnosis precise: the domain is\0a\\* built right, only the equality is not\0aASSUME(DOMAIN [a |-> 1] = {"a"})\0a\0aSpec == [][TRUE]_<<>>\0a=====================\0a'
   'SPECIFICATION Spec\0a'
 ::
+++  test-mc-rnd-const-subst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '5 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aCONSTANT C\0aR == RandomElement(0..9)\0aVARIABLE x\0aInit == x = 100 + R\0aNext == x\' = IF C = R THEN 200 ELSE C\0a====\0a'
+    'CONSTANT C <- R\0aINIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
 ++  test-mc-rnd-exists
   %+  expect-eq
     !>  ^-  wain
@@ -1956,6 +2060,50 @@
     'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
   12.345
 ::
+++  test-mc-rnd-setmap-draws
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = <<{{}, {3}}, <<6, 5, 6>>>>'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = << {RandomElement(SUBSET ({1, 2, 3} \\ {n})) : n \\in {1, 2}},\0a               [n \\in {1, 2, 3} |-> RandomElement(1..9)] >>\0aNext == UNCHANGED x\0aInv == x[1] = {}\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+  0
+::
+++  test-mc-rnd-spantree4
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '584 states generated, 119 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '------------------------------ MODULE spec ------------------------------\0a(***************************************************************************)\0a(* The specification in this module is a modified version of the one in    *)\0a(* module SpanTree obtained by replacing the declared constant Edges with  *)\0a(* a defined constant that equals a randomly chosen set of edges joining   *)\0a(* the nodes in Nodes.  Thus it can be used to test the algorithm of       *)\0a(* SpanTree on a randomly chosen node, making it easy to check the         *)\0a(* algorithm on a sequence of different graphs.                            *)\0a(***************************************************************************)\0aEXTENDS Integers, FiniteSets, TLC\0a\0aCONSTANTS Nodes, Root, MaxCardinality\0a\0aEdges == \0a  UNION { {{n, m} : m \\in RandomElement(SUBSET (Nodes\\{n}))} : n \\in Nodes }\0a  (*************************************************************************)\0a  (* To understand this definition let\'s look at its subformulas, from the *)\0a  (* inside out.                                                           *)\0a  (*                                                                       *)\0a  (*  - SUBSET (Nodes \\ {n})  is the set of all subsets of the set         *)\0a  (*    Nodes \\ {n} , which is the set of all nodes other than n.          *)\0a  (*                                                                       *)\0a  (*  - RandomElement(...)  is a hack introduced in the TLC module.  TLC   *)\0a  (*    computes its value to be a randomly chosen element in the set      *)\0a  (*    ... . This is hack because, in math, an expression has the same    *)\0a  (*    value whenever it\'s computed.  The value of 2^{1/2} is the same    *)\0a  (*    next Thursday as it is today.  Every mathematical expression exp   *)\0a  (*    satisfies exp = exp.  However, TLC may evaluate                    *)\0a  (*                                                                       *)\0a  (*       RandomElement(S) = RandomElement(S)                             *)\0a  (*                                                                       *)\0a  (*    to equal FALSE if S is a set with more than 1 element, This is     *)\0a  (*    one of the few cases in which TLC does not obey the rules of math. *)\0a  (*                                                                       *)\0a  (*  - {{n, m} : m \\in RandomElement(...)}  is the set of  elements that  *)\0a  (*    equal the set {n, m} for m some element of RandomElement(...) .    *)\0a  (*                                                                       *)\0a  (*  - UNION { ... : n \\in Nodes }  is the union of all sets ...  for n   *)\0a  (*    an element of Nodes.  This expression makes sense if the           *)\0a  (*    expression equals a set that depends on the value of n.            *)\0a  (*************************************************************************)\0a\0aASSUME /\\ Root \\in Nodes\0a       /\\ MaxCardinality \\in Nat\0a       /\\ MaxCardinality >= Cardinality(Nodes)\0a       \0aVARIABLES mom, dist\0avars == <<mom, dist>>\0a\0aNbrs(n) == {m \\in Nodes : {m, n} \\in Edges}\0a\0aTypeOK == /\\ mom \\in [Nodes -> Nodes]\0a          /\\ dist \\in [Nodes -> Nat]\0a          /\\ \\A e \\in Edges : (e \\subseteq Nodes) /\\ (Cardinality(e) = 2)\0a\0aInit == /\\ mom = [n \\in Nodes |-> n]\0a        /\\ dist = [n \\in Nodes |-> IF n = Root THEN 0 ELSE MaxCardinality]\0a        \0aNext == \\E n \\in Nodes :\0a          \\E m \\in Nbrs(n) : \0a             /\\ dist[m] < 1 + dist[n]\0a             /\\ \\E d \\in (dist[m]+1) .. (dist[n] - 1) :\0a                    /\\ dist\' = [dist EXCEPT ![n] = d]\0a                    /\\ mom\'  = [mom  EXCEPT ![n] = m]\0a\0aSpec == Init /\\ [][Next]_vars /\\ WF_vars(Next)\0a-----------------------------------------------------------------------------\0aPostCondition == \0a  \\A n \\in Nodes :\0a    \\/ /\\ n = Root \0a       /\\ dist[n] = 0\0a       /\\ mom[n] = n\0a    \\/ /\\ dist[n] = MaxCardinality \0a       /\\ mom[n] = n\0a       /\\ \\A m \\in Nbrs(n) : dist[m] = MaxCardinality\0a    \\/ /\\ dist[n] \\in 1..(MaxCardinality-1)\0a       /\\ mom[n] \\in Nbrs(n)\0a       /\\ dist[n] = dist[mom[n]] + 1\0a\0aSafety == []((~ ENABLED Next) => PostCondition)\0a\0aLiveness == <>PostCondition\0a(***************************************************************************)\0a(* Model Model_1 has TLC check these correctness condition for a (randomly *)\0a(* chosen) graph with six nodes.  On a few tries, it took TLC an average   *)\0a(* of a little more than 30 seconds to do it.                              *)\0a(***************************************************************************)\0a=============================================================================\0a\\* Modification History\0a\\* Last modified Mon Jun 17 05:39:15 PDT 2019 by lamport\0a\\* Created Fri Jun 14 03:07:58 PDT 2019 by lamport\0a'
+    'CONSTANTS\0a  Nodes = {n1, n2, n3, n4}\0a  MaxCardinality = 4\0a  Root = n1\0aINVARIANT TypeOK\0aSPECIFICATION Spec\0aCHECK_DEADLOCK FALSE\0a'
+  0
+::
+++  test-mc-rnd-startup-order
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        '/\\ x = 23'
+        '/\\ y = <<93, 36, 83036, 129>>'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aB == RandomElement(0..99)\0aA == RandomElement(0..99)\0aD == B + 1000 * RandomElement(0..99)\0aE == A + B\0aVARIABLES x, y\0aInit == x = RandomElement(0..99) /\\ y = <<A, B, D, E>>\0aNext == UNCHANGED <<x, y>>\0aInv == x > 1000\0aASSUME RandomElement(0..99) >= 0\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+  12.345
+::
 ++  test-mc-rnd-two-draws
   %+  expect-eq
     !>  ^-  wain
@@ -1985,6 +2133,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == /\\ x < 3\0a        /\\ x\' = RandomElement(0..2)\0a        /\\ y\' = RandomElement(0..2)\0aInv == x <= 2\0a====\0a'
     'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
   987.654.321
+::
+++  test-mc-rnd-union-draws
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = {{1, 2}, {1, 3}, {1, 4}, {2, 4}, {3, 4}}'
+    ==
+  !>
+  %-  trim
+  %^  check-seed:check
+    '---- MODULE spec ----\0aEXTENDS Integers, FiniteSets, TLC\0aNodes == 1..4\0aEdges == UNION { {{n, m} : m \\in RandomElement(SUBSET (Nodes\\{n}))} : n \\in Nodes }\0aVARIABLE x\0aInit == x = Edges\0aNext == UNCHANGED x\0aInv == x = {}\0a====\0a'
+    'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+  0
 ::
 ++  test-mc-rsos-graph
   %+  expect-eq
@@ -2196,6 +2358,19 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a state is\0a\\* printed. Measured at the pin: `SUBSET (1..3)` and `(1..4) \\X (1..2)` stay\0a\\* unexpanded, while a set FILTER `{y \\in 1..4 : y > 1}` is expanded anyway --\0a\\* it is per-Value-class, not a global switch.\0aEXTENDS Naturals, FiniteSets\0aVARIABLE x\0aInit == x = SUBSET (1..3)\0aNext == UNCHANGED x\0aInv == Cardinality(x) = 99\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-thm-ref
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant Inv is violated by the initial state:'
+        'x = 1'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0a---- MODULE Inner ----\0aEXTENDS Naturals\0aCONSTANT K\0aLEMMA Pos == \\A i \\in 0..K : i <= K\0a====\0aCONSTANT N\0aP(k) == INSTANCE Inner WITH K <- k\0aTHEOREM T1 == N + 1 > N\0aVARIABLE x\0aInit == x = IF T1 /\\ (\\A k \\in 1..N : P(k)!Pos) THEN 1 ELSE 0\0aNext == UNCHANGED x\0aInv == x = 0\0aASSUME T1\0a====\0a'
+  'CONSTANT N = 3\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-tlcext-getandset
   %+  expect-eq
