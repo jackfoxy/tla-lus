@@ -212,8 +212,10 @@
       [%action gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t]
       [%deadlock gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state)]
       [%limited what=?(%states %depth) gen=@ud distinct=@ud queued=@ud depth=@ud]
-      ::  a typed evaluation failure during the search (WU6.9)
-      [%error msg=@t]
+      ::  a typed evaluation failure during the search (WU6.9). R4.2j: `ec` is
+      ::  the pin's error code (0 when the port has none to report) and
+      ::  `trace` the behavior tlc2 prints with it (`~` when it prints none)
+      [%error msg=@t ec=@ud trace=(list state)]
   ==
 ::  one `Tool.getActions` leaf action: its name, its next-state body, and the
 ::  bound-variable CONTEXT the decomposition bound into it. Non-empty only for
@@ -756,7 +758,7 @@
   ::  constraint-pruned state was still discovered
   =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (lte l 1))) st ~ e rs.cur)
   =^  ch  rs.cur  (con-hold-rs cons.o st ce rs.cur)
-  ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
+  ?:  ?=(%| -.ch)  [`[%error p.ch 0 ~] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
   ?^  prev
@@ -764,7 +766,7 @@
     ::  transition
     =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (gth l 1))) u.prev `st e rs.cur)
     =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st ce rs.cur)
-    ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
+    ?:  ?=(%| -.ah)  [`[%error p.ah 0 ~] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
     ::  R2.7.15a: the IMPLIED ACTIONS, at the same hook and with the opposite
@@ -788,7 +790,10 @@
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?~  iv  [~ cur]
-  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+  ::  R4.2j: an invariant that fails to EVALUATE is tlc2's EC 2103 (`The
+  ::  error occurred when TLC was evaluating the nested expressions ...`),
+  ::  whose cause is the evaluation message
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv 2.103 ~] cur]
   :_  cur
   :-  ~
   :*  %inv  gen.cur  distinct.cur  len.queue.cur  depth.cur
@@ -829,7 +834,7 @@
     ::  are the ones standing before it, and the trace runs through THIS
     ::  predecessor rather than the one that first discovered the state
     ?~  ia0  [~ cur]
-    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0 0 ~] cur]
     ?:  cont.o  [~ cur]
     :_  cur
     :-  ~
@@ -861,7 +866,10 @@
   =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?^  iv
-    ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+    ::  R4.2j: an invariant that fails to EVALUATE is tlc2's EC 2103 (`The
+  ::  error occurred when TLC was evaluating the nested expressions ...`),
+  ::  whose cause is the evaluation message
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv 2.103 ~] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is
     ::  still ENQUEUED below -- measured at the pin, a violator's successors are
     ::  explored and can violate in turn, which is how the same spec reports at
@@ -884,7 +892,7 @@
   ::  caller (R2.7.15a's first attempt) reported `1 states left on queue`
   ::  where the pin reports 0
   ?^  ia0
-    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0 0 ~] cur]
     ?:  cont.o
       =.  queue.cur  (fi-put queue.cur fp)
       =?  inits.cur  =('' pred)  [fp inits.cur]
@@ -1122,8 +1130,28 @@
     ::  R2.7.4.3: the expansion reads AND writes the run-scoped store, so a
     ::  `TLCSet` in one action is visible to the next action, the next state,
     ::  and the constraints/invariants that follow
-    =^  nr  rs.c2  (next-states-rs:ne st.vis body.i.as (act-env e ctx.i.as) rs.c2)
-    ?:  ?=(%| -.nr)  [`[%error msg.p.nr] c2]
+    =^  nr  rs.c2  (next-states-raw-rs:ne st.vis body.i.as (act-env e ctx.i.as) rs.c2)
+    ::  R4.2j: a successor that fails to EVALUATE is the error's own code
+    ::  (`\div` by 0 is EC 2179) with the behavior up to the state being
+    ::  expanded, as tlc2 prints it
+    ?:  ?=(%| -.nr)  [`[%error msg.p.nr code.p.nr (trace-to seen.c2 fp)] c2]
+    ::  R4.2j: an INCOMPLETE successor is EC 2109, naming its unassigned
+    ::  variables (sorted, `TLCStateMutExt.getUnassigned`) and the action when
+    ::  the relation has several (`ModelChecker.doNextSetErr`); the behavior
+    ::  printed ends WITH the incomplete successor
+    =/  bad  (skim p.nr |=(s=state !(complete:ne s vars.o)))
+    ?^  bad
+      =/  miss=(list @t)
+        %+  sort  (skip ~(tap in vars.o) |=(v=@t (~(has by i.bad) v)))
+        aor
+      =/  msg=@t
+        %+  rap  3
+        :~  'Successor state is not completely specified by '
+            ?:(?=([* ~] acts) 'the next-state action' (rap 3 ~['action ' name.i.as ' of the next-state relation']))
+            '. The following variable'  ?:(?=([* ~] miss) ' is' 's are')
+            ' not defined: '  (rap 3 (join ', ' miss))  '.'
+        ==
+      [`[%error msg 2.109 (snoc (trace-to seen.c2 fp) i.bad)] c2]
     =/  ng  (lent p.nr)
     =/  d0  distinct.c2
     =.  gen.c2  (add gen.c2 ng)
@@ -2961,10 +2989,34 @@
     |-  ^-  (map @t sem-def:sem-lib)
     ?~  ps  out
     =/  d  (~(get by defs) q.i.ps)
-    =/  l  (~(get by out) p.i.ps)
     ?~  d  $(ps t.ps)
-    ?.  &(?=(^ l) =(p.i.ms origin.u.l))  $(ps t.ps)
-    $(ps t.ps, out (~(put by out) p.i.ps u.d))
+    ::  R4.2 (MCPaxos): EVERY entry that is `M`'s `lhs`, under whatever
+    ::  instance qualification imported it (`V!Ballot` from `V == INSTANCE
+    ::  Voting`) -- tlc2 overrides the OpDefNode itself, which each
+    ::  instantiation shares
+    =/  named=(list [k=@t v=sem-def:sem-lib])
+      (skim ~(tap by out) |=([k=@t *] =(p.i.ps (bnm:ne k))))
+    =/  hits=(list @t)
+      %+  murn  named
+      |=  [k=@t v=sem-def:sem-lib]
+      ^-  (unit @t)
+      ?.  =(p.i.ms origin.v)  ~
+      `k
+    ::  R4.2 (LeastCircularSubstring): an `lhs` that `M` INHERITS
+    ::  (`Nat <- [ZSequences]ZSeqNat`, Nat from Naturals): tlc2 sets the
+    ::  override on that one definition's body (`opDefs[j].getBody()
+    ::  .setToolObject`), a node every module shares, so every reference to
+    ::  it takes `rhs`. Taken when `lhs` has a single defining module
+    =?  hits  ?&  ?=(~ hits)
+                  ?=(^ named)
+                  (levy t.named |=([* v=sem-def:sem-lib] =(origin.v origin.v.i.named)))
+              ==
+      (turn named |=([k=@t *] k))
+    =.  out
+      %+  roll  hits
+      |=  [k=@t o=_out]
+      (~(put by o) k u.d)
+    $(ps t.ps)
   $(ms t.ms)
 ::
 ++  override-consts
@@ -3644,6 +3696,8 @@
           ::  -- handing the caller one would mean building the product twice
           pcs=(list @t)  rs=rst:ne
           poss=(list [name=@t body=sem:sem-lib lvl=@ud])
+          ::  R4.2i: the ALIAS the lasso is rendered through
+          al=(unit sem:sem-lib)
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
   ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
@@ -3690,6 +3744,7 @@
       aname
       (box-free-tf o.hit)
       pcl
+      al
   ==
 ::
 ++  live-render
@@ -3717,6 +3772,8 @@
           ::  temporal violation too, and its line sits between the EC
           ::  2257/2259 hint and the counts. `~` when every postcondition holds
           pcl=wain
+          ::  R4.2i: the ALIAS each prefix state is rendered through
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
@@ -3731,8 +3788,14 @@
   =/  stut     =(%stuttering class.u.l)
   ::  the numbered prefix states (factored out by R2.7.5: the post-error
   ::  second block renders the same prefix with no closer and no counts)
+  ::  R4.2i, measured: under an ALIAS the last prefix state is paired with
+  ::  the state the cycle returns to, and with itself under a stuttering or
+  ::  suppressed closer
+  =/  lsuc=(unit @t)
+    ?:  |(stut noclose)  ~
+    `(snag (dec loop.u.l) prefix.u.l)
   =/  body=wain
-    (live-prefix-lines prefix.u.l states actions env order modn)
+    (live-prefix-lines prefix.u.l states actions env order modn al lsuc)
   ::  the closer: a stuttering self-loop is a new numbered `State`, a
   ::  back-to-state cycle is `Back to state <loop>: <action reaching it>`
   =/  closer=wain
@@ -3763,8 +3826,13 @@
   ::  the numbered prefix states of a lasso: state 1 is the initial predicate,
   ::  each later state labeled with the action that generated it (no
   ::  fingerprint line). Shared by `+live-render` and `+post-error-live`
+  ::  R4.2i: under an ALIAS (`al`) each state is rendered as `+alias-state`
+  ::  renders a safety trace -- paired with the next prefix state, and the
+  ::  LAST with `lsuc` (the state the cycle returns to; ~ is itself), as the
+  ::  pin pairs them (`LiveWorker`)
   |=  $:  prefix=(list @t)  states=(map @t state:ne)  actions=(list act)
           env=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:sem-lib)  lsuc=(unit @t)
       ==
   ^-  wain
   =/  i  1
@@ -3776,10 +3844,16 @@
   =/  label=@t
     ?~  prev  '<Initial predicate>'
     (edge-action-label (~(got by states) u.prev) i.ps actions env order modn)
+  =/  shown=[order=(list @t) st=state:ne]
+    ?~  al  [order st]
+    =/  suc=state:ne
+      ?^  t.ps  (~(got by states) i.t.ps)
+      ?~(lsuc st (~(got by states) u.lsuc))
+    (alias-state u.al env st suc)
   %+  weld
     ;:  weld
       ~[(crip "State {(a-tape i)}: {(trip label)}")]
-      (render-state order st ~ *eenv:ne ~)
+      (render-state order.shown st.shown ~ *eenv:ne ~)
     ==
   $(ps t.ps, i +(i), prev `i.ps)
 ::
@@ -3811,6 +3885,7 @@
           inits=(list @t)  nsb=sem:sem-lib  env=eenv:ne
           order=(list @t)  modn=@t  defs=(map @t sem-def:sem-lib)
           pname=@t  props=(list [name=@t body=sem:sem-lib])  aname=@t
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   ?.  ?=(?(%inv %deadlock) -.out)  ~
@@ -3831,7 +3906,7 @@
     ~['Error: The following behavior constitutes a counter-example:']
     %-  live-prefix-lines
     :*  prefix.u.l.hit  states  (get-actions nsb aname defs env)
-        env  order  modn
+        env  order  modn  al  ~
     ==
   ==
 ::
@@ -3923,7 +3998,7 @@
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
         ::  the `live-message-lines` differential renders the lasso alone, so
         ::  it declares no postconditions (R2.7.14)
-        ~  empty-rst:ne  ~
+        ~  empty-rst:ne  ~  ~
     ==
   ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
   ::  path (`+check-in`), so the differential wrapper carries it too -- else
@@ -5488,16 +5563,8 @@
   ::  state search and aborts the run, so the final liveness check never runs:
   ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
   ::  violation the port used to report over the same state count.
-  ::  ALIAS is LIVE on every SAFETY path (R2.3.2) -- including the implied
-  ::  init / implied action / box-state branches above, which all render
-  ::  through `+render-outcome`. It is REFUSED here, on the genuine temporal
-  ::  path: tlc2 aliases the lasso trace too (`LiveWorker.java:876-972`), but
-  ::  `+live-report` renders its prefix and cycle itself and takes no alias,
-  ::  so accepting one would print an UNALIASED trace -- exactly the silent
-  ::  wrong trace R1.8.6's blanket rejection existed to prevent. Narrowed,
-  ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
-  ?^  alias.c
-    ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
+  ::  ALIAS is live on the temporal path too (R4.2i): the lasso's prefix
+  ::  states render through it (`+live-prefix-lines`), as `LiveWorker` does
   ::  R2.3.4: the graph build carries the config's INVARIANTs. It used to
   ::  pass `~`, so an INVARIANT alongside a temporal PROPERTY was simply not
   ::  checked -- which is why the kernel refused the combination rather than
@@ -5526,7 +5593,7 @@
       :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
           (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
           order.c  modn  defs.c
-          pname  props.c  aname.c
+          pname  props.c  aname.c  alias.c
       ==
     ::  R2.7.7.3: the postconditions run here too -- measured, they run
     ::  after a VIOLATION as well as on a clean run
@@ -5560,7 +5627,7 @@
         order.c  modn  defs.c  pname
         props.c
         gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
-        pcs.c  rs.bg  poss.c
+        pcs.c  rs.bg  poss.c  alias.c
     ==
   report.r
 ::

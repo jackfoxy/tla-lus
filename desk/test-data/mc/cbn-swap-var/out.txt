@@ -1,0 +1,20 @@
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ up = <<TRUE, TRUE, TRUE>>
+/\ leader = 1
+/\ log = 0
+State 2: <Fail(1) line 12, col 12 to line 12, col 79 of module spec>
+/\ up = <<FALSE, TRUE, TRUE>>
+/\ leader = 1
+/\ log = 0
+State 3: <Fail(2) line 12, col 12 to line 12, col 79 of module spec>
+/\ up = <<FALSE, FALSE, TRUE>>
+/\ leader = 1
+/\ log = 0
+State 4: <Fail(3) line 12, col 12 to line 12, col 79 of module spec>
+/\ up = <<FALSE, FALSE, FALSE>>
+/\ leader = 1
+/\ log = 0
+75 states generated, 38 distinct states found, 8 states left on queue.
+The depth of the complete state graph search is 5.

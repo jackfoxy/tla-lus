@@ -157,6 +157,21 @@
     ::  an approved difference: a file read is not part of a run's sources
     [['Json' 'JsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'JsonDeserialize'))]]
     [['Json' 'ndJsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'ndJsonDeserialize'))]]
+    ::  R4.2h: CommunityModules' process and file surfaces, refused by name
+    ::  (their TLA+ bodies are dummies; a run has no process and reads or
+    ::  writes only through its request and artifacts)
+    [['IOUtils' 'IOExec' 1] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOExec' 'it runs a process'))]]
+    [['IOUtils' 'IOEnvExec' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOEnvExec' 'it runs a process'))]]
+    [['IOUtils' 'IOExecTemplate' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOExecTemplate' 'it runs a process'))]]
+    [['IOUtils' 'IOEnvExecTemplate' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOEnvExecTemplate' 'it runs a process'))]]
+    [['IOUtils' 'IOSerialize' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOSerialize' 'it writes a file'))]]
+    [['IOUtils' 'IODeserialize' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IODeserialize' 'it reads a file'))]]
+    [['IOUtils' 'Serialize' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'Serialize' 'it writes a file'))]]
+    [['IOUtils' 'Deserialize' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'Deserialize' 'it reads a file'))]]
+    [['CSV' 'CSVWrite' 3] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVWrite' 'it writes a file'))]]
+    [['CSV' 'CSVWriteRecord' 4] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVWriteRecord' 'it writes a file'))]]
+    [['CSV' 'CSVRead' 3] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRead' 'it reads a file'))]]
+    [['CSV' 'CSVRecords' 1] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRecords' 'it reads a file'))]]
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
@@ -842,6 +857,17 @@
   :-  2.132
   %^  rap  3  'The first argument of Assert evaluated to FALSE; '
   ~['the second argument was: ' (crip (render:v i.t.as))]
+::
+++  io-refused
+  ::  R4.2h: a CommunityModules process or file operator, refused by name
+  |=  [mod=@t nm=@t why=@t]
+  ^-  eres
+  :-  %|
+  :-  0
+  %+  rap  3
+  :~  'unsupported CommunityModules operator: '  mod  '!'  nm  '; '  why
+      ', and a run has no process and touches no file outside its request'
+  ==
 ::
 ++  json-read-refused
   ::  R4.2f: `JsonDeserialize` / `ndJsonDeserialize` read a FILE by a path

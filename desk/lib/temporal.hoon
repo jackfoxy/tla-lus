@@ -474,7 +474,7 @@
     |=  why=(unit @t)
     ^-  (each live-expr aerr)
     ?.  (gth l 2)  (leaf s l c env)
-    =/  where  (crip (loc-leaf modn.c s))
+    =/  where  (err-where s c env)
     :-  %|
     :-  2.213
     ?~  why  (rap 3 ~['TLC cannot handle the temporal formula ' where])
@@ -629,7 +629,7 @@
     :~  'expansion bound reached ('
         (crip ((d-co:co 1) expand-cap))
         ' nested user-operator expansions) translating the temporal formula '
-        (crip (loc-leaf modn.c s))
+        (err-where s c env)
         '; the recursion reaches no base case. tlc2 has no bound here: it '
         'overflows the JVM stack and reports EC 1005'
     ==
@@ -641,7 +641,7 @@
     :-  %|
     :-  2.213
     %+  rap  3
-    ~['TLC cannot handle the temporal formula ' (crip (loc-leaf modn.c s))]
+    ~['TLC cannot handle the temporal formula ' (err-where s c env)]
   --
 ::
 ++  bind-formals
@@ -1352,6 +1352,68 @@
   |=  [modn=@t s=sem:sm]
   ^-  tape
   (trip (loc-str:config modn (sspan-of s)))
+::
+++  err-where
+  ::  R4.2ad: an error's location names the module the node's TEXT is in,
+  ::  as Location.toString does. A span carries no module, so the node is
+  ::  found in the definition bodies (+sem-module); the root's name when it
+  ::  is in none (a LET-local or a synthesized node)
+  |=  [s=sem:sm c=actx env=eenv:ne]
+  ^-  @t
+  (crip (loc-leaf (sem-module s ops.env modn.c) s))
+::
+++  sem-module
+  ::  the module whose text holds `s`: the `origin` of the definition whose
+  ::  body contains it, switched to the instanced module inside a
+  ::  `$SubstIn:<mod>` wrapper's wrapped body (its substitution expressions
+  ::  stay in the instancing module). Searched only on an error path
+  |=  [s=sem:sm ops=(map @t sem-def:sm) dflt=@t]
+  ^-  @t
+  |^  (go ~(val by ops))
+  ++  go
+    |=  ds=(list sem-def:sm)
+    ^-  @t
+    ?~  ds  dflt
+    ?~  body.i.ds  $(ds t.ds)
+    =/  m  (find-in u.body.i.ds ?:(=('' origin.i.ds) dflt origin.i.ds))
+    ?^  m  u.m
+    $(ds t.ds)
+  ::
+  ++  find-in
+    |=  [r=sem:sm mo=@t]
+    ^-  (unit @t)
+    ?:  =(r s)  `mo
+    ?-    -.r
+        ?(%lit %atref %nullodn)  ~
+    ::
+        %letin
+      =/  m  (find-list (murn lets.r |=(d=sem-def:sm body.d)) mo)
+      ?^  m  m
+      ?~(body.r ~ (find-in u.body.r mo))
+    ::
+        %apply
+      =/  m
+        %+  find-list
+          (murn bound.r |=(b=sem-bound:sm range.b))
+        mo
+      ?^  m  m
+      =/  wm  (anysubstin-mod:sm name.op.r)
+      ?~  wm  (find-list args.r mo)
+      =/  xs  (flop args.r)
+      ?~  xs  ~
+      =/  w  (find-in i.xs u.wm)
+      ?^  w  w
+      (find-list t.xs mo)
+    ==
+  ::
+  ++  find-list
+    |=  [l=(list sem:sm) mo=@t]
+    ^-  (unit @t)
+    ?~  l  ~
+    =/  m  (find-in i.l mo)
+    ?^  m  m
+    $(l t.l)
+  --
 ::
 ++  snag-le
   |=  [i=@ud l=(list live-expr)]

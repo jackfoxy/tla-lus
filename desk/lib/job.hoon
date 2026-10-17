@@ -202,6 +202,9 @@
           sloc=sspan:semantic
           fair=(list sem:semantic)
           aname=@t
+          ::  R4.2i: the ALIAS body, for the lasso and a pre-empting safety
+          ::  trace alike
+          al=(unit sem:semantic)
       ==
       ::  seeded simulation
       $:  %sim
@@ -212,6 +215,8 @@
           ::  `-difftrace` (R2.4.3): tlc2 honours it in SIMULATION only, so it
           ::  rides on this kont and nowhere else
           df=?
+          ::  R4.2i: the ALIAS the simulated behavior is rendered through
+          al=(unit sem:semantic)
       ==
       ::  depth-first iterative deepening (R2.5). Its own kont because its
       ::  visited set is not the BFS one: each fingerprint carries a status
@@ -1135,6 +1140,18 @@
   ?~  cfg.s  ~
   `[[%inline ''] (shax u.cfg.s)]
 ::
+++  cfg-text
+  ::  the config a loaded file yields: a `.tla` path carries it in a
+  ::  `CONFIG` block (R4.2ab, `tlc-monolith`); provenance still hashes
+  ::  the whole file as read (+clay-provs)
+  |=  c=lcur
+  ^-  (unit @t)
+  ?~  cfg.c  ~
+  ?~  cfg-path.c  cfg.c
+  =/  p  (flop u.cfg-path.c)
+  ?.  ?=([%tla @ *] p)  cfg.c
+  `(monolith-config:mod u.cfg.c i.t.p)
+::
 ++  close-load
   ::  the module graph is closed: record what was read, then hand the
   ::  sources to %parse exactly as an inline bundle would
@@ -1198,7 +1215,7 @@
     (load-fail j 'Cannot find the config file.' pre)
   ::  `j` is narrowed to the %clay bundle here, so the hand-off happens
   ::  in a gate of its own rather than by writing back into it
-  (close-load j (clay-provs c) [root.c mods.c cfg.c pc.c] pre)
+  (close-load j (clay-provs c) [root.c mods.c (cfg-text c) pc.c] pre)
 ::
 ::  +|  Stage: %parse
 ::
@@ -1620,6 +1637,7 @@
     %-  ~(gas by consts)
     :~  ['$env' (str-rec env.request.j)]
         ['$props' (str-rec props.request.j)]
+        ['$config' (run-config mode deadlock.rs)]
     ==
   ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode.
   ::  `%dfid` carries no seed on this wire, so it runs from the 0 default
@@ -1698,7 +1716,17 @@
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
     irs0
   =/  isr  -.isc
-  ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
+  ?:  ?=(%| -.isr)
+    ::  R4.2j: the pin's code on the wire -- EC 2102 (`current state is not a
+    ::  legal state`) for an initial state left incomplete, else the
+    ::  evaluation error's own
+    =/  ec=@ud
+      ?:  =('incomplete initial state: a variable is unassigned.' msg.p.isr)
+        2.102
+      code.p.isr
+    ?:  =(0 ec)  (finish j [%failed msg.p.isr] pre)
+    =/  dm  (add-diags j ~[[[%tlc ec] %error %explore msg.p.isr ~ ~]])
+    (finish j.dm [%failed msg.p.isr] (weld pre evs.dm))
   =/  is  p.isr
   ::  R2.7.4.2b: everything the coverage block needs and the search does not
   ::  otherwise carry. `irej` is the R2.7.4.1a carrier's INIT rejection count
@@ -1749,13 +1777,6 @@
       ==
     (more j pre)
   ?:  ?=(%simulate -.mode)
-    ::  `+trace-states` renders the simulated behavior with no alias, and
-    ::  tlc2 does apply one there (`SimulationWorker.java:163`), so an ALIAS
-    ::  here would print a wrong trace. Refused, narrowly (R2.3.2)
-    ?^  alias.rs
-      %^  finish  j
-        [%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)']
-      pre
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
     =/  actions  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
@@ -1779,7 +1800,7 @@
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
-      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j])
+      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j alb])
     (more j pre)
   ::  R2.7.15c: the IMPLIED INITS, which this kernel used to compute and drop.
   ::  tlc2 checks a level<=1 PROPERTY only while computing the INITIAL STATES
@@ -1824,13 +1845,6 @@
   ::  wired below, where the opts are built); the LIVENESS stage is planned
   ::  only when a genuine temporal property was declared.
   ?^  temps.bins
-    ::  the lasso trace is rendered by the %liveness stage, which takes no
-    ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
-    ::  narrowly, matching the console path's guard (R2.3.2)
-    ?^  alias.rs
-      %^  finish  j
-        [%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
-      pre
     ::  a genuine temporal property runs the 8.2-8.6 engine in the %liveness
     ::  stage; a %clay run could not know it needs that stage until its config
     ::  is read, so the plan grows here, honestly, with its total
@@ -1871,7 +1885,7 @@
           temps.bins
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
-          sname  sloc  fair  aname
+          sname  sloc  fair  aname  alb
       ==
     (more j pre)
   ::  no temporal property: a safety run, and the box-state properties are part
@@ -1931,6 +1945,40 @@
       ==
     c
   '-'
+::
+++  run-config
+  ::  R4.2w: `TLCGet("config")`, the record the pin's checker builds
+  ::  (`AbstractChecker.createConfig`; the simulator's own for -simulate and
+  ::  -generate). Measured with tla2tools.jar: an exhaustive run is [mode
+  ::  "bfs", deadlock, worker 1, seed (a string), fingerprint (the FP64
+  ::  polynomial of `-fp 0`, a string), install]; DFID reports "bfs" too; a
+  ::  simulation is [mode "simulate"/"generate", deadlock, seed, worker 1,
+  ::  traces, depth, aril "0", sched "random", install]. `install` is the
+  ::  jar's path at the pin; here it names this engine (approved difference)
+  |=  [m=check-mode cfg-ddl=?]
+  ^-  value:check
+  =/  inst=value:check  [%str '%tla-lus']
+  =/  sd  |=(s=@ud `value:check`[%str (crip (a-co:co s))])
+  %-  normalize:vl:check
+  :-  %rec
+  ?-  -.m
+      %exhaustive
+    :~  ['mode' [%str 'bfs']]  ['deadlock' [%bool &(deadlock.m cfg-ddl)]]
+        ['worker' [%int --1]]  ['seed' (sd seed.m)]
+        ['fingerprint' [%str '-7992595565342442794']]  ['install' inst]
+    ==
+      %dfid
+    :~  ['mode' [%str 'bfs']]  ['deadlock' [%bool &(deadlock.m cfg-ddl)]]
+        ['worker' [%int --1]]  ['seed' (sd 0)]
+        ['fingerprint' [%str '-7992595565342442794']]  ['install' inst]
+    ==
+      %simulate
+    :~  ['mode' [%str ?:(generate.m 'generate' 'simulate')]]
+        ['deadlock' [%bool cfg-ddl]]  ['seed' (sd seed.m)]  ['worker' [%int --1]]
+        ['traces' [%int (sun:si num.m)]]  ['depth' [%int (sun:si depth.m)]]
+        ['aril' [%str '0']]  ['sched' [%str 'random']]  ['install' inst]
+    ==
+  ==
 ::
 ++  str-rec
   ::  R4.2c/g: a string map as a record value
@@ -2018,8 +2066,7 @@
     ::  R2.3.4: with INVARIANTs carried here, `%inv` is now reachable and is a
     ::  real verdict -- the safety violation pre-empts the temporal check, as
     ::  `ModelChecker.doNext` returning pre-empts tlc2's. `+finish-bfs` renders
-    ::  it exactly as the plain safety path does. ALIAS is refused alongside a
-    ::  temporal PROPERTY (R2.3.2), so `~` is the whole story for the alias
+    ::  it exactly as the plain safety path does, through the ALIAS (R4.2i)
     ::  R4.P7: and so does every other end of the search -- a deadlock, an
     ::  implied-action violation, an evaluation error -- exactly as
     ::  `ModelChecker.doNext` aborts the run before the final liveness check.
@@ -2031,7 +2078,7 @@
         ::  the %live kont carries no postcondition names: the liveness path
         ::  keeps them on its own kont, and this branch is the search outcome
         ::  that pre-empts it (R2.3.4)
-        nl.kk  act.kk  aname.kk  ~  ~  ~  pre
+        nl.kk  act.kk  aname.kk  al.kk  ~  ~  pre
       ==
     =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
     =.  stats.j  st
@@ -2053,7 +2100,20 @@
           pre=(list event)
       ==
   ^-  step-out
-  ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
+  ?:  ?=(%error -.out)
+    ::  R4.2j: a run that fails to evaluate carries the pin's error code as a
+    ::  diagnostic and, where tlc2 prints one, the behavior as a `%trace`
+    ::  artifact (EC 2109 / 2179 during the search)
+    ?:  =(0 ec.out)  (finish j [%failed msg.out] pre)
+    =/  dm  (add-diags j ~[[[%tlc ec.out] %error %explore msg.out ~ ~]])
+    =.  j  j.dm
+    =?  artifacts.j  ?=(^ trace.out)
+      =/  env   (make-env:ne defs.o consts.o vars.o)
+      =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
+      =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
+      %+  ~(put by artifacts.j)  %trace
+      [%trace [%safety (trace-states trace.out act acts env order.o modn al) ~]]
+    (finish j [%failed msg.out] (weld pre evs.dm))
   =/  st=run-stats
     ?-  -.out
       %ok        [gen.out distinct.out queued.out depth.out od]
@@ -2193,6 +2253,7 @@
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
           props.kk
           generated.st  distinct.st  depth.st  ~  aname.kk  |  (pcl-of ~)
+          al.kk
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
@@ -2251,10 +2312,19 @@
           modn.kk
           ?:((box-free-tf:check ~[o]) 0 loop.u.l)
         ==
+        al.kk
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
-  =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '' ~) `loop.u.l]
+  ::  R4.2i: aliased as the report is -- the last state paired with the
+  ::  cycle's target, or itself for a stuttering or suppressed closer
+  =/  lsuc=(unit state:check)
+    ?:  |(=(%stuttering class.u.l) (box-free-tf:check ~[o]))  ~
+    `(~(got by states) (snag (dec loop.u.l) prefix.u.l))
+  =/  typed=trace
+    :+  %lasso
+      (trace-states-to tr-states act.kk ~ ?~(al.kk *eenv:ne env) ~ '' al.kk lsuc)
+    `loop.u.l
   ::  R2.7.12: the TYPED result names the same property the report does. The
   ::  wire carries ONE name where the console can now print several, so it
   ::  takes the first attributed one; `pname` remains the fallback
@@ -2323,10 +2393,18 @@
     ;:  weld
       ~[headline]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '' ~ ~ df.kk)
+      ::  R4.2i: through the ALIAS, each state paired with its successor
+      ::  and the last with itself, as `SimulationWorker` prints it
+      %:  render-trace:check
+        vpath  nl.kk  ~
+        ?~(al.kk *eenv:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk))
+        ~  ''  al.kk  ~  df.kk
+      ==
       ~[head]
     ==
-  =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '' ~) ~]
+  =/  typed=trace
+    =/  se  ?~(al.kk *eenv:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk))
+    [%simulate (trace-states vpath act.kk ~ se ~ '' al.kk) ~]
   =/  vn
     ?-  vk
       ::  simulation reports what a BEHAVIOR violated; it has no
@@ -2496,6 +2574,17 @@
           al=(unit sem:semantic)
       ==
   ^-  (list trace-state)
+  (trace-states-to sts act acts e order modn al ~)
+::
+++  trace-states-to
+  ::  +trace-states with the LAST state's alias successor given: a lasso's
+  ::  last state pairs with the state its cycle returns to (R4.2i)
+  |=  $:  sts=(list state:check)  act=next-act
+          acts=(list act:check)
+          e=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:semantic)  lsuc=(unit state:check)
+      ==
+  ^-  (list trace-state)
   =/  i  1
   =/  prev=(unit state:check)  ~
   |-  ^-  (list trace-state)
@@ -2519,7 +2608,7 @@
   ::  `+render-trace` uses, so report and wire trace never disagree
   =/  shown=[order=(list @t) st=state:check]
     ?~  al  [order i.sts]
-    (alias-state:check u.al e i.sts ?~(t.sts i.sts i.t.sts))
+    (alias-state:check u.al e i.sts ?^(t.sts i.t.sts ?~(lsuc i.sts u.lsuc)))
   :_  $(sts t.sts, i +(i), prev `i.sts)
   [i a (state-pairs:check order.shown st.shown)]
 ::

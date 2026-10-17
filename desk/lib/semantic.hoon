@@ -1210,6 +1210,27 @@
     $(ds t.ds, seen (~(put in seen) name.i.ds), out [i.ds out])
   $(ms t.ms, seen seen.acc, out out.acc, lcl lcl.acc)
 ::
+++  inst-ext-defs
+  ::  the definitions module `mod` inherits through EXTENDS, transitively, as
+  ::  +ext-defs gives them to a root: over the closure in dependency-first
+  ::  order (a post-order walk; an instanced module has no graph order of
+  ::  its own here)
+  |=  [mod=@t ctxs=(map @t ctx) mods=(map @t loaded:modules)]
+  ^-  (list sem-def)
+  |^  (ext-defs mod (flop out:(walk mod ~ ~)) ctxs mods)
+  ++  walk
+    |=  [nm=@t seen=(set @t) out=(list @t)]
+    ^-  [seen=(set @t) out=(list @t)]
+    ?:  (~(has in seen) nm)  [seen out]
+    =.  seen  (~(put in seen) nm)
+    =/  ld  (~(get by mods) nm)
+    =/  xs=(list @t)  ?~(ld ~ (extends-of tree.u.ld))
+    |-  ^-  [seen=(set @t) out=(list @t)]
+    ?~  xs  [seen [nm out]]
+    =/  r  (walk i.xs seen out)
+    $(xs t.xs, seen seen.r, out out.r)
+  --
+::
 ++  thm-defs
   ::  R4.2ah: the NAMED theorems and assumptions of module `mod` as
   ::  definitions an expression can reference. tlc2 evaluates a reference
@@ -1554,7 +1575,15 @@
       ?~  bound.s  ~
       :-  i.bound.s(range ?~(range.i.bound.s ~ `^$(s u.range.i.bound.s)))
       $(bound.s t.bound.s)
-    s(op op2, args args2, bound bound2)
+    ::  R4.2 (MCKVsnap): an operator ARGUMENT names its operator in the
+    ::  `$OpArg`'s ubound (`satisfyIsolationLevel(s, t, CT_SI)` inside
+    ::  `CC == INSTANCE ClientCentric`)
+    =/  ub2
+      ?.  =('$OpArg' name.op.s)  ubound.s
+      ?~  ubound.s  ubound.s
+      =/  q  (~(get by sibs) name.i.ubound.s)
+      ?~(q ubound.s [i.ubound.s(name u.q) t.ubound.s])
+    s(op op2, args args2, bound bound2, ubound ub2)
   ::
       %letin
     =/  lets2
@@ -3053,7 +3082,10 @@
   %=  $
     ps         t.ps
     syms.out   (weld syms.out (inst-syms u.iu ctxs c2.i.ps))
-    defs.out   (weld defs.out defs.gi)
+    ::  R4.2 (MCEWD687a): and its nested members (`nds`), which the instance's
+    ::  own bodies name -- `$Local:G!SeqOf`, from Graphs' `LOCAL INSTANCE
+    ::  SequencesExt`
+    defs.out   :(weld defs.out defs.gi nds.gi)
     thms.out   (weld thms.out thms.gi)
     ds.out     (weld ds.out ds.gi)
   ==
@@ -3288,6 +3320,13 @@
     ?~  niu  $(bus t.bus)
     =/  ngi  (g-instance i.bus u.niu bctx ctxs mods)
     $(bus t.bus, out (weld (flop (weld defs.ngi nds.ngi)) out))
+  ::  R4.2 (Sailfish): and what the instanced module INHERITS through its
+  ::  EXTENDS, under their PLAIN names, as `+nested-defs` (R4.2o) gives a
+  ::  top-level instance's: a NESTED instance's closure was missing
+  ::  (`INSTANCE Sailfish` -> `INSTANCE BlockDag`, which `EXTENDS Utils`,
+  ::  gives `Max`). In `nds`: they resolve, and SemDump and the level check
+  ::  never see them
+  =/  xinh  (inst-ext-defs mod.ip ctxs mods)
   ::  R2.7.8: the instanced module's own NON-LOCAL member names -- the set a
   ::  sibling reference inside one of their bodies can name. Collected in a
   ::  first pass, since a member may reference a sibling defined LATER
@@ -3369,18 +3408,22 @@
     |=  base=sem-def
     ^-  sem-def
     =/  ilvl  (max lvl.base sub-lvl)
+    =/  nm
+      ?:  local.base  (local-inst-name name.iu name.base)
+      (inst-op-name name.iu name.base)
+    ::  a nested instance's inherited StandardModule operator has no body
+    ?~  body.base
+      base(name nm, arity (add (lent iparams) arity.base), local |(local.iu local.base))
     =/  subw=sem
       :*  %apply  [(cat 3 '$SubstIn:' mod.ip) %builtin]  ilvl  (span-of:ast u)
           (turn nms.gsubs |=(nm=@t `sbind`[nm | ~]))
           ~
           %+  weld  exs.gsubs
           ^-  (list sem)
-          ?~  body.base  ~
           [(qualify-siblings u.body.base name.iu sibs) ~]
       ==
     :*  %sdef
-        ?:  local.base  (local-inst-name name.iu name.base)
-        (inst-op-name name.iu name.base)
+        nm
         (add (lent iparams) arity.base)
         ?|(local.iu local.base)
         ilvl
@@ -3428,7 +3471,7 @@
       -.ithms
       irec(subs isubs.gsubs)
       :(weld ds.gsubs +.idefs +.ithms)
-      ndefs
+      (weld xinh ndefs)
   ==
 ::
 ++  own-decls

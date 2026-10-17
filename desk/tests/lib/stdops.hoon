@@ -181,5 +181,7 @@
   ::  R4.2f adds Json's three pure encoders (ToJson, ToJsonArray,
   ::  ToJsonObject); its two writers are node-ops. 37 -> 40. Its two readers
   ::  are typed refusals by name (approved difference). 40 -> 42.
-  (expect-eq !>(42) !>(~(wyt by registry:so)))
+  ::  R4.2h: twelve CommunityModules process/file operators (IOUtils, CSV)
+  ::  are typed refusals by name. 42 -> 54.
+  (expect-eq !>(54) !>(~(wyt by registry:so)))
 --

@@ -530,17 +530,54 @@
     !>(`'path /secrets/cfg/txt is not under a declared search root')
   !>((validate:job-lib (clay-req 'spec' `/secrets/cfg/txt ~[/src])))
 ::
-++  test-clay-tla-config-rejected
-  ::  R4.1c approved difference: tlc2 would read a `---- CONFIG spec ----`
-  ::  block from the module (MonolithSpecExtractor.config)
-  =/  want=@t
-    %+  rap  3
-    :~  'config path /src/spec/tla is a .tla module; a CONFIG block '
-        'inside a module is not supported, give a .cfg'
-    ==
+++  test-clay-monolith-config
+  ::  R4.2ab: a `.tla` given as the config yields its `CONFIG <name>`
+  ::  block, `<name>` the file name minus `.tla` (tlc2 `-config spec.tla`)
+  =/  mono
+    (rap 3 ~[single-mod '\0a---- CONFIG spec ----\0a' mc-cfg '====\0a'])
+  =/  f  (mk-fs ~[[/src/spec/tla mono]])
   %+  expect-eq
-    !>(`want)
-  !>((validate:job-lib (clay-req 'spec' `/src/spec/tla ~[/src])))
+    !>(`[%ok [4 3 0 3 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/spec/tla ~[/src])))
+::
+++  test-clay-monolith-config-other-file
+  ::  the name comes from the CONFIG file, not the root module (pin:
+  ::  `-config M1.tla M2` reads `CONFIG M1`); a Clay segment is the
+  ::  lowercased name, so the header matches it case-folded
+  =/  conf
+    %+  rap  3
+    :~  '---- CONFIG Spec ----\0aINIT Init\0a====\0a'
+        '---- CONFIG Conf ----\0a'  mc-cfg  '====\0a'
+    ==
+  =/  f  (mk-fs ~[[/src/spec/tla single-mod] [/src/conf/tla conf]])
+  %+  expect-eq
+    !>(`[%ok [4 3 0 3 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/conf/tla ~[/src])))
+::
+++  test-clay-monolith-config-missing-block
+  ::  no matching block is an EMPTY config (pin: EC 2231, the same
+  ::  failure an empty `.cfg` gives)
+  =/  mono  (rap 3 ~[single-mod '\0a---- CONFIG other ----\0a' mc-cfg '===='])
+  =/  f  (mk-fs ~[[/src/spec/tla mono]])
+  =/  ir  (run-inline (inline-req 'spec' ~[['spec' single-mod]] '') 256)
+  (expect-eq !>(result.ir) !>((clay-result f (clay-req 'spec' `/src/spec/tla ~[/src]))))
+::
+++  test-monolith-config-edges
+  ::  the first block wins; an unterminated block runs to end of file;
+  ::  the header is whole-line with at least four dashes each side;
+  ::  the body is trimmed (MonolithSpecExtractor.config)
+  ;:  weld
+    %+  expect-eq  !>('A\0aB')
+    !>((monolith-config:mod '---- CONFIG x ----\0aA\0aB\0a====\0a---- CONFIG x ----\0aC' %x))
+    %+  expect-eq  !>('A')
+    !>((monolith-config:mod '-----  CONFIG \09 X  -------\0d\0a  A  \0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '--- CONFIG x ----\0aA\0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '---- CONFIG x ---- y\0aA\0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '---- CONFIG x ----\0a====\0aA\0a' %x))
+  ==
 ::
 ++  test-clay-bad-module-name-rejected
   %+  expect-eq

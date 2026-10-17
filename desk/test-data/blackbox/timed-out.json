@@ -197,7 +197,7 @@
    "model": "specifications/TLC/TestGraphs.cfg",
    "size": "small",
    "expected": "success",
-   "bottleneck": "R4.2 (2026-10-13): after the instance name-capture fixes the safety part agrees (Spec alone 2,790 / 2,590 / 51 = pin, single-file copy); WITH its PROPERTIES (Termination, Live, Refinement2) one job slice exhausted the 8 GB loom (`behn: bail: %meme`, ship down) -> R4.2ap. Refinement2 is also refused as undefined in the config (R4.2aq)."
+   "bottleneck": "R4.2 (2026-10-13): after the instance name-capture fixes the safety part agrees (Spec alone 2,790 / 2,590 / 51 = pin, single-file copy); WITH its PROPERTIES (Termination, Live, Refinement) one job slice exhausted the 8 GB loom (`behn: bail: %meme`, ship down) -> R4.2ap."
   }
  ]
 }

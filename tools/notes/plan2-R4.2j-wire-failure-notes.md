@@ -1,4 +1,4 @@
-# R4.2j: `op-wire-failure`, the typed wire's projection of a failing run (in progress)
+# R4.2j: `op-wire-failure`, the typed wire's projection of a failing run (DONE 2026-10-14)
 
 ```text
 Row: op-wire-failure (absent; created by R4.0f)
@@ -38,8 +38,23 @@ pin (L6). The messages are fixed, and `safety-gen` now expects the pin's
 text. One approximation remains, stated in the code: `sem-thm` has no
 origin, so an ASSUME imported through EXTENDS is located in the root module.
 
-## (a) Runtime evaluation failures: OPEN
+## (a) Runtime evaluation failures: DONE (2026-10-14)
 
-EC 2102/2109/2103/2179 still produce `[%failed reason]` with no diagnostic
-and no `%trace` of the behavior tlc2 prints. The `incomplete next state`
-reason text also differs. Four arms remain withheld.
+Measured with `tla2tools.jar -tool` on the four fixtures:
+
+| fixture | pin | port now |
+|---|---|---|
+| IncompleteInit (`y` never assigned) | EC 2102 `current state is not a legal state` | diagnostic `[%tlc 2102]` |
+| IncompleteNext (`Next == x' = x + 1`) | EC 2109 `Successor state is not completely specified by the next-state action. The following variable is not defined: y.` + behavior (Initial predicate, Next) | the same text and code; `%trace` artifact ending in the incomplete successor |
+| InvariantEvaluation (`1 \div x` at x = 0) | EC 1000 wrapping 2179, then EC 2103 | diagnostic `[%tlc 2103]`, message the cause (`The second argument of \div is 0.`) |
+| Evaluation (`\div` by 0 in Next) | EC 2179 + behavior (Initial predicate) | diagnostic `[%tlc 2179]`; `%trace` up to the expanded state |
+
+`outcome`'s `%error` carries `ec` and `trace`; `+bfs-step` classifies a
+next-state failure (`+next-states-raw-rs` leaves completeness to it, so it can
+name the variables: sorted, as `getUnassigned` is, and the action when
+`getActions` has several); `+finish-bfs` and the init-failure path emit the
+diagnostic. All four black-box arms are green (runtime 19); `KNOWN` is empty
+and the ledger row is `parity`.
+
+The console path's `%error` rendering is unchanged (one `Error:` line, no
+trace).

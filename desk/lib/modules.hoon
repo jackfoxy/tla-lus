@@ -139,6 +139,62 @@
     `(of-wain:format (flop [i.rest body]))
   $(rest t.rest, body [i.rest body])
 ::
+++  monolith-config
+  ::  tlc2's config from a `.tla` given as the config (R4.2ab,
+  ::  MonolithSpecExtractor.config): the lines after the FIRST whole-line
+  ::  `-----* CONFIG <name> -----*` up to the next `====` line, markers
+  ::  excluded, trimmed; no block is an empty config. tlc2's `<name>` is
+  ::  the config file name minus `.tla`; a Clay file segment is the
+  ::  lowercased name (+module-seg:source-path), so `seg` matches the
+  ::  header's name case-folded
+  |=  [text=@t seg=@ta]
+  ^-  @t
+  =/  ws  (mask " \09\0d")
+  =/  head
+    ;~  plug
+      (stun [4 4.096] hep)
+      (star ws)
+      (jest 'CONFIG')
+      (plus ws)
+      (star next)
+    ==
+  =/  tail
+    ;~  plug
+      (jest seg)
+      (star ws)
+      (stun [4 4.096] hep)
+      (star (mask "\0d"))
+    ==
+  =/  lines=wain  (to-wain:format text)
+  |-  ^-  @t
+  ?~  lines  ''
+  =/  h  (rush i.lines head)
+  ?~  h  $(lines t.lines)
+  ::  the header's name onward, case-folded against the segment
+  =/  nam=tape  +>+>.u.h
+  ?~  (rush (crip (cass nam)) tail)  $(lines t.lines)
+  ::  an unterminated block runs to end of file, as in Java
+  =/  body=wain  ~
+  =/  rest=wain  t.lines
+  |-  ^-  @t
+  ?~  rest  (trim-ws (of-wain:format (flop body)))
+  ?:  =('====' (end [3 4] i.rest))
+    (trim-ws (of-wain:format (flop body)))
+  $(rest t.rest, body [i.rest body])
+::
+++  trim-ws
+  ::  java.lang.String.trim: drop every char at or below ' ' from both ends
+  |=  t=@t
+  ^-  @t
+  =/  low  |=(c=@t (lte c ' '))
+  =/  s=tape  (trip t)
+  |-  ^-  @t
+  ?:  &(?=(^ s) (low i.s))  $(s t.s)
+  =/  r=tape  (flop s)
+  |-  ^-  @t
+  ?:  &(?=(^ r) (low i.r))  $(r t.r)
+  (crip (flop r))
+::
 ::  +|  Resolvers
 ::
 ::

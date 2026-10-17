@@ -281,6 +281,13 @@ def hoon_registry() -> tuple:
 # (IOUtils.java `@TLAPlusOperator(identifier = "IOEnv", module = "IOUtils")`).
 COMMUNITY_OVERRIDES = {
     ("IOUtils", "IOEnv", 0): "R4.2c: the request's `env` as a record",
+    # R4.2h: refused by name (no process; no file outside the request)
+    ("IOUtils", "IOExec", 1): "R4.2h refusal", ("IOUtils", "IOEnvExec", 2): "R4.2h refusal",
+    ("IOUtils", "IOExecTemplate", 2): "R4.2h refusal", ("IOUtils", "IOEnvExecTemplate", 3): "R4.2h refusal",
+    ("IOUtils", "IOSerialize", 3): "R4.2h refusal", ("IOUtils", "IODeserialize", 2): "R4.2h refusal",
+    ("IOUtils", "Serialize", 3): "R4.2h refusal", ("IOUtils", "Deserialize", 2): "R4.2h refusal",
+    ("CSV", "CSVWrite", 3): "R4.2h refusal", ("CSV", "CSVWriteRecord", 4): "R4.2h refusal",
+    ("CSV", "CSVRead", 3): "R4.2h refusal", ("CSV", "CSVRecords", 1): "R4.2h refusal",
 }
 
 

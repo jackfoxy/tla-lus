@@ -4,7 +4,7 @@ Examples `47b0e2cc0268836b89f5ce451f38e5df5f1cf773`. The July 2026 suite (`promp
 
 **Corpus (driven by `tools/examples.py`, oracle = manifest):** 158 selected models -- liveness failure 2, safety failure 16, success 140; 127 small, 31 large. 373 modules parse-only-or-more. Selected = tested: the runner takes this file as its work list.
 
-**Failure scenarios (`-test` arms, `desk/tests/lib/blackbox/`):** 40 arms, 4 withheld on a measured divergence, 7 excluded.
+**Failure scenarios (`-test` arms, `desk/tests/lib/blackbox/`):** 44 arms, 0 withheld on a measured divergence, 7 excluded.
 
 | group | scenario | oracle | expected | July's guess |
 |---|---|---|---|---|
@@ -23,18 +23,18 @@ Examples `47b0e2cc0268836b89f5ce451f38e5df5f1cf773`. The July 2026 suite (`promp
 | config | wrong-level-invariant | pin tlc | error 2146 | level-error 2146  <- July guessed differently |
 | config | wrong-level-property | pin tlc | error 2229 | config-error 5002  <- July guessed differently |
 | runtime | false-assumption | pin tlc | assumption-failure 2104 | assumption-failure 2104 |
-| runtime | incomplete-initial-state | pin tlc | error 2102 -- **WITHHELD**: `op-wire-failure` (R4.2j): a runtime evaluation failure is `[%failed reason]` with no diagnostic, so EC 2102 never reaches the wire | evaluation-error 2106  <- July guessed differently |
-| runtime | incomplete-next-state | pin tlc | error 2109 -- **WITHHELD**: `op-wire-failure` (R4.2j): no EC 2109 on the wire, no `%trace` of the behavior tlc2 prints, and the reason text differs from tlc2's | evaluation-error 2109  <- July guessed differently |
+| runtime | incomplete-initial-state | pin tlc | error 2102 | evaluation-error 2106  <- July guessed differently |
+| runtime | incomplete-next-state | pin tlc | error 2109 | evaluation-error 2109  <- July guessed differently |
 | runtime | no-initial-states | pin tlc | success | evaluation-error 2118  <- July guessed differently |
 | runtime | no-constraint-states | pin tlc | success | evaluation-error 2256  <- July guessed differently |
 | runtime | invariant-in-initial-state | pin tlc | safety-failure 2107 | safety-failure 2107 |
 | runtime | invariant-in-reachable-state | pin tlc | safety-failure 2110 | safety-failure 2110 |
-| runtime | invariant-evaluation | pin tlc | error 2103 -- **WITHHELD**: `op-wire-failure` (R4.2j): no EC 2103 on the wire | evaluation-error 2111  <- July guessed differently |
+| runtime | invariant-evaluation | pin tlc | error 2103 | evaluation-error 2111  <- July guessed differently |
 | runtime | action-property | pin tlc | liveness-failure 2112 | safety-failure 2112  <- July guessed differently |
 | runtime | deadlock | pin tlc | deadlock-failure 2114 | deadlock-failure 2114 |
 | runtime | liveness-lasso | pin tlc | liveness-failure 2116 | liveness-failure 2116 |
 | runtime | liveness-with-symmetry | pin tlc | success | config-error 2279  <- July guessed differently |
-| runtime | expression-evaluation | pin tlc | error 2179 -- **WITHHELD**: `op-wire-failure` (R4.2j): no EC 2179 on the wire and no `%trace` | evaluation-error 2179  <- July guessed differently |
+| runtime | expression-evaluation | pin tlc | error 2179 | evaluation-error 2179  <- July guessed differently |
 | runtime | invalid-mode | EXCLUDED | the typed wire cannot carry an unknown mode: `check-mode` is a closed `$%`, so the noun is ill-typed and is `malformed-payload`'s case | parameter-error 3113 |
 | runtime | invalid-flag | EXCLUDED | the wire has no free-form flag list; every tlc2 flag the port honours is a typed field | parameter-error 3113 |
 | runtime | invalid-worker | EXCLUDED | the engine is single-threaded by design (one Gall agent); there is no worker count to get wrong | parameter-error 3105 |

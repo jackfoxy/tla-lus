@@ -251,12 +251,10 @@ CASES = [
 # owner. A divergence is never "fixed" by editing the oracle.
 _WIRE = "`op-wire-failure` (R4.2j): "
 KNOWN = {
-    "incomplete-initial-state": _WIRE + "a runtime evaluation failure is "
-        "`[%failed reason]` with no diagnostic, so EC 2102 never reaches the wire",
-    "incomplete-next-state": _WIRE + "no EC 2109 on the wire, no `%trace` of the "
-        "behavior tlc2 prints, and the reason text differs from tlc2's",
-    "invariant-evaluation": _WIRE + "no EC 2103 on the wire",
-    "expression-evaluation": _WIRE + "no EC 2179 on the wire and no `%trace`",
+    # R4.2j(a) (2026-10-14) un-withheld incomplete-initial-state (EC 2102),
+    # incomplete-next-state (EC 2109 + the behavior), invariant-evaluation
+    # (EC 2103) and expression-evaluation (EC 2179 + the behavior): the
+    # failing run now carries the pin's code as a diagnostic and its trace.
     # false-assumption: un-withheld by R4.2j(b) -- `[%violated [%assumption loc]]`.
     # module-name-mismatch / missing-dependency: un-withheld by R4.2j(c), which
     # gave the inline %analyze path SANY's texts (the %clay loader had them).

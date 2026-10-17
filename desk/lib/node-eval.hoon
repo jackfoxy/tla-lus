@@ -248,7 +248,7 @@
     =/  sb  (~(get by psub.e) nm)
     ?~  sb  [(lookup-val nm e) rs]
     ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
-    (eval-rs u.sb e rs)
+    (eval-rs u.sb (outer-of nm e) rs)
   ::
     ::  a substituted name resolves to the node it was bound to, in the
     ::  OUTER scope -- `v <- x` makes the inner module's `v` read the outer
@@ -257,7 +257,7 @@
     =/  sb  (~(get by psub.e) nm)
     ?~  sb  [(lookup-var nm e) rs]
     ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
-    (eval-rs u.sb e rs)
+    (eval-rs u.sb (outer-of nm e) rs)
   ::
     ::  R4.2ah: a NAMED theorem or assumption is its body (`+thm-defs:sm`)
       %thm-assump
@@ -268,6 +268,16 @@
   ::
     %module-instance  [[%| 0 'a module instance is not an evaluable value.'] rs]
   ==
+::
+++  outer-of
+  ::  the env a call-by-name entry's expression is read in. It was written in
+  ::  an OUTER scope, where the inner name it is bound to does not exist:
+  ::  braf's `RAF == INSTANCE RandomAccessFile WITH file_content <-
+  ::  LogicalFileContent`, whose root body names the root's own
+  ::  `file_content`, looped through the substitution
+  |=  [nm=@t e=eenv]
+  ^-  eenv
+  e(psub (~(del by psub.e) nm))
 ::
 ++  by-name
   ::  R4.2m: the expression a bare CONSTANT or VARIABLE reference is bound to
@@ -332,7 +342,7 @@
     (eval-user n e rs)
   ::  R4.2m: a CONSTANT an INSTANCE substitution bound by name (`+bind-substs`)
   =/  sb  ?.(?=(~ args.n) ~ ?:((~(has by vals.e) nm) ~ (~(get by psub.e) nm)))
-  ?:  &(?=(^ sb) !(self-ref u.sb nm))  (eval-rs u.sb e rs)
+  ?:  &(?=(^ sb) !(self-ref u.sb nm))  (eval-rs u.sb (outer-of nm e) rs)
   ?~  args.n  [(lookup-val nm e) rs]
   =/  fv  (~(get by vals.e) nm)
   ?~  fv  [[%| 0 (rap 3 ~['undefined identifier: ' nm])] rs]
@@ -415,7 +425,7 @@
   ?.  ?=(%apply -.n)  (as-sexp (eval n e))
   ::  R4.2m: a name bound call-by-name denotes its expression's set
   =/  sb  (by-name n e)
-  ?^  sb  $(n u.sb)
+  ?^  sb  $(n u.sb, e (outer-of name.op.n e))
   =/  nm  name.op.n
   ?:  =(nm 'SUBSET')      (un-sexp %subset args.n e)
   ?:  =(nm 'UNION')       (un-sexp %union args.n e)
@@ -425,10 +435,32 @@
   ?:  |(=(nm '\\times') =(nm '$CartesianProd'))  (prod-sexp args.n e)
   ?:  =(nm '$SetOfFcns')  (fcns-sexp args.n e)
   ?:  =(nm '$SetOfRcds')  (rcds-sexp args.n e)
+  ::  R4.2 (CoffeeCan): an instanced definition's `$SubstIn` wrapper, and a
+  ::  zero-arity user definition with no value yet, denote their bodies'
+  ::  sets, kept lazy as tlc2 keeps them (`Can == [black : 0..1000, white :
+  ::  0..1000]` has 1,002,001 records; `{c \in Can : ...}` streams it)
+  ?^  (anysubstin-mod:sm nm)
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  (as-sexp (eval n e))
+    =/  e2  (bind-substs e names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e2)  e2
+    $(n inner.u.sp, e p.e2)
   ::  a StandardModule set operator (Nat, Int) denotes an infinite set: it
   ::  has a lazy descriptor here, though it is not a value (unit 6C.2)
   =/  d  (~(get by ops.e) nm)
   ?~  d  (as-sexp (eval n e))
+  ?:  ?&  ?=(~ args.n)
+          ?=(%user-op kind.op.n)
+          ?=(~ params.u.d)
+          ?=(^ body.u.d)
+          !(~(has by vals.e) nm)
+          !(~(has by cdefs.e) nm)
+          !(is-standard:so ov.e origin.u.d)
+          ?=(~ (lookup:so ov.e [origin.u.d (bnm name.u.d) 0]))
+          ?=(~ (node-op:so [origin.u.d (bnm name.u.d) 0]))
+          (gth fuel.e 0)
+      ==
+    $(n u.body.u.d, fuel.e (dec fuel.e))
   =/  key=op-key:so  [origin.u.d (bnm name.u.d) (lent args.n)]
   ?.  (is-descriptor:so key)  (as-sexp (eval n e))
   ::  Seq(S) carries its range, so the arguments are evaluated first
@@ -548,6 +580,8 @@
   ::  prime and UNCHANGED (state/action; WU6.6)
   ?:  =(nm '\'')          (eval-rs (snag 0 as) e(primed &) rs)
   ?:  =(nm 'UNCHANGED')   (eval-unchanged as e rs)
+  ?:  &(=(nm '$SquareAct') ?=([* * ~] as))  (eval-act-sub | as e rs)
+  ?:  &(=(nm '$AngleAct') ?=([* * ~] as))   (eval-act-sub & as e rs)
   ?:  =(nm 'ENABLED')     (eval-enabled-rs (snag 0 as) e rs)
   ::  set constructors (forced when used as a value)
   ?:  (~(has in set-ctor-names) nm)
@@ -735,6 +769,25 @@
   ?:  ?=(%| -.r)  [r rs]
   [[%& [%bool p.r]] rs]
 ::
+++  eval-act-sub
+  ::  `[A]_e` (`ang` |) is A \/ e' = e; `<<A>>_e` (`ang` &) is A /\ e' # e
+  ::  (Tool.eval OPCODE_sa / OPCODE_aa: A first, then the subscript)
+  |=  [ang=? as=(list sem:sm) e=eenv rs=rst]
+  ^-  eout
+  =^  a  rs  (eval-rs (snag 0 as) e rs)
+  ?:  ?=(%| -.a)  [a rs]
+  ?.  ?=(%bool -.p.a)
+    :_  rs
+    :+  %|  0
+    ?:  ang
+      'Attempted to evaluate an expression of form <A>_e, but A was not a boolean.'
+    'Attempted to evaluate an expression of form [A]_e, but A was not a boolean.'
+  ?:  =(ang !p.p.a)  [[%& [%bool p.p.a]] rs]
+  =^  u  rs  (eval-unchanged (slag 1 as) e rs)
+  ?:  ?=(%| -.u)  [u rs]
+  ?>  ?=(%bool -.p.u)
+  [[%& [%bool ?:(ang !p.p.u p.p.u)]] rs]
+::
 ++  bi-in
   |=  [as=(list sem:sm) e=eenv neg=? rs=rst]
   ^-  eout
@@ -756,7 +809,7 @@
   |=  [x=value:v n=sem:sm e=eenv]
   ^-  (each ? eval-err:v)
   =/  sb  (by-name n e)
-  ?^  sb  $(n u.sb)
+  ?^  sb  $(n u.sb, e ?.(?=(%apply -.n) e (outer-of name.op.n e)))
   =/  dflt
     |.  ^-  (each ? eval-err:v)
     =/  sd  (eval-domain n e)
@@ -765,6 +818,16 @@
   ?.  ?=(%apply -.n)  $:dflt
   =/  nm  name.op.n
   =/  as  args.n
+  ::  R4.2 (MCNano): an instanced definition's body is its `$SubstIn`
+  ::  wrapper; membership is decided on the INNER structure under the
+  ::  substitutions, as eval binds them. `distributedLedger \in [Node ->
+  ::  N!Ledger]` forced `[Hash -> SignedBlock \cup {NoBlock}]` (> 1,000,000)
+  ?^  (anysubstin-mod:sm nm)
+    =/  sp  (substin-parts:sm n)
+    ?~  sp  $:dflt
+    =/  e2  (bind-substs e names.u.sp exprs.u.sp)
+    ?:  ?=(%| -.e2)  e2
+    $(n inner.u.sp, e p.e2)
   ?:  ?&(=(nm '\\') ?=([* * ~] as))
     =/  a  $(n i.as)
     ?:  |(?=(%| -.a) !p.a)  a
@@ -791,6 +854,20 @@
     =/  m  $(n rng.g)
     ?:  |(?=(%| -.m) !p.m)  m
     (eval-bool i.as (bind-group e g x))
+  ::  `UNION {S1, ..., Sn}`: a member of some Si (tlc2's UnionValue.member
+  ::  asks each element set). Disruptor's `slots: UNION {[0 .. LastIndex ->
+  ::  Values \union {NULL}]}` with `Values <- Int`
+  ?:  ?&  =(nm 'UNION')
+          ?=([* ~] as)
+          ?=(%apply -.i.as)
+          =('$SetEnumerate' name.op.i.as)
+      ==
+    =/  ss  args.i.as
+    |-  ^-  (each ? eval-err:v)
+    ?~  ss  [%& |]
+    =/  r  ^$(n i.ss)
+    ?:  |(?=(%| -.r) p.r)  r
+    $(ss t.ss)
   ?:  ?&(=(nm 'SUBSET') ?=([* ~] as))
     ?.  (set-like:v x)  [%& |]
     =/  els  (set-elems:v (normalize:v x))
@@ -1006,6 +1083,8 @@
 ++  eval-fcnapply
   |=  [as=(list sem:sm) e=eenv rs=rst]
   ^-  eout
+  =/  rf  (recfcn-infinite (snag 0 as) e)
+  ?^  rf  (apply-recfcn u.rf (snag 1 as) e rs)
   =^  f  rs  (eval-rs (snag 0 as) e rs)
   ?:  ?=(%| -.f)  [f rs]
   =^  x  rs  (eval-rs (snag 1 as) e rs)
@@ -1046,7 +1125,19 @@
   ^-  eout
   =^  r  rs  (eval-rs (snag 0 as) e rs)
   ?:  ?=(%| -.r)  [r rs]
-  [(apply:v p.r [%str (lit-str (snag 1 as))] |) rs]
+  =/  f  (lit-str (snag 1 as))
+  ::  tlc2's `r.f` wording (Tool.java OPCODE_rs), up to the expression's
+  ::  location, which it appends and a span here cannot name (no module)
+  ?:  ?&  ?=(%rec -.p.r)
+          !(lien p.p.r |=(fd=vfield:v =(k.fd f)))
+      ==
+    :_  rs
+    :+  %|  0
+    %+  rap  3
+    :~  'Attempted to select nonexistent field "'  f  '" from the record\0a'
+        (crip (render:v p.r))
+    ==
+  [(apply:v p.r [%str f] |) rs]
 ::
 ++  eval-ite
   ::  `+if-val:v` inlined so the TAKEN branch's run state comes back out.
@@ -1439,6 +1530,58 @@
   %+  fcn-over:v  p.sd
   |=(w=value:v (eval body (bind-group e i.bs w)))
 ::
+++  recfcn-infinite
+  ::  R4.2 (MCEcho): `f[a]` where `f` names a recursive function definition
+  ::  over `Nat` or `Int` (`trcl[n \in Nat] == ...` in Relation.tla's
+  ::  `TransitiveClosure`). tlc2 keeps it a lazy FcnLambdaValue and evaluates
+  ::  only the applied point, so the infinite domain is never enumerated; the
+  ::  port cannot enumerate it either. The definition, its one plain binder
+  ::  and its domain, when it is such a function
+  |=  [f=sem:sm e=eenv]
+  ^-  (unit [n=sem-apply:sm g=bgroup sd=sexp:v])
+  ?.  ?=(%apply -.f)  ~
+  ?.  ?=(~ args.f)  ~
+  ?.  ?=(%user-op kind.op.f)  ~
+  ?:  (~(has by vals.e) name.op.f)  ~
+  =/  d  (~(get by ops.e) name.op.f)
+  ?~  d  ~
+  ?.  ?=(~ params.u.d)  ~
+  ?~  body.u.d  ~
+  =/  b  u.body.u.d
+  ?.  ?=(%apply -.b)  ~
+  ?.  =('$RecursiveFcnSpec' name.op.b)  ~
+  =/  bs  (flatten-bound bound.b)
+  ?.  ?=([* ~] bs)  ~
+  ?:  tup.i.bs  ~
+  =/  sd  (eval-domain rng.i.bs e)
+  ?:  ?=(%| -.sd)  ~
+  ?.  ?=(?(%nats %ints) -.p.sd)  ~
+  `[b i.bs p.sd]
+::
+++  apply-recfcn
+  ::  the applied point of an infinite-domain recursive function: the fixpoint
+  ::  of +eval-recfcn over the points between 0 and the argument, which is
+  ::  every point a well-founded recursion toward 0 can reach. The same value
+  ::  tlc2's lazy application computes, and each point is solved once (tlc2
+  ::  re-evaluates the body per reference). An argument outside the domain,
+  ::  or a point the restricted sweep cannot solve, is the definition's own
+  ::  failure
+  |=  [rf=[n=sem-apply:sm g=bgroup sd=sexp:v] xa=sem:sm e=eenv rs=rst]
+  ^-  eout
+  =^  x  rs  (eval-rs xa e rs)
+  ?:  ?=(%| -.x)  [x rs]
+  ?.  ?=(%int -.p.x)
+    [[%| 0 'Attempted to enumerate the non-enumerable set Nat.'] rs]
+  =/  [neg=? mag=@ud]  =/(o (old:si p.p.x) [!-.o +.o])
+  ?:  &(neg ?=(%nats -.sd.rf))
+    [[%| 0 'Attempted to enumerate the non-enumerable set Nat.'] rs]
+  =/  pts=(list value:v)
+    %+  turn  (gulf 0 mag)
+    |=(i=@ud [%int ?:(neg (new:si | i) (sun:si i))])
+  =/  r  (recfcn-fix n.rf g.rf pts e)
+  ?:  ?=(%| -.r)  [r rs]
+  [(apply:v p.r p.x &) rs]
+::
 ++  recfcn-partial
   ::  the points solved so far, in domain order, as a function value — what
   ::  the self-binder is bound to while the remaining points are solved
@@ -1466,8 +1609,6 @@
   ::  source span — the port has no unforced-value form; compatibility.md)
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
-  ?~  ubound.n  [%| 0 'recursive function definition without a self-binder.']
-  =/  fnm  name.i.ubound.n
   =/  bs  (flatten-bound bound.n)
   ?.  ?=([* ~] bs)
     [%| 0 'function constructor over multiple binders is unsupported.']
@@ -1477,7 +1618,14 @@
   ?:  ?=(%| -.fr)  fr
   =/  el  (elemsof-e:v p.fr)
   ?:  ?=(%| -.el)  el
-  =/  pts  p.el
+  (recfcn-fix n i.bs p.el e)
+::
+++  recfcn-fix
+  ::  +eval-recfcn's sweep to a fixpoint over the domain points `pts`
+  |=  [n=sem-apply:sm g=bgroup pts=(list value:v) e=eenv]
+  ^-  eres
+  ?~  ubound.n  [%| 0 'recursive function definition without a self-binder.']
+  =/  fnm  name.i.ubound.n
   =/  body  (snag 0 args.n)
   =/  tot  (lent pts)
   =|  sol=(map @ud value:v)
@@ -1499,7 +1647,7 @@
     =/  ev2=eenv
       %+  bind-group
         e(vals (~(put by vals.e) fnm (recfcn-partial pts s2)))
-      [i.bs i.ps]
+      [g i.ps]
     =/  r  (eval body ev2)
     ?:  ?=(%| -.r)  $(ps t.ps, i +(i), e2 p.r)
     $(ps t.ps, i +(i), s2 (~(put by s2) i p.r))
@@ -1943,6 +2091,11 @@
       ==
     =/  pv  (run-prop e (rsh [3 2] p.p.k))
     [[%& [%str ?~(pv p.p.k u.pv)]] rs]
+  ::  R4.2w: `TLCGet("config")`, the run's configuration record (`$config`,
+  ::  bound by the job kernel; the console path has none and keeps the
+  ::  refusal by name)
+  ?:  &(?=(%str -.p.k) =('config' p.p.k) (~(has by vals.e) '$config'))
+    [[%& (~(got by vals.e) '$config')] rs]
   [(tlc-get:so ~[p.k] run.e regs.rs named.rs) rs]
 ::
 ++  run-prop
@@ -2390,11 +2543,14 @@
   ?~  as  [%| 0 'argument count mismatch.']
   ?:  (gth arity.i.ps 0)
     =/  od  (resolve-oparg i.as e0)
-    ?~  od  [%| 0 'unsupported operator-valued argument.']
+    ?~  od
+      [%| 0 (rap 3 ~['unsupported operator-valued argument: ' (oparg-name i.as) '.'])]
     $(ps t.ps, as t.as, e e(ops (~(put by ops.e) name.i.ps u.od)))
   ?.  used.i.ps
-    ::  an unused expression parameter is not evaluated (lazy argument)
-    $(ps t.ps, as t.as)
+    ::  an unused expression parameter is not evaluated (lazy argument), and
+    ::  still shadows an outer binding of its name
+    =/  nm  name.i.ps
+    $(ps t.ps, as t.as, e e(psub (~(del by psub.e) nm), vals (~(del by vals.e) nm)))
   =/  av  (eval i.as e0)
   ?:  ?=(%| -.av)  av
   ::  R4.2c (TestGraphs): the parameter SHADOWS a call-by-name entry of its
@@ -2450,18 +2606,53 @@
   =/  nm  (oparg-name n)
   ?:  =('' nm)  ~
   ?:  =('LAMBDA' nm)  (lambda-def n)
-  (~(get by ops.e) nm)
+  =/  d  (~(get by ops.e) nm)
+  ?^  d  d
+  (builtin-def n nm)
+::
+++  builtin-def
+  ::  R4.2 (MCKVsnap): a BUILT-IN operator passed as an argument
+  ::  (`ReduceSet(\intersect, S, b)`, Util.tla) is SANY's OpArgNode over the
+  ::  built-in's own node; it has no definition to look up, so one is built:
+  ::  formals that no source can name, the built-in applied to them
+  |=  [n=sem:sm nm=@t]
+  ^-  (unit sem-def:sm)
+  ?.  ?=(%apply -.n)  ~
+  ?.  =('$OpArg' name.op.n)  ~
+  ?.  ?=(%builtin kind.op.n)  ~
+  ?.  ?=([[%lit %num * *] ~] args.n)  ~
+  =/  ar=@ud  (rash val.i.args.n dem)
+  =/  ps=(list @t)
+    (turn (gulf 1 ar) |=(i=@ud (cat 3 '$arg' (crip (a-co:co i)))))
+  :-  ~
+  :*  %sdef  nm  ar  |  lvl.n  ~
+      (turn ps |=(p=@t `spar:sm`[p 0 & ~]))
+      `[%apply [nm %builtin] lvl.n ~ ~ ~ (turn ps |=(p=@t `sem:sm`[%apply [p %formal-param] 0 ~ ~ ~ ~]))]
+      ''
+  ==
 ::
 ++  eval-letin
   |=  [n=sem-letin:sm e=eenv rs=rst]
   ^-  eout
   ?~  body.n  [[%| 0 'LET with no body.'] rs]
-  =/  e2=eenv
-    =/  os  ops.e
-    |-  ^-  eenv
-    ?~  lets.n  e(ops os)
-    $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
-  (eval-rs u.body.n e2 rs)
+  (eval-rs u.body.n (with-lets lets.n e) rs)
+::
+++  with-lets
+  ::  a LET's definitions in scope. Each SHADOWS an outer binding of its
+  ::  name: a bound variable or parameter in `vals`/`psub` would otherwise
+  ::  win (+eval-user reads a zero-arity name's `vals` entry first). Nano's
+  ::  `\E block \in received[node] : ... LET block == signedBlock.block`
+  ::  read the quantifier's signed block as `block`
+  |=  [ls=(list sem-def:sm) e=eenv]
+  ^-  eenv
+  |-  ^-  eenv
+  ?~  ls  e
+  %=  $
+    ls      t.ls
+    ops.e   (~(put by ops.e) name.i.ls i.ls)
+    vals.e  (~(del by vals.e) name.i.ls)
+    psub.e  (~(del by psub.e) name.i.ls)
+  ==
 ::
 ::  +|  Action Solving (WU6.7): initial and successor state streams
 ::
@@ -2706,10 +2897,21 @@
   ?~  as  [%& e]
   ?:  (gth arity.i.ps 0)
     =/  od  (resolve-oparg i.as ev)
-    ?~  od  [%| 0 'unsupported operator-valued argument.']
+    ?~  od
+      [%| 0 (rap 3 ~['unsupported operator-valued argument: ' (oparg-name i.as) '.'])]
     $(ps t.ps, as t.as, e e(ops (~(put by ops.e) name.i.ps u.od)))
+  ::  each binding SHADOWS the other table's entry of the name: a `%formal-
+  ::  param` reads `psub` first, so a stale call-by-name `src` from an outer
+  ::  call captured this call's value `src` (CheckpointCoordination:
+  ::  "variable is unassigned in the current state: src")
+  =/  nm  name.i.ps
+  ::  the argument is bound as the variable it DENOTES in the caller (chased
+  ::  through the caller's `psub`): `Connected(Leader, p)` binds `src` to
+  ::  `Leader`, and its `ConnectedOneWay(src, dst)` must bind its own `src`
+  ::  to `Leader` too, not to the node `src`, which names itself there
   ?:  (state-var-ref i.as ev)
-    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
+    =/  dn  (deref-sem i.as psub.ev)
+    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) nm dn), vals (~(del by vals.e) nm)))
   ::  R4.2o: a PRIMED state variable (`XAct(0, x, x')`, TwoPhase) is bound by
   ::  name too, as tlc2 binds every argument lazily: `xNext = xInit` in the
   ::  body is then an assignment to `x'` (`+assignable-sem` chases it), where
@@ -2719,12 +2921,13 @@
           ?=([* ~] args.i.as)
           (state-var-ref i.args.i.as ev)
       ==
-    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) name.i.ps i.as)))
+    =/  dn  i.as(args ~[(deref-sem i.args.i.as psub.ev)])
+    $(ps t.ps, as t.as, e e(psub (~(put by psub.e) nm dn), vals (~(del by vals.e) nm)))
   ?.  used.i.ps
-    $(ps t.ps, as t.as)
+    $(ps t.ps, as t.as, e e(psub (~(del by psub.e) nm), vals (~(del by vals.e) nm)))
   =/  av  (eval i.as ev)
   ?:  ?=(%| -.av)  av
-  $(ps t.ps, as t.as, e e(vals (~(put by vals.e) name.i.ps p.av)))
+  $(ps t.ps, as t.as, e e(vals (~(put by vals.e) nm p.av), psub (~(del by psub.e) nm)))
 ::
 ++  solve
   |=  [n=sem:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
@@ -2741,6 +2944,16 @@
   ?:  |(=(nm '$DisjList') =(nm '\\lor'))
     (solve-disj args.n mode cur part e s)
   ?:  =(nm '$IfThenElse')  (solve-ite args.n mode cur part e s)
+  ?:  =(nm '$Case')  (solve-case args.n mode cur part e s)
+  ::  R4.2 (MCRealTimeHourClock): `[A]_e` in action position is `A \/
+  ::  UNCHANGED e` (`getNextStates` OPCODE_sa: A's successors, then
+  ::  `processUnchanged`), `BigNext == [NowNext]_now /\ [HCnxt]_hr`
+  ?:  &(=(nm '$SquareAct') ?=([* * ~] args.n))
+    =^  r  s  (solve i.args.n mode cur part e s)
+    ?:  ?=(%| -.r)  [r s]
+    =^  u  s  (solve-unchanged i.t.args.n mode cur part e s)
+    ?:  ?=(%| -.u)  [u s]
+    [[%& (weld p.r p.u)] s]
   ::  R4.2g: action composition `A \cdot B` -- `s -A-> t -B-> u`
   ?:  &(=(nm '\\cdot') ?=([* * ~] args.n))
     (solve-cdot i.args.n i.t.args.n mode cur part e s)
@@ -2905,12 +3118,7 @@
   |=  [n=sem-letin:sm mode=?(%init %next) cur=state part=state e=eenv s=rst]
   ^-  sout
   ?~  body.n  [[%| 0 'LET with no body in an action.'] s]
-  =/  e2=eenv
-    =/  os  ops.e
-    |-  ^-  eenv
-    ?~  lets.n  e(ops os)
-    $(lets.n t.lets.n, os (~(put by os) name.i.lets.n i.lets.n))
-  (solve u.body.n mode cur part e2 s)
+  (solve u.body.n mode cur part (with-lets lets.n e) s)
 ::
 ++  solve-conj
   ::  thread the partial state left-to-right across the conjuncts
@@ -2984,6 +3192,41 @@
   =^  b  s  (eval-bool-rs (snag 0 as) (senv mode cur part e) s)
   ?:  ?=(%| -.b)  [b s]
   (solve ?:(p.b (snag 1 as) (snag 2 as)) mode cur part e s)
+::
+++  solve-case
+  ::  R4.2 (ReadersWriters): `Tool.getInitStates`/`getNextStates`
+  ::  OPCODE_case -- the guards are evaluated in order, the first TRUE one's
+  ::  arm is SOLVED (so `CASE p -> Read(a) [] q -> Write(a)` assigns), OTHER
+  ::  only when no guard holds. Filtering the CASE as a boolean evaluated the
+  ::  arm's primed variables before they were assigned
+  |=  [as=(list sem:sm) mode=?(%init %next) cur=state part=state e=eenv s=rst]
+  ^-  sout
+  =/  other=(unit sem:sm)  ~
+  |-  ^-  sout
+  ?~  as
+    ?^  other  (solve u.other mode cur part e s)
+    :_  s
+    :+  %|  0
+    ?:  ?=(%init mode)
+      'In computing initial states, TLC encountered a CASE with no conditions true.'
+    'In computing next states, TLC encountered a CASE with no conditions true.'
+  =/  pr  i.as
+  ?.  ?=(%apply -.pr)  [[%| 0 'malformed CASE arm.'] s]
+  =/  guard  (snag 0 args.pr)
+  =/  body   (snag 1 args.pr)
+  ?:  ?=(%nullodn -.guard)  $(as t.as, other `body)
+  =^  b  s  (eval-rs guard (senv mode cur part e) s)
+  ?:  ?=(%| -.b)  [b s]
+  ?.  ?=(%bool -.p.b)
+    :_  s
+    :+  %|  0
+    %+  rap  3
+    :~  'In computing '  ?:(?=(%init mode) 'initial' 'next')
+        ' states, a non-boolean expression ('  (type-name:v p.b)
+        ') was used as a guard condition of a CASE.'
+    ==
+  ?:  p.p.b  (solve body mode cur part e s)
+  $(as t.as)
 ::
 ++  solve-exists
   ::  \E x \in S : A — branch over the domain in enumeration order. SEVERAL
@@ -3357,6 +3600,14 @@
   ^-  sres
   -:(next-states-rs cur body e empty-rst)
 ::
+++  next-states-raw-rs
+  ::  R4.2j: `+next-states-rs` without the completeness check, so the caller
+  ::  can report WHICH successor is incomplete and which variables it lacks
+  ::  (EC 2109) together with the behavior that led to it
+  |=  [cur=state body=sem:sm e=eenv s=rst]
+  ^-  sout
+  (solve body %next cur ~ e(s0 cur) s)
+::
 ++  next-states-rs
   |=  [cur=state body=sem:sm e=eenv s=rst]
   ^-  sout
@@ -3520,13 +3771,7 @@
   ?.  ?=(%apply -.n)
     ?.  ?=(%letin -.n)  (pfilter n cur part e acts p fil)
     ?~  body.n  [[%err 0 'LET with no body in an action.'] p]
-    =/  e2=eenv
-      =/  os  ops.e
-      =/  ls  lets.n
-      |-  ^-  eenv
-      ?~  ls  e(ops os)
-      $(ls t.ls, os (~(put by os) name.i.ls i.ls))
-    (psolve u.body.n cur part e2 acts p fil)
+    (psolve u.body.n cur part (with-lets lets.n e) acts p fil)
   =/  nm  name.op.n
   ?:  &(|(=(nm '$Label') =(nm '$Nop')) ?=(^ args.n))  $(n i.args.n)
   ?:  |(=(nm '$ConjList') =(nm '\\land'))

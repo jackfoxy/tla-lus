@@ -28,6 +28,48 @@
 ::
 ::  oracle: pin tlc
 ::
+++  test-runtime-incomplete-initial-state-e54f4830
+  %-  expect-case
+  :*  'incomplete-initial-state'
+      %run
+      :+  'IncompleteInit'
+        :~
+          :-  'IncompleteInit'
+          '---------------------------- MODULE IncompleteInit ----------------------------\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0\0aNext == /\\ x\' = x\0a        /\\ y\' = y\0aSpec == Init /\\ [][Next]_<<x, y>>\0a=============================================================================\0a'
+        ==
+      `'SPECIFICATION Spec\0a'
+      [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [~ ~ ~]
+      %error
+      `2.102
+      ~
+      ~
+      ~
+  ==
+::
+::  oracle: pin tlc
+::
+++  test-runtime-incomplete-next-state-63fc591e
+  %-  expect-case
+  :*  'incomplete-next-state'
+      %run
+      :+  'IncompleteNext'
+        :~
+          :-  'IncompleteNext'
+          '---------------------------- MODULE IncompleteNext ----------------------------\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == /\\ x = 0\0a        /\\ y = 0\0aNext == x\' = x + 1\0aSpec == Init /\\ [][Next]_<<x, y>>\0a=============================================================================\0a'
+        ==
+      `'SPECIFICATION Spec\0a'
+      [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [~ ~ ~]
+      %error
+      `2.109
+      `'The following variable is not defined: y'
+      ~['Initial predicate' 'Next']
+      ~
+  ==
+::
+::  oracle: pin tlc
+::
 ++  test-runtime-no-initial-states-9af037bd
   %-  expect-case
   :*  'no-initial-states'
@@ -112,6 +154,27 @@
 ::
 ::  oracle: pin tlc
 ::
+++  test-runtime-invariant-evaluation-bd2a4a5c
+  %-  expect-case
+  :*  'invariant-evaluation'
+      %run
+      :+  'InvariantEvaluation'
+        :~
+          :-  'InvariantEvaluation'
+          '---------------------------- MODULE InvariantEvaluation ----------------------------\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aInv  == (1 \\div x) >= 0\0a=============================================================================\0a'
+        ==
+      `'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+      [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [~ ~ ~]
+      %error
+      `2.103
+      `'The second argument of \\div is 0.'
+      ~
+      ~
+  ==
+::
+::  oracle: pin tlc
+::
 ++  test-runtime-action-property-e648ad10
   %-  expect-case
   :*  'action-property'
@@ -191,6 +254,27 @@
       ~
       ~
       ~
+      ~
+  ==
+::
+::  oracle: pin tlc
+::
+++  test-runtime-expression-evaluation-55bcafe0
+  %-  expect-case
+  :*  'expression-evaluation'
+      %run
+      :+  'Evaluation'
+        :~
+          :-  'Evaluation'
+          '---------------------------- MODULE Evaluation ----------------------------\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) \\div (x - x)\0aSpec == Init /\\ [][Next]_x\0a=============================================================================\0a'
+        ==
+      `'SPECIFICATION Spec\0a'
+      [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [~ ~ ~]
+      %error
+      `2.179
+      `'The second argument of \\div is 0.'
+      ~['Initial predicate']
       ~
   ==
 ::

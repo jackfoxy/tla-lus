@@ -95,6 +95,59 @@
     '---- MODULE spec ----\0aVARIABLE i\0aInit == i = 1\0aNext == UNCHANGED i\0aSpec == Init /\\ [][Next]_i\0aInv == i = 2\0aAlias == [ i |-> i, foo |-> "bar", j |-> i = i\' ]\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANTS Inv\0aALIAS Alias\0a'
 ::
+++  test-mc-alias-lasso-back
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        '/\\ x = 0'
+        '/\\ nx = 1'
+        '/\\ d = 1'
+        'State 2: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        '/\\ x = 1'
+        '/\\ nx = 2'
+        '/\\ d = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        '/\\ x = 2'
+        '/\\ nx = 0'
+        '/\\ d = -2'
+        'Back to state 1: <Next line 5, col 9 to line 5, col 24 of module spec>'
+        '4 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 3\0aSpec == Init /\\ [][Next]_x /\\ WF_x(Next)\0aProp == <>(x = 5)\0aAlias == [x |-> x, nx |-> x\', d |-> x\' - x]\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0aALIAS Alias\0a'
+::
+++  test-mc-alias-lasso-stutter
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        '/\\ x = 0'
+        '/\\ nx = 1'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        '/\\ x = 1'
+        '/\\ nx = 2'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        '/\\ x = 2'
+        '/\\ nx = 2'
+        'State 4: Stuttering'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 2 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aProp == <>(x = 5)\0aAlias == [x |-> x, nx |-> x\']\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0aALIAS Alias\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-args-caller-env
   %+  expect-eq
     !>  ^-  wain
@@ -113,6 +166,72 @@
   %+  check:check
     '---- MODULE spec ----\0a\\* R4.2: every argument is evaluated in the CALLER\'s env. `F`\'s formal is\0a\\* named `q`, like the bound variable its later argument reads; binding the\0a\\* formals one by one and evaluating `Len(q) + 1` after the first made it\0a\\* see the formal (N-Queens: "index 3 of tuple <<1, 1>>").\0aEXTENDS Naturals, Sequences\0aF(q, n) == q[n]\0aVARIABLE x\0aInit == x = 0\0aNext == /\\ x = 0\0a        /\\ \\E q \\in {<<5, 6>>} : x\' = F(Append(q, 7), Len(q) + 1)\0aInv == x \\in {0, 7}\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-case-action
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ q = <<<<"r", 1>>, <<"x", 0>>, <<"w", 2>>, <<"r", 3>>>>'
+        '/\\ r = 0'
+        '/\\ w = 0'
+        'State 2: <Step line 6, col 9 to line 11, col 23 of module spec>'
+        '/\\ q = <<<<"x", 0>>, <<"w", 2>>, <<"r", 3>>>>'
+        '/\\ r = 1'
+        '/\\ w = 0'
+        'State 3: <Step line 6, col 9 to line 11, col 23 of module spec>'
+        '/\\ q = <<<<"w", 2>>, <<"r", 3>>>>'
+        '/\\ r = 1'
+        '/\\ w = 0'
+        'State 4: <Step line 6, col 9 to line 11, col 23 of module spec>'
+        '/\\ q = <<<<"r", 3>>>>'
+        '/\\ r = 1'
+        '/\\ w = 2'
+        'State 5: <Step line 6, col 9 to line 11, col 23 of module spec>'
+        '/\\ q = <<>>'
+        '/\\ r = 4'
+        '/\\ w = 2'
+        '5 states generated, 5 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, Sequences\0aVARIABLES q, r, w\0aRd(a) == r\' = r + a /\\ UNCHANGED w\0aWr(a) == w\' = w + a /\\ UNCHANGED r\0aStep == /\\ q /= <<>>\0a        /\\ LET p == Head(q) IN\0a           CASE p[1] = "r" -> Rd(p[2])\0a             [] p[1] = "w" -> Wr(p[2])\0a             [] OTHER -> UNCHANGED <<r, w>>\0a        /\\ q\' = Tail(q)\0aInit == q = <<<<"r", 1>>, <<"x", 0>>, <<"w", 2>>, <<"r", 3>>>> /\\ r = 0 /\\ w = 0\0aNext == Step\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
+++  test-mc-cbn-swap-var
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        '/\\ up = <<TRUE, TRUE, TRUE>>'
+        '/\\ leader = 1'
+        '/\\ log = 0'
+        'State 2: <Fail(1) line 12, col 12 to line 12, col 79 of module spec>'
+        '/\\ up = <<FALSE, TRUE, TRUE>>'
+        '/\\ leader = 1'
+        '/\\ log = 0'
+        'State 3: <Fail(2) line 12, col 12 to line 12, col 79 of module spec>'
+        '/\\ up = <<FALSE, FALSE, TRUE>>'
+        '/\\ leader = 1'
+        '/\\ log = 0'
+        'State 4: <Fail(3) line 12, col 12 to line 12, col 79 of module spec>'
+        '/\\ up = <<FALSE, FALSE, FALSE>>'
+        '/\\ leader = 1'
+        '/\\ log = 0'
+        '75 states generated, 38 distinct states found, 8 states left on queue.'
+        'The depth of the complete state graph search is 5.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES up, leader, log\0aNode == {1, 2, 3}\0aCOW(src, dst) == up[src] /\\ up[dst]\0aCon(src, dst) == COW(src, dst) /\\ COW(dst, src)\0aInit == up = [n \\in Node |-> TRUE] /\\ leader = 1 /\\ log = 0\0aSend(p) == /\\ leader /= p\0a           /\\ Con(leader, p)\0a           /\\ log\' = log + p\0a           /\\ UNCHANGED <<up, leader>>\0aFail(n) == up[n] /\\ up\' = [up EXCEPT ![n] = FALSE] /\\ UNCHANGED <<leader, log>>\0aNext == (\\E p \\in Node : Send(p)) \\/ (\\E n \\in Node : Fail(n))\0aConstr == log < 6\0a====\0a'
+  'INIT Init\0aNEXT Next\0aCONSTRAINT Constr\0a'
 ::
 ++  test-mc-ce-empty
   %+  expect-eq
@@ -356,6 +475,21 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Integers\0aVARIABLE x\0aUnused == 1.5\0aInit == x = 0\0aNext == x\' = x + 1 /\\ x < 3\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
+::
+++  test-mc-domain-lazy-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Computed 2 initial states...'
+        'Model checking completed. No error has been found.'
+        '5 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 1.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE c\0aBig == [a : 0..1100, b : 0..1000]\0aInit == c \\in {r \\in Big : r.a + r.b = 2}\0aNext == c.a > 0 /\\ c\' = [c EXCEPT !.a = @ - 1, !.b = @ + 1]\0aInv == c \\in Big\0a====\0a'
+  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ++  test-mc-gate-no-fair
   %+  expect-eq
@@ -1158,6 +1292,20 @@
     '---- MODULE spec ----\0a\\* R4.2n: an action whose body is a LET with sibling definitions. `+get-actions`\0a\\* descended through the LET and dropped its definitions, so `x\' = b - 1`\0a\\* failed "undefined operator: b". The trace label is the LET BODY\'s location.\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aA(p) == LET a == x + p\0a            b == a + 1\0a        IN x < 3 /\\ x\' = b - 1\0aNext == \\E p \\in {1} : A(p)\0a====\0a'
   'INIT Init\0aNEXT Next\0a'
 ::
+++  test-mc-let-shadow-bound
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '7 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aS == {[block |-> [type |-> "a"], sig |-> 1], [block |-> [type |-> "b"], sig |-> 2]}\0aOp(sb) == LET block == sb.block IN block.type\0aInit == x = "none"\0aNext == \\E block \\in S : x\' = Op(block)\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
+::
 ++  test-mc-live-after-deadlock
   %+  expect-eq
     !>  ^-  wain
@@ -1520,6 +1668,20 @@
     '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets\0aVARIABLE U\0aDPs(n) == {D \\in SUBSET SUBSET (1..n) :\0a             /\\ (UNION D) = 1..n\0a             /\\ \\A I, J \\in D : (I # J) => (I \\cap J = {}) }\0aInit == U = {{1, 2}, {3}, {4}}\0aNext == U\' \\in {{{1, 2, 3, 4}}, {{1}, {2, 3, 4}}, {{1, 2}, {2, 3, 4}}}\0aInv == U \\in DPs(4)\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-mc-memb-union-int
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '37 states generated, 9 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Integers\0aCONSTANT NULL\0aVARIABLE r\0aInit == r = [s |-> [i \\in 0..1 |-> NULL]]\0aNext == \\E i \\in 0..1, v \\in {-1, 2} : r\' = [r EXCEPT !.s[i] = v]\0aTypeOk == r \\in [s : UNION {[0..1 -> Int \\cup {NULL}]}]\0aASSUME NULL \\notin Int\0a====\0a'
+  'CONSTANT NULL = NULL\0aINIT Init\0aNEXT Next\0aINVARIANT TypeOk\0a'
+::
 ++  test-mc-multibind
   %+  expect-eq
     !>  ^-  wain
@@ -1554,6 +1716,20 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets\0a\0aCONSTANT N\0a\0a\\* a module with no VARIABLES and a config with no behaviour spec: TLC\0a\\* checks the assumptions and completes over zero initial states. The\0a\\* documented idiom for using TLC to evaluate expressions\0aASSUME N \\in Nat\0aASSUME Cardinality({1, 2, 3}) = 3\0aASSUME \\A i \\in 1..N : i * i >= i\0a=====================\0a'
   'CONSTANT N = 4\0a'
+::
+++  test-mc-oparg-builtin
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '3 states generated, 2 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 2.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aRed(op(_, _), a, b) == op(a, b)\0aASSUME Red(\\intersect, {1, 2}, {2, 3}) = {2}\0aASSUME Red(\\union, {1}, {3}) = {1, 3}\0aInit == x = Red(\\cup, {0}, {1})\0aNext == x\' = Red(\\cap, x, {1})\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
 ::
 ++  test-mc-oparg-lambda
   %+  expect-eq
@@ -2067,6 +2243,29 @@
     '---- MODULE spec ----\0aEXTENDS TLC, Integers\0a\0a\\* In TLA+ a RECORD is a function whose domain is a set of strings, and tlc2\0a\\* compares the two representations equal (RecordValue vs FcnRcdValue). The\0a\\* port keeps `%rec` outside `+fcn-like`, so these are FALSE here and TRUE at\0a\\* the pin -- the whole of BagsTest\'s divergence, and nothing to do with Bags.\0aASSUME([a |-> 1] = ("a" :> 1))\0aASSUME([a |-> 1, b |-> 2] = ("a" :> 1) @@ ("b" :> 2))\0aASSUME([x \\in {"a"} |-> 1] = [a |-> 1])\0a\0a\\* this one AGREES, which is what makes the diagnosis precise: the domain is\0a\\* built right, only the equality is not\0aASSUME(DOMAIN [a |-> 1] = {"a"})\0a\0aSpec == [][TRUE]_<<>>\0a=====================\0a'
   'SPECIFICATION Spec\0a'
 ::
+++  test-mc-recfcn-nat
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Deadlock reached.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 17, col 9 to line 17, col 33 of module spec>'
+        'x = 1'
+        'State 3: <Next line 17, col 9 to line 17, col 33 of module spec>'
+        'x = 2'
+        'State 4: <Next line 17, col 9 to line 17, col 33 of module spec>'
+        'x = 6'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals, FiniteSets\0aCONSTANT S\0aVARIABLE x\0aTC(R) ==\0a  LET N == Cardinality(S)\0a      trcl[n \\in Nat] ==\0a        [a, b \\in S |-> IF n = 0 THEN R[a, b]\0a                        ELSE \\/ trcl[n-1][a, b]\0a                             \\/ \\E z \\in S : trcl[n-1][a, z] /\\ trcl[n-1][z, b]]\0a  IN  trcl[N]\0aFact[n \\in Nat] == IF n = 0 THEN 1 ELSE n * Fact[n - 1]\0aEdge == [p \\in S \\X S |-> p[2] = p[1] + 1]\0aASSUME TC(Edge)[1, 3] /\\ ~TC(Edge)[3, 1]\0aASSUME Fact[5] = 120\0aInit == x = 0\0aNext == x < 3 /\\ x\' = Fact[x + 1]\0aInv == x \\in {0, 1, 2, 6}\0a====\0a'
+  'CONSTANT S = {1, 2, 3}\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-mc-rnd-const-subst
   %+  expect-eq
     !>  ^-  wain
@@ -2388,6 +2587,20 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES x, y\0aInit == x = 0 /\\ y = 0\0aNext == x\' = (x + 1) % 3 /\\ y\' = y\0aSpec == Init /\\ [][Next]_x\0aInv == x < 9\0a====\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
+::
+++  test-mc-square-act-next
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Model checking completed. No error has been found.'
+        '19 states generated, 6 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLES now, hr\0aNowNext == now\' = (now + 1) % 3 /\\ UNCHANGED hr\0aHCnxt == hr\' = (hr + 1) % 2\0aInit == now = 0 /\\ hr = 0\0aNext == /\\ [NowNext]_now\0a        /\\ [HCnxt]_hr\0a====\0a'
+  'INIT Init\0aNEXT Next\0a'
 ::
 ++  test-mc-symmetry-trace
   %+  expect-eq

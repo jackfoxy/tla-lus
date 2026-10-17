@@ -36,8 +36,7 @@ PlusCal-translated module) failed in turn on each of these. Each is general.
 
 Result: TestGraphs' safety part (`SPECIFICATION Spec` alone, single-file copy)
 is 2,790 / 2,590 / 51 = the pin. With its PROPERTIES one job slice exhausted
-the loom and took the ship down -> R4.2ap; `Refinement2` is refused as
-undefined by the config -> R4.2aq. Also found: a bound variable that
+the loom and took the ship down -> R4.2ap. Also found: a bound variable that
 redeclares an earlier VARIABLE in an inner module is accepted where SANY
 reports 4201 -> R4.2ar.
 

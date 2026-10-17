@@ -749,6 +749,259 @@
   %-  expect
   !>  ?=(^ (find "Json!ndJsonDeserialize; it reads a file" (trip why)))
 ::
+++  config-spec
+  |=  want=@t
+  ^-  @t
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'VARIABLE x'
+      'Init == x = 0'
+      'Next == x < 1 /\\ x\' = x + 1'
+      (cat 3 'ASSUME ' want)
+      '===='
+  ==
+::
+++  test-tlcget-config-bfs
+  ::  R4.2w: the exhaustive run's record, as tla2tools.jar prints it
+  ::  (`mode |-> "bfs", worker |-> 1, seed |-> "0", fingerprint |->
+  ::  "-7992595565342442794", deadlock |-> FALSE`); install names this engine
+  =/  sp  %-  config-spec
+    %+  rap  3
+    :~  'LET c == TLCGet("config") IN c.mode = "bfs" /\\ c.worker = 1 /\\ '
+        'c.seed = "0" /\\ c.fingerprint = "-7992595565342442794" /\\ '
+        'c.deadlock = FALSE /\\ DOMAIN c = {"mode", "deadlock", "worker", '
+        '"seed", "fingerprint", "install"}'
+    ==
+  =/  a  (run-all (init:job-lib (check-req sp 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a') t0) 256)
+  (expect !>(?=([~ %ok *] result.+.a)))
+::
+++  test-tlcget-config-generate
+  ::  R4.2w: a `-generate` run's record (SimTokenRing, EWD998_opts assume
+  ::  `mode = "generate"`); traces and depth are the request's
+  =/  sp  %-  config-spec
+    %+  rap  3
+    :~  'LET c == TLCGet("config") IN c.mode = "generate" /\\ c.traces = 3 /\\ '
+        'c.depth = 4 /\\ c.aril = "0" /\\ c.sched = "random"'
+    ==
+  =/  r  (sim-req sp 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' 0 3 4)
+  =/  r2  r(op [%check [| | | | ~ | ~ [%simulate 0 3 4 &]]])
+  =/  a  (run-all (init:job-lib r2 t0) 256)
+  (expect !>(?=([~ %ok *] result.+.a)))
+::
+++  test-ioexec-refused
+  ::  R4.2h: a CommunityModules process operator is refused by name
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, IOUtils'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME IOExec(<<"ls">>).exitValue = 0'
+        '===='
+    ==
+  =/  iou  '---- MODULE IOUtils ----\0aIOExec(c) == CHOOSE r : TRUE\0a====\0a'
+  =/  b  [%inline 'spec' (malt ~[['spec' spec] ['IOUtils' iou]]) `'INIT Init\0aNEXT Next\0a']
+  =/  r0  (check-req spec '')
+  =/  a  (run-all (init:job-lib r0(src b) t0) 256)
+  =/  why=@t  ?.(?=([~ %failed *] result.+.a) '' reason.u.result.+.a)
+  %-  expect
+  !>  ?=(^ (find "IOUtils!IOExec; it runs a process" (trip why)))
+::
+++  ec2213-why
+  ::  the failure reason of a two-module PROPERTY run (R4.2ad)
+  |=  [mods=(list [@t @t]) cfg=@t]
+  ^-  tape
+  =/  b  [%inline 'r' (malt mods) `cfg]
+  =/  r0  (check-req '' '')
+  =/  a  (run-all (init:job-lib r0(src b) t0) 256)
+  ?.  ?=([~ %failed *] result.+.a)  ""
+  (trip reason.u.result.+.a)
+::
+++  ec2213-a
+  %-  of-wain:format
+  :~  '---- MODULE A ----'
+      'EXTENDS Naturals'
+      'VARIABLE x'
+      'Init == x = 0'
+      'Next == x\' = (x + 1) % 3'
+      'Bad == \\A i \\in {x} : <>(x = i)'
+      '===='
+  ==
+::
+++  test-ec2213-module-extends
+  ::  R4.2ad: EC 2213's location names the module the formula is IN (pin:
+  ::  `... line 6, col 8 to line 6, col 31 of module A:`), not the root
+  =/  r
+    '---- MODULE r ----\0aEXTENDS A\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+  =/  why  (ec2213-why ~[['r' r] ['A' ec2213-a]] 'SPECIFICATION Spec\0aPROPERTY Bad\0a')
+  %+  expect-eq
+    !>("TLC cannot handle the temporal formula line 6, col 8 to line 6, col 31 of module A")
+  !>((scag 82 why))
+::
+++  test-ec2213-module-instance
+  ::  through an INSTANCE: the instanced module's text (pin: `of module A`)
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE r ----'
+        'EXTENDS Naturals'
+        'VARIABLE y'
+        'I == INSTANCE A WITH x <- y'
+        'Spec == y = 0 /\\ [][(y\' = (y + 1) % 3)]_y'
+        'Prop == I!Bad'
+        '===='
+    ==
+  =/  why  (ec2213-why ~[['r' r] ['A' ec2213-a]] 'SPECIFICATION Spec\0aPROPERTY Prop\0a')
+  %+  expect-eq
+    !>("TLC cannot handle the temporal formula line 6, col 8 to line 6, col 31 of module A")
+  !>((scag 82 why))
+::
+++  bundle-stats
+  ::  [generated distinct depth] of an inline multi-module %check, or the
+  ::  failure reason (R4.2 census fixes)
+  |=  [root=@t mods=(list [@t @t]) cfg=@t]
+  ^-  (each [@ud @ud @ud] @t)
+  =/  bun  [%inline root (malt mods) `cfg]
+  =/  r0  (check-req '' '')
+  =/  a  (run-all (init:job-lib r0(src bun) t0) 256)
+  =/  res  result.+.a
+  ?~  res  [%| 'no result']
+  ?.  ?=(%ok -.u.res)
+    [%| ?:(?=(%failed -.u.res) reason.u.res 'not ok')]
+  [%& [generated distinct depth]:stats.u.res]
+::
+++  test-instance-extends-chain
+  ::  an unnamed INSTANCE imports what the instanced module itself imports
+  ::  through ITS unnamed INSTANCE and EXTENDS (Sailfish: `INSTANCE Sailfish`
+  ::  -> `INSTANCE BlockDag` -> `EXTENDS Utils` gives `Max`). Pin: 2/1/1
+  =/  u  '---- MODULE U ----\0aEXTENDS Integers\0aMax(S) == CHOOSE x \\in S : \\A y \\in S : y <= x\0a====\0a'
+  =/  b  '---- MODULE B ----\0aEXTENDS Integers, U\0aTop == Max({1, 5, 3})\0a====\0a'
+  =/  sm
+    '---- MODULE S ----\0aEXTENDS Integers\0aINSTANCE B\0aVARIABLE x\0aInit == x = Top\0aNext == UNCHANGED x\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Integers\0aVARIABLE x\0aINSTANCE S\0aInv == x = Max({2, 5})\0a====\0a'
+  %+  expect-eq  !>([%& [2 1 1]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['S' sm] ['B' b] ['U' u]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mod-override-through-instance
+  ::  `B <-[V] MB` overrides V's `B` under every instance qualification
+  ::  (MCPaxos: `Ballot <-[Voting] MCBallot` with `V == INSTANCE Voting`);
+  ::  else `\E b \in Nat` is enumerated. Pin: 4/3/2
+  =/  v
+    '---- MODULE V ----\0aEXTENDS Naturals\0aB == Nat\0aVARIABLE y\0aVI == y = 0\0aVN == \\E b \\in B : b > y /\\ y\' = b\0a====\0a'
+  =/  p
+    '---- MODULE P ----\0aEXTENDS Naturals\0aVARIABLE y\0aMB == 0..2\0aW == INSTANCE V\0aInit == W!VI\0aNext == W!VN\0a====\0a'
+  %+  expect-eq  !>([%& [4 3 2]])
+  !>  %^  bundle-stats  'P'
+        ~[['P' p] ['V' v]]
+      'CONSTANT B <-[V] MB\0aINIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mod-override-inherited
+  ::  `Nat <- [M]MNat` where M INHERITS Nat (LeastCircularSubstring:
+  ::  `Nat <- [ZSequences]ZSeqNat`): tlc2 overrides Nat's one shared
+  ::  definition. Pin: 6/3/1
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aSmall == {n \\in Nat : n < 3}\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Naturals, M\0aMNat == 0..5\0aVARIABLE x\0aInit == x \\in Small\0aNext == x\' = (x + 1) % 3\0a====\0a'
+  %+  expect-eq  !>([%& [6 3 1]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'CONSTANT Nat <- [M]MNat\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-subst-names-own-var
+  ::  `I == INSTANCE A WITH x <- Lx`, where the ROOT's `Lx == x + 1` names
+  ::  the root's own `x`: the substitution expression is read outside the
+  ::  inner binding of `x` (braf: `file_content <- LogicalFileContent`
+  ::  looped). Pin: 5/5/5
+  =/  a  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aAN == x\' = x + 1\0aASpec == x = 1 /\\ [][AN]_x\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Lx == x + 1'
+        'I == INSTANCE A WITH x <- Lx'
+        'Init == x = 0'
+        'Next == x < 4 /\\ x\' = x + 1'
+        'Prop == I!ASpec'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [5 5 5]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['A' a]]
+      'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-oparg-sibling-through-instance
+  ::  an operator ARGUMENT naming a sibling inside a named instance resolves
+  ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`
+  ::  in `CC == INSTANCE ClientCentric`). Pin: 3/3/3
+  =/  c
+    '---- MODULE C ----\0aEXTENDS Naturals\0aTwice(f(_), a) == f(f(a))\0aInc(a) == a + 1\0aT(a) == Twice(Inc, a)\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Naturals\0aCC == INSTANCE C\0aVARIABLE x\0aInit == x = CC!T(0)\0aNext == x < 6 /\\ x\' = CC!T(x)\0a====\0a'
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['C' c]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-memb-through-substin
+  ::  membership in an instanced definition is decided on the structure
+  ::  under its `$SubstIn` wrapper (MCNano's `N!Ledger`): `[D -> SUBSET
+  ::  (1..12)]` has 4096^3 elements and must not be built. Pin: 385/64/7
+  =/  m
+    %-  of-wain:format
+    :~  '---- MODULE M ----'
+        'EXTENDS Naturals'
+        'CONSTANT D'
+        'VARIABLE l'
+        'Big == [D -> SUBSET (1..12)]'
+        'TypeOk == l \\in [{1, 2} -> Big]'
+        'MI == l = [i \\in {1, 2} |-> [d \\in D |-> {}]]'
+        'MN == \\E i \\in {1, 2}, d \\in D : l\' = [l EXCEPT ![i][d] = {1}]'
+        '===='
+    ==
+  =/  q
+    %-  of-wain:format
+    :~  '---- MODULE Q ----'
+        'EXTENDS Naturals'
+        'VARIABLE l'
+        'N == INSTANCE M WITH D <- {1, 2, 3}'
+        'Init == N!MI'
+        'Next == N!MN'
+        'Inv == N!TypeOk'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [385 64 7]])
+  !>  %^  bundle-stats  'Q'
+        ~[['Q' q] ['M' m]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-sim-alias
+  ::  R4.2i: a simulated behavior renders through the ALIAS, each state
+  ::  paired with its successor and the last with itself (pin, -simulate:
+  ::  `x = 3` / `nx = 3` last)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == x\' = x + 1'
+        'Inv == x < 3'
+        'Alias == [x |-> x, nx |-> x\']'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (sim-req spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a' 7 1 10) t0) 256)
+  =/  rep  (~(get by artifacts.+.a) %report)
+  =/  txt=tape  ?.(?=([~ %text *] rep) "" (trip +.u.rep))
+  ;:  weld
+    (expect !>(?=(^ (find "/\\ x = 2\0a/\\ nx = 3" txt))))
+    (expect !>(?=(^ (find "/\\ x = 3\0a/\\ nx = 3" txt))))
+  ==
+::
 ++  test-check-budget-independent
   ::  the final job is identical whatever the per-event budget
   =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
@@ -1824,27 +2077,6 @@
     (expect-eq !>(~[['v' '2'] ['doubled' '4'] ['moved' 'FALSE']]) !>(bindings:(snag 2 sts)))
   ==
 ::
-++  test-alias-refused-with-property
-  ::  the lasso trace is rendered by the %liveness stage, which takes no alias,
-  ::  and tlc2 does alias it. Narrowed refusal, not a silent wrong trace
-  =/  cfg  'SPECIFICATION Spec\0aPROPERTY Lead\0aALIAS Alias\0a'
-  =/  [evs=(list event) j=jb]
-    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
-  %+  expect-eq
-    !>(`[%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)'])
-  !>(result.j)
-::
-++  test-alias-refused-in-simulation
-  ::  same shape one mode over: the simulated trace is not aliased either
-  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
-  =/  [evs=(list event) j=jb]
-    (run-all (init:job-lib (sim-req alias-spec cfg 1 4 4) t0) 256)
-  %+  expect-eq
-    !>(`[%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)'])
-  !>(result.j)
-::
-::  the same spec WITHOUT the VIEW line still runs: the refusal is keyed on the
-::  option, not on the definition being present in the module
 ++  test-view-definition-alone-is-fine
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a') t0) 256)
