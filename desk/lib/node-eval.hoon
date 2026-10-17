@@ -1814,6 +1814,9 @@
   ?:  ?=(%cardinality tag)    [(eval-cardinality n e) rs]
   ?:  ?=(%is-finite-set tag)  [(eval-is-finite n e) rs]
   ?:  ?=(%sort-seq tag)       [(eval-sort-seq n e) rs]
+  ::  R4.2b: CommunityModules overrides with an operator argument
+  ?:  ?=(?(%fold-left %fold-left-dom %fold-right %fold-right-dom %fold-function %fold-seq %fold-function-on-set %fold-set %fold-bag %quantify %remove-first-match %select-in-seq %select-last-in-seq %select-in-subseq %select-last-in-subseq %causal-order) tag)
+    [(eval-cm-op tag n e) rs]
   ?:  ?=(%tlc-eval tag)       (eval-tlc-eval n e rs)
   ::  R2.7.4.3: the REGISTER STORE. These four are the reason the carrier
   ::  exists -- `%tlc-get` READS `regs.rs`, `%tlc-set` WRITES it, and the two
@@ -2496,6 +2499,240 @@
   :-  2.169
   %^  rap  3  'The second argument of '
   ~[op ' should be a ' what ', but instead it is:\0a<Operator ' nm '>']
+::
+++  apply-op
+  ::  apply an operator ARGUMENT: a Java-overridden one (`+` from Naturals,
+  ::  passed bare) through its override, any other through its body
+  |=  [d=sem-def:sm vs=(list value:v) e=eenv]
+  ^-  eres
+  =/  ov  (lookup:so ov.e [origin.d (bnm name.d) (lent vs)])
+  ?^  ov  (gate.u.ov vs)
+  (apply-def d vs e)
+::
+++  cm-op
+  ::  R4.2b: the operator argument at position `i` of a CommunityModules
+  ::  override (tlc2 hands it an OpValue)
+  |=  [op=@t i=@ud n=sem-apply:sm e=eenv]
+  ^-  (each sem-def:sm eval-err:v)
+  =/  a  (snag i args.n)
+  =/  od  (resolve-oparg a e)
+  ?~  od  [%| (op-arg-error op 'operator' a)]
+  [%& u.od]
+::
+++  eval-cm-op
+  ::  R4.2b: CommunityModules' Java overrides that take an OPERATOR argument,
+  ::  ported from the pinned deps jar (tools/gen-cm-tests.py measures each
+  ::  against the pin). Each walks its collection in the override's order,
+  ::  which is where the TLA+ bodies (a CHOOSE-driven fold) disagree
+  |=  [tag=@tas n=sem-apply:sm e=eenv]
+  ^-  eres
+  =/  ev  |=(i=@ud (eval (snag i args.n) e))
+  ?+    tag  [%| 0 (rap 3 ~['internal: unknown CommunityModules op ' tag])]
+  ::
+  ::  FoldLeft(op, base, seq): acc = op(acc, s[i]), first to last;
+  ::  FoldLeftDomain the same over the indices
+      ?(%fold-left %fold-left-dom)
+    =/  nm  ?:(?=(%fold-left tag) 'FoldLeft' 'FoldLeftDomain')
+    =/  od  (cm-op nm 0 n e)
+    ?:  ?=(%| -.od)  od
+    =/  b  (ev 1)
+    ?:  ?=(%| -.b)  b
+    =/  sv  (ev 2)
+    ?:  ?=(%| -.sv)  sv
+    =/  t  (to-tuple:v p.sv)
+    ?~  t  [%| (arg-error:so 2.169 3 nm 'sequence' | p.sv)]
+    =/  xs=(list value:v)
+      ?:  ?=(%fold-left tag)  u.t
+      (turn (gulf 1 (lent u.t)) |=(i=@ud [%int (sun:si i)]))
+    =/  acc  p.b
+    |-  ^-  eres
+    ?~  xs  [%& acc]
+    =/  r  (apply-op p.od ~[acc i.xs] e)
+    ?:  ?=(%| -.r)  r
+    $(xs t.xs, acc p.r)
+  ::
+  ::  FoldRight(op, seq, base): acc = op(s[i], acc), last to first
+      ?(%fold-right %fold-right-dom)
+    =/  nm  ?:(?=(%fold-right tag) 'FoldRight' 'FoldRightDomain')
+    =/  od  (cm-op nm 0 n e)
+    ?:  ?=(%| -.od)  od
+    =/  sv  (ev 1)
+    ?:  ?=(%| -.sv)  sv
+    =/  b  (ev 2)
+    ?:  ?=(%| -.b)  b
+    =/  t  (to-tuple:v p.sv)
+    ?~  t  [%| (arg-error:so 2.169 2 nm 'sequence' | p.sv)]
+    =/  xs=(list value:v)
+      %-  flop
+      ?:  ?=(%fold-right tag)  u.t
+      (turn (gulf 1 (lent u.t)) |=(i=@ud [%int (sun:si i)]))
+    =/  acc  p.b
+    |-  ^-  eres
+    ?~  xs  [%& acc]
+    =/  r  (apply-op p.od ~[i.xs acc] e)
+    ?:  ?=(%| -.r)  r
+    $(xs t.xs, acc p.r)
+  ::
+  ::  FoldFunction / FoldSeq (op, base, fun): acc = op(fun[d], acc) over the
+  ::  domain in order; FoldFunctionOnSet over the given subdomain
+      ?(%fold-function %fold-seq %fold-function-on-set)
+    =/  nm
+      ?-  tag
+        %fold-function  'FoldFunction'
+        %fold-seq  'FoldSeq'
+        %fold-function-on-set  'FoldFunctionOnSet'
+      ==
+    =/  od  (cm-op nm 0 n e)
+    ?:  ?=(%| -.od)  od
+    =/  b  (ev 1)
+    ?:  ?=(%| -.b)  b
+    =/  fv  (ev 2)
+    ?:  ?=(%| -.fv)  fv
+    =/  ps  (to-fcn-pairs:v (normalize:v p.fv))
+    ?~  ps  [%| (arg-error:so 2.169 3 'FoldFunction' 'function' | p.fv)]
+    =/  ds=(each (list value:v) eval-err:v)
+      ?.  ?=(%fold-function-on-set tag)  [%& (turn u.ps |=(p=vpair:v d.p))]
+      =/  iv  (ev 3)
+      ?:  ?=(%| -.iv)  iv
+      ?.  (set-like:v p.iv)
+        [%| (arg-error:so 2.169 4 nm 'set' | p.iv)]
+      [%& (set-elems:v (normalize:v p.iv))]
+    ?:  ?=(%| -.ds)  ds
+    =/  xs  p.ds
+    =/  acc  p.b
+    |-  ^-  eres
+    ?~  xs  [%& acc]
+    =/  x  (apply:v p.fv i.xs |)
+    ?:  ?=(%| -.x)  x
+    =/  r  (apply-op p.od ~[p.x acc] e)
+    ?:  ?=(%| -.r)  r
+    $(xs t.xs, acc p.r)
+  ::
+  ::  FoldSet(op, base, S): acc = op(x, acc) over S in normalized order
+      %fold-set
+    =/  od  (cm-op 'FoldSet' 0 n e)
+    ?:  ?=(%| -.od)  od
+    =/  b  (ev 1)
+    ?:  ?=(%| -.b)  b
+    =/  sv  (ev 2)
+    ?:  ?=(%| -.sv)  sv
+    ?.  (set-like:v p.sv)  [%| (arg-error:so 2.169 3 'FoldSet' 'set' | p.sv)]
+    =/  xs  (set-elems:v (normalize:v p.sv))
+    =/  acc  p.b
+    |-  ^-  eres
+    ?~  xs  [%& acc]
+    =/  r  (apply-op p.od ~[i.xs acc] e)
+    ?:  ?=(%| -.r)  r
+    $(xs t.xs, acc p.r)
+  ::
+  ::  FoldBag(op, base, B): acc = op(acc, x), each x as many times as B[x]
+      %fold-bag
+    =/  od  (cm-op 'FoldBag' 0 n e)
+    ?:  ?=(%| -.od)  od
+    =/  b  (ev 1)
+    ?:  ?=(%| -.b)  b
+    =/  bv  (ev 2)
+    ?:  ?=(%| -.bv)  bv
+    =/  ps  (to-fcn-pairs:v (normalize:v p.bv))
+    ?~  ps  [%| (arg-error:so 2.169 3 'FoldBag' 'bag' | p.bv)]
+    =/  xs  u.ps
+    =/  acc  p.b
+    |-  ^-  eres
+    ?~  xs  [%& acc]
+    ?.  &(?=(%int -.r.i.xs) (syn:si p.r.i.xs) !=(--0 p.r.i.xs))
+      [%| (wrong-value-error:so 'FoldBag' 'an element of Nat' r.i.xs)]
+    =/  k  (abs:si p.r.i.xs)
+    |-  ^-  eres
+    ?:  =(0 k)  ^$(xs t.xs, acc acc)
+    =/  r  (apply-op p.od ~[acc d.i.xs] e)
+    ?:  ?=(%| -.r)  r
+    $(k (dec k), acc p.r)
+  ::
+  ::  Quantify(S, P): how many elements satisfy P
+      %quantify
+    =/  sv  (ev 0)
+    ?:  ?=(%| -.sv)  sv
+    ?.  (set-like:v p.sv)  [%| (arg-error:so 2.169 1 'Quantify' 'set' | p.sv)]
+    =/  od  (cm-op 'Quantify' 1 n e)
+    ?:  ?=(%| -.od)  od
+    =/  xs  (set-elems:v (normalize:v p.sv))
+    =|  c=@ud
+    |-  ^-  eres
+    ?~  xs  [%& [%int (sun:si c)]]
+    =/  r  (apply-op p.od ~[i.xs] e)
+    ?:  ?=(%| -.r)  r
+    ?.  ?=(%bool -.p.r)  [%| (op-arg-error 'Quantify' 'boolean-valued operator' (snag 1 args.n))]
+    $(xs t.xs, c ?:(p.p.r +(c) c))
+  ::
+  ::  RemoveFirstMatch(s, Test): drop the first element Test accepts
+      %remove-first-match
+    =/  sv  (ev 0)
+    ?:  ?=(%| -.sv)  sv
+    =/  t  (to-tuple:v p.sv)
+    ?~  t  [%| (arg-error:so 2.169 1 'RemoveFirstMatch' 'sequence' | p.sv)]
+    =/  od  (cm-op 'RemoveFirstMatch' 1 n e)
+    ?:  ?=(%| -.od)  od
+    =/  xs  u.t
+    =|  out=(list value:v)
+    |-  ^-  eres
+    ?~  xs  [%& [%seq (flop out)]]
+    =/  r  (apply-op p.od ~[i.xs] e)
+    ?:  ?=(%| -.r)  r
+    ?.  ?=(%bool -.p.r)
+      [%| (op-arg-error 'RemoveFirstMatch' 'boolean-valued function' (snag 1 args.n))]
+    ?:  p.p.r  [%& [%seq (weld (flop out) t.xs)]]
+    $(xs t.xs, out [i.xs out])
+  ::
+  ::  SelectInSeq / SelectLastInSeq (s, Test) and their SubSeq forms
+  ::  (s, from, to, Test): the 1-based index of the first (last) match, 0
+      ?(%select-in-seq %select-last-in-seq %select-in-subseq %select-last-in-subseq)
+    =/  sub  ?=(?(%select-in-subseq %select-last-in-subseq) tag)
+    =/  last  ?=(?(%select-last-in-seq %select-last-in-subseq) tag)
+    =/  nm
+      ?-  tag
+        %select-in-seq  'SelectInSeq'
+        %select-last-in-seq  'SelectLastInSeq'
+        %select-in-subseq  'SelectInSubSeq'
+        %select-last-in-subseq  'SelectLastInSubSeq'
+      ==
+    =/  sv  (ev 0)
+    ?:  ?=(%| -.sv)  sv
+    =/  t  (to-tuple:v p.sv)
+    ?~  t  [%| (arg-error:so 2.169 1 nm 'sequence' | p.sv)]
+    =/  len  (lent u.t)
+    =/  od  (cm-op nm ?:(sub 3 1) n e)
+    ?:  ?=(%| -.od)  od
+    =/  rng=(each [lo=@ud hi=@ud] eval-err:v)
+      ?.  sub  [%& 1 len]
+      =/  fv  (ev 1)
+      ?:  ?=(%| -.fv)  fv
+      =/  tv  (ev 2)
+      ?:  ?=(%| -.tv)  tv
+      ?.  ?=(%int -.p.fv)  [%| (arg-error:so 2.169 2 nm 'natural' | p.fv)]
+      ?.  ?=(%int -.p.tv)  [%| (arg-error:so 2.169 3 nm 'natural' | p.tv)]
+      ?:  (slth:v p.p.tv p.p.fv)  [%& 1 0]
+      =/  ok  |=(x=@s &((syn:si x) !=(--0 x) (lte (abs:si x) len)))
+      ?.  (ok p.p.fv)  [%| 0 (rap 3 ~['The second argument of ' nm ' is not in the domain of its first argument.'])]
+      ?.  (ok p.p.tv)  [%| 0 (rap 3 ~['The third argument of ' nm ' is not in the domain of its first argument.'])]
+      [%& (abs:si p.p.fv) (abs:si p.p.tv)]
+    ?:  ?=(%| -.rng)  rng
+    ?:  (gth lo.p.rng hi.p.rng)  [%& [%int --0]]
+    =/  is=(list @ud)  (gulf lo.p.rng hi.p.rng)
+    =?  is  last  (flop is)
+    |-  ^-  eres
+    ?~  is  [%& [%int --0]]
+    =/  r  (apply-op p.od ~[(snag (dec i.is) u.t)] e)
+    ?:  ?=(%| -.r)  r
+    ?.  ?=(%bool -.p.r)
+      [%| (op-arg-error nm 'boolean-valued operator' (snag ?:(sub 3 1) args.n))]
+    ?:  p.p.r  [%& [%int (sun:si i.is)]]
+    $(is t.is)
+  ::
+      %causal-order
+    :-  %|
+    :-  0
+    'unsupported CommunityModules operator: VectorClocks!CausalOrder; its order is java.util.HashMap\'s'
+  ==
 ::
 ++  apply-def
   ::  apply an operator definition to already-evaluated arguments

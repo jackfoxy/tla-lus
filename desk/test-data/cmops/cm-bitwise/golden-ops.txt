@@ -1,0 +1,29 @@
+BINDINGS
+Bitwise!&/2|body
+Bitwise!And/4|override:MethodValue
+Bitwise!Not/1|override:MethodValue
+Bitwise!NotR/3|body
+Bitwise!Or/4|override:MethodValue
+Bitwise!Xor/4|override:MethodValue
+Bitwise!^^/2|body
+Bitwise!shiftR/2|override:MethodValue
+Bitwise!|/2|body
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+BAnd IntValue 8
+BAnd0 IntValue 0
+BNot IntValue 2
+BOr IntValue 14
+BShr IntValue 12
+BXor IntValue 6

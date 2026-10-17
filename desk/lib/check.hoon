@@ -1872,6 +1872,15 @@
   ^-  act
   (snag i l)
 ::
+++  succ-level
+  ::  R4.2as: the env a SUCCESSOR's invariants and constraints see -- its own
+  ::  level, one above the expanded state's (`TLCGet("level")` is the
+  ::  evaluated state's `getLevel()`)
+  |=  e=eenv:ne
+  ^-  eenv:ne
+  ?~  run.e  e
+  e(run `u.run.e(level +(level.u.run.e)))
+::
 ++  sim-nexts
   ::  SimulationWorker's next-state functor for one action, in generation order.
   ::  Per successor it does exactly what `SimulationWorker.addElement` does, in
@@ -1905,13 +1914,14 @@
   =/  nr  (next-states:ne cur body.a (act-env e ctx.a))
   ?:  ?=(%| -.nr)  [%ok ~ 0]
   =/  gen  p.nr
+  =/  ei  (succ-level e)
   =|  keep=(list state)
   =|  n=@ud
   |-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
   ?~  gen  [%ok (flop keep) n]
-  =/  fv  (first-violated invs i.gen e)
+  =/  fv  (first-violated invs i.gen ei)
   ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n)]
-  =/  ch  (con-hold cons i.gen e)
+  =/  ch  (con-hold cons i.gen ei)
   =/  ah  (acon-hold acons cur i.gen e)
   =/  in=?  &(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah)
   $(gen t.gen, n +(n), keep ?:(in [i.gen keep] keep))
@@ -1959,12 +1969,13 @@
           e=eenv:ne  p=pst:ne
       ==
   ^-  [step-res pst:ne]
+  =/  ei  (succ-level e)
   =/  fil
     |=  st=state
     ^-  fres:ne
-    =/  fv  (first-violated invs st e)
+    =/  fv  (first-violated invs st ei)
     ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv)]
-    =/  ch  (con-hold cons st e)
+    =/  ch  (con-hold cons st ei)
     =/  ah  (acon-hold acons cur st e)
     ?:(&(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah) %keep %drop)
   =^  r  p  (next-states-prob:ne cur body.a (act-env e ctx.a) p fil)
@@ -2078,6 +2089,10 @@
     ::  `ne`, the library core, not on the arm's product
     =/  rs0=rst:ne  empty-rst:ne
     =/  pp=pst:ne  [rs0(es es.cur) s.cur 0]
+    ::  R4.2as: `TLCGet("level")` is the expanded state's position in the
+    ::  behavior (the initial state is level 1); it read the constant 0, so
+    ::  EWD840_anim's `TLCGet("level") < 20` held on every behavior
+    =/  e  (with-run:ne e [& +(n.w) ~])
     |-  ^-  [step-res pst:ne]
     ?:  =(tries alen)  [[%none ~] pp]
     =/  a  (nth-action index actions.o)
@@ -3105,6 +3120,7 @@
       ::  and not of the language (`ev-lazyclass`, R2.7.13)
       ?+  cls.x  "SetEnumValue"
         %subset    "SubsetValue"
+        %k-subset  "KSubsetValue"
         %prod      "SetOfTuplesValue"
         %set-pred  "SetPredValue"
         %set-cup   "SetCupValue"
@@ -3189,7 +3205,15 @@
   ::  the graph is generated ONCE for the whole case
   |=  [spec=@t cfg=@t skip=(list @t)]
   ^-  (list tape)
-  =/  mo  (generate:sem-lib 'A' (malt ~[['A' spec]]))
+  (project-defs-with spec cfg ~ skip)
+::
+++  project-defs-with
+  ::  +project-defs over a module set: `mods` are the other modules the root
+  ::  `A` reaches (R4.2b: the CommunityModules sources the pin loads from its
+  ::  jar)
+  |=  [spec=@t cfg=@t mods=(list [@t @t]) skip=(list @t)]
+  ^-  (list tape)
+  =/  mo  (generate:sem-lib 'A' (malt [['A' spec] mods]))
   ?~  mo  ~["! no semantic graph"]
   =/  defs  (defmap-of:ne u.mo)
   =/  e  (make-env:ne defs (const-map cfg) (vars-of:ne u.mo))

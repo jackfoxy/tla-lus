@@ -145,6 +145,18 @@ Next == /\\ y' = y + 1
 Inv == x < 90
 ====
 """, "INIT Init\nNEXT Next\nINVARIANT Inv\n", 60, [1, 2, 3]),
+    # R4.2as: `TLCGet("level")` in an invariant is the successor's level and
+    # in an action the expanded state's (EWD840_anim's `level < 20`)
+    ("level", """---- MODULE spec ----
+EXTENDS Naturals, TLC
+VARIABLE x
+Init == x = 0
+A == x' = x + 1
+B == TLCGet("level") > 2 /\\ x' = x + 10
+Next == A \\/ B
+Inv == TLCGet("level") < 6
+====
+""", "INIT Init\nNEXT Next\nINVARIANT Inv\n", 40, [1, 2, 3]),
 ]
 
 

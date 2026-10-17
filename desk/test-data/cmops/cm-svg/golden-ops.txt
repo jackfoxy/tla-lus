@@ -1,0 +1,42 @@
+BINDINGS
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+SVG!Circle/4|body
+SVG!Group/2|body
+SVG!Image/6|body
+SVG!Line/5|body
+SVG!NodeOfRingNetwork/5|override:MethodValue
+SVG!NodesOfDirectedMultiGraph/3|override:MethodValue
+SVG!PointOnLine/3|override:MethodValue
+SVG!Rect/5|body
+SVG!SVGDoc/6|body
+SVG!SVGElem/4|body
+SVG!SVGElemToString/1|override:MethodValue
+SVG!SVGSerialize/3|body
+SVG!Svg/2|body
+SVG!Text/4|body
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+EVAL
+ElemStr StringValue "<rect x='1' y='2' fill='red' width='3' height='4'></rect>"
+GroupStr StringValue "<g><circle cx='5' cy='5' r='2'></circle><text x='0' y='0'>hi</text></g>"
+POL RecordValue [x |-> 5, y |-> 10]
+Ring0 RecordValue [x |-> 15, y |-> 10]
+Ring1 RecordValue [x |-> 10, y |-> 15]
+Ring3 RecordValue [x |-> 54, y |-> 121]

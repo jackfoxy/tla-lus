@@ -33,3 +33,27 @@ EWD687a_anim run but DIVERGE from the pin in simulation: with seed 0 the pin
 violates `AnimInv` at trace 39 (268,287 states); the port completes 100
 traces without a violation. A new row (simulation draw divergence on a large
 random-initial-state spec), not an ALIAS defect.
+
+## R4.2as — the `_anim` simulation divergence (2026-10-17)
+
+Localized with a probe (`e840probe`: `Inv3 == TLCGet("level") < 3`, seed 0,
+pin vs port first behavior):
+
+1. **A real defect, fixed:** `TLCGet("level")` was the constant 0 in
+   simulation (`+sim-step` bound `[& 0 ~]`), so `AnimInv == terminationDetected
+   => TLCGet("level") < 20` could never fail. Now the expanded state's
+   position (initial = 1) for actions and its successor's for invariants and
+   constraints (`+succ-level`). sim-diff case `level` (pin goldens, 3 seeds).
+2. **Rendering, fixed:** the job's simulation report labelled every step with
+   the whole Next and the first state `<Initial predicate>`; the pin names the
+   generating action and labels state 1 with the Init definition
+   (`<AnimInit line 11, col 3 to line 15, col 31 of module EWD840_anim>`).
+   `+sim-init-label`, render with the actions/env/order (job
+   `test-sim-alias` asserts both labels).
+3. **What remains is an approved difference:** the first behaviors still
+   differ because `Color == {"white", "black"}` enumerates in tlc2's INTERN
+   order (`"white"` first) and in string order here (`tlc-value-order`), so
+   the random index into the 262,144 initial states lands on a different
+   state (the probe's `color` values are exactly inverted). EWD840_anim now
+   reports the manifest's safety failure (AnimInv) through a different
+   behavior; EWD687a_anim still reaches a liveness failure first.

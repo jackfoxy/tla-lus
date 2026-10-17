@@ -395,4 +395,33 @@
   %+  expect-eq
     !>  `@ud`135
   !>  gen:(simulate-spec:check src-existsconj cfg-existsconj 3 1 60)
+++  src-level  '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aVARIABLE x\0aInit == x = 0\0aA == x\' = x + 1\0aB == TLCGet("level") > 2 /\\ x\' = x + 10\0aNext == A \\/ B\0aInv == TLCGet("level") < 6\0a====\0a'
+++  cfg-level  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+++  test-sim-level-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=5"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-level cfg-level 1 1 40))
+++  test-sim-gen-level-1
+  %+  expect-eq
+    !>  `@ud`6
+  !>  gen:(simulate-spec:check src-level cfg-level 1 1 40)
+++  test-sim-level-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=12" "x=22" "x=32"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-level cfg-level 2 1 40))
+++  test-sim-gen-level-2
+  %+  expect-eq
+    !>  `@ud`6
+  !>  gen:(simulate-spec:check src-level cfg-level 2 1 40)
+++  test-sim-level-3
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=12" "x=13" "x=14"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-level cfg-level 3 1 40))
+++  test-sim-gen-level-3
+  %+  expect-eq
+    !>  `@ud`6
+  !>  gen:(simulate-spec:check src-level cfg-level 3 1 40)
 --

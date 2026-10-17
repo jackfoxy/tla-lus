@@ -183,5 +183,24 @@
   ::  are typed refusals by name (approved difference). 40 -> 42.
   ::  R4.2h: twelve CommunityModules process/file operators (IOUtils, CSV)
   ::  are typed refusals by name. 42 -> 54.
-  (expect-eq !>(54) !>(~(wyt by registry:so)))
+  ::  R4.2b: fourteen CommunityModules overrides ported natively (pure ones;
+  ::  the operator-argument ones are node-ops) and three refused by name.
+  ::  54 -> 71.
+  (expect-eq !>(71) !>(~(wyt by registry:so)))
+::
+++  test-cm-refusals
+  ::  R4.2b: three CommunityModules overrides are refused by name -- their
+  ::  answers are doubles or a Java layout library, and their TLA+ bodies
+  ::  are dummies that would answer wrongly
+  =/  msg
+    |=  k=op-key:so
+    ^-  tape
+    =/  im=op-impl:so  (~(got by registry:so) k)
+    =/  r  (gate.im ~)
+    ?:(?=(%| -.r) (trip msg.p.r) "")
+  ;:  weld
+    (expect !>(?=(^ (find "SVG!NodeOfRingNetwork; it rounds" (msg ['SVG' 'NodeOfRingNetwork' 5])))))
+    (expect !>(?=(^ (find "SVG!NodesOfDirectedMultiGraph; it is a jungrapht" (msg ['SVG' 'NodesOfDirectedMultiGraph' 3])))))
+    (expect !>(?=(^ (find "Statistics!ChiSquare; it is Apache" (msg ['Statistics' 'ChiSquare' 3])))))
+  ==
 --

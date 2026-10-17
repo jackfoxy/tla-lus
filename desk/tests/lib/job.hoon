@@ -1000,6 +1000,10 @@
   ;:  weld
     (expect !>(?=(^ (find "/\\ x = 2\0a/\\ nx = 3" txt))))
     (expect !>(?=(^ (find "/\\ x = 3\0a/\\ nx = 3" txt))))
+    ::  R4.2as: the simulator's labels (pin: `<Init line 4, col 9 to line 4,
+    ::  col 13 of module S1>`, then the generating action)
+    (expect !>(?=(^ (find "State 1: <Init line 4, col 9 to line 4, col 13 of module spec>" txt))))
+    (expect !>(?=(^ (find "State 2: <Next line 5, col 9 to line 5, col 18 of module spec>" txt))))
   ==
 ::
 ++  test-check-budget-independent

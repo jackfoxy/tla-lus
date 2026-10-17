@@ -217,6 +217,10 @@
           df=?
           ::  R4.2i: the ALIAS the simulated behavior is rendered through
           al=(unit sem:semantic)
+          ::  R4.2as: the initial state's label -- the simulator names the Init
+          ::  definition (`<AnimInit line ... of module M>`), where the BFS
+          ::  trace says `<Initial predicate>`
+          il=@t
       ==
       ::  depth-first iterative deepening (R2.5). Its own kont because its
       ::  visited set is not the BFS one: each fingerprint carries a status
@@ -1800,7 +1804,7 @@
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
-      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j alb])
+      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j alb (sim-init-label isb defs modn)])
     (more j pre)
   ::  R2.7.15c: the IMPLIED INITS, which this kernel used to compute and drop.
   ::  tlc2 checks a level<=1 PROPERTY only while computing the INITIAL STATES
@@ -2395,16 +2399,25 @@
       ~['Error: The behavior up to this point is:']
       ::  R4.2i: through the ALIAS, each state paired with its successor
       ::  and the last with itself, as `SimulationWorker` prints it
-      %:  render-trace:check
-        vpath  nl.kk  ~
-        ?~(al.kk *eenv:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk))
-        ~  ''  al.kk  ~  df.kk
-      ==
+      ::  R4.2as: with the actions, env, order and module the console path
+      ::  renders with, so each step names the action that generated it
+      ::  (`<AnimSendMsg(8) ...>`) rather than the whole Next
+      =/  rt=wain
+        %:  render-trace:check
+          vpath  nl.kk  actions.o.kk
+          (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+          order.o.kk
+          ?~(act.kk '' ?~(at.u.act.kk '' src.u.at.u.act.kk))
+          al.kk  ~  df.kk
+        ==
+      ?~  rt  rt
+      [(rap 3 ~['State 1: ' il.kk]) t.rt]
       ~[head]
     ==
   =/  typed=trace
-    =/  se  ?~(al.kk *eenv:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk))
-    [%simulate (trace-states vpath act.kk ~ se ~ '' al.kk) ~]
+    =/  se  (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+    =/  mn  ?~(act.kk '' ?~(at.u.act.kk '' src.u.at.u.act.kk))
+    [%simulate (trace-states vpath act.kk actions.o.kk se order.o.kk mn al.kk) ~]
   =/  vn
     ?-  vk
       ::  simulation reports what a BEHAVIOR violated; it has no
@@ -2611,6 +2624,26 @@
     (alias-state:check u.al e i.sts ?^(t.sts i.t.sts ?~(lsuc i.sts u.lsuc)))
   :_  $(sts t.sts, i +(i), prev `i.sts)
   [i a (state-pairs:check order.shown st.shown)]
+::
+++  sim-init-label
+  ::  R4.2as: the label the simulator prints on a behavior's first state: the
+  ::  Init definition's name and its BODY's location, as an action label
+  ::  (measured: `<AnimInit line 11, col 3 to line 15, col 31 of module
+  ::  EWD840_anim>`); the BFS's `<Initial predicate>` when Init is no bare
+  ::  definition reference
+  ::  definition reference. The SPECIFICATION decomposition (and INIT's
+  ::  `+sem-body`) hands on the definition's BODY, so the definition is the
+  ::  one whose body it is
+  |=  [isb=sem:semantic defs=(map @t sem-def:semantic) modn=@t]
+  ^-  @t
+  =/  dflt  '<Initial predicate>'
+  =/  hit
+    %+  skim  ~(val by defs)
+    |=(d=sem-def:semantic &(?=(~ params.d) =(`isb body.d)))
+  ?~  hit  dflt
+  =/  d  i.hit
+  =/  mo  ?:(=('' origin.d) modn origin.d)
+  (rap 3 ~['<' name.d ' ' (loc-str:config mo (sem-at:check isb)) '>'])
 ::
 ++  wain-text
   |=  w=wain

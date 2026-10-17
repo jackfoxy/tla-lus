@@ -288,6 +288,26 @@ COMMUNITY_OVERRIDES = {
     ("IOUtils", "Serialize", 3): "R4.2h refusal", ("IOUtils", "Deserialize", 2): "R4.2h refusal",
     ("CSV", "CSVWrite", 3): "R4.2h refusal", ("CSV", "CSVWriteRecord", 4): "R4.2h refusal",
     ("CSV", "CSVRead", 3): "R4.2h refusal", ("CSV", "CSVRecords", 1): "R4.2h refusal",
+    # R4.2b: ported from the pinned deps jar's overrides (tools/gen-cm-tests.py
+    # measures each against the pin), or refused by name
+    ("SequencesExt", "SetToSeq", 1): "R4.2b", ("SequencesExt", "SetToSeqs", 1): "R4.2b",
+    ("SequencesExt", "Contains", 2): "R4.2b", ("SequencesExt", "IsPrefix", 2): "R4.2b",
+    ("SequencesExt", "LongestCommonPrefix", 1): "R4.2b", ("SequencesExt", "Suffixes", 1): "R4.2b",
+    ("SequencesExt", "AllSubSeqs", 1): "R4.2b", ("SequencesExt", "RemoveFirst", 2): "R4.2b",
+    ("Functions", "IsInjective", 1): "R4.2b", ("Functions", "AntiFunction", 1): "R4.2b",
+    ("FiniteSetsExt", "kSubset", 2): "R4.2b", ("IOUtils", "atoi", 1): "R4.2b",
+    ("SVG", "SVGElemToString", 1): "R4.2b", ("SVG", "PointOnLine", 3): "R4.2b",
+    ("SVG", "NodeOfRingNetwork", 5): "R4.2b refusal", ("SVG", "NodesOfDirectedMultiGraph", 3): "R4.2b refusal",
+    ("Statistics", "ChiSquare", 3): "R4.2b refusal",
+    # R4.2b node-ops (an operator argument): lib/node-eval +eval-cm-op
+    ("SequencesExt", "FoldLeft", 3): "R4.2b", ("SequencesExt", "FoldLeftDomain", 3): "R4.2b",
+    ("SequencesExt", "FoldRight", 3): "R4.2b", ("SequencesExt", "FoldRightDomain", 3): "R4.2b",
+    ("SequencesExt", "FoldSeq", 3): "R4.2b", ("SequencesExt", "RemoveFirstMatch", 2): "R4.2b",
+    ("SequencesExt", "SelectInSeq", 2): "R4.2b", ("SequencesExt", "SelectLastInSeq", 2): "R4.2b",
+    ("SequencesExt", "SelectInSubSeq", 4): "R4.2b", ("SequencesExt", "SelectLastInSubSeq", 4): "R4.2b",
+    ("Functions", "FoldFunction", 3): "R4.2b", ("Functions", "FoldFunctionOnSet", 4): "R4.2b",
+    ("FiniteSetsExt", "FoldSet", 3): "R4.2b", ("FiniteSetsExt", "Quantify", 2): "R4.2b",
+    ("BagsExt", "FoldBag", 3): "R4.2b", ("VectorClocks", "CausalOrder", 4): "R4.2b refusal",
 }
 
 

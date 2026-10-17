@@ -173,6 +173,27 @@
     [['CSV' 'CSVRead' 3] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRead' 'it reads a file'))]]
     [['CSV' 'CSVRecords' 1] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRecords' 'it reads a file'))]]
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
+    ::  R4.2b: CommunityModules' Java overrides (the pinned deps jar's), ported
+    ::  where the TLA+ body answers differently -- measured by
+    ::  tools/gen-cm-tests.py against the pin with the jar bound
+    [['SequencesExt' 'SetToSeq' 1] [| 0 |=(a=(list value:v) (cm-set-to-seq a))]]
+    [['SequencesExt' 'SetToSeqs' 1] [| 0 |=(a=(list value:v) (cm-set-to-seqs a))]]
+    [['SequencesExt' 'Contains' 2] [| 0 |=(a=(list value:v) (cm-contains a))]]
+    [['SequencesExt' 'IsPrefix' 2] [| 0 |=(a=(list value:v) (cm-is-prefix a))]]
+    [['SequencesExt' 'LongestCommonPrefix' 1] [| 0 |=(a=(list value:v) (cm-lcp a))]]
+    [['SequencesExt' 'Suffixes' 1] [| 0 |=(a=(list value:v) (cm-suffixes a))]]
+    [['SequencesExt' 'AllSubSeqs' 1] [| 0 |=(a=(list value:v) (cm-all-sub-seqs a))]]
+    [['SequencesExt' 'RemoveFirst' 2] [| 0 |=(a=(list value:v) (cm-remove-first a))]]
+    [['Functions' 'IsInjective' 1] [| 0 |=(a=(list value:v) (cm-is-injective a))]]
+    [['Functions' 'AntiFunction' 1] [| 0 |=(a=(list value:v) (cm-anti-function a))]]
+    [['FiniteSetsExt' 'kSubset' 2] [| 0 |=(a=(list value:v) (cm-k-subset a))]]
+    [['IOUtils' 'atoi' 1] [| 0 |=(a=(list value:v) (cm-atoi a))]]
+    [['SVG' 'SVGElemToString' 1] [| 0 |=(a=(list value:v) (cm-svg-elem a))]]
+    [['SVG' 'PointOnLine' 3] [| 0 |=(a=(list value:v) (cm-point-on-line a))]]
+    ::  refused by name: answers this engine cannot reproduce
+    [['SVG' 'NodeOfRingNetwork' 5] [| 0 |=(a=(list value:v) (cm-refused 'SVG' 'NodeOfRingNetwork' 'it rounds java.lang.Math.cos/sin doubles'))]]
+    [['SVG' 'NodesOfDirectedMultiGraph' 3] [| 0 |=(a=(list value:v) (cm-refused 'SVG' 'NodesOfDirectedMultiGraph' 'it is a jungrapht graph layout'))]]
+    [['Statistics' 'ChiSquare' 3] [| 0 |=(a=(list value:v) (cm-refused 'Statistics' 'ChiSquare' 'it is Apache Commons Math\'s chi-square test over doubles'))]]
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
     [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
@@ -197,7 +218,7 @@
 ++  ordinal
   |=  i=@ud
   ^-  @t
-  ?:(=(i 2) 'second' ?:(=(i 3) 'third' 'first'))
+  ?:(=(i 2) 'second' ?:(=(i 3) 'third' ?:(=(i 4) 'fourth' 'first')))
 ::
 ++  arg-error
   ::  "The <n> argument of <op> should be a[n] <what>, but instead it is:
@@ -361,6 +382,23 @@
   ?:  =(k ['FiniteSets' 'Cardinality' 1])  `[%cardinality | 0]
   ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `[%is-finite-set | 0]
   ?:  =(k ['TLC' 'SortSeq' 2])             `[%sort-seq | 0]
+  ::  R4.2b: CommunityModules overrides that take an operator argument
+  ?:  =(k ['SequencesExt' 'FoldLeft' 3])           `[%fold-left | 0]
+  ?:  =(k ['SequencesExt' 'FoldLeftDomain' 3])     `[%fold-left-dom | 0]
+  ?:  =(k ['SequencesExt' 'FoldRight' 3])          `[%fold-right | 0]
+  ?:  =(k ['SequencesExt' 'FoldRightDomain' 3])    `[%fold-right-dom | 0]
+  ?:  =(k ['SequencesExt' 'FoldSeq' 3])            `[%fold-seq | 0]
+  ?:  =(k ['SequencesExt' 'RemoveFirstMatch' 2])   `[%remove-first-match | 0]
+  ?:  =(k ['SequencesExt' 'SelectInSeq' 2])        `[%select-in-seq | 0]
+  ?:  =(k ['SequencesExt' 'SelectLastInSeq' 2])    `[%select-last-in-seq | 0]
+  ?:  =(k ['SequencesExt' 'SelectInSubSeq' 4])     `[%select-in-subseq | 0]
+  ?:  =(k ['SequencesExt' 'SelectLastInSubSeq' 4])  `[%select-last-in-subseq | 0]
+  ?:  =(k ['Functions' 'FoldFunction' 3])          `[%fold-function | 0]
+  ?:  =(k ['Functions' 'FoldFunctionOnSet' 4])     `[%fold-function-on-set | 0]
+  ?:  =(k ['FiniteSetsExt' 'FoldSet' 3])           `[%fold-set | 0]
+  ?:  =(k ['FiniteSetsExt' 'Quantify' 2])          `[%quantify | 0]
+  ?:  =(k ['BagsExt' 'FoldBag' 3])                 `[%fold-bag | 0]
+  ?:  =(k ['VectorClocks' 'CausalOrder' 4])        `[%causal-order | 0]
   ::  the one `@Evaluation` override in scope: tlc2 hands it the node, the
   ::  context, and the states, and it decides what to evaluate
   ?:  =(k ['TLC' 'TLCEval' 1])             `[%tlc-eval & 0]
@@ -857,6 +895,324 @@
   :-  2.132
   %^  rap  3  'The first argument of Assert evaluated to FALSE; '
   ~['the second argument was: ' (crip (render:v i.t.as))]
+::
+++  cm-refused
+  ::  R4.2b: a CommunityModules override whose answer this engine cannot
+  ::  reproduce (floating point, a Java graph-layout library, HashMap order),
+  ::  refused by name rather than answered by its dummy TLA+ body
+  |=  [mod=@t nm=@t why=@t]
+  ^-  eres
+  [%| 0 (rap 3 ~['unsupported CommunityModules operator: ' mod '!' nm '; ' why])]
+::
+++  cm-set-to-seq
+  ::  SequencesExt!SetToSeq: the set's elements in normalized order
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SetToSeq expects one argument.']
+  ?.  (set-like:v i.as)  [%| (one-arg-error 'SetToSeq' 'set' i.as)]
+  [%& [%seq (set-elems:v (normalize:v i.as))]]
+::
+++  cm-set-to-seqs
+  ::  SequencesExt!SetToSeqs: every ordering of the set, as tuples;
+  ::  `{<<>>}` for the empty set
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SetToSeqs expects one argument.']
+  ?.  (set-like:v i.as)
+    [%| (wrong-value-error 'SetToSeqs' 'a finite set' i.as)]
+  =/  es  (set-elems:v (normalize:v i.as))
+  ?~  es  [%& (normalize:v [%set %set-enum ~[[%seq ~]]])]
+  [%& (normalize:v [%set %set-enum (turn (orderings es) |=(o=(list value:v) [%seq o]))])]
+::
+++  cm-contains
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'Contains expects two arguments.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'Contains' 'sequence' i.as)]
+  [%& [%bool (lien u.t |=(x=value:v (equal:v x i.t.as)))]]
+::
+++  cm-is-prefix
+  ::  strings by `startsWith`, else element-wise over tuples
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'IsPrefix expects two arguments.']
+  ?:  &(?=(%str -.i.as) ?=(%str -.i.t.as))
+    =/  n  (met 3 p.i.as)
+    [%& [%bool =(p.i.as (end [3 n] p.i.t.as))]]
+  =/  s  (to-tuple:v i.as)
+  =/  t  (to-tuple:v i.t.as)
+  ?~  s  [%| (arg-error 2.169 1 'IsPrefix' 'sequence' | i.as)]
+  ?~  t  [%| (arg-error 2.169 2 'IsPrefix' 'sequence' | i.t.as)]
+  ?:  (gth (lent u.s) (lent u.t))  [%& [%bool |]]
+  =/  ss  u.s
+  =/  tt  u.t
+  |-  ^-  eres
+  ?~  ss  [%& [%bool &]]
+  ?~  tt  [%& [%bool |]]
+  ?.  (equal:v i.ss i.tt)  [%& [%bool |]]
+  $(ss t.ss, tt t.tt)
+::
+++  cm-lcp
+  ::  SequencesExt!LongestCommonPrefix: the prefix of the FIRST element in
+  ::  normalized order shared by every other (strings by character)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'LongestCommonPrefix expects one argument.']
+  =/  bad  (one-arg-error 'LongestCommonPrefix' 'non-empty set' i.as)
+  ?.  (set-like:v i.as)  [%| bad]
+  =/  es  (set-elems:v (normalize:v i.as))
+  ?~  es  [%| bad]
+  ?:  ?=(%str -.i.es)
+    =/  pre=tape  (trip p.i.es)
+    =/  up  (lent pre)
+    =/  os  t.es
+    |-  ^-  eres
+    ?~  os  [%& [%str (crip (scag up pre))]]
+    ?.  ?=(%str -.i.os)  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+    $(os t.os, up (common-len (scag up pre) (trip p.i.os)))
+  =/  f  (to-tuple:v i.es)
+  ?~  f  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+  =/  up  (lent u.f)
+  =/  os  t.es
+  |-  ^-  eres
+  ?~  os  [%& [%seq (scag up u.f)]]
+  =/  o  (to-tuple:v i.os)
+  ?~  o  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+  $(os t.os, up (common-vals (scag up u.f) u.o))
+::
+++  common-len
+  |=  [a=tape b=tape]
+  ^-  @ud
+  =|  n=@ud
+  |-  ^-  @ud
+  ?~  a  n
+  ?~  b  n
+  ?.  =(i.a i.b)  n
+  $(a t.a, b t.b, n +(n))
+::
+++  common-vals
+  |=  [a=(list value:v) b=(list value:v)]
+  ^-  @ud
+  =|  n=@ud
+  |-  ^-  @ud
+  ?~  a  n
+  ?~  b  n
+  ?.  (equal:v i.a i.b)  n
+  $(a t.a, b t.b, n +(n))
+::
+++  cm-suffixes
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'Suffixes expects one argument.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'Suffixes' 'sequence' i.as)]
+  =|  out=(list value:v)
+  =/  s  u.t
+  |-  ^-  eres
+  ?~  s  [%& (normalize:v [%set %set-enum [[%seq ~] out]])]
+  $(s t.s, out [[%seq s] out])
+::
+++  cm-all-sub-seqs
+  ::  every subsequence (elements kept in order), 2^n of them
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'AllSubSeqs expects one argument.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'AllSubSeqs' 'sequence' i.as)]
+  =/  subs=(list (list value:v))
+    =/  xs  (flop u.t)
+    =/  acc=(list (list value:v))  [~ ~]
+    |-  ^-  (list (list value:v))
+    ?~  xs  acc
+    $(xs t.xs, acc (weld acc (turn acc |=(l=(list value:v) `(list value:v)`[i.xs l]))))
+  [%& (normalize:v [%set %set-enum (turn subs |=(l=(list value:v) [%seq l]))])]
+::
+++  cm-remove-first
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'RemoveFirst expects two arguments.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (arg-error 2.169 1 'RemoveFirst' 'sequence' | i.as)]
+  =|  out=(list value:v)
+  =/  s  u.t
+  |-  ^-  eres
+  ?~  s  [%& [%seq (flop out)]]
+  ?:  (equal:v i.s i.t.as)  [%& [%seq (weld (flop out) t.s)]]
+  $(s t.s, out [i.s out])
+::
+++  cm-is-injective
+  ::  Functions!IsInjective: a tuple or a function's VALUES pairwise
+  ::  distinct; a record is not a function to the override (EC 2283)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'IsInjective expects one argument.']
+  =/  vs=(unit (list value:v))
+    ?+  -.i.as  ~
+      %seq  `p.i.as
+      %fcn  `(turn p.i.as |=(p=vpair:v r.p))
+    ==
+  ?~  vs  [%| (one-arg-error 'IsInjective' 'function' i.as)]
+  =/  l  u.vs
+  |-  ^-  eres
+  ?~  l  [%& [%bool &]]
+  ?:  (lien t.l |=(x=value:v (equal:v x i.l)))  [%& [%bool |]]
+  $(l t.l)
+::
+++  cm-anti-function
+  ::  Functions!AntiFunction: the function's values mapped back to its domain
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'AntiFunction expects one argument.']
+  =/  ps  (to-fcn-pairs:v (normalize:v i.as))
+  ?~  ps  [%| (one-arg-error 'AntiFunction' 'functions' i.as)]
+  [%& (normalize:v [%fcn (turn u.ps |=(p=vpair:v [r.p d.p]))])]
+::
+++  cm-k-subset
+  ::  FiniteSetsExt!kSubset: the k-element subsets, a KSubsetValue; `{}` when
+  ::  k is out of range and the SubsetValue `{{}}` for k = 0
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'kSubset expects two arguments.']
+  ?.  (set-like:v i.t.as)  [%| (one-arg-error 'kSubset' 'set' i.t.as)]
+  ?.  ?=(%int -.i.as)
+    [%| (arg-error 2.169 1 'kSubset' 'natural number' | i.as)]
+  =/  es  (set-elems:v (normalize:v i.t.as))
+  ?.  (syn:si p.i.as)  [%& [%set %set-enum ~]]
+  =/  k  (abs:si p.i.as)
+  ?:  (gth k (lent es))  [%& [%set %set-enum ~]]
+  ?:  =(0 k)  [%& [%set %subset ~[[%set %set-enum ~]]]]
+  =/  cs  (k-combos k es)
+  =/  n  (normalize:v [%set %set-enum (turn cs |=(c=(list value:v) [%set %set-enum c]))])
+  ?.  ?=(%set -.n)  [%& n]
+  [%& n(cls %k-subset)]
+::
+++  k-combos
+  |=  [k=@ud es=(list value:v)]
+  ^-  (list (list value:v))
+  ?:  =(0 k)  ~[~]
+  ?~  es  ~
+  %+  weld
+    (turn $(k (dec k), es t.es) |=(c=(list value:v) [i.es c]))
+  $(es t.es)
+::
+++  cm-atoi
+  ::  IOUtils!atoi: java.lang.Integer.parseInt -- an optional sign and
+  ::  decimal digits, within the 32-bit range
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'atoi expects one argument.']
+  =/  bad  [%| (one-arg-error 'atoi' 'string' i.as)]
+  ?.  ?=(%str -.i.as)  bad
+  =/  t=tape  (trip p.i.as)
+  =/  neg  ?=([%'-' *] t)
+  =?  t  ?=([?(%'-' %'+') *] t)  t.t
+  ?~  t  bad
+  ?.  (levy `tape`t |=(c=@t &((gte c '0') (lte c '9'))))  bad
+  =/  m  (rash (crip t) dem)
+  =/  x  (new:si !neg m)
+  ?.  (in-range x)  bad
+  [%& [%int x]]
+::
+++  cm-svg-elem
+  ::  SVG!SVGElemToString: `<name attrs>innerText children</name>`, the
+  ::  attributes in the RECORD's field order (`_` in a name becomes `-`)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SVGElemToString expects one argument.']
+  =/  r  (svg-string i.as)
+  ?:  ?=(%| -.r)  r
+  [%& [%str p.r]]
+::
+++  svg-string
+  |=  el=value:v
+  ^-  (each @t eval-err:v)
+  =/  bad
+    |=  why=@t
+    ^-  (each @t eval-err:v)
+    [%| 0 (rap 3 ~['SVGElemToString: ' why])]
+  ?.  ?=(%rec -.el)  (bad 'an SVG element must be a record')
+  =/  fld
+    |=  k=@t
+    ^-  (unit value:v)
+    =/  h  (skim p.el |=(f=vfield:v =(k k.f)))
+    ?~(h ~ `v.i.h)
+  =/  nm  (fld 'name')
+  ?.  ?=([~ %str *] nm)  (bad 'the element has no string `name`')
+  =/  at  (fld 'attrs')
+  ::  `attrs` as the override's `toRcd()` sees it: a record, or a function
+  ::  over strings (`Merge`'s `[x \in D |-> ...]`)
+  =/  attrs=(list vfield:v)
+    ?:  ?=([~ %rec *] at)  p.u.at
+    ?.  ?=([~ %fcn *] at)  ~
+    %+  murn  p.u.at
+    |=  p=vpair:v
+    ?.  ?=(%str -.d.p)  ~
+    `[p.d.p r.p]
+  =/  astr=tape
+    %-  zing
+    %+  turn  attrs
+    |=  f=vfield:v
+    =/  k=tape  (turn (trip k.f) |=(c=@t ?:(=(c '_') '-' c)))
+    =/  val=tape  ?:(?=(%str -.v.f) (trip p.v.f) (render:v v.f))
+    :(weld " " k "='" val "'")
+  =/  ch  (fld 'children')
+  =/  kids=(list value:v)
+    ?~  ch  ~
+    ?:  ?=(%seq -.u.ch)  p.u.ch
+    ?:  ?=(%rec -.u.ch)  (turn p.u.ch |=(f=vfield:v v.f))
+    ?:  ?=(%fcn -.u.ch)  (turn p.u.ch |=(p=vpair:v r.p))
+    ~
+  =|  cstr=tape
+  |-  ^-  (each @t eval-err:v)
+  ?^  kids
+    =/  c  (svg-string i.kids)
+    ?:  ?=(%| -.c)  c
+    $(kids t.kids, cstr (weld cstr (trip p.c)))
+  =/  it  (fld 'innerText')
+  =/  inner=tape  ?:(?=([~ %str *] it) (svg-escape (trip p.u.it)) "")
+  =/  name=tape  (trip p.u.nm)
+  [%& (crip ;:(weld "<" name astr ">" inner cstr "</" name ">"))]
+::
+++  svg-escape
+  ::  `<<` and `>>` as entities, as the override's two replaceAll calls do
+  |=  t=tape
+  ^-  tape
+  ?~  t  ~
+  ?:  ?=([%'<' %'<' *] t)  (weld "&lt;&lt;" $(t t.t.t))
+  ?:  ?=([%'>' %'>' *] t)  (weld "&gt;&gt;" $(t t.t.t))
+  [i.t $(t t.t)]
+::
+++  cm-point-on-line
+  ::  SVG!PointOnLine: `(int)(f + (t - f) / (idx * 1.0))` per coordinate --
+  ::  the double quotient truncated toward zero (the TLA+ body floors)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * * ~] as)  [%| 0 'PointOnLine expects three arguments.']
+  ?.  ?=(%int -.i.t.t.as)  [%| (arg-error 2.169 3 'PointOnLine' 'integer' | i.t.t.as)]
+  =/  d  p.i.t.t.as
+  ?:  =(--0 d)  [%| 0 'PointOnLine: a zero segment count.']
+  =/  co
+    |=  [r=value:v k=@t]
+    ^-  (unit @s)
+    ?.  ?=(%rec -.r)  ~
+    =/  h  (skim p.r |=(f=vfield:v =(k k.f)))
+    ?~  h  ~
+    ?.  ?=(%int -.v.i.h)  ~
+    `p.v.i.h
+  =/  fx  (co i.as 'x')
+  =/  fy  (co i.as 'y')
+  =/  tx  (co i.t.as 'x')
+  =/  ty  (co i.t.as 'y')
+  ?.  &(?=(^ fx) ?=(^ fy) ?=(^ tx) ?=(^ ty))
+    [%| 0 'PointOnLine: the points must be records with integer x and y.']
+  =/  pt
+    |=  [f=@s t=@s]
+    ^-  @s
+    ::  (f*d + (t - f)) / d, truncated toward zero
+    =/  num  (sum:si (pro:si f d) (dif:si t f))
+    (fra:si num d)
+  (mk-rec:v ~[['x' [%int (pt u.fx u.tx)]] ['y' [%int (pt u.fy u.ty)]]])
 ::
 ++  io-refused
   ::  R4.2h: a CommunityModules process or file operator, refused by name
