@@ -1466,6 +1466,43 @@ function …`) and a definition's `F[9]` (`Attempted to apply function: …`), w
 because tlc2 keeps the former a lazy `FcnLambdaValue` and normalizes the latter to a
 `FcnRcdValue`.
 
+## R4.2 close — three approved output differences (2026-10-17)
+
+Approved by the user at the R4.2 close; none moves a verdict or a count.
+
+- **Print interleaving (R4.2ao).** When one action yields several
+  successors, tlc2 checks each successor as it is generated, so the
+  invariants' `Print` lines interleave with the action's; here every
+  successor of the action is generated first, then each is checked, so the
+  action's lines come first (measured on `x' = x + d` over `d \in {1, 2}`).
+- **SANY warnings (R4.2ae).** tlc2 prints SANY's `*** Warnings: N` block in
+  its parse phase (between `Semantic processing of module ...` and
+  `Linting ...`), a phase the console report here does not render at all
+  (no `Parsing file` / `Semantic processing` lines either). The warnings
+  are produced by the semantic pass and reach `%analyze` as typed
+  diagnostics.
+- **SemDump-only projections (R4.2an).** SemDump lists the theorems a module
+  INHERITS in the extender's dump; an ASSUME over an inherited CONSTANT gets
+  a level annotation here where SemDump has none; a parameter's maxLevel
+  through a LAMBDA operator argument in `WITH` is 2 at the pin and 3 here
+  (sem `inst-lambda` withheld). The dump is a diagnostic projection; no
+  verdict depends on it.
+
+## Release R4.2af — PROPERTY decomposition (2026-10-17)
+
+A PROPERTY `\A i \in S : P(i)` over a constant S is binned on `P`'s shape as
+`processConfigProps` bins each unrolled element (an invariant, implied init
+or implied action named by `P`'s location; temporal otherwise), and a
+non-recursive operator applied to constant arguments (`SM(42)!Spec`) is
+decomposed through its body. One residue: an operator applied to a
+STATE-level argument (`Check(x, 2)`) stays one part, because its body's
+levels were computed with constant formals; tlc2 decomposes it, so its
+box-state conjuncts are checked by the liveness engine here (same verdict,
+a temporal rather than an invariant report). A temporal violation now names
+the configured PROPERTY, as tlc2 does (it named the definition or the
+conjunct's location since R4.2n). Evidence: mc `forall-unroll-*`,
+`param-inline-*`, `temporal-name-*`.
+
 ## Release R4.2 — census residue (2026-10-14..16)
 
 Semantics brought to the pin while clearing the Examples census's error rows

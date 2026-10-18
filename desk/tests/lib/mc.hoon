@@ -491,6 +491,82 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE c\0aBig == [a : 0..1100, b : 0..1000]\0aInit == c \\in {r \\in Big : r.a + r.b = 2}\0aNext == c.a > 0 /\\ c\' = [c EXCEPT !.a = @ - 1, !.b = @ + 1]\0aInv == c \\in Big\0a====\0a'
   'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-mc-forall-unroll-action
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Action property line 10, col 24 to line 10, col 39 of module spec is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aP == \\A i \\in {1, 2} : [](x < i + 1)\0aQ == \\A i \\in {2, 5} : <>(x = i)\0aR == \\A i \\in {1, 2} : x # i - 1\0aA == \\A i \\in {1, 2} : [][x\' # i + 1]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY A\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-forall-unroll-init
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Warning: The formula R is a state-level formula, but it was used as a PROPERTY (or PROPERTIES), where a temporal formula is typically expected. State-level formulas used as PROPERTY or PROPERTIES are only checked in the initial state. To verify that the formula R holds in all states of every behavior, use INVARIANT R instead. Alternatively, applying the "always" temporal operator ([]) to the state-level formula R changes it into a temporal formula, asserting that R holds in all states of every behavior. See https://explain.tlapl.us/invariants-and-properties for additional details.'
+        'Error: Property line 9, col 24 to line 9, col 32 of module spec is violated by the initial state:'
+        'x = 0'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aP == \\A i \\in {1, 2} : [](x < i + 1)\0aQ == \\A i \\in {2, 5} : <>(x = i)\0aR == \\A i \\in {1, 2} : x # i - 1\0aA == \\A i \\in {1, 2} : [][x\' # i + 1]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY R\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-forall-unroll-inv
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant line 7, col 24 to line 7, col 36 of module spec is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aP == \\A i \\in {1, 2} : [](x < i + 1)\0aQ == \\A i \\in {2, 5} : <>(x = i)\0aR == \\A i \\in {1, 2} : x # i - 1\0aA == \\A i \\in {1, 2} : [][x\' # i + 1]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY P\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-forall-unroll-temporal
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Q was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: Stuttering'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aP == \\A i \\in {1, 2} : [](x < i + 1)\0aQ == \\A i \\in {2, 5} : <>(x = i)\0aR == \\A i \\in {1, 2} : x # i - 1\0aA == \\A i \\in {1, 2} : [][x\' # i + 1]_x\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Q\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-gate-no-fair
   %+  expect-eq
     !>  ^-  wain
@@ -1745,6 +1821,49 @@
     '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0a\0a\\* an operator argument supplied by a LAMBDA rather than by name: SANY\0a\\* synthesizes an OpDefNode and points an OpArgNode at it, so there is no\0a\\* name to resolve\0aPick(S, P(_)) == CHOOSE y \\in S : P(y)\0a\0aInit == x = Pick({1, 2, 3}, LAMBDA n : n > 2)\0aNext == UNCHANGED x\0aSpec == Init /\\ [][Next]_x\0a\0aInv == x = 3\0a=====================\0a'
   'SPECIFICATION Spec\0aINVARIANT Inv\0a'
 ::
+++  test-mc-param-inline-inv
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Invariant line 7, col 16 to line 7, col 24 of module spec is violated.'
+        'Error: The behavior up to this point is:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        '3 states generated, 3 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 3.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aCheck(k, m) == [](x < k) /\\ <>(x = m)\0aProp == Check(2, 3)\0aLive(m) == <>(x = m)\0aP3 == Live(3)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-param-inline-live
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property P3 was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aCheck(k, m) == [](x < k) /\\ <>(x = m)\0aProp == Check(2, 3)\0aLive(m) == <>(x = m)\0aP3 == Live(3)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY P3\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-mc-pc-live-gate
   %+  expect-eq
     !>  ^-  wain
@@ -2625,6 +2744,50 @@
   %+  check:check
     '---- MODULE spec ----\0aEXTENDS Naturals, TLC\0aCONSTANT P, a, b\0aVARIABLE n, x\0aInit == x = a /\\ n = 0\0aNext == n < 2 /\\ n\' = n + 1 /\\ x\' = IF x = a THEN b ELSE a\0aPerms == Permutations(P)\0aInv == n < 2\0a====\0a'
   'CONSTANT a = a  b = b  P = {a, b}\0aSYMMETRY Perms\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mc-temporal-name-conj
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Both was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aLive == <>(x = 3)\0aProp == Live\0aBoth == Live /\\ <>(x = 7)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Both\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mc-temporal-name-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'Error: Temporal property Prop was violated.'
+        'Error: The following behavior constitutes a counter-example:'
+        'State 1: <Initial predicate>'
+        'x = 0'
+        'State 2: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 1'
+        'State 3: <Next line 5, col 9 to line 5, col 27 of module spec>'
+        'x = 2'
+        'State 4: Stuttering'
+        '4 states generated, 4 distinct states found, 0 states left on queue.'
+        'The depth of the complete state graph search is 4.'
+    ==
+  !>
+  %-  trim
+  %+  check:check
+    '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x < 3 /\\ x\' = x + 1\0aSpec == Init /\\ [][Next]_x\0aLive == <>(x = 3)\0aProp == Live\0aBoth == Live /\\ <>(x = 7)\0a====\0a'
+  'SPECIFICATION Spec\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
 ::
 ::  APPROVED DIFFERENCE (R2.7.6.1) -- this arm asserts the PORT's output,
 ::  not the pin's. R2.7.9: `-terse` suppresses the EXPANSION of some lazy sets when a state

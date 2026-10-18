@@ -5303,6 +5303,36 @@
   =/  nm  name.i.ps
   =/  x   body.i.ps
   =/  ws  ws.i.ps
+  ::  R4.2af: `processConfigProps` UNROLLS `\A i \in S : P(i)` over a
+  ::  constant S into one part per element, each named by the location of
+  ::  `P(i)` (`expr.toString()`) and binned on ITS shape. Every element part
+  ::  carries the same name and the same bin, so one part `\A i \in S :
+  ::  P'(i)` -- P' the binned form -- is observationally the same (measured:
+  ::  `\A i \in {1, 2} : [](x < i + 1)` is `Invariant line 7, col 24 to line
+  ::  7, col 36 of module spec is violated`, a safety stop). A part that bins
+  ::  as TEMPORAL keeps the whole formula and its property name, as the
+  ::  liveness report names the PROPERTY
+  =/  fa  (const-forall x)
+  ?^  fa
+    =/  fb  body.u.fa
+    =/  fnm  (loc-str:config mo.i.ps (sspan-of:tp fb))
+    =/  wrap  |=(b=sem:sem-lib (rewrap ws (rebound q.u.fa b)))
+    =/  fbinner  (box-state-inner:tp fb)
+    ?^  fbinner
+      =/  bn=@t
+        ?.  ?&(?=(%apply -.u.fbinner) ?=(~ args.u.fbinner) ?=(%user-op kind.op.u.fbinner))
+          fnm
+        name.op.u.fbinner
+      $(ps t.ps, binvs.rest [[bn (wrap u.fbinner)] binvs.rest])
+    ?:  (lte (sem-lvl:sem-lib fb) 1)
+      $(ps t.ps, iinits.rest [[fnm (wrap fb)] iinits.rest])
+    =/  fia  (implied-action-parts fb)
+    ?^  fia
+      =/  ia=[name=@t body=sem:sem-lib sub=(unit sem:sem-lib)]
+        :+  fnm  (wrap body.u.fia)
+        ?~(sub.u.fia ~ `(rewrap ws u.sub.u.fia))
+      $(ps t.ps, iacts.rest [ia iacts.rest])
+    $(ps t.ps, temps.rest [[i.props (rewrap ws x)] temps.rest])
   =/  binner  (box-state-inner:tp x)
   ?^  binner
     =/  bn=@t
@@ -5318,7 +5348,10 @@
       :+  nm  (rewrap ws body.u.iact)
       ?~(sub.u.iact ~ `(rewrap ws u.sub.u.iact))
     $(ps t.ps, iacts.rest [ia iacts.rest])
-  $(ps t.ps, temps.rest [[nm (rewrap ws x)] temps.rest])
+  ::  a TEMPORAL part keeps the configured PROPERTY's name: tlc2's
+  ::  violation report names the property (`Temporal property Prop was
+  ::  violated.` for `Prop == Live`), not the part (measured)
+  $(ps t.ps, temps.rest [[i.props (rewrap ws x)] temps.rest])
 ::
 ++  prop-parts
   ::  R4.2n: `SpecProcessor.processConfigProps`' structural decomposition of
@@ -5336,46 +5369,104 @@
   ::  property stays whole here and its parts reach the liveness converter,
   ::  which expands the quantifier itself (`+quant-of:tp`)
   |=  [name=@t s=sem:sem-lib defs=(map @t sem-def:sem-lib)]
-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
   =|  ws=(list sem:sem-lib)
   =|  seen=(set @t)
   =/  mo=@t
     =/  d  (~(get by defs) name)
     ?~(d '' origin.u.d)
-  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
   ?:  ?=(%letin -.s)
-    ?~  body.s  ~[[name s ws]]
+    ?~  body.s  ~[[name s ws mo]]
     $(s u.body.s, ws [s ws])
-  ?.  ?=(%apply -.s)  ~[[name s ws]]
+  ?.  ?=(%apply -.s)  ~[[name s ws mo]]
   ?^  (anysubstin-mod:sem-lib name.op.s)
     =/  sp  (substin-parts:sem-lib s)
-    ?~  sp  ~[[name s ws]]
+    ?~  sp  ~[[name s ws mo]]
     $(s inner.u.sp, ws [s ws], mo mod.u.sp)
   ?:  ?&  ?=(~ args.s)
           ?=(%user-op kind.op.s)
           !(~(has in seen) name.op.s)
       ==
     =/  d  (~(get by defs) name.op.s)
-    ?~  d  ~[[name s ws]]
-    ?~  body.u.d  ~[[name s ws]]
-    ?.  ?=(~ params.u.d)  ~[[name s ws]]
+    ?~  d  ~[[name s ws mo]]
+    ?~  body.u.d  ~[[name s ws mo]]
+    ?.  ?=(~ params.u.d)  ~[[name s ws mo]]
     %=  $
       name  name.op.s
       s     u.body.u.d
       seen  (~(put in seen) name.op.s)
       mo    ?:(=('' origin.u.d) mo origin.u.d)
     ==
+  ::  R4.2af: a parameterized operator applied with arguments, outside any
+  ::  substitution (`Check(x, 2)`, `SM(42)!Spec`): `processConfigProps` binds
+  ::  the formals to the arguments (`getOpContext`, lazily) and recurses into
+  ::  the body. The binding rides as a substitution wrapper over the formals,
+  ::  which `+bind-substs` evaluates the same lazy way, and `+rewrap` puts it
+  ::  back around every part. Only for CONSTANT-level arguments: the body's
+  ::  levels were computed with constant formals, so a state-level argument
+  ::  (`Check(x, 2)`) would leave a temporal leaf looking constant; such a
+  ::  property stays whole, as before
+  ?:  ?&  ?=(^ args.s)
+          ?=(%user-op kind.op.s)
+          ?=(~ ws)
+          !(~(has in seen) name.op.s)
+          (levy `(list sem:sem-lib)`args.s |=(a=sem:sem-lib =(0 (sem-lvl:sem-lib a))))
+      ==
+    =/  d  (~(get by defs) name.op.s)
+    ?~  d  ~[[name s ws mo]]
+    ?~  body.u.d  ~[[name s ws mo]]
+    ::  not a recursive operator (`!odn.getInRecursive()`): its body reaches
+    ::  its own name
+    ?:  (~(has in (reach-names:ne u.body.u.d defs)) name.op.s)  ~[[name s ws mo]]
+    ?.  =((lent params.u.d) (lent args.s))  ~[[name s ws mo]]
+    ?.  (levy params.u.d |=(p=spar:sem-lib =(0 arity.p)))  ~[[name s ws mo]]
+    =/  om  ?:(=('' origin.u.d) mo origin.u.d)
+    =/  w=sem:sem-lib
+      :*  %apply  [(cat 3 '$SubstIn:' om) %builtin]  lvl.s  at.s
+          (turn params.u.d |=(p=spar:sem-lib `sbind:sem-lib`[name.p | ~]))
+          ~
+          (snoc args.s u.body.u.d)
+      ==
+    %=  $
+      name  name.op.s
+      s     u.body.u.d
+      ws    [w ws]
+      seen  (~(put in seen) name.op.s)
+      mo    om
+    ==
   ?:  =('$Nop' name.op.s)
-    ?~  args.s  ~[[name s ws]]
+    ?~  args.s  ~[[name s ws mo]]
     $(s i.args.s)
   ?.  |(=('$ConjList' name.op.s) =('\\land' name.op.s))
-    ~[[name s ws]]
+    ~[[name s ws mo]]
   =/  as=(list sem:sem-lib)  args.s
-  =|  out=(list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
-  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib)])
+  =|  out=(list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
   ?~  as  out
   =/  nm  (loc-str:config mo (sspan-of:tp i.as))
   $(as t.as, out (weld out ^$(s i.as, name nm)))
+::
+++  const-forall
+  ::  R4.2af: `\A i \in S : P` whose domains are constant-level -- the shape
+  ::  `processConfigProps` unrolls (`opDefEvaluator.contexts` succeeds)
+  |=  s=sem:sem-lib
+  ^-  (unit [q=sem-apply:sem-lib body=sem:sem-lib])
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('$BoundedForall' name.op.s)  ~
+  ?.  ?=([* ~] args.s)  ~
+  ?~  bound.s  ~
+  ?.  %+  levy  `(list sem-bound:sem-lib)`bound.s
+      |=  b=sem-bound:sem-lib
+      ?~(range.b | =(0 (sem-lvl:sem-lib u.range.b)))
+    ~
+  `[s i.args.s]
+::
+++  rebound
+  ::  the quantifier `q` around a new body
+  |=  [q=sem-apply:sem-lib b=sem:sem-lib]
+  ^-  sem:sem-lib
+  q(args ~[b], lvl (sem-lvl:sem-lib b))
 ::
 ++  rewrap
   ::  put a part back under the wrappers it was found in (innermost first);
