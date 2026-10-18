@@ -93,6 +93,26 @@
       ::  the liveness product keys a successor exactly as the graph build
       ::  keyed it (`+live-key:lv`); `[~ ~]` = the plain FP64 identity
       idk=[perms=(list (map @t @t)) view=(unit sem:sm)]
+      ::  R4.3: the scope each call-by-name INSTANCE substitution was written
+      ::  in. tlc2 resolves a name by its SANY node, so `T <- SeqToSet(T) \cup
+      ::  {<<state, succ>> : succ \in successors}` reads the INSTANTIATING
+      ::  module's `successors` even though the instance substitutes its own
+      ::  `successors` too; the port binds by name, and read in the instance
+      ::  body's env the expression captured the sibling substitution
+      ::  (TestGraphs' `Refinement`: a wrong implied-action failure)
+      pout=(map @t clo)
+  ==
+::  a call-by-name entry's defining scope (+outer-of), with the expression it
+::  was recorded for: a later rebinding of the name leaves it stale. TWO
+::  levels, not a recursive mold (one loops zuse-408's mold compiler): the
+::  scope keeps its own parent's closures one level deep, enough for an
+::  instance inside an instance (TestGraphs -> TLCMC -> MCReachability)
++$  clo1  [sub=sem:sm psub=(map @t sem:sm) vals=(map @t value:v)]
++$  clo
+  $:  sub=sem:sm
+      psub=(map @t sem:sm)
+      vals=(map @t value:v)
+      pout=(map @t clo1)
   ==
 +$  eres  (each value:v eval-err:v)
 ::  the action solver yields the ordered list of complete states satisfying
@@ -275,9 +295,19 @@
   ::  braf's `RAF == INSTANCE RandomAccessFile WITH file_content <-
   ::  LogicalFileContent`, whose root body names the root's own
   ::  `file_content`, looped through the substitution
+  ::  R4.3: an INSTANCE substitution is read in the scope it was written in
+  ::  (`pout`), where neither the instance body's bindings nor the sibling
+  ::  substitutions exist
   |=  [nm=@t e=eenv]
   ^-  eenv
-  e(psub (~(del by psub.e) nm))
+  =/  o  (~(get by pout.e) nm)
+  ?.  ?&(?=(^ o) =(`sub.u.o (~(get by psub.e) nm)))
+    e(psub (~(del by psub.e) nm))
+  %=  e
+    psub  psub.u.o
+    vals  vals.u.o
+    pout  (~(run by pout.u.o) |=(c=clo1 `clo`[sub.c psub.c vals.c ~]))
+  ==
 ::
 ++  by-name
   ::  R4.2m: the expression a bare CONSTANT or VARIABLE reference is bound to
@@ -1706,8 +1736,12 @@
   ::  (`+eval-sdef`), so the references made while one state is expanded
   ::  share one evaluation. GameOfLife's `sc[<<x, y>> \in ...] == ...` was
   ::  re-materialized at every one of its 18 references per state
-  ?:  ?&(?=(~ args.n) =(1 lvl.def) !=('' origin.def))
-    (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e))) rs)
+  ::  R4.3: a CONSTANT-level one too -- `+with-cdefs` leaves a tlc2-lazy set
+  ::  uncached (`+lazy-set`) -- keyed without the states, which it cannot
+  ::  read, so it is evaluated once rather than once per state
+  ?:  ?&(?=(~ args.n) (lte lvl.def 1) !=('' origin.def))
+    =/  se  (sdef-env u.body.def e(fuel (dec fuel.e)))
+    (eval-sdef u.body.def ?:(=(0 lvl.def) se(s0 ~, s1 ~) se) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
   =/  ew  p.e2(fuel (dec fuel.e))
@@ -1768,6 +1802,10 @@
     %-  malt
     ^-  (list [@t sem:sm])
     (skim ~(tap by psub.e) |=([k=@t *] (~(has in ns) k)))
+  =.  pout.e
+    %-  malt
+    ^-  (list [@t clo])
+    (skim ~(tap by pout.e) |=([k=@t *] (~(has in ns) k)))
   ?:  |(primed.e enabled.e)  e
   e(s1 ~)
 ::
@@ -3056,6 +3094,14 @@
   ?.  ?=(%variable kind.op.n)  |
   (~(has in vars.e) name.op.n)
 ::
+++  clo-of
+  ::  the closure of a call-by-name substitution `sub` written in env `e`
+  |=  [sub=sem:sm e=eenv]
+  ^-  clo
+  :*  sub  psub.e  vals.e
+      (~(run by pout.e) |=(c=clo `clo1`[sub.c psub.c vals.c]))
+  ==
+::
 ++  bind-substs
   ::  bind an INSTANCE's `WITH` substitutions (R2.3.5). Same split `+bind-psub`
   ::  makes for operator parameters, and for the same reason: a substitution
@@ -3080,6 +3126,7 @@
     ?~  od  $(ns t.ns, as t.as)
     $(ns t.ns, as t.as, e e(ops (~(put by ops.e) name.i.ns u.od)))
   ?:  (state-var-ref i.as e0)
+    =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, e e(psub (~(put by psub.e) name.i.ns i.as)))
   ::  R4.2n: a STATE-DEPENDENT expression (`y <- x % 2`) is bound LAZILY as
   ::  well, as tlc2's `getVal(expr, con, false)` does (a LazyValue): an inner
@@ -3096,6 +3143,7 @@
   ::  (implied-action) failure where tlc2 succeeds. An inner CONSTANT bound
   ::  this way reads it through `psub` (`+apply-const`)
   ?:  (gth (sem-level i.as) 0)
+    =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, psub.e (~(put by psub.e) name.i.ns i.as))
   =/  av  (eval i.as e0)
   ::  R4.2m: an expression with no VALUE -- `Values <- Int`, an infinite
@@ -3103,6 +3151,7 @@
   ::  the lazy value; a reference reads it where it is used (membership,
   ::  `+eval-domain`), and a genuine error surfaces there
   ?:  ?=(%| -.av)
+    =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, psub.e (~(put by psub.e) name.i.ns i.as))
   $(ns t.ns, as t.as, e e(vals (~(put by vals.e) name.i.ns p.av)))
 ::
@@ -3596,7 +3645,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~ [~ ~]]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~ [~ ~] ~]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -3650,7 +3699,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~]])
+  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~] ~])
 ::
 ++  with-cdefs
   ::  R4.P3 (H4): tlc2's `SpecProcessor.processConstantDefns` -- every
@@ -3691,6 +3740,7 @@
           =(0 lvl.d)
           ?=(^ body.d)
           !(reaches-run-op u.body.d ops.e)
+          !(lazy-set u.body.d ops.e)
           !(is-standard:so ov.e origin.d)
           ?=(~ (lookup:so ov.e [origin.d (bnm name.d) 0]))
           ?=(~ (node-op:so [origin.d (bnm name.d) 0]))
@@ -3701,6 +3751,42 @@
   =/  [res=eres rs=rst]  p.r
   ?.  &(?=(%& -.res) =(empty-rst rs))  $(ds t.ds)
   $(ds t.ds, acc (~(put by acc) nm [d p.res]))
+::
+++  lazy-set
+  ::  R4.3: does a body denote a set tlc2 keeps LAZY (the class rules of
+  ::  `+sexp-class:v`, read off the expression)? `processConstantDefns`
+  ::  caches such a value as an unenumerated SetOfRcdsValue, SubsetValue, ...;
+  ::  materialized here, MultiPaxos's unused `NodeStates` (about 3 x 10^9
+  ::  records) never finished, and a 192,000-record one cost 565 s. Left
+  ::  uncached, a reference evaluates it through `+eval-sdef`'s memo, and
+  ::  membership never materializes it (`+memb-node`). A misjudged class only
+  ::  moves cost, never a value
+  |=  [b=sem:sm ops=(map @t sem-def:sm)]
+  ^-  ?
+  =/  fuel  32
+  |-  ^-  ?
+  ?.  ?=(%apply -.b)  |
+  ?:  =(0 fuel)  |
+  =/  nm  name.op.b
+  ?:  ?|  =(nm 'SUBSET')  =(nm '$SetOfFcns')  =(nm '$SetOfRcds')
+          =(nm '\\times')  =(nm '$CartesianProd')
+      ==
+    &
+  ?:  =(nm 'UNION')
+    ?.  ?=([[%apply *] *] args.b)  &
+    !=('$SetEnumerate' name.op.i.args.b)
+  ?:  ?&  ?=([* * ~] args.b)
+          |(=(nm '\\union') =(nm '\\intersect') =(nm '\\'))
+      ==
+    =/  l  $(b i.args.b, fuel (dec fuel))
+    ?:  =(nm '\\')  l
+    =/  r  $(b i.t.args.b, fuel (dec fuel))
+    ?:(=(nm '\\union') |(l r) &(l r))
+  ?.  ?&(?=(~ args.b) ?=(%user-op kind.op.b))  |
+  =/  d  (~(get by ops) nm)
+  ?~  d  |
+  ?.  ?&(?=(~ params.u.d) ?=(^ body.u.d))  |
+  $(b u.body.u.d, fuel (dec fuel))
 ::
 ++  reaches-run-op
   ::  R4.2c: does a body reach an operator whose override has minLevel > 0?

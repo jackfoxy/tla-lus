@@ -566,9 +566,14 @@
   |=  [as=(list sem:sm) op=@t s=sem:sm c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ::  a formal parameter bound call-by-name to an argument NODE is translated
-  ::  in place (tlc2's Context lookup finds the substituted value first)
+  ::  in place (tlc2's Context lookup finds the substituted value first).
+  ::  R4.3: not a binding of `op` to a bare reference to `op` itself -- an
+  ::  unnamed `INSTANCE M` substitutes M's variables by NAME (`done <-
+  ::  done`), and chasing that re-translates the same node forever, which
+  ::  exhausted the loom in one slice (TestMCReachability, TestGraphs with
+  ::  their PROPERTIES; node-eval's own lookups have the same guard)
   =/  sb  (~(get by psub.env) op)
-  ?^  sb  (ast u.sb c env)
+  ?:  ?&(?=(^ sb) !(self-ref:ne u.sb op))  (ast u.sb c env)
   |^  go
   ++  go
     ^-  (each live-expr aerr)
@@ -936,79 +941,44 @@
     ?:  ?=(%disj -.i.nes)  $(nes t.nes, t (mul t (lent ds.i.nes)))
     $(nes t.nes)
   ?:  =(1 total)  [%conj nes]
-  ::  build `total` conjunct-lists by the odometer distribution
-  =/  res=(list (list live-expr))  (reap total *(list live-expr))
-  =/  num=@ud   1
-  =/  rcount=@ud  total
-  =.  res
+  ::  the odometer's rows, the first disjunctive factor most significant (as
+  ::  tlc2 fills rows [k*rc, (k+1)*rc) with disjunct k). Each row is built
+  ::  reversed, one cons per factor, so the product costs rows x factors; the
+  ::  block-by-block fill cost rows^2 (R4.3: ElevatorLivenessLarge's 10 SF
+  ::  conjuncts x 8 negated properties, 8,192 rows, ran past 150 s)
+  =/  rows=(list (list live-expr))  ~[~]
+  =.  rows
     |-  ^-  (list (list live-expr))
-    ?~  nes  res
+    ?~  nes  rows
     ?.  ?=(%disj -.i.nes)
-      ::  a plain factor: append to every conjunct-list
-      %=  $
-        nes  t.nes
-        res  (add-to-all res i.nes)
-      ==
-    =/  w  (lent ds.i.nes)
-    =/  rc  (div rcount w)
-    =.  res  (spread-disj res ds.i.nes num rc)
-    %=  $
-      nes     t.nes
-      num     (mul num w)
-      rcount  rc
-    ==
-  [%disj (wrap-conjs res)]
+      $(nes t.nes, rows (cons-all rows i.nes))
+    $(nes t.nes, rows (cross-rows rows ds.i.nes))
+  [%disj (wrap-conjs rows)]
 ::
-++  add-to-all
-  ::  append `e` to each conjunct-list (order preserved via flop)
-  |=  [res=(list (list live-expr)) e=live-expr]
+++  cons-all
+  ::  prepend `e` to each reversed conjunct-list
+  |=  [rows=(list (list live-expr)) e=live-expr]
   ^-  (list (list live-expr))
-  ?~  res  ~
-  [(snoc-le i.res e) $(res t.res)]
+  ?~  rows  ~
+  [[e i.rows] $(rows t.rows)]
 ::
-++  snoc-le
-  |=  [l=(list live-expr) e=live-expr]
-  ^-  (list live-expr)
-  ?~  l  ~[e]
-  [i.l $(l t.l)]
-::
-++  spread-disj
-  ::  distribute a disjunct factor across the odometer: for each of `num`
-  ::  blocks, each of the `w` disjuncts fills `rc` consecutive conjunct-lists
-  |=  [res=(list (list live-expr)) ds=(list live-expr) num=@ud rc=@ud]
+++  cross-rows
+  ::  each reversed row extended by every disjunct in turn, rows in order
+  |=  [rows=(list (list live-expr)) ds=(list live-expr)]
   ^-  (list (list live-expr))
-  =/  idx  0
-  =/  j    0
+  ?~  rows  ~
+  =/  rest=(list (list live-expr))  $(rows t.rows)
+  =/  ks=(list live-expr)  ds
   |-  ^-  (list (list live-expr))
-  ?:  =(j num)  res
-  $(j +(j), idx (add idx (mul (lent ds) rc)), res (fill-block res ds idx rc))
-::
-++  fill-block
-  ::  for one block starting at `idx`: disjunct k fills rows [idx+k*rc, +rc)
-  |=  [res=(list (list live-expr)) ds=(list live-expr) idx=@ud rc=@ud]
-  ^-  (list (list live-expr))
-  =/  k  0
-  |-  ^-  (list (list live-expr))
-  ?~  ds  res
-  =/  res2  (fill-rows res i.ds (add idx (mul k rc)) rc)
-  $(ds t.ds, k +(k), res res2)
-::
-++  fill-rows
-  ::  append `e` to rows [start, start+n)
-  |=  [res=(list (list live-expr)) e=live-expr start=@ud n=@ud]
-  ^-  (list (list live-expr))
-  =/  i  0
-  |-  ^-  (list (list live-expr))
-  ?~  res  ~
-  ?:  &((gte i start) (lth i (add start n)))
-    [(snoc-le i.res e) $(res t.res, i +(i))]
-  [i.res $(res t.res, i +(i))]
+  ?~  ks  rest
+  [[i.ks i.rows] $(ks t.ks)]
 ::
 ++  wrap-conjs
+  ::  each reversed conjunct-list, in order, as one spliced conjunction
   |=  l=(list (list live-expr))
   ^-  (list live-expr)
   ?~  l  ~
-  [[%conj (splice-conj i.l)] $(l t.l)]
+  [[%conj (splice-conj (flop-le i.l))] $(l t.l)]
 ::
 ++  splice-conj
   ::  R4.2n: `LNConj.addConj` SPLICES a conjunction kid into its parent, so a
@@ -1172,6 +1142,12 @@
   ?:  (le-equal i.l x)  &
   $(l t.l)
 ::
+++  snoc-le
+  |=  [l=(list live-expr) e=live-expr]
+  ^-  (list live-expr)
+  ?~  l  ~[e]
+  [i.l $(l t.l)]
+::
 ++  add-to-bin
   ::  append `x` to `bin` if not already present (by le-equal); return the
   ::  index of `x` in the bin
@@ -1256,7 +1232,9 @@
   (le-equal u.a u.b)
 ::
 ++  add-to-group
-  ::  add pem `p` under tf, lumping with an existing equal-tf group (in order)
+  ::  add pem `p` under tf, lumping with an existing equal-tf group (in
+  ::  order). A group's pems are held REVERSED (one cons per pem, not a snoc
+  ::  over the group, R4.3); +turn-groups restores their order
   |=  $:  gs=(list [tf=(unit live-expr) ps=(list pem-acc)])
           tf=(unit live-expr)
           p=pem-acc
@@ -1264,20 +1242,22 @@
   ^-  (list [tf=(unit live-expr) ps=(list pem-acc)])
   ?~  gs  ~[[tf ~[p]]]
   ?:  (tf-equal tf.i.gs tf)
-    [i.gs(ps (snoc-pem ps.i.gs p)) t.gs]
+    [i.gs(ps [p ps.i.gs]) t.gs]
   [i.gs $(gs t.gs)]
 ::
-++  snoc-pem
-  |=  [l=(list pem-acc) p=pem-acc]
+++  flop-pem
+  |=  l=(list pem-acc)
   ^-  (list pem-acc)
-  ?~  l  ~[p]
-  [i.l $(l t.l)]
+  =|  acc=(list pem-acc)
+  |-  ^-  (list pem-acc)
+  ?~  l  acc
+  $(l t.l, acc [i.l acc])
 ::
 ++  turn-groups
   |=  gs=(list [tf=(unit live-expr) ps=(list pem-acc)])
   ^-  (list oos)
   ?~  gs  ~
-  [(build-oos i.gs) $(gs t.gs)]
+  [(build-oos i.gs(ps (flop-pem ps.i.gs))) $(gs t.gs)]
 ::
 ++  build-oos
   |=  g=[tf=(unit live-expr) ps=(list pem-acc)]

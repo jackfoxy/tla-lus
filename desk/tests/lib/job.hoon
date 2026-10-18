@@ -934,6 +934,51 @@
         ~[['R' r] ['A' a]]
       'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-live-instance-self-subst
+  ::  an unnamed INSTANCE substitutes `d <- d`; a bare `d` in the instanced
+  ::  module's temporal PROPERTY must translate as the variable, not chase
+  ::  that binding forever (TestMCReachability's `Termination`: one slice
+  ::  exhausted the loom). Pin: 3/3/3
+  =/  i
+    %-  of-wain:format
+    :~  '---- MODULE I ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, d'
+        'Init == x = 0 /\\ d = FALSE'
+        'Next == x < 2 /\\ x\' = x + 1 /\\ d\' = (x + 1 = 2)'
+        'Spec == Init /\\ [][Next]_<<x, d>> /\\ WF_<<x, d>>(Next)'
+        'Done == <>(d \\/ x = 5)'
+        '===='
+    ==
+  =/  r  '---- MODULE R ----\0aEXTENDS Naturals\0aVARIABLES x, d\0aINSTANCE I\0a====\0a'
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['I' i]]
+      'SPECIFICATION Spec\0aPROPERTY Done\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-reads-instancer-scope
+  ::  `b <- a` names the INSTANTIATING module's `a`, although the instance
+  ::  also substitutes its own `a <- x`: a call-by-name substitution is read
+  ::  in the scope it was written in (TestGraphs' `Refinement`: `T <- ... \cup
+  ::  {.. : succ \in successors}` captured the sibling `successors`, a wrong
+  ::  implied-action failure). Pin: 3/3/3
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLES a, b\0aStep == b\' = b /\\ a\' = a + 1\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, a'
+        'I == INSTANCE M WITH a <- x, b <- a'
+        'Init == x = 0 /\\ a = 10'
+        'Next == x < 2 /\\ x\' = x + 1 /\\ a\' = a'
+        'Prop == [][I!Step]_<<x, a>>'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-oparg-sibling-through-instance
   ::  an operator ARGUMENT naming a sibling inside a named instance resolves
   ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`
