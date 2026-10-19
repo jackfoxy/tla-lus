@@ -979,6 +979,72 @@
         ~[['R' r] ['M' m]]
       'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-subst-state-expr-lazy
+  ::  a state-reading `WITH` expression carries level 0 in the graph; it is
+  ::  bound by name all the same, so `x'` through the instance reads the
+  ::  successor (it read the current-state value: a wrong implied-action
+  ::  failure). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLE x\0aInc == x\' = x + 2\0aNext == Inc\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'I == INSTANCE M WITH x <- x * 2'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Inc]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-state-op-lazy
+  ::  as above through an operator, `y <- Dbl(x)` ("primed variable is
+  ::  unassigned in the successor state: y"). Pin: 4/4/4
+  =/  n  '---- MODULE N ----\0aEXTENDS Naturals\0aVARIABLE y\0aInc == y\' = y + 2\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Dbl(v) == v * 2'
+        'I == INSTANCE N WITH y <- Dbl(x)'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Inc]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['N' n]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-sibling-member
+  ::  `I!Next` calls its sibling `Inc`, whose `WITH` wrapper binds `x <-
+  ::  Dbl(x)` again from inside the instance: the binding in force is kept,
+  ::  so `Dbl` is applied once (EWD998ChanID's `active <- Node2Nat(active)`
+  ::  was applied twice). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLE x\0aInc == x\' = x + 2\0aNext == Inc\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Dbl(v) == v * 2'
+        'I == INSTANCE M WITH x <- Dbl(x)'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Next]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-oparg-sibling-through-instance
   ::  an operator ARGUMENT naming a sibling inside a named instance resolves
   ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`
@@ -1254,6 +1320,41 @@
   %+  expect-eq
     !>(`%depth)
   !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
+::
+::  R4.3: the state bound is checked before each INITIAL state is
+::  registered (it was checked only after all of them: LeastCircularSubstring-
+::  Medium's 6,400 ran out of time first), so it stops at bound + 1
+++  test-limited-states-in-inits
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..50\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  10
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%states 11])
+  !>  ?.  ?&(?=(^ result.j) ?=(%limited -.u.result.j))  ~
+      `[kind distinct.stats]:u.result.j
+::
+::  R4.3: under a bound an init `x \in {y \in S : P}` takes bound + 1
+::  elements, not the whole filter (CoffeeCan3000Beans' ~4.5 million)
+++  test-init-filter-bounded
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {y \\in 0..50 : y % 2 = 0}\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  5
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%states 6 6])
+  !>  ?.  ?&(?=(^ result.j) ?=(%limited -.u.result.j))  ~
+      `[kind generated.stats distinct.stats]:u.result.j
+::
+::  R4.3: a bounded init that a later conjunct thins below the bound is
+::  solved again unbounded, so a truncated init set is never explored:
+::  the 5 states x > 40 complete (the bounded pass alone found none)
+++  test-init-filter-bound-resolved
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {y \\in 0..50 : y % 2 = 0} /\\ x > 40\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  5
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%ok 5])
+  !>  ?.  ?&(?=(^ result.j) ?=(%ok -.u.result.j))  ~
+      `[%ok distinct.stats.u.result.j]
 ::
 ++  test-limited-time
   ::  max-time is checked on entry to every slice

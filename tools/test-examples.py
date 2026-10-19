@@ -86,6 +86,10 @@ def main() -> int:
           len(skipped) == len(ids) and not ({m["id"] for m in kept} & ids))
     kept, skipped = e.select_work(work, "", True)
     check("--include-timed-out keeps them", not skipped and len(kept) == len(work))
+    kept, _ = e.select_work(work, "", True, "large")
+    check("--size large keeps only CI's large models",
+          kept and all(m["size"] == "large" for m in kept)
+          and len(kept) == sum(m["size"] == "large" for m in work))
 
     #  marked extension for the default census
     check("census file has a marked extension (.txt)",

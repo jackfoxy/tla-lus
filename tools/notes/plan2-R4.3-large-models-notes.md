@@ -65,3 +65,86 @@ pin 3/3/3) and `test-subst-reads-instancer-scope` (`I == INSTANCE M WITH a
 <- x, b <- a`, `[][I!Step]_<<x, a>>`; pin 3/3/3; bites: with `+outer-of`'s
 closure disabled the port reports `Prop` violated). job 150 green.
 The DNF rewrite keeps tlc2's order; the liveness/tableau shards check it.
+
+## Part 2: the smoke census (2026-10-18)
+
+Decision (the user, 2026-10-18): **smoke-budget = 1,000 distinct states**
+(option A): a large model passes clause 3 when it reaches 1,000 distinct, or
+completes, with no error, refusal or `%limited` other than states. The runner
+gained `--size small|large` (test-examples checks it). Census:
+`tools/examples.py --run --size large --include-timed-out --budget 1000
+--wall 900` → `tla-zod-tools/logs/census-r43-smoke.txt` (31 rows).
+
+26/31 passed as run. Then:
+
+| model | cause | fix | now |
+|---|---|---|---|
+| LeastCircularSubstringMedium, ElevatorSafetyLarge | `+bfs-step` checked the state bound only after EVERY initial state was registered (6,400 and 198,656 of them) | the bound is checked before each registration | `limited states` in 201 s / 99 s |
+| MCEWD687a (838 at the wall) | `TreeWithRoot`'s `G!IsTreeWithRoot` (a LET INSTANCE of Graphs) evaluates `SimplePath(G)`, hence `SeqOf`, once per node with the same `G`: 3.4 s per call | `+eval-app`: an application of a module-level constant/state-level operator goes through `+eval-sdef`'s `~+` memo; `+sdef-env` drops from the key the names BOUND in the reach (`+bound-reach`: binders, LET definitions and their formals, reached operators' formals; the applied operator's own formals kept) and cuts the states to the reached variables when no call-by-name binding is kept | 0.84 s per call; 1,003 distinct in 417 s |
+| CoffeeCan3000Beans (0 at the wall) | every one of its ~4.5 M states is initial; the init solve materialized `{c \in Can : ...}` in one slice | `ilim` (eenv): under a bound, an init `x \in {y \in S : P}` takes bound + 1 elements, streaming S (`+filter-lim`); `trunc` (rst) records a cut, and the kernel re-solves unbounded if the bounded set yields fewer distinct states than the bound | `limited states` 1,001 in 10.4 s |
+
+**30/31.** Left: MCInnerSerial. tlc2 itself COMPLETES at 195 distinct
+(6,181 generated) in 12 min 34 s, so a 1,000-state budget is unreachable and
+the smoke needs completion. One state expansion costs 16.3 s here against
+about 3.9 s at the pin (`UpdateOpOrder`: `opOrder' \in SUBSET(opId' \X
+opId')` /\ `Serializable'`), about 53 min to complete. The `+bound-reach`
+key change did not move it (the cost is the SUBSET enumeration itself).
+
+Also measured: the %config floor for a spec that loads the community
+closure (IOUtils/SequencesExt/Graphs...) is semantic generation, ~22 s
+(TestGraphs, TestMCReachability, the zprobe modules).
+
+A note on the measurement helpers: interrupts inside `mule` (every job
+slice, and dojo generators) print no frames; `~>  %bout.[0 %label]` timers in
+ship-only copies and the stepping generator (`gen/zstep`, now with a budget
+argument: one slice = one state expansion at budget 1) were what localized
+these.
+
+Tests: job `test-limited-states-in-inits` (bound 10 over 51 initial states:
+`limited states` at 11), `test-init-filter-bounded` (bound 5: 6 generated, 6
+distinct, not the filter's 26), `test-init-filter-bound-resolved` (`x \in
+{even} /\ x > 40` under bound 5: the bounded pass finds none, the re-solve
+finds 5, success).
+
+## Part 3: the loom rows carried from R4.2 (R4.2aj, R4.2al)
+
+**R4.2al EWD998ChanID: SUCCESS 15 / 14 / 14 = pin (133 s).** The loom
+blow-up was gone after part 1; behind it the run failed `Attempted to apply
+function with integer domain to the non-integer argument n1` where the pin
+succeeds. Localized by bisecting the config (only `EWD998ChanSpec`, and in it
+the implied action `[][EWD998Chan!Next]_vars`) and a ship-only print at the
+failing application. Three nested-INSTANCE scope bugs, each with a repro
+against the pin:
+
+1. `+bare-self`: EWD998Chan's nested `INSTANCE EWD998` substitutes `active <-
+   active`, which names EWD998Chan's `active` (itself `Node2Nat(active)`). The
+   self-reference guard read the root variable; a self-reference with a
+   recorded closure is now read in that closure's scope.
+2. `+in-force`: the port wraps every instance member in its own `WITH` and in
+   each enclosing instance's, so a sibling call (`EWD998Chan!Next` calling
+   `System`) re-bound the substitutions from INSIDE the instance; its closure
+   was the instance's own scope and `Node2Nat` was applied twice. tlc2 binds
+   them once. A binding already in force at any level of the scope chain
+   (current, then one and two closures out) is kept. Checking only the
+   innermost level broke TestGraphs (TestGraphs' outer `S <- S` re-applied
+   inside TLCMC's `MCR` over `S <- SeqToSet(S)`: `Len` of a set), caught by
+   the runner re-check.
+3. `+reads-state` (PRE-EXISTING: the R4.2af build fails the same way): a
+   `WITH` expression carries level 0 in the graph, so `x <- x * 2` and `y <-
+   Dbl(x)` were judged constant and evaluated once, at the current state; an
+   implied action through the instance then read the wrong value (`x`) or
+   none (`y'`). Bound by name when it reaches a declared variable or a
+   call-by-name binding (a superset, so a misjudgment only binds lazily).
+
+lib/temporal's `+substin-of` now binds through `+bind-substs:ne` (same lazy
+rule, plus operator-valued substitutions and closures), and the liveness
+leaves (`le-act`/`le-state`/`le-enabled`) carry `pout`, as does `actx`
+(`lo`). Tests: job `test-subst-state-expr-lazy`, `test-subst-state-op-lazy`,
+`test-subst-sibling-member` (all pin 4/4/4; the last bites with `+in-force`
+disabled, as does EWD998ChanID at 2 nodes).
+
+**R4.2aj btree:** no loom exhaustion now (guarded dojo stepper, full config:
+878 distinct after 8 slices of 3-22 s, RSS flat ~150 MB). Throughput-bound
+(374,727 distinct; tlc2 15 s): it stays on `timed-out.json`, note updated.
+
+`timed-out.json`: TestGraphs and EWD998ChanID removed (10 → 8 entries).

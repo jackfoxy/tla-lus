@@ -1088,14 +1088,17 @@
   =/  spent  0
   |-  ^-  bfs-slice
   ?:  (gte spent budget)  [%more cur]
+  ::  the state bound before anything else: R4.3 -- checked only after the
+  ::  initial states, a model with more of them than the bound (MCLeast-
+  ::  CircularSubstringMedium) ran out of time registering them instead
+  ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
+    [%done [%limited %states gen.cur distinct.cur len.queue.cur depth.cur] cur]
   ::  register pending initial states first (depth 1, no predecessor)
   =/  todo  init-todo.cur
   ?^  todo
     =/  rr  (register o cur(init-todo t.todo) i.todo 1 '' ~)
     ?^  out.rr  [%done u.out.rr cur.rr]
     $(cur cur.rr, spent +(spent))
-  ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
-    [%done [%limited %states gen.cur distinct.cur len.queue.cur depth.cur] cur]
   =/  q  (fi-pop queue.cur)
   ?~  q
     [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
@@ -3278,7 +3281,7 @@
   ::  the BODY's span, not the declaration's: tlc2 locates the expression
   ::  (`col 8` past `ASSUME `), measured
   =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
-  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0])
+  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0 |])
   ?:  ?=(%| -.r)
     `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
   ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
@@ -3668,7 +3671,7 @@
   =|  out=(list @t)
   |-  ^-  (list @t)
   ?~  props  (flop out)
-  =/  lr  (ast:tp body.i.props [modn 0 ~ ~] env)
+  =/  lr  (ast:tp body.i.props [modn 0 ~ ~ ~] env)
   ?:  ?=(%| -.lr)  $(props t.props)
   ?:  (eval-on-lasso:lv p.lr sts cyc 0 env)  $(props t.props)
   ?:  (lien out |=(n=@t =(n name.i.props)))  $(props t.props)

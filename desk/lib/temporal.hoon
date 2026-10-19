@@ -26,7 +26,16 @@
 ::  operator's formals) -- tlc2's `Context con1` -- which every leaf built
 ::  under them carries, so the leaf evaluates later and two expansions of one
 ::  node stay distinct leaves
-+$  actx  [modn=@t dep=@ud lv=(map @t value:vl) ls=(map @t sem:sm)]
+::  R4.3: `lo`, the scopes the call-by-name entries of `ls` were written in
+::  (node-eval's `pout`), so a leaf under nested INSTANCEs reads each
+::  substitution at its own level
++$  actx
+  $:  modn=@t
+      dep=@ud
+      lv=(map @t value:vl)
+      ls=(map @t sem:sm)
+      lo=(map @t clo:ne)
+  ==
 ::
 ++  expand-cap
   ::  the nested user-operator expansion bound. tlc2 has none — it expands
@@ -97,6 +106,8 @@
       ::  R4.2n: the translation-time bindings, as `le-state`'s
       ctx=(map @t value:vl)
       nsub=(map @t sem:sm)
+      ::  R4.3: the closures of `nsub`'s INSTANCE entries
+      pout=(map @t clo:ne)
   ==
 +$  le-state
   $+  le-state
@@ -118,6 +129,8 @@
       ::  SPAN, and `+render-struct` prints the span, so neither sees them.
       ctx=(map @t value:vl)
       nsub=(map @t sem:sm)
+      ::  R4.3: the closures of `nsub`'s INSTANCE entries
+      pout=(map @t clo:ne)
   ==
 +$  le-enabled
   $+  le-enabled
@@ -128,6 +141,8 @@
       ::  R4.2n: the translation-time bindings, as `le-state`'s
       ctx=(map @t value:vl)
       nsub=(map @t sem:sm)
+      ::  R4.3: the closures of `nsub`'s INSTANCE entries
+      pout=(map @t clo:ne)
   ==
 +$  le-bool
   $+  le-bool
@@ -396,21 +411,21 @@
     =/  e  (hd as)
     =/  a  (hd (tl as))
     :+  %&  %all
-    [%even [%disj ~[[%neg [%enabled | `e a lv.c ls.c]] [%act | `e a lv.c ls.c]]]]
+    [%even [%disj ~[[%neg [%enabled | `e a lv.c ls.c lo.c]] [%act | `e a lv.c ls.c lo.c]]]]
   ?:  =(op '$SF')
     ::  SF_e(A) == <>[]-ENABLED<A>_e \/ []<><A>_e
     =/  e  (hd as)
     =/  a  (hd (tl as))
     :+  %&  %disj
-    :~  [%even [%all [%neg [%enabled | `e a lv.c ls.c]]]]
-        [%all [%even [%act | `e a lv.c ls.c]]]
+    :~  [%even [%all [%neg [%enabled | `e a lv.c ls.c lo.c]]]]
+        [%all [%even [%act | `e a lv.c ls.c lo.c]]]
     ==
   ?:  =(op '$AngleAct')
     ::  <A>_e ; args = [A e]
-    [%& [%act | `(hd (tl as)) (hd as) lv.c ls.c]]
+    [%& [%act | `(hd (tl as)) (hd as) lv.c ls.c lo.c]]
   ?:  =(op '$SquareAct')
-    [%& [%act & `(hd (tl as)) (hd as) lv.c ls.c]]
-  ?:  =(op '\'')      [%& [%act | ~ s lv.c ls.c]]
+    [%& [%act & `(hd (tl as)) (hd as) lv.c ls.c lo.c]]
+  ?:  =(op '\'')      [%& [%act | ~ s lv.c ls.c lo.c]]
   ::  R4.2n: bounded quantifiers (`Liveness.astToLiveAppl` OPCODE_bf/be)
   ?:  =(op '$BoundedForall')  (quant-of & s c env)
   ?:  =(op '$BoundedExists')  (quant-of | s c env)
@@ -513,6 +528,8 @@
   ?~  ns  c
   =/  v  (~(get by vals.env) i.ns)
   =/  n  (~(get by psub.env) i.ns)
+  =/  o  (~(get by pout.env) i.ns)
+  =.  lo.c  ?~(o (~(del by lo.c) i.ns) (~(put by lo.c) i.ns u.o))
   =.  c
     ?^  v  c(lv (~(put by lv.c) i.ns u.v), ls (~(del by ls.c) i.ns))
     ?^  n  c(ls (~(put by ls.c) i.ns u.n), lv (~(del by lv.c) i.ns))
@@ -529,19 +546,13 @@
   =/  sp  (substin-parts:sm s)
   ?~  sp  (leaf s (sem-lvl s) c env)
   =/  ns=(list @t)  (turn names.u.sp |=(b=sbind:sm name.b))
-  =/  e2
-    =/  e  env
-    =/  ns  ns
-    =/  xs  exprs.u.sp
-    |-  ^-  eenv:ne
-    ?~  ns  e
-    ?~  xs  e
-    =/  r  (eval:ne i.xs env)
-    =/  e3=eenv:ne
-      ?:  ?=(%& -.r)
-        e(vals (~(put by vals.e) i.ns p.r), psub (~(del by psub.e) i.ns))
-      e(psub (~(put by psub.e) i.ns i.xs), vals (~(del by vals.e) i.ns))
-    $(ns t.ns, xs t.xs, e e3)
+  ::  R4.3: node-eval's own binding (the same lazy rule, plus operator-valued
+  ::  substitutions and each call-by-name entry's closure, `pout`): bound by
+  ::  name alone, EWD998ChanID's nested `active <- active` read the root's
+  ::  variable where EWD998Chan's `active <- Node2Nat(active)` was meant
+  =/  eb  (bind-substs:ne env names.u.sp exprs.u.sp)
+  ?:  ?=(%| -.eb)  [%| code.p.eb msg.p.eb]
+  =/  e2  p.eb
   (ast inner.u.sp (with-locals c e2 ns) e2)
 ::
 ++  user-op
@@ -704,8 +715,8 @@
   |=  [s=sem:sm l=@ud c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  =(0 l)     (eval-const s env)
-  ?:  (lte l 1)  [%& [%state s lv.c ls.c]]
-  [%& [%act | ~ s lv.c ls.c]]
+  ?:  (lte l 1)  [%& [%state s lv.c ls.c lo.c]]
+  [%& [%act | ~ s lv.c ls.c lo.c]]
 ::
 ++  leaf-ctx
   ::  `+leaf` for an EXPANDED user-operator call (R2.7.6.3): identical, except
@@ -728,8 +739,8 @@
   |=  [s=sem:sm l=@ud c=actx env=eenv:ne]
   ^-  (each live-expr aerr)
   ?:  =(0 l)     (eval-const s env)
-  ?:  (lte l 1)  [%& [%state s vals.env psub.env]]
-  [%& [%act | ~ s lv.c ls.c]]
+  ?:  (lte l 1)  [%& [%state s vals.env psub.env pout.env]]
+  [%& [%act | ~ s lv.c ls.c lo.c]]
 ::
 ++  eval-const
   ::  a constant-level leaf folded to LNBool via node-eval; an evaluation error
@@ -1205,7 +1216,7 @@
   ::  typed rejection (a non-boolean constant leaf). `env` folds constant leaves
   |=  [props=(list sem:sm) modn=@t fair=(list sem:sm) env=eenv:ne]
   ^-  (each (list oos) aerr)
-  =/  c=actx  [modn 0 ~ ~]
+  =/  c=actx  [modn 0 ~ ~ ~]
   =/  lr  (parse-liveness (drop-box-state props) fair c env)
   ?:  ?=(%| -.lr)  lr
   ?~  p.lr  [%& ~]

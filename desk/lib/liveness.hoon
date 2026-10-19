@@ -25,16 +25,17 @@
   ::  quantifier's variables, an INSTANCE's substitutions, expanded formals)
   |=  [x=live-expr:tp env=eenv:ne]
   ^-  eenv:ne
-  =/  b=[ctx=(map @t value:vl) nsub=(map @t sem:sm)]
-    ?+  -.x  [~ ~]
-      %state    ?>(?=(%state -.x) [ctx.x nsub.x])
-      %act      ?>(?=(%act -.x) [ctx.x nsub.x])
-      %enabled  ?>(?=(%enabled -.x) [ctx.x nsub.x])
+  =/  b=[ctx=(map @t value:vl) nsub=(map @t sem:sm) pout=(map @t clo:ne)]
+    ?+  -.x  [~ ~ ~]
+      %state    ?>(?=(%state -.x) [ctx.x nsub.x pout.x])
+      %act      ?>(?=(%act -.x) [ctx.x nsub.x pout.x])
+      %enabled  ?>(?=(%enabled -.x) [ctx.x nsub.x pout.x])
     ==
   ?:  &(=(~ ctx.b) =(~ nsub.b))  env
   %=  env
     vals  (~(uni by vals.env) ctx.b)
     psub  (~(uni by psub.env) nsub.b)
+    pout  (~(uni by pout.env) pout.b)
   ==
 ::
 ++  st-pred-bool

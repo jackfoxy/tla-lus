@@ -101,6 +101,11 @@
       ::  body's env the expression captured the sibling substitution
       ::  (TestGraphs' `Refinement`: a wrong implied-action failure)
       pout=(map @t clo)
+      ::  R4.3: a bound on the elements an INIT `x \in {y \in S : P}`
+      ::  assignment takes (0 = none), so a capped run never solves more
+      ::  initial states than its state bound can register. The kernel sets
+      ::  it and re-solves unbounded if the bound cut a smaller set (`trunc`)
+      ilim=@ud
   ==
 ::  a call-by-name entry's defining scope (+outer-of), with the expression it
 ::  was recorded for: a later rebinding of the name leaves it stale. TWO
@@ -167,13 +172,16 @@
       ::  (`A \cdot B`'s `s -A-> t`), which tlc2 counts as generated
       ::  (`nss.incrementStatesGenerated`); `+bfs-step` adds and clears it
       xgen=@ud
+      ::  R4.3: an `ilim`-bounded init assignment stopped before its domain
+      ::  was exhausted
+      trunc=?
   ==
 ::  a solver result carrying the run state, and its evaluator sibling. UNFACED,
 ::  like `[pres pst]` on the `-generate` path: a face on the head leaks into
 ::  whatever `=^` binds, so `p.r` on the bound result stops resolving
 +$  sout  [sres rst]
 +$  eout  [eres rst]
-++  empty-rst  ^-(rst [~ ~ 0 0 ~ ~ 0])
+++  empty-rst  ^-(rst [~ ~ 0 0 ~ ~ 0 |])
 ::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
 ::  and coarse category, message, source location, operator/evaluation stack,
 ::  and whether a checker may recover. Per-site emission (replacing the bare
@@ -267,7 +275,7 @@
     ::  in place; otherwise it is a value parameter resolved from `vals`
     =/  sb  (~(get by psub.e) nm)
     ?~  sb  [(lookup-val nm e) rs]
-    ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
+    ?:  (bare-self u.sb nm e)  [(lookup-var nm e) rs]
     (eval-rs u.sb (outer-of nm e) rs)
   ::
     ::  a substituted name resolves to the node it was bound to, in the
@@ -276,7 +284,7 @@
       %variable
     =/  sb  (~(get by psub.e) nm)
     ?~  sb  [(lookup-var nm e) rs]
-    ?:  (self-ref u.sb nm)  [(lookup-var nm e) rs]
+    ?:  (bare-self u.sb nm e)  [(lookup-var nm e) rs]
     (eval-rs u.sb (outer-of nm e) rs)
   ::
     ::  R4.2ah: a NAMED theorem or assumption is its body (`+thm-defs:sm`)
@@ -320,7 +328,7 @@
   ?:  (~(has by vals.e) name.op.n)  ~
   =/  sb  (~(get by psub.e) name.op.n)
   ?~  sb  ~
-  ?:  (self-ref u.sb name.op.n)  ~
+  ?:  (bare-self u.sb name.op.n e)  ~
   sb
 ::
 ++  bnm
@@ -351,6 +359,21 @@
   ?.  ?=(?(%variable %formal-param) kind.op.s)  |
   =(nm name.op.s)
 ::
+++  bare-self
+  ::  R4.3: a self-referential binding (`+self-ref`) with no recorded scope.
+  ::  One an INSTANCE substitution recorded (`pout`) names the INSTANTIATING
+  ::  module's `nm`, which may itself be substituted: EWD998Chan's nested
+  ::  `INSTANCE EWD998` substitutes `active <- active`, EWD998Chan's own
+  ::  `active <- Node2Nat(active)` -- read as the state variable, an
+  ::  integer-domain function met a node (EWD998ChanID). `+outer-of` reads
+  ::  such a binding in that scope, one level out, so it terminates
+  |=  [s=sem:sm nm=@t e=eenv]
+  ^-  ?
+  ?.  (self-ref s nm)  |
+  =/  o  (~(get by pout.e) nm)
+  ?~  o  &
+  !=(s sub.u.o)
+::
 ++  lookup-val
   |=  [nm=@t e=eenv]
   ^-  eres
@@ -372,7 +395,7 @@
     (eval-user n e rs)
   ::  R4.2m: a CONSTANT an INSTANCE substitution bound by name (`+bind-substs`)
   =/  sb  ?.(?=(~ args.n) ~ ?:((~(has by vals.e) nm) ~ (~(get by psub.e) nm)))
-  ?:  &(?=(^ sb) !(self-ref u.sb nm))  (eval-rs u.sb (outer-of nm e) rs)
+  ?:  &(?=(^ sb) !(bare-self u.sb nm e))  (eval-rs u.sb (outer-of nm e) rs)
   ?~  args.n  [(lookup-val nm e) rs]
   =/  fv  (~(get by vals.e) nm)
   ?~  fv  [[%| 0 (rap 3 ~['undefined identifier: ' nm])] rs]
@@ -1740,7 +1763,7 @@
   ::  uncached (`+lazy-set`) -- keyed without the states, which it cannot
   ::  read, so it is evaluated once rather than once per state
   ?:  ?&(?=(~ args.n) (lte lvl.def 1) !=('' origin.def))
-    =/  se  (sdef-env u.body.def e(fuel (dec fuel.e)))
+    =/  se  (sdef-env u.body.def e(fuel (dec fuel.e)) ~)
     (eval-sdef u.body.def ?:(=(0 lvl.def) se(s0 ~, s1 ~) se) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
@@ -1749,10 +1772,31 @@
   ::  parameters must win over a substitution of the same name
   ::  (`+keep-params`)
   =/  sp  (substin-parts:sm u.body.def)
-  ?~  sp  (eval-rs u.body.def ew rs)
+  ?~  sp  (eval-app def u.body.def ew rs)
   =/  e3  (bind-substs ew names.u.sp exprs.u.sp)
   ?:  ?=(%| -.e3)  [e3 rs]
-  (eval-rs inner.u.sp (keep-params p.e3 ew params.def) rs)
+  (eval-app def inner.u.sp (keep-params p.e3 ew params.def) rs)
+::
+++  eval-app
+  ::  R4.3: an application of a module-level constant- or state-level
+  ::  operator is memoized as R4.P11 memoizes its arity-0 definitions: the
+  ::  key is the body and the environment cut to what it can read, its
+  ::  bound parameters included (MCEWD687a's `IsTreeWithRoot` applies
+  ::  `SimplePath(G)`, hence `SeqOf`, once per node with the same `G`).
+  ::  A constant-level one is keyed without the states unless a parameter
+  ::  is bound by name, which reads the state through `psub`, or is an
+  ::  operator, whose argument may read it (CigaretteSmokers' `ChooseOne(S,
+  ::  LAMBDA x : smokers[x].smoking)`)
+  |=  [def=sem-def:sm b=sem:sm ew=eenv rs=rst]
+  ^-  eout
+  ?.  ?&((lte lvl.def 1) !=('' origin.def))  (eval-rs b ew rs)
+  =/  se  (sdef-env b ew (turn params.def |=(p=spar:sm name.p)))
+  ?.  ?&  =(0 lvl.def)
+          %+  levy  params.def
+          |=(p=spar:sm &(=(0 arity.p) !(~(has by psub.ew) name.p)))
+      ==
+    (eval-sdef b se rs)
+  (eval-sdef b se(s0 ~, s1 ~) rs)
 ::
 ++  keep-params
   ::  R4.2c (TestGraphs): re-assert an operator's own parameters over the
@@ -1791,9 +1835,15 @@
   ::  reaches (`+reach-names`; constants, and any INSTANCE substitution
   ::  read through a reached member), never the call site's other locals;
   ::  the successor state only where it can be read (primed or ENABLED)
-  |=  [b=sem:sm e=eenv]
+  ::  R4.3: minus the names BOUND in that reach (`+bound-reach`), which are
+  ::  rebound wherever they are read, so a caller's local of the same name
+  ::  cannot matter -- except `keep`, the applied operator's own formals.
+  ::  Kept, `SeqOf(set, n)`'s `n` put AreConnectedIn's `n` in every key
+  |=  [b=sem:sm e=eenv keep=(list @t)]
   ^-  eenv
-  =/  ns  (reach-names b ops.e)
+  =/  ns
+    %-  ~(dif in (reach-names b ops.e))
+    (~(dif in (bound-reach b ops.e)) (silt keep))
   =.  vals.e
     %-  malt
     ^-  (list [@t value:v])
@@ -1806,8 +1856,64 @@
     %-  malt
     ^-  (list [@t clo])
     (skim ~(tap by pout.e) |=([k=@t *] (~(has in ns) k)))
+  ::  R4.3: and the states cut to the variables the reach names, unless a
+  ::  call-by-name binding is kept (its expression may read others).
+  ::  MCInnerSerial's `totalOpOrder` reads only `opQ`, but keyed on the whole
+  ::  successor it missed for each of up to 65,536 `opOrder'` candidates
+  =?  e  ?=(~ psub.e)
+    =/  rv=(set @)  (reach-names b ops.e)
+    =/  cut
+      |=  st=state
+      ^-  state
+      %-  malt
+      ^-  (list [@t value:v])
+      (skim ~(tap by st) |=([k=@t *] (~(has in rv) k)))
+    e(s0 (cut s0.e), s1 (cut s1.e))
   ?:  |(primed.e enabled.e)  e
   e(s1 ~)
+::
+++  bound-reach
+  ::  R4.3: the names BOUND somewhere in `b`'s reach -- quantifier and
+  ::  constructor binders, LET definitions and their parameters, and the
+  ::  formals of every operator it reaches by name. `~+`, as +reach-names
+  |=  [b=sem:sm ops=(map @t sem-def:sm)]
+  ^-  (set @t)
+  ~+
+  =|  out=(set @t)
+  =|  seen=(set @t)
+  =/  stk=(list sem:sm)  ~[b]
+  |-  ^-  (set @t)
+  ?~  stk  out
+  =/  x  i.stk
+  ?-    -.x
+      ?(%lit %atref %nullodn)  $(stk t.stk)
+  ::
+      %letin
+    =/  ls=(list sem-def:sm)  lets.x
+    =/  ks=(list sem:sm)  ?~(body.x t.stk [u.body.x t.stk])
+    |-  ^-  (set @t)
+    ?~  ls  ^$(stk ks)
+    =.  out  (~(put in out) name.i.ls)
+    =.  out  (~(gas in out) (turn params.i.ls |=(p=spar:sm name.p)))
+    $(ls t.ls, ks ?~(body.i.ls ks [u.body.i.ls ks]))
+  ::
+      %apply
+    =.  out  (~(gas in out) (turn ubound.x |=(v=sbind:sm name.v)))
+    =/  gs=(list sem-bound:sm)  bound.x
+    =/  ks=(list sem:sm)  (weld args.x t.stk)
+    =^  ks  out
+      |-  ^-  [(list sem:sm) (set @t)]
+      ?~  gs  [ks out]
+      =.  out  (~(gas in out) (turn vars.i.gs |=(v=sbind:sm name.v)))
+      $(gs t.gs, ks ?~(range.i.gs ks [u.range.i.gs ks]))
+    =/  nm  name.op.x
+    ?:  (~(has in seen) nm)  $(stk ks)
+    =/  d  (~(get by ops) nm)
+    ?~  d  $(stk ks)
+    =.  seen  (~(put in seen) nm)
+    =.  out  (~(gas in out) (turn params.u.d |=(p=spar:sm name.p)))
+    $(stk ?~(body.u.d ks [u.body.u.d ks]))
+  ==
 ::
 ++  reach-names
   ::  every atom in `b` and in the body of every operator it reaches by
@@ -3068,6 +3174,36 @@
   ^-  ?
   (levy ~(tap in vars) |=(nm=@t (~(has by st) nm)))
 ::
+++  filter-lim
+  ::  R4.3: the first `lim` elements of a one-binder set filter in its
+  ::  domain's enumeration order, without materializing the rest, and
+  ::  whether elements were left (CoffeeCan3000Beans: about 4.5 million
+  ::  initial states, solved in one slice before any could be registered)
+  |=  [n=sem-apply:sm e=eenv lim=@ud]
+  ^-  (each [els=(list value:v) cut=?] eval-err:v)
+  =/  bs  (flatten-bound bound.n)
+  ?.  ?=([* ~] bs)  [%| 0 'a set filter expects one bounded variable.']
+  =/  sd  (eval-domain rng.i.bs e)
+  ?:  ?=(%| -.sd)  sd
+  =/  body  (snag 0 args.n)
+  =/  rc  (enum:v p.sd)
+  ?:  ?=(%| -.rc)  rc
+  =|  acc=(list value:v)
+  =/  k  0
+  =/  cur  p.rc
+  |-  ^-  (each [els=(list value:v) cut=?] eval-err:v)
+  =/  st  (enum-next:v cur)
+  =/  es  -.st
+  ?-    -.es
+      %done  [%& (flop acc) |]
+      %item
+    ?:  (gte k lim)  [%& (flop acc) &]
+    =/  b  (eval-bool body (bind-group e i.bs v.es))
+    ?:  ?=(%| -.b)  b
+    ?.  p.b  $(cur +.st)
+    $(acc [v.es acc], k +(k), cur +.st)
+  ==
+::
 ++  drain-sexp
   ::  the domain's elements in TLC enumeration order (branch order)
   |=  x=sexp:v
@@ -3093,6 +3229,19 @@
   ?.  ?=(~ args.n)  |
   ?.  ?=(%variable kind.op.n)  |
   (~(has in vars.e) name.op.n)
+::
+++  in-force
+  ::  R4.3: is the call-by-name substitution `nm <- x` already bound in `e`,
+  ::  innermost or in the scopes its recorded closures restore?
+  |=  [nm=@t x=sem:sm e=eenv]
+  ^-  ?
+  =/  o  (~(get by pout.e) nm)
+  ?~  o  |
+  ?:  =(`x (~(get by psub.e) nm))  &
+  ?:  =(`x (~(get by psub.u.o) nm))  &
+  =/  o2  (~(get by pout.u.o) nm)
+  ?~  o2  |
+  =(`x (~(get by psub.u.o2) nm))
 ::
 ++  clo-of
   ::  the closure of a call-by-name substitution `sub` written in env `e`
@@ -3125,6 +3274,18 @@
     =/  od  (resolve-oparg i.as e0)
     ?~  od  $(ns t.ns, as t.as)
     $(ns t.ns, as t.as, e e(ops (~(put by ops.e) name.i.ns u.od)))
+  ::  R4.3: the SAME substitution already in force -- the port wraps every
+  ::  member of an instance in its `WITH`, so `EWD998Chan!Next` calling its
+  ::  sibling `System` binds the instance's substitutions again, from inside
+  ::  the instance. Rebound there, its closure was the instance's own scope
+  ::  and `active <- Node2Nat(active)` applied `Node2Nat` twice
+  ::  (EWD998ChanID). tlc2 binds them once; the binding in force is kept
+  ::  At ANY level of the scope chain: the port also wraps each member in
+  ::  every ENCLOSING instance's `WITH`, so a sibling call inside TLCMC's
+  ::  `MCR` re-applied TestGraphs' outer `S <- S` from inside MCR's scope,
+  ::  over MCR's own `S <- SeqToSet(S)` (`Len` of a set, TestGraphs)
+  ?:  (in-force name.i.ns i.as e0)
+    $(ns t.ns, as t.as)
   ?:  (state-var-ref i.as e0)
     =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, e e(psub (~(put by psub.e) name.i.ns i.as)))
@@ -3142,7 +3303,11 @@
   ::  `[][C!Next]_chosen` failed on every step: MCVoting reported a liveness
   ::  (implied-action) failure where tlc2 succeeds. An inner CONSTANT bound
   ::  this way reads it through `psub` (`+apply-const`)
-  ?:  (gth (sem-level i.as) 0)
+  ::  R4.3: and an expression that READS the state whatever its recorded
+  ::  level -- a `WITH` expression carries level 0 in the graph (`x <- x * 2`,
+  ::  `y <- Dbl(x)`), so it was evaluated once, at the current state, and an
+  ::  implied action through the instance read the wrong value or none
+  ?:  |((gth (sem-level i.as) 0) (reads-state i.as e0))
     =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, psub.e (~(put by psub.e) name.i.ns i.as))
   =/  av  (eval i.as e0)
@@ -3154,6 +3319,17 @@
     =.  pout.e  (~(put by pout.e) name.i.ns (clo-of i.as e0))
     $(ns t.ns, as t.as, psub.e (~(put by psub.e) name.i.ns i.as))
   $(ns t.ns, as t.as, e e(vals (~(put by vals.e) name.i.ns p.av)))
+::
+++  reads-state
+  ::  R4.3: may `s` read the state? It names a declared variable or a
+  ::  call-by-name binding, directly or through what it reaches (a superset,
+  ::  so a misjudgment only binds lazily, which is always sound)
+  |=  [s=sem:sm e=eenv]
+  ^-  ?
+  =/  rn  (reach-names s ops.e)
+  ?|  (lien ~(tap in vars.e) |=(n=@t (~(has in rn) n)))
+      (lien ~(tap by psub.e) |=([n=@t *] (~(has in rn) n)))
+  ==
 ::
 ++  sem-level
   |=  s=sem:sm
@@ -3270,7 +3446,18 @@
   ?:  =(nm '\\in')
     =/  as  (assignable-sem (snag 0 args.n) mode vars.e part psub.e)
     ?~  as  (solve-filter n mode cur part e s)
-    =/  sd  (eval-domain (snag 1 args.n) (senv mode cur part e))
+    =/  dn  (snag 1 args.n)
+    ?:  ?&  =(%init mode)
+            !=(0 ilim.e)
+            ?=(%apply -.dn)
+            =('$SubsetOf' name.op.dn)
+            !(sem-draws dn e)
+        ==
+      =/  lf  (filter-lim dn (senv mode cur part e) ilim.e)
+      ?:  ?=(%| -.lf)  [lf s]
+      :-  [%& (turn els.p.lf |=(x=value:v (~(put by part) u.as x)))]
+      s(trunc |(trunc.s cut.p.lf))
+    =/  sd  (eval-domain dn (senv mode cur part e))
     ?:  ?=(%| -.sd)  [sd s]
     =/  els  (drain-sexp p.sd)
     ?:  ?=(%| -.els)  [els s]
@@ -3645,7 +3832,7 @@
   ::  the initial environment for a module's definitions under given states
   |=  [mo=sem-module:sm s0=state s1=state]
   ^-  eenv
-  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~ [~ ~] ~]
+  [~ (defmap-of mo) ~ default-fuel s0 s1 | | (vars-of mo) ~ 0 make-senv:so ~ ~ ~ [~ ~] ~ 0]
 ::
 ++  eval-pred
   ::  evaluate the boolean definition `nm` under current/successor states
@@ -3699,7 +3886,7 @@
   ::  context the checker builds once and reuses across the BFS)
   |=  [defs=(map @t sem-def:sm) consts=(map @t value:v) vars=(set @t)]
   ^-  eenv
-  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~] ~])
+  (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~] ~ 0])
 ::
 ++  with-cdefs
   ::  R4.P3 (H4): tlc2's `SpecProcessor.processConstantDefns` -- every

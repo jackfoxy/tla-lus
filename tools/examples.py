@@ -19,7 +19,7 @@ oracle there is the MANIFEST (clause 7). Clause 2's comparison against the
 pin's projection reads the same census.
 
   tools/examples.py --stage DIR       write the %tla-ex desk tree to DIR
-  tools/examples.py --run [--only S] [--census FILE] [--budget N]
+  tools/examples.py --run [--only S] [--size small|large] [--census FILE] [--budget N]
   tools/examples.py --resume --census FILE
 
 Long run: ask before starting it (R4 rule). The census file is append-only
@@ -382,10 +382,13 @@ class Watchdog(threading.Thread):
                       f"#{len(self.sigints)}", flush=True)
 
 
-def select_work(work: list, only: str, include_timed_out: bool):
-    """The models a run visits, and the timed-out ones it skips."""
+def select_work(work: list, only: str, include_timed_out: bool, size: str = ""):
+    """The models a run visits, and the timed-out ones it skips. `size`
+    ("small" or "large", R4.3) keeps one side of CI's split"""
     if only:
         work = [m for m in work if only in m["model"]]
+    if size:
+        work = [m for m in work if m["size"] == size]
     slow = set() if include_timed_out else timed_out_ids()
     return ([m for m in work if m["id"] not in slow],
             [m["model"] for m in work if m["id"] in slow])
@@ -393,7 +396,7 @@ def select_work(work: list, only: str, include_timed_out: bool):
 
 def run(a) -> int:
     work, skipped = select_work(json.loads(WORK.read_text())["models"],
-                                a.only, a.include_timed_out)
+                                a.only, a.include_timed_out, a.size)
     if skipped:
         print(f"skipping {len(skipped)} timed-out model(s) (timed-out.json; "
               "--include-timed-out runs them)", flush=True)
@@ -515,6 +518,7 @@ def main() -> int:
     #  signal recovery (MCChangRoberts, R4.0e2); interrupt with less to unwind
     ap.add_argument("--rss-cap", type=int, default=2500)
     ap.add_argument("--include-timed-out", action="store_true")
+    ap.add_argument("--size", choices=["small", "large"], default="")
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
     if a.stage:

@@ -1717,8 +1717,19 @@
     ::  R4.2k/R3.2: nothing to solve -- no behaviour spec, or a SPECIFICATION
     ::  with no initial predicate: zero initial states
     ?:  ?=(%nullodn -.isb)  [[%& ~] irs0]
-    %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    irs0
+    ::  R4.3: under a state bound, an init assignment takes at most one more
+    ::  element than the bound (`ilim`); solved again unbounded only if that
+    ::  cut a set which then yields fewer distinct states than it, so a
+    ::  truncated init set is never explored
+    =/  ie  (make-env:ne defs consts vars)
+    =/  lim=@ud  ?:(=(0 max-states.lims) 0 +(max-states.lims))
+    =/  r1=sout:ne  (init-states-rs:ne isb ie(ilim lim) irs0)
+    =/  ok
+      ?.  trunc.+.r1  &
+      ?.  ?=(%& -.-.r1)  &
+      (gte ~(wyt in (silt p.-.r1)) lim)
+    ?:  ok  r1
+    (init-states-rs:ne isb ie irs0)
   =/  isr  -.isc
   ?:  ?=(%| -.isr)
     ::  R4.2j: the pin's code on the wire -- EC 2102 (`current state is not a
