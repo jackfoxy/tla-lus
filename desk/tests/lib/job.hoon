@@ -1045,6 +1045,51 @@
         ~[['R' r] ['M' m]]
       'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-memo-key-keeps-free-names
+  ::  an operator application is memoized with its environment cut to the
+  ::  names FREE in its reach: `F` reads the constant `N` freely, and `N` is
+  ::  only BOUND in `L`'s `Lib(N)` -- a cut by every name bound anywhere in
+  ::  the reach dropped it ("undefined identifier: N", EWD998Chan). Pin: 3/3/3
+  =/  l  '---- MODULE L ----\0aEXTENDS Naturals\0aLib(N) == N + 1\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals, L'
+        'CONSTANT N'
+        'F(x) == x + N + Lib(0)'
+        'VARIABLE v'
+        'Init == v = F(1)'
+        'Next == v < 9 /\\ v\' = v + 1'
+        'Inv == v >= 7'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['L' l]]
+      'CONSTANT N = 5\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-memo-const-def-reads-state
+  ::  `F` is constant-level in its module, but `c <- x` makes it read the
+  ::  state, here through its sibling `G`: the memo keys it with the variables its reach names, never by
+  ::  the graph's level (cleared states read "unassigned", TLCSailfish2's
+  ::  BlockDag over `vs`). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aCONSTANT c\0aF == c + 1\0aG == F * 2\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'I == INSTANCE M WITH c <- x'
+        'Init == x = 0'
+        'Next == x < 3 /\\ x\' = x + 1'
+        'Inv == I!G = 2 * (x + 1)'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-oparg-sibling-through-instance
   ::  an operator ARGUMENT naming a sibling inside a named instance resolves
   ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`

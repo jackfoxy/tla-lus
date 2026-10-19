@@ -1760,11 +1760,13 @@
   ::  share one evaluation. GameOfLife's `sc[<<x, y>> \in ...] == ...` was
   ::  re-materialized at every one of its 18 references per state
   ::  R4.3: a CONSTANT-level one too -- `+with-cdefs` leaves a tlc2-lazy set
-  ::  uncached (`+lazy-set`) -- keyed without the states, which it cannot
-  ::  read, so it is evaluated once rather than once per state
+  ::  uncached (`+lazy-set`). `+sdef-env` cuts the states to the variables
+  ::  it reaches, so one that reads none is evaluated once, not per state.
+  ::  The graph's level is NOT trusted for that: under INSTANCE a "constant"
+  ::  definition reads the state through a substitution (TLCSailfish2's
+  ::  BlockDag over `vs`), and cleared states read "unassigned: vs"
   ?:  ?&(?=(~ args.n) (lte lvl.def 1) !=('' origin.def))
-    =/  se  (sdef-env u.body.def e(fuel (dec fuel.e)) ~)
-    (eval-sdef u.body.def ?:(=(0 lvl.def) se(s0 ~, s1 ~) se) rs)
+    (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e)) ~) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
   =/  ew  p.e2(fuel (dec fuel.e))
@@ -1783,20 +1785,12 @@
   ::  key is the body and the environment cut to what it can read, its
   ::  bound parameters included (MCEWD687a's `IsTreeWithRoot` applies
   ::  `SimplePath(G)`, hence `SeqOf`, once per node with the same `G`).
-  ::  A constant-level one is keyed without the states unless a parameter
-  ::  is bound by name, which reads the state through `psub`, or is an
-  ::  operator, whose argument may read it (CigaretteSmokers' `ChooseOne(S,
-  ::  LAMBDA x : smokers[x].smoking)`)
+  ::  The states are cut by `+sdef-env` to the variables the reach names
+  ::  (not by the graph's level, which INSTANCE substitutions defeat)
   |=  [def=sem-def:sm b=sem:sm ew=eenv rs=rst]
   ^-  eout
   ?.  ?&((lte lvl.def 1) !=('' origin.def))  (eval-rs b ew rs)
-  =/  se  (sdef-env b ew (turn params.def |=(p=spar:sm name.p)))
-  ?.  ?&  =(0 lvl.def)
-          %+  levy  params.def
-          |=(p=spar:sm &(=(0 arity.p) !(~(has by psub.ew) name.p)))
-      ==
-    (eval-sdef b se rs)
-  (eval-sdef b se(s0 ~, s1 ~) rs)
+  (eval-sdef b (sdef-env b ew (turn params.def |=(p=spar:sm name.p))) rs)
 ::
 ++  keep-params
   ::  R4.2c (TestGraphs): re-assert an operator's own parameters over the
@@ -1835,15 +1829,14 @@
   ::  reaches (`+reach-names`; constants, and any INSTANCE substitution
   ::  read through a reached member), never the call site's other locals;
   ::  the successor state only where it can be read (primed or ENABLED)
-  ::  R4.3: minus the names BOUND in that reach (`+bound-reach`), which are
-  ::  rebound wherever they are read, so a caller's local of the same name
-  ::  cannot matter -- except `keep`, the applied operator's own formals.
-  ::  Kept, `SeqOf(set, n)`'s `n` put AreConnectedIn's `n` in every key
+  ::  R4.3: only the names FREE in that reach (`+free-reach`), so a
+  ::  caller's local that the body rebinds cannot matter, plus `keep`, the
+  ::  applied operator's own formals. `SeqOf(set, n)`'s `n` had put
+  ::  AreConnectedIn's `n` in every key. (A cut by every name bound ANYWHERE
+  ::  in the reach dropped EWD998Chan's constant `N`, read freely elsewhere)
   |=  [b=sem:sm e=eenv keep=(list @t)]
   ^-  eenv
-  =/  ns
-    %-  ~(dif in (reach-names b ops.e))
-    (~(dif in (bound-reach b ops.e)) (silt keep))
+  =/  ns  (~(gas in (free-reach b ops.e)) keep)
   =.  vals.e
     %-  malt
     ^-  (list [@t value:v])
@@ -1872,47 +1865,70 @@
   ?:  |(primed.e enabled.e)  e
   e(s1 ~)
 ::
-++  bound-reach
-  ::  R4.3: the names BOUND somewhere in `b`'s reach -- quantifier and
-  ::  constructor binders, LET definitions and their parameters, and the
-  ::  formals of every operator it reaches by name. `~+`, as +reach-names
+++  free-reach
+  ::  R4.3: the names a body can look up in its caller's environment: those
+  ::  FREE in it, scope by scope -- a quantifier's or constructor's variables
+  ::  are bound in its body (not in its ranges), a LET's names in its
+  ::  definitions and body, an operator's formals in its own body -- and,
+  ::  through every operator it reaches by name, those free in that
+  ::  operator's body. `~+`: once per body and operator table
   |=  [b=sem:sm ops=(map @t sem-def:sm)]
   ^-  (set @t)
   ~+
   =|  out=(set @t)
   =|  seen=(set @t)
-  =/  stk=(list sem:sm)  ~[b]
+  =/  stk=(list [x=sem:sm bd=(set @t)])  ~[[b ~]]
   |-  ^-  (set @t)
   ?~  stk  out
-  =/  x  i.stk
+  =/  x  x.i.stk
+  =/  bd  bd.i.stk
   ?-    -.x
       ?(%lit %atref %nullodn)  $(stk t.stk)
   ::
       %letin
+    =/  ln=(set @t)  (~(gas in bd) (turn lets.x |=(d=sem-def:sm name.d)))
+    =/  ks  t.stk
+    =?  ks  ?=(^ body.x)  [[u.body.x ln] ks]
     =/  ls=(list sem-def:sm)  lets.x
-    =/  ks=(list sem:sm)  ?~(body.x t.stk [u.body.x t.stk])
     |-  ^-  (set @t)
     ?~  ls  ^$(stk ks)
-    =.  out  (~(put in out) name.i.ls)
-    =.  out  (~(gas in out) (turn params.i.ls |=(p=spar:sm name.p)))
-    $(ls t.ls, ks ?~(body.i.ls ks [u.body.i.ls ks]))
+    =/  pb=(set @t)  (~(gas in ln) (turn params.i.ls |=(p=spar:sm name.p)))
+    $(ls t.ls, ks ?~(body.i.ls ks [[u.body.i.ls pb] ks]))
   ::
       %apply
-    =.  out  (~(gas in out) (turn ubound.x |=(v=sbind:sm name.v)))
-    =/  gs=(list sem-bound:sm)  bound.x
-    =/  ks=(list sem:sm)  (weld args.x t.stk)
-    =^  ks  out
-      |-  ^-  [(list sem:sm) (set @t)]
-      ?~  gs  [ks out]
-      =.  out  (~(gas in out) (turn vars.i.gs |=(v=sbind:sm name.v)))
-      $(gs t.gs, ks ?~(range.i.gs ks [u.range.i.gs ks]))
     =/  nm  name.op.x
+    =?  out  !(~(has in bd) nm)  (~(put in out) nm)
+    ::  binder groups: each range sees the variables of the groups before
+    ::  it; the body sees them all
+    =/  gs=(list sem-bound:sm)  bound.x
+    =/  inner=(set @t)  (~(gas in bd) (turn ubound.x |=(v=sbind:sm name.v)))
+    =/  ks  t.stk
+    =^  ks  inner
+      |-  ^-  [(list [x=sem:sm bd=(set @t)]) (set @t)]
+      ?~  gs  [ks inner]
+      =?  ks  ?=(^ range.i.gs)  [[u.range.i.gs inner] ks]
+      %=  $
+        gs     t.gs
+        inner  (~(gas in inner) (turn vars.i.gs |=(v=sbind:sm name.v)))
+      ==
+    ::  an INSTANCE wrapper: its substitution expressions are in the OUTER
+    ::  scope; only the wrapped body (its last argument) sees the names
+    =.  ks
+      ?.  ?=(^ (anysubstin-mod:sm nm))
+        (weld (turn args.x |=(a=sem:sm [a inner])) ks)
+      =/  rv=(list sem:sm)  (flop args.x)
+      ?~  rv  ks
+      :-  [i.rv inner]
+      (weld (turn (flop t.rv) |=(a=sem:sm [a bd])) ks)
+    ::  an operator reached by name: its own body, under its own formals
+    ?:  (~(has in bd) nm)  $(stk ks)
     ?:  (~(has in seen) nm)  $(stk ks)
     =/  d  (~(get by ops) nm)
     ?~  d  $(stk ks)
     =.  seen  (~(put in seen) nm)
-    =.  out  (~(gas in out) (turn params.u.d |=(p=spar:sm name.p)))
-    $(stk ?~(body.u.d ks [u.body.u.d ks]))
+    ?~  body.u.d  $(stk ks)
+    =/  pb=(set @t)  (silt (turn params.u.d |=(p=spar:sm name.p)))
+    $(stk [[u.body.u.d pb] ks])
   ==
 ::
 ++  reach-names

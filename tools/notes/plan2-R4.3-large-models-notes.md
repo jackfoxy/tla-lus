@@ -148,3 +148,26 @@ disabled, as does EWD998ChanID at 2 nodes).
 (374,727 distinct; tlc2 15 s): it stays on `timed-out.json`, note updated.
 
 `timed-out.json`: TestGraphs and EWD998ChanID removed (10 → 8 entries).
+
+## Part 4: the re-run on the final code (2026-10-18)
+
+The approved smoke re-run on the committed code (4f31b14f) came back 27/31:
+three regressions the shards had not caught. EWD998Chan (`undefined
+identifier: N`) and MCNanoLarge (`undefined identifier: Hash`): part 2's
+`+bound-reach` cut from the memo env every name bound ANYWHERE in the reach,
+so a constant read freely elsewhere was dropped (EWD998Chan's `N`, also a
+formal in a reached library operator). Replaced by `+free-reach`, a
+scope-aware free-name walk (binders bind in their bodies, not their ranges;
+formals in their own body; `$SubstIn` expressions in the OUTER scope).
+TLCSailfish2 (`variable is unassigned in the current state: vs`): the memo
+cleared the states for a constant-LEVEL definition, which under INSTANCE reads
+the state through a substitution (BlockDag over `vs`); latent since part 1
+beyond 1,000 states, it surfaced inside the budget after part 2. The states
+are now cut only to the variables the reach names. Arms
+`test-memo-key-keeps-free-names` and `test-memo-const-def-reads-state` (the
+latter bites with the old clear); job 158.
+
+Final: 65/65 shards, smoke census **30/31** on the final code
+(`census-r43-smoke3.txt`; only MCInnerSerial, moved to the performance plan),
+validate, scaffold gate and test-examples pass. Lesson: an evaluator shortcut
+needs a targeted Examples census as its gate, not only the shards.
