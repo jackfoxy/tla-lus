@@ -3403,8 +3403,20 @@
     $(ps t.ps, as t.as, e e(psub (~(put by psub.e) nm dn), vals (~(del by vals.e) nm)))
   ?.  used.i.ps
     $(ps t.ps, as t.as, e e(psub (~(del by psub.e) nm), vals (~(del by vals.e) nm)))
+  ::  R4.3 (LockHS): an ACTION argument (`NoStutter(NoHistoryChange(l0(self)))`)
+  ::  cannot be evaluated before the successor is solved, and tlc2 binds
+  ::  every argument lazily: bound by name, read in the CALLER's scope (its
+  ::  closure, as an INSTANCE substitution's), and solved where the body uses
+  ::  it in action position. Likewise one that fails to evaluate here
+  =/  lazy=eenv
+    %=  e
+      psub  (~(put by psub.e) nm i.as)
+      pout  (~(put by pout.e) nm (clo-of i.as ev))
+      vals  (~(del by vals.e) nm)
+    ==
+  ?:  (gth (sem-level i.as) 1)  $(ps t.ps, as t.as, e lazy)
   =/  av  (eval i.as ev)
-  ?:  ?=(%| -.av)  av
+  ?:  ?=(%| -.av)  $(ps t.ps, as t.as, e lazy)
   $(ps t.ps, as t.as, e e(vals (~(put by vals.e) nm p.av), psub (~(del by psub.e) nm)))
 ::
 ++  solve
@@ -3502,6 +3514,14 @@
     =/  e2  (bind-substs (senv mode cur part e) names.u.sp exprs.u.sp)
     ?:  ?=(%| -.e2)  [e2 s]
     (solve inner.u.sp mode cur part p.e2 s)
+  ::  R4.3 (LockHS): a formal parameter bound by name to an expression is
+  ::  that expression in action position (tlc2's getNextStates follows the
+  ::  Context binding), solved in the caller's scope, not filtered
+  ?:  ?&(?=(%formal-param kind.op.n) ?=(~ args.n))
+    =/  sb  (~(get by psub.e) nm)
+    ?:  ?|(?=(~ sb) (bare-self u.sb nm e) (state-var-ref u.sb e))
+      (solve-filter n mode cur part e s)
+    (solve u.sb mode cur part (outer-of nm e) s)
   ::  R4.2o: a CONSTANT operator bound to an operator (an INSTANCE's
   ::  `$OpArg` substitution, or a config `F <- G`) is expanded like a user
   ::  operator, so an assignment in its body still assigns

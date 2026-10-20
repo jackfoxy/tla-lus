@@ -1090,6 +1090,26 @@
         ~[['R' r] ['M' m]]
       'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-action-argument-solved
+  ::  an ACTION passed as an operator argument is bound by name and solved
+  ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`
+  ::  was evaluated eagerly: "primed variable is unassigned"). Pin: 4/4/4
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, s'
+        'Keep(A) == A /\\ UNCHANGED s'
+        'Wrap(A) == s = 0 /\\ A'
+        'Init == x = 0 /\\ s = 0'
+        'Next == Wrap(Keep(x < 3 /\\ x\' = x + 1))'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-oparg-sibling-through-instance
   ::  an operator ARGUMENT naming a sibling inside a named instance resolves
   ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`
