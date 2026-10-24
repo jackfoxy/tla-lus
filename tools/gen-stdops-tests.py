@@ -225,7 +225,7 @@ def hoon_contracts() -> dict:
             r"\[\['([^']+)' '((?:[^'\\]|\\.)+)' (\d+)\]\s*\[([|&]) (\d+)", table):
         key = (m.group(1), m.group(2).replace("\\\\", "\\"), int(m.group(3)))
         out[key] = (m.group(4) == "&", int(m.group(5)))
-    nodes = text.split("++  node-op")[1].split("++  op-meta")[0]
+    nodes = text.split("++  node-op\n")[1].split("++  op-meta")[0]
     for m in re.finditer(
             r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)\s*`\[%[\w-]+ ([|&]) (\d+)\]", nodes):
         out[(m.group(1), m.group(2), int(m.group(3)))] = (

@@ -366,6 +366,17 @@
       =(k ['Sequences' 'Seq' 1])
   ==
 ::
+++  node-op-modules
+  ::  the modules `+node-op` has keys in
+  ^-  (set @t)
+  ^~
+  %-  silt
+  ^-  (list @t)
+  :~  'Bags'  'BagsExt'  'FiniteSets'  'FiniteSetsExt'  'Functions'
+      'IOUtils'  'Json'  'Randomization'  'Sequences'  'SequencesExt'
+      'TLC'  'TLCExt'  'VectorClocks'
+  ==
+::
 ++  node-op
   ::  StandardModule operators the evaluator itself must run, because the
   ::  override needs something a value cannot carry: an OPERATOR argument
@@ -377,6 +388,9 @@
   ::  argument contract is recorded for every implemented operator
   |=  k=op-key
   ^-  (unit [tag=@tas lazy=? level=@ud])
+  ::  R4.Q1: a module with no node-op answers at once -- every user
+  ::  operator call asked all forty keys below
+  ?.  (~(has in node-op-modules) module.k)  ~
   ?:  =(k ['Sequences' 'SelectSeq' 2])     `[%select-seq | 0]
   ?:  =(k ['Bags' 'BagOfAll' 2])           `[%bag-of-all | 0]
   ?:  =(k ['FiniteSets' 'Cardinality' 1])  `[%cardinality | 0]

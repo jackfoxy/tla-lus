@@ -413,6 +413,12 @@
       ::  Neither is part of the checked state: neither enters a fingerprint,
       ::  and two states differing only in them are the same state
       rs=rst:ne
+      ::  R4.Q8: each state's successor keys, REVERSED, deduplicated in first-
+      ::  occurrence order, constraint-pruned transitions excluded -- recorded
+      ::  on a liveness graph build (FP64 keys, `!hkey`), so the product build
+      ::  reads the edges instead of solving every state's successors again
+      ::  (tlc2's LiveCheck records them while the search runs)
+      succ=(map @t (list @t))
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -425,7 +431,7 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is *fifo ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne]
+  [is *fifo ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne ~]
 ::
 ::  R4.P1 (H1/H2): the BFS frontier as a two-list FIFO with its length kept,
 ::  so enqueue, dequeue and the `states left on queue` count are O(1)
@@ -829,6 +835,10 @@
   ::  `[][x' = x + 1]_x` on the 3 -> 0 step, and state 0 was seen at depth 1.
   ::  Checking only new successors reported nothing at all.
   =/  ia0  ?~(prev ~ (first-bad-action iacts.o u.prev st (env-of o)))
+  =?  succ.cur  &(!hkey.o !=('' pred))
+    =/  ss=(list @t)  (~(gut by succ.cur) pred ~)
+    ?:  (lien ss |=(x=@t =(x fp)))  succ.cur
+    (~(put by succ.cur) pred [fp ss])
   ?:  (~(has by seen.cur) fp)
     ::  a REVISITED successor: nothing is counted or enqueued, so the statistics
     ::  are the ones standing before it, and the trace runs through THIS

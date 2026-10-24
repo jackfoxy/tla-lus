@@ -2281,7 +2281,7 @@
       %+  lasso-of-product:lv  o
       (labeled-product:lv o states (flop inits.cur.kk) next.o.kk env order.o.kk)
     =/  pc  ?~(pcur.kk (product-init:lv o states (flop inits.cur.kk) env) u.pcur.kk)
-    =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget)
+    =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget succ.cur.kk)
     ?.  done.r  [%more cur.r]
     [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]
   ?:  ?=(%more -.res)

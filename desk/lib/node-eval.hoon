@@ -246,7 +246,9 @@
       %num
     ::  tlc2 integers are 32-bit: a larger numeral is EC 2265, which fails
     ::  the whole run there and this expression here (unit 6C.2)
-    =/  x  (sun:si (rash val.n dem))
+    ::  R4.Q1 (H21): digits are read with a loop; `rash` built a parser per
+    ::  evaluation, about 45 µs for every literal evaluated
+    =/  x  (sun:si (fast-dec val.n))
     ?.  (in-range:so x)
       [%| 2.265 (rap 3 ~['TLC can\'t handle a number this big.\0a' val.n])]
     [%& [%int x]]
@@ -258,6 +260,20 @@
     ::  rejection, the timing differs (R1.4.5, compatibility.md)
     %dec  [%| 0 (cat 3 'TLC can\'t handle real numbers. ' val.n)]
   ==
+::
+++  fast-dec
+  ::  R4.Q1 (H21): a decimal numeral's value; anything but plain digits
+  ::  takes the parser it always took
+  |=  t=@t
+  ^-  @ud
+  =/  n  (met 3 t)
+  ?:  =(0 n)  (rash t dem)
+  =|  [i=@ud a=@ud]
+  |-  ^-  @ud
+  ?:  =(i n)  a
+  =/  c  (cut 3 [i 1] t)
+  ?.  &((gte c '0') (lte c '9'))  (rash t dem)
+  $(i +(i), a (add (mul 10 a) (sub c '0')))
 ::
 ++  eval-apply-rs
   |=  [n=sem-apply:sm e=eenv rs=rst]
@@ -336,13 +352,16 @@
   ::  (`Buffer!Cardinality`, `$Local:I!Op` -> the last `!`-segment). The
   ::  StandardModule override registry is keyed by the operator's own name in
   ::  its own module; an instance-imported member carries a qualified one
+  ::  R4.Q1: scanned as bytes, from the end; the tape round trip ran on
+  ::  every operator call
   |=  nm=@t
   ^-  @t
-  =/  t  (trip nm)
-  =/  r  (flop t)
-  =/  i  (find "!" r)
-  ?~  i  nm
-  (crip (flop (scag u.i r)))
+  =/  n  (met 3 nm)
+  =/  i  n
+  |-  ^-  @t
+  ?:  =(0 i)  nm
+  ?:  =('!' (cut 3 [(dec i) 1] nm))  (rsh [3 i] nm)
+  $(i (dec i))
 ::
 ++  self-ref
   ::  R4.2n: is a call-by-name binding of `nm` a bare reference to `nm`
@@ -1765,7 +1784,11 @@
   ::  The graph's level is NOT trusted for that: under INSTANCE a "constant"
   ::  definition reads the state through a substitution (TLCSailfish2's
   ::  BlockDag over `vs`), and cleared states read "unassigned: vs"
-  ?:  ?&(?=(~ args.n) (lte lvl.def 1) !=('' origin.def))
+  ?:  ?&  ?=(~ args.n)
+          (lte lvl.def 1)
+          !=('' origin.def)
+          (heavy-body u.body.def ops.e)
+      ==
     (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e)) ~) rs)
   =/  e2  (bind-params e params.def args.n)
   ?:  ?=(%| -.e2)  [e2 rs]
@@ -1789,7 +1812,8 @@
   ::  (not by the graph's level, which INSTANCE substitutions defeat)
   |=  [def=sem-def:sm b=sem:sm ew=eenv rs=rst]
   ^-  eout
-  ?.  ?&((lte lvl.def 1) !=('' origin.def))  (eval-rs b ew rs)
+  ?.  ?&((lte lvl.def 1) !=('' origin.def) (heavy-body b ops.ew))
+    (eval-rs b ew rs)
   (eval-sdef b (sdef-env b ew (turn params.def |=(p=spar:sm name.p))) rs)
 ::
 ++  keep-params
@@ -1864,6 +1888,26 @@
     e(s0 (cut s0.e), s1 (cut s1.e))
   ?:  |(primed.e enabled.e)  e
   e(s1 ~)
+::
+++  heavy-body
+  ::  R4.Q1: is a body worth the memo? Its key (`+sdef-env`) rebuilds four
+  ::  maps per call, which costs more than evaluating a small body such as
+  ::  `Op(z) == z = z`; only a body whose reach builds or quantifies over a
+  ::  set is memoized
+  |=  [b=sem:sm ops=(map @t sem-def:sm)]
+  ^-  ?
+  ~+
+  =/  rn  (reach-names b ops)
+  %+  lien  heavy-ops
+  |=(o=@t (~(has in rn) o))
+::
+++  heavy-ops
+  ^-  (list @t)
+  :~  '$SetOfAll'  '$SubsetOf'  '$BoundedExists'  '$BoundedForall'
+      '$BoundedChoose'  '$FcnConstructor'  '$NonRecursiveFcnSpec'
+      '$RecursiveFcnSpec'  '$SetOfFcns'  '$SetOfRcds'  'SUBSET'  'UNION'
+      '\\times'  '$CartesianProd'
+  ==
 ::
 ++  free-reach
   ::  R4.3: the names a body can look up in its caller's environment: those

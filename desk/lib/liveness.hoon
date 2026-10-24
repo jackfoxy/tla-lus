@@ -454,6 +454,9 @@
   ::  stutter makes [A]_e true and <A>_e false without evaluating A)
   |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne s1=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.Q8: memoized per leaf and transition -- the same fairness leaf
+  ::  stands in every OrderOfSolution of a run
+  ~+
   =/  stut
     ?~  sub  |
     =/  v0  (sub-val u.sub s0 env)
@@ -469,6 +472,9 @@
   ::  changes the subscript e; ENABLED [A]_e is always true
   |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.Q8: memoized per leaf and STATE: it depends on `s0` alone, and was
+  ::  solved again for every edge out of it and for every OrderOfSolution
+  ~+
   ?:  &(box ?=(^ sub))  &
   ::  R2.7.4.1: an ENABLED test discards the run carrier, like +eval-enabled
   =/  r=sres:ne  -:(solve:ne a %next s0 ~ env(enabled &) empty-rst:ne)
@@ -553,8 +559,10 @@
   ::  advance a product-build cursor by at most `budget` worklist keys; `done`
   ::  is true when the worklist is empty (the product is complete). Mirrors the
   ::  tableau branch of +labeled-product exactly, one slice at a time.
+  ::  R4.Q8: `sm` is the graph build's recorded successors (`succ` of the
+  ::  BFS cursor); when present they are the edges, else they are solved
   |=  $:  o=oos:tp  states=(map @t state:ne)  nsb=sem:sm  env=eenv:ne
-          order=(list @t)  pc=pcursor  budget=@ud
+          order=(list @t)  pc=pcursor  budget=@ud  sm=(map @t (list @t))
       ==
   ^-  [done=? cur=pcursor]
   =/  spent  0
@@ -574,6 +582,9 @@
   =/  succs=(list [fp=@t st=state:ne])
     =/  c  (~(get by sc.pc) fp.k)
     ?^  c  (turn u.c |=(f=@t [f (~(got by states) f)]))
+    ?.  =(~ sm)
+      %+  turn  (flop (~(gut by sm) fp.k ~))
+      |=(f=@t [f (~(got by states) f)])
     (succ-fps s0 nsb env order states)
   =.  sc.pc  (~(put by sc.pc) fp.k (turn succs |=([f=@t *] f)))
   =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env)
@@ -632,7 +643,7 @@
   ::  drain the bounded product-build cursor in one unbounded pass (the job
   ::  kernel steps the same cursor a slice at a time — unit 8.8.2a)
   =/  pc  (product-init o states inits env)
-  =/  r   (product-step o states nsb env order pc (bex 62))
+  =/  r   (product-step o states nsb env order pc (bex 62) ~)
   [nodes.cur.r edges.cur.r inits.cur.r]
 ::
 ++  bit-tape
