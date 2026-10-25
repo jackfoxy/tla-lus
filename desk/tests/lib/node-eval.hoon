@@ -188,4 +188,25 @@
   %+  expect-eq
     !>  '1'
   !>  (crip (eval-text:ne '[a |-> 1, b |-> 2].a'))
+::
+::  R4.Q3: the sorted-input shortcut in `+norm-set` and `+normalize` must
+::  not trust `+vlth` across an interval and a set of the same elements:
+::  this list rises, yet its first and last tuples are equal
+++  test-q3-rising-skips-intervals
+  %+  expect-eq
+    !>  '2'
+  !>  (crip (eval-text:ne 'Cardinality({<<1..2>>, <<5>>, <<{1, 2}>>})'))
+::
+::  R4.Q3: `+equal`'s fast paths stay exact across representations
+++  test-q3-equal-across-forms
+  %+  expect-eq
+    !>  'TRUE'
+  !>  %-  crip
+      %-  eval-text:ne
+      %+  rap  3
+      :~  '/\\ <<1..2>> = <<{1, 2}>>  /\\ (1..0) = (5..4)  /\\ 1..3 # 1..2'
+          '  /\\ [i \\in 1..2 |-> i] = <<1, 2>>'
+          '  /\\ [a |-> 1, b |-> 2] = [b |-> 2, a |-> 1]'
+          '  /\\ {<<1, 2>>, <<1, 2>>} = {<<1, 2>>}'
+      ==
 --

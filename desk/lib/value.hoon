@@ -183,16 +183,65 @@
 ::  +|  Equality (total, cross-representation)
 ::
 ++  equal
-  ::  `+ekey` is normalization-invariant, so nothing is normalized here
+  ::  `+ekey` is normalization-invariant, so nothing is normalized here.
+  ::  R4.Q3 (H14): the cheap answers first; the key is built only when
+  ::  none of them decides. Each is exact: identical nouns have one key; a
+  ::  scalar's key is its noun; two lists equal position by position are
+  ::  the same set (or function); a nonempty interval is its bounds
   |=  [a=value b=value]
   ^-  ?
+  ?:  =(a b)  &
+  ?:  |((scalar a) (scalar b))  |
+  ?:  &(?=(%intv -.a) ?=(%intv -.b))
+    &((slth hi.a lo.a) (slth hi.b lo.b))
+  ?:  &(?=(%seq -.a) ?=(%seq -.b))
+    (list-equal p.a p.b)
+  ?:  ?&  ?=(%set -.a)  ?=(%set -.b)
+          (list-equal p.a p.b)
+      ==
+    &
+  ?:  ?&  ?=(%fcn -.a)  ?=(%fcn -.b)
+          (pairs-equal p.a p.b)
+      ==
+    &
+  ?:  ?&  ?=(%rec -.a)  ?=(%rec -.b)
+          (fields-equal p.a p.b)
+      ==
+    &
   =((ekey a) (ekey b))
 ::
 ++  equal-norm
   ::  both inputs already normalized
   |=  [a=value b=value]
   ^-  ?
-  =((ekey a) (ekey b))
+  (equal a b)
+::
+++  scalar  |=(v=value ?=(?(%bool %int %str %model) -.v))
+::
+++  list-equal
+  ::  R4.Q3: equal position by position (same length)
+  |=  [a=(list value) b=(list value)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  (equal i.a i.b)  |
+  $(a t.a, b t.b)
+::
+++  pairs-equal
+  |=  [a=(list vpair) b=(list vpair)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  &((equal d.i.a d.i.b) (equal r.i.a r.i.b))  |
+  $(a t.a, b t.b)
+::
+++  fields-equal
+  |=  [a=(list vfield) b=(list vfield)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  &(=(k.i.a k.i.b) (equal v.i.a v.i.b))  |
+  $(a t.a, b t.b)
 ::
 ++  ekey
   ::  R4.P4 (H5): an EXACT equality key -- `(ekey a)` = `(ekey b)` iff
@@ -286,6 +335,9 @@
   ::  Intervals and tuples keep their representation (views, not eager).
   |=  v=value
   ^-  value
+  ::  R4.Q3 (H14): a set already in normal form is returned as it is; a
+  ::  forced set was normalized once as an image and again by `+force`
+  ?:  &(?=(%set -.v) (normal v))  v
   ?-  -.v
     %bool   v
     %int    v
@@ -304,6 +356,39 @@
     [%set cls.v (norm-set (turn p.v normalize))]
   ==
 ::
+++  normal
+  ::  R4.Q3: `(normalize v)` would return `v` itself: every component is
+  ::  normal and each sorted list is strictly `+rising` (so stable sorts keep
+  ::  it and dedup finds nothing). Conservative: `|` only costs the sort
+  |=  v=value
+  ^-  ?
+  ?-  -.v
+    %bool   &
+    %int    &
+    %str    &
+    %model  &
+    %intv   &
+    %seq    (levy p.v normal)
+    %set    &((rising p.v) (levy p.v normal))
+      %rec
+    ?&  (keys-rising p.v)
+        (levy p.v |=(f=vfield (normal v.f)))
+    ==
+      %fcn
+    ?&  (rising (turn p.v |=(pr=vpair d.pr)))
+        (levy p.v |=(pr=vpair &((normal d.pr) (normal r.pr))))
+    ==
+  ==
+::
+++  keys-rising
+  |=  fs=(list vfield)
+  ^-  ?
+  ?~  fs  &
+  |-  ^-  ?
+  ?~  t.fs  &
+  ?.  (strlth k.i.fs k.i.t.fs)  |
+  $(fs t.fs)
+::
 ++  norm-set
   ::  elements already normalized: dedup by equality, keeping the LAST of
   ::  equal elements, then sort into the private storage order. R4.P4: the
@@ -312,6 +397,13 @@
   |=  vs=(list value)
   ^-  (list value)
   ?:  (sorted-scalars vs)  vs
+  ::  R4.Q3 (H14): already in order, or in reverse order (`+force`
+  ::  accumulates backwards), so distinct and needing no keys
+  ?:  (rising vs)  vs
+  ?:  (falling vs)  (flop vs)
+  ::  R4.Q3: scalars are equal only when identical, so sorting first puts
+  ::  every duplicate beside its twin; no keys
+  ?:  (levy vs scalar)  (drop-twins (vsort vs))
   =/  rev  (flop vs)
   =|  seen=(set *)
   =|  uniq=(list value)
@@ -320,6 +412,59 @@
   =/  k  (ekey i.rev)
   ?:  (~(has in seen) k)  $(rev t.rev)
   $(rev t.rev, seen (~(put in seen) k), uniq [i.rev uniq])
+::
+++  drop-twins
+  ::  a sorted list without its adjacent repeats
+  |=  vs=(list value)
+  ^-  (list value)
+  =|  out=(list value)
+  |-  ^-  (list value)
+  ?~  vs  (flop out)
+  ?:  &(?=(^ out) =(i.vs i.out))  $(vs t.vs)
+  $(vs t.vs, out [i.vs out])
+::
+++  rising
+  ::  R4.Q3: strictly increasing in storage order, and so distinct. `+vlth`
+  ::  is a strict total order consistent with `+equal` except where an
+  ::  interval meets a set of the same elements (they rank by kind) or
+  ::  another interval (by `lo` alone): `<<{1, 2}>> < <<{1, 3}>> < <<1..2>>`
+  ::  rises, yet its ends are equal. So no interval may occur anywhere
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  ?.  (no-intv i.vs)  |
+  |-  ^-  ?
+  ?~  t.vs  &
+  ?.  (vlth i.vs i.t.vs)  |
+  ?.  (no-intv i.t.vs)  |
+  $(vs t.vs)
+::
+++  falling
+  ::  `+rising` read backwards, without reversing the list
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  ?.  (no-intv i.vs)  |
+  |-  ^-  ?
+  ?~  t.vs  &
+  ?.  (vlth i.t.vs i.vs)  |
+  ?.  (no-intv i.t.vs)  |
+  $(vs t.vs)
+::
+++  no-intv
+  |=  v=value
+  ^-  ?
+  ?-  -.v
+    %bool   &
+    %int    &
+    %str    &
+    %model  &
+    %intv   |
+    %set    (levy p.v no-intv)
+    %seq    (levy p.v no-intv)
+    %rec    (levy p.v |=(f=vfield (no-intv v.f)))
+    %fcn    (levy p.v |=(pr=vpair &((no-intv d.pr) (no-intv r.pr))))
+  ==
 ::
 ++  sorted-scalars
   ::  R4.P5: integers only, or strings only, already strictly increasing in
