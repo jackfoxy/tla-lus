@@ -1090,6 +1090,43 @@
         ~[['R' r] ['M' m]]
       'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-subset-assign-supersets
+  ::  R4.Q5: `x' \in SUBSET T /\ x \subseteq x'` produces only the
+  ::  supersets of x (`+subset-sup`); the counts are the full path's. Pin:
+  ::  10/4/2
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = {1}'
+        'Next == /\\ x\' \\in SUBSET {1, 2, 3, 4}'
+        '        /\\ x \\subseteq x\''
+        '        /\\ 3 \\notin x\''
+        '===='
+    ==
+  %+  expect-eq  !>([%& [10 4 2]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subset-assign-outside
+  ::  R4.Q5: A not within T leaves no candidate. Pin: 1/1/1
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = {5}'
+        'Next == /\\ x\' \\in SUBSET {1, 2, 3, 4}'
+        '        /\\ x \\subseteq x\''
+        '===='
+    ==
+  %+  expect-eq  !>([%& [1 1 1]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
 ++  test-action-argument-solved
   ::  an ACTION passed as an operator argument is bound by name and solved
   ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`

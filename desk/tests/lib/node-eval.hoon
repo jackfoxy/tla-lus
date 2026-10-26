@@ -209,4 +209,32 @@
           '  /\\ [a |-> 1, b |-> 2] = [b |-> 2, a |-> 1]'
           '  /\\ {<<1, 2>>, <<1, 2>>} = {<<1, 2>>}'
       ==
+::
+::  R4.Q4: a recursive function over several binders, one of them `Nat`
+::  (TransitiveClosure's `CR[n \in Nat, v \in S]`), applied lazily
+++  test-q4-recfcn-two-binders-nat
+  %+  expect-eq
+    !>  '5'
+  !>  %-  crip
+      %-  eval-text:ne
+      'LET f[n \\in Nat, v \\in {1, 2}] == IF n = 0 THEN v ELSE f[n - 1, v] + 1 IN f[3, 2]'
+::
+++  test-q4-recfcn-two-binders-cross
+  %+  expect-eq
+    !>  '<<TRUE, FALSE>>'
+  !>  %-  crip
+      %-  eval-text:ne
+      %+  rap  3
+      :~  'LET g[n \\in Nat, v \\in {1, 2, 3}] == IF n = 0 THEN v = 1 '
+          'ELSE g[n - 1, v] \\/ \\E u \\in {1, 2, 3} : g[n - 1, u] /\\ u + 1 = v '
+          'IN <<g[2, 3], g[1, 3]>>'
+      ==
+::
+::  R4.Q4: over finite binders the whole product is swept
+++  test-q4-recfcn-two-binders-finite
+  %+  expect-eq
+    !>  '4'
+  !>  %-  crip
+      %-  eval-text:ne
+      'LET f[n \\in 0..2, v \\in {1, 2}] == IF n = 0 THEN v ELSE f[n - 1, v] * 2 IN f[2, 1]'
 --

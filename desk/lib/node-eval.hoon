@@ -1607,10 +1607,12 @@
   ::  over `Nat` or `Int` (`trcl[n \in Nat] == ...` in Relation.tla's
   ::  `TransitiveClosure`). tlc2 keeps it a lazy FcnLambdaValue and evaluates
   ::  only the applied point, so the infinite domain is never enumerated; the
-  ::  port cannot enumerate it either. The definition, its one plain binder
-  ::  and its domain, when it is such a function
+  ::  port cannot enumerate it either. The definition, its plain binders
+  ::  and their domains, when it is such a function. R4.Q4: over SEVERAL
+  ::  binders too, one of them infinite (TransitiveClosure's
+  ::  `CR[n \in Nat, v \in S]`)
   |=  [f=sem:sm e=eenv]
-  ^-  (unit [n=sem-apply:sm g=bgroup sd=sexp:v])
+  ^-  (unit [n=sem-apply:sm gs=(list bgroup) sds=(list sexp:v)])
   ?.  ?=(%apply -.f)  ~
   ?.  ?=(~ args.f)  ~
   ?.  ?=(%user-op kind.op.f)  ~
@@ -1623,12 +1625,18 @@
   ?.  ?=(%apply -.b)  ~
   ?.  =('$RecursiveFcnSpec' name.op.b)  ~
   =/  bs  (flatten-bound bound.b)
-  ?.  ?=([* ~] bs)  ~
-  ?:  tup.i.bs  ~
-  =/  sd  (eval-domain rng.i.bs e)
+  ?~  bs  ~
+  ?:  (lien `(list bgroup)`bs |=(g=bgroup tup.g))  ~
+  =|  sds=(list sexp:v)
+  =/  gs=(list bgroup)  bs
+  |-  ^-  (unit [n=sem-apply:sm gs=(list bgroup) sds=(list sexp:v)])
+  ?~  gs
+    =.  sds  (flop sds)
+    ?.  (lien sds |=(x=sexp:v ?=(?(%nats %ints) -.x)))  ~
+    `[b bs sds]
+  =/  sd  (eval-domain rng.i.gs e)
   ?:  ?=(%| -.sd)  ~
-  ?.  ?=(?(%nats %ints) -.p.sd)  ~
-  `[b i.bs p.sd]
+  $(gs t.gs, sds [p.sd sds])
 ::
 ++  apply-recfcn
   ::  the applied point of an infinite-domain recursive function: the fixpoint
@@ -1638,21 +1646,71 @@
   ::  re-evaluates the body per reference). An argument outside the domain,
   ::  or a point the restricted sweep cannot solve, is the definition's own
   ::  failure
-  |=  [rf=[n=sem-apply:sm g=bgroup sd=sexp:v] xa=sem:sm e=eenv rs=rst]
+  ::  R4.Q4: over several binders the argument is a tuple and the points
+  ::  are the product of each binder's: 0 to the argument's component on an
+  ::  infinite one, every element on a finite one
+  |=  [rf=[n=sem-apply:sm gs=(list bgroup) sds=(list sexp:v)] xa=sem:sm e=eenv rs=rst]
   ^-  eout
   =^  x  rs  (eval-rs xa e rs)
   ?:  ?=(%| -.x)  [x rs]
-  ?.  ?=(%int -.p.x)
+  =/  xs=(list value:v)
+    ?:  ?=([* ~] sds.rf)  ~[p.x]
+    ?.  ?=(%seq -.p.x)  ~
+    p.p.x
+  ?.  =((lent xs) (lent sds.rf))
     [[%| 0 'Attempted to enumerate the non-enumerable set Nat.'] rs]
-  =/  [neg=? mag=@ud]  =/(o (old:si p.p.x) [!-.o +.o])
-  ?:  &(neg ?=(%nats -.sd.rf))
-    [[%| 0 'Attempted to enumerate the non-enumerable set Nat.'] rs]
+  =|  dims=(list (list value:v))
+  =/  sds  sds.rf
+  |-  ^-  eout
+  ?^  sds
+    ?~  xs  !!
+    =/  dm  (recfcn-dim i.sds i.xs setmax.e)
+    ?:  ?=(%| -.dm)  [dm rs]
+    $(sds t.sds, xs t.xs, dims [p.dm dims])
   =/  pts=(list value:v)
-    %+  turn  (gulf 0 mag)
-    |=(i=@ud [%int ?:(neg (new:si | i) (sun:si i))])
-  =/  r  (recfcn-fix n.rf g.rf pts e)
+    =/  ps  (recfcn-product (flop dims))
+    ?:  ?=([* ~] sds.rf)  (turn ps |=(t=(list value:v) ?>(?=([* ~] t) i.t)))
+    (turn ps |=(t=(list value:v) `value:v`[%seq t]))
+  =/  r  (recfcn-fix n.rf gs.rf pts e)
   ?:  ?=(%| -.r)  [r rs]
   [(apply:v p.r p.x &) rs]
+::
+++  recfcn-dim
+  ::  one binder's points for `+apply-recfcn`: the integers from 0 to `x`
+  ::  on `Nat` or `Int`, every element otherwise
+  |=  [sd=sexp:v x=value:v lim=@ud]
+  ^-  (each (list value:v) eval-err:v)
+  ?.  ?=(?(%nats %ints) -.sd)
+    =/  fr  (force:v sd lim)
+    ?:  ?=(%| -.fr)  fr
+    (elemsof-e:v p.fr)
+  ?.  ?=(%int -.x)
+    [%| 0 'Attempted to enumerate the non-enumerable set Nat.']
+  =/  [neg=? mag=@ud]  =/(o (old:si p.x) [!-.o +.o])
+  ?:  &(neg ?=(%nats -.sd))
+    [%| 0 'Attempted to enumerate the non-enumerable set Nat.']
+  :-  %&
+  %+  turn  (gulf 0 mag)
+  |=(i=@ud [%int ?:(neg (new:si | i) (sun:si i))])
+::
+++  recfcn-product
+  ::  every combination, the first dimension varying slowest
+  |=  dims=(list (list value:v))
+  ^-  (list (list value:v))
+  ?~  dims  ~[~]
+  =/  rest  $(dims t.dims)
+  %-  zing
+  %+  turn  i.dims
+  |=(x=value:v (turn rest |=(t=(list value:v) [x t])))
+::
+++  bind-point
+  ::  a domain point bound to the binders: the point itself for one, its
+  ::  components for several
+  |=  [e=eenv gs=(list bgroup) pt=value:v]
+  ^-  eenv
+  ?:  ?=([* ~] gs)  (bind-group e i.gs pt)
+  ?.  ?=(%seq -.pt)  e
+  (bind-vals e gs p.pt)
 ::
 ++  recfcn-partial
   ::  the points solved so far, in domain order, as a function value — what
@@ -1682,19 +1740,29 @@
   |=  [n=sem-apply:sm e=eenv]
   ^-  eres
   =/  bs  (flatten-bound bound.n)
-  ?.  ?=([* ~] bs)
-    [%| 0 'function constructor over multiple binders is unsupported.']
-  =/  sd  (eval-domain rng.i.bs e)
-  ?:  ?=(%| -.sd)  sd
-  =/  fr  (force:v p.sd setmax.e)
-  ?:  ?=(%| -.fr)  fr
-  =/  el  (elemsof-e:v p.fr)
-  ?:  ?=(%| -.el)  el
-  (recfcn-fix n i.bs p.el e)
+  ?~  bs  [%| 0 'recursive function definition without a bound.']
+  ::  R4.Q4: over several binders the domain is their product, its points
+  ::  tuples (`f[a, b]` is `f[<<a, b>>]`)
+  =|  dims=(list (list value:v))
+  =/  gs=(list bgroup)  bs
+  |-  ^-  eres
+  ?^  gs
+    =/  sd  (eval-domain rng.i.gs e)
+    ?:  ?=(%| -.sd)  sd
+    =/  fr  (force:v p.sd setmax.e)
+    ?:  ?=(%| -.fr)  fr
+    =/  el  (elemsof-e:v p.fr)
+    ?:  ?=(%| -.el)  el
+    $(gs t.gs, dims [p.el dims])
+  =.  dims  (flop dims)
+  ?:  ?=([* ~] bs)  (recfcn-fix n bs ?>(?=([* ~] dims) i.dims) e)
+  =/  pts=(list value:v)
+    (turn (recfcn-product dims) |=(t=(list value:v) `value:v`[%seq t]))
+  (recfcn-fix n bs pts e)
 ::
 ++  recfcn-fix
   ::  +eval-recfcn's sweep to a fixpoint over the domain points `pts`
-  |=  [n=sem-apply:sm g=bgroup pts=(list value:v) e=eenv]
+  |=  [n=sem-apply:sm gs=(list bgroup) pts=(list value:v) e=eenv]
   ^-  eres
   ?~  ubound.n  [%| 0 'recursive function definition without a self-binder.']
   =/  fnm  name.i.ubound.n
@@ -1717,9 +1785,10 @@
     ::  the self-binder plus this point, destructured if the binder is a
     ::  tuple pattern (R1.3.8)
     =/  ev2=eenv
-      %+  bind-group
-        e(vals (~(put by vals.e) fnm (recfcn-partial pts s2)))
-      [g i.ps]
+      %^  bind-point
+          e(vals (~(put by vals.e) fnm (recfcn-partial pts s2)))
+        gs
+      i.ps
     =/  r  (eval body ev2)
     ?:  ?=(%| -.r)  $(ps t.ps, i +(i), e2 p.r)
     $(ps t.ps, i +(i), s2 (~(put by s2) i p.r))
@@ -1784,9 +1853,11 @@
   ::  The graph's level is NOT trusted for that: under INSTANCE a "constant"
   ::  definition reads the state through a substitution (TLCSailfish2's
   ::  BlockDag over `vs`), and cleared states read "unassigned: vs"
+  ::  R4.Q4: a LET's arity-0 definition (no origin) too: tlc2 binds it as a
+  ::  LazyValue, evaluated at its first reference and reused by the rest.
+  ::  CarTalkPuzzle's `Sum` read `LET y == CHOOSE ...` twice per call
   ?:  ?&  ?=(~ args.n)
           (lte lvl.def 1)
-          !=('' origin.def)
           (heavy-body u.body.def ops.e)
       ==
     (eval-sdef u.body.def (sdef-env u.body.def e(fuel (dec fuel.e)) ~) rs)
@@ -3692,7 +3763,10 @@
   |-  ^-  sout
   ?~  cs  [[%& ~[part]] s]
   ?:  &(!first (complete part vars.e))  (conj-bools cs mode cur part e s)
-  =^  r  s  (solve i.cs mode cur part e s)
+  =^  r  s
+    =/  sup  (subset-sup i.cs t.cs mode cur part e s)
+    ?^  sup  [u.sup s]
+    (solve i.cs mode cur part e s)
   ?:  ?=(%| -.r)  [r s]
   =/  ps  p.r
   =|  out=(list state)
@@ -3701,6 +3775,57 @@
   =^  r2  s  ^$(cs t.cs, part i.ps, first |)
   ?:  ?=(%| -.r2)  [r2 s]
   $(ps t.ps, out (weld (flop p.r2) out))
+::
+++  subset-sup
+  ::  R4.Q5 (H17): `x' \in SUBSET T` followed DIRECTLY by `A \subseteq x'`
+  ::  (MCInnerSerial's `UpdateOpOrder`, up to 65,536 candidates, nearly all
+  ::  failing the second conjunct). Only the subsets of T that contain A
+  ::  can pass, so only they are produced: A's members (as T holds them)
+  ::  with each subset of the rest. In the same order as the full
+  ::  enumeration filtered -- by size, then combination order over T, which
+  ::  adding the fixed members to every combination preserves -- so the
+  ::  successors, their order and the counts are the full path's. The
+  ::  second conjunct is still evaluated per candidate. Not applied when A
+  ::  or T cannot be evaluated before x' is assigned, or either draws
+  |=  $:  c=sem:sm  nx=(list sem:sm)  mode=?(%init %next)
+          cur=state  part=state  e=eenv  s=rst
+      ==
+  ^-  (unit (each (list state) eval-err:v))
+  ?.  ?=(%apply -.c)  ~
+  ?.  &(=('\\in' name.op.c) ?=([* * ~] args.c))  ~
+  ?~  nx  ~
+  =/  c2  i.nx
+  ?.  ?=(%apply -.c2)  ~
+  ?.  &(=('\\subseteq' name.op.c2) ?=([* * ~] args.c2))  ~
+  =/  as  (assignable-sem i.args.c mode vars.e part psub.e)
+  ?~  as  ~
+  ?.  =(as (assignable-sem i.t.args.c2 mode vars.e part psub.e))  ~
+  =/  dn  i.t.args.c
+  ?.  ?=(%apply -.dn)  ~
+  ?.  &(=('SUBSET' name.op.dn) ?=([* ~] args.dn))  ~
+  ?:  |((sem-draws dn e) (sem-draws i.args.c2 e))  ~
+  =/  se  (senv mode cur part e)
+  =/  tv  -:(eval-rs i.args.dn se s)
+  ?:  ?=(%| -.tv)  ~
+  =/  av  -:(eval-rs i.args.c2 se s)
+  ?:  ?=(%| -.av)  ~
+  ?.  &((set-like:v p.tv) (set-like:v p.av))  ~
+  =/  te  (elemsof-e:v p.tv)
+  ?:  ?=(%| -.te)  ~
+  =/  ae  (elemsof-e:v p.av)
+  ?:  ?=(%| -.ae)  ~
+  ::  T's members split into those A holds and the rest, in T's order
+  =/  [inn=(list value:v) rest=(list value:v)]
+    (skid p.te |=(x=value:v (lien p.ae |=(y=value:v (equal:v x y)))))
+  ::  A not within T: no subset of T contains it
+  ?.  =((lent inn) (lent (norm-set:v p.ae)))  `[%& ~]
+  =/  us  (drain-sexp [%subset [%set %set-enum rest]])
+  ?:  ?=(%| -.us)  ~
+  :+  ~  %&
+  %+  turn  p.us
+  |=  u=value:v
+  ?>  ?=(%set -.u)
+  (~(put by part) u.as (normalize:v [%set %set-enum (weld inn p.u)]))
 ::
 ++  conj-bools
   ::  R4.2d: the all-assigned fast path -- every remaining conjunct is a
