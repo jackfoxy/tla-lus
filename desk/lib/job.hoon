@@ -254,6 +254,30 @@
 ::  work units one Gall event may spend; engine configuration,
 ::  deliberately separate from the request's user-facing limits
 ++  default-budget  256
+::  R4.QS: a Gall event cannot be preempted, and a step's budget counts states, so
+::  a model whose expansions cost seconds each held the ship for half an
+::  hour per slice (256 of MCInnerSerial's), the class two king crashes
+::  followed. The time between a job's consecutive wakes is the length of
+::  the slice between them (the wake is set for `now`), so each budget is
+::  sized from the last: scaled toward `pace-goal` when it ran over twice
+::  that, doubled when it ran under it (a slice's fixed cost alone must not
+::  pin the budget low), between 1 and `default-budget`. A new job starts at
+::  `pace-start`, so its first slice cannot be the long one
+++  pace-goal   ~s10
+++  pace-start  16
+++  pace-budget
+  |=  [p=(unit [at=@da bud=@ud]) now=@da]
+  ^-  @ud
+  =/  top  default-budget
+  ?~  p  pace-start
+  =/  d=@dr  ?:((gth now at.u.p) (sub now at.u.p) `@dr`1)
+  =/  b
+    ?:  (gth d (mul 2 pace-goal))
+      (div (mul bud.u.p pace-goal) d)
+    ?:  (lth d pace-goal)
+      (mul 2 bud.u.p)
+    bud.u.p
+  (max 1 (min top b))
 ::  Clay reads one slice may request, bounding a wide dependency fan-out
 ::  independently of the work budget
 ++  default-load-budget  8
@@ -1885,14 +1909,19 @@
     ::  safety path's deadlock flag (`deadlock && getCheckDeadlock()`). All
     ::  four were off here, so a deadlocking spec reported its PROPERTY
     ::  violated where tlc2 stops at `Deadlock reached`
+    ::  R4.QS: the getActions decomposition built ONCE and carried, as the
+    ::  safety path's is (R2.7.4.2b). Left empty, `+bfs-step` rebuilt it at
+    ::  every slice -- 12.8 s each for EWD998ChanID
+    =/  acts  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
     =/  o=bfs-opts:check
       :*  nsb  (weld invs binvs.bins)  cons  acons  ~  vars  order  perms
           defs  consts
           ?&(deadlock.mode deadlock.rs)
-          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
+          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  acts
           *cov-opts:check  0  iacts
           ::  R4.P5c: a temporal graph keeps FP64 (lasso choice reads map order)
           |
+          cdefs:(make-env:ne defs consts vars)
       ==
     =.  cont.j
       %-  save-kont
@@ -1930,6 +1959,8 @@
         iacts
         ::  R4.P5c: the identity key, unless the spec can draw
         !(draws:check defs)
+        ::  R4.QS: the constant definitions, evaluated once for every slice
+        cdefs:(make-env:ne defs consts vars)
     ==
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
@@ -2123,7 +2154,7 @@
     =/  dm  (add-diags j ~[[[%tlc ec.out] %error %explore msg.out ~ ~]])
     =.  j  j.dm
     =?  artifacts.j  ?=(^ trace.out)
-      =/  env   (make-env:ne defs.o consts.o vars.o)
+      =/  env   (cenv-of:check o)
       =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
       =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
       %+  ~(put by artifacts.j)  %trace
@@ -2150,7 +2181,7 @@
   ::  per-action attribution for the wire trace: the getActions leaves plus the
   ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
   ::  keeps the whole-Next label it has always rendered.
-  =/  env   (make-env:ne defs.o consts.o vars.o)
+  =/  env   (cenv-of:check o)
   ::  R2.7.4.2b: `+do-config` built this list once and put it on the opts, so
   ::  the trace labels and the coverage counters index the SAME decomposition
   =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
@@ -2232,7 +2263,7 @@
   =/  states  (states-of:check seen.cur.kk)
   ::  R4.2e: the liveness product keys states as the graph build did
   =/  env
-    (with-idk:ne (make-env:ne defs.o.kk consts.o.kk vars.o.kk) perms.o.kk view.o.kk)
+    (with-idk:ne (cenv-of:check o.kk) perms.o.kk view.o.kk)
   ::  R2.7.14a/b: the POSTCONDITION lines, in tlc2's slot (between the EC
   ::  2257/2259 hint and the counts). The run's FINAL carrier and statistics,
   ::  for the same reason R2.7.7.4a threaded them on the safety path -- a

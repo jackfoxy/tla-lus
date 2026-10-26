@@ -294,6 +294,11 @@
       ::  graph build (lasso choice follows map order) or a spec whose
       ::  per-state reseed is `fingerPrint ^ seed`. `_|`: off unless asked
       hkey=_|
+      ::  R4.QS: the constant definitions `+with-cdefs:ne` evaluated, carried
+      ::  so that `+env-of` does not depend on its `~+` entry surviving a
+      ::  slice: per-state memo entries evict it, and EWD998ChanID re-ran
+      ::  them for 13 s at every slice. Empty: `+env-of` evaluates them
+      cd=(map @t [def=sem-def:sem-lib val=value])
   ==
 ::
 +$  cov-opts
@@ -336,7 +341,15 @@
   ::  the node-eval evaluation context for a search
   |=  o=bfs-opts
   ^-  eenv:ne
-  (with-setmax:ne (make-env:ne defs.o consts.o vars.o) setmax.o)
+  (with-setmax:ne (cenv-of o) setmax.o)
+::
+++  cenv-of
+  ::  R4.QS: `+make-env:ne` on the search's inputs, from the constant
+  ::  definitions the options carry when they carry them
+  |=  o=bfs-opts
+  ^-  eenv:ne
+  ?~  cd.o  (make-env:ne defs.o consts.o vars.o)
+  (make-env-cd:ne defs.o consts.o vars.o cd.o)
 ::
 ++  run-stats-at
   ::  the live `TLC!TLCGet` statistics for the state about to be expanded
@@ -1185,12 +1198,16 @@
     $(as t.as, ix +(ix), c2 c3)
   ?^  out.rr  [%done u.out.rr cur.rr]
   =/  cost  (sub gen.cur.rr gen.cur)
+  ::  R4.QS: and the solver's candidates, a sixteenth of a unit each, so a
+  ::  slice of expensive expansions ends after a few of them, not 256
+  =/  wk  (div wrk.rs.cur.rr 16)
+  =.  wrk.rs.cur.rr  0
   ?:  =(0 cost)
     ::  a dequeued state with NO successors still contributes a 0 out-degree
     ::  sample: TLC calls outDegree.addSample(unseenSuccessorStates) for every
     ::  state it dequeues, so a sink pulls the distribution's min to 0 (R1.5.12b)
     =.  outdeg.cur.rr  (~(put by outdeg.cur.rr) 0 +((~(gut by outdeg.cur.rr) 0 0)))
-    ?.  deadlock.o  $(cur cur.rr, spent +(spent))
+    ?.  deadlock.o  $(cur cur.rr, spent :(add spent 1 wk))
     :+  %done
       :*  %deadlock  gen.cur.rr  distinct.cur.rr  len.queue.cur.rr
           depth.cur.rr  (trace-to seen.cur.rr fp)
@@ -1201,7 +1218,7 @@
   =/  sample  (sub distinct.cur.rr before)
   =.  outdeg.cur.rr
     (~(put by outdeg.cur.rr) sample +((~(gut by outdeg.cur.rr) sample 0)))
-  $(cur cur.rr, spent (add spent cost))
+  $(cur cur.rr, spent :(add spent cost wk))
 ::
 ++  explore
   ::  deterministic BFS from the initial states; stops at the first
@@ -3291,7 +3308,7 @@
   ::  the BODY's span, not the declaration's: tlc2 locates the expression
   ::  (`col 8` past `ASSUME `), measured
   =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
-  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0 |])
+  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0 | 0])
   ?:  ?=(%| -.r)
     `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
   ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
@@ -3497,7 +3514,7 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
@@ -3540,7 +3557,7 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
@@ -3578,7 +3595,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
@@ -3596,7 +3613,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
@@ -4022,7 +4039,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ |]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
   =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
@@ -5253,7 +5270,7 @@
     =/  o=bfs-opts
       :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c
           vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
-          ~  *cov-opts  0  iacts.c  !(draws defs.c)
+          ~  *cov-opts  0  iacts.c  !(draws defs.c)  ~
       ==
     =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
     =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -5699,7 +5716,7 @@
   ::  running it. `+bfs-step` already checks `invs` and stops at the first
   ::  violation, so no new checking machinery was needed here, only the list
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~ |]
+    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  bg    (build-graph-out is.c o)
   =/  modn  (module-name-of tree.c)
   ?:  capped.bg
@@ -5776,7 +5793,7 @@
   =/  o=bfs-opts
     :*  nsb.c  invs.c  cons.c  acons.c  poss.c  vars.c  order.c  perms.c  defs.c
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed  ~
-        !(draws defs.c)
+        !(draws defs.c)  cdefs.env
     ==
   =/  r  (explore-full-regs is.c irs.c o)
   ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
@@ -5975,7 +5992,7 @@
   =/  o=bfs-opts
     :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c  vars.c  order.c
         perms.c  defs.c  consts.c  ddl.c  cap  0  view.c  0  |  ~  *cov-opts  0
-        iacts.c  !(draws defs.c)
+        iacts.c  !(draws defs.c)  ~
     ==
   =/  er  (explore is.c o)
   ?.  ?=(%ok -.out.er)  (explore-outcome out.er od.er)
@@ -5985,7 +6002,7 @@
   ::  (R1.5.5): a capped build yields %limited rather than a lasso verdict on a
   ::  partial graph
   =/  lo=bfs-opts
-    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~ |]
+    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  bg  (build-graph-cap is.c lo)
   ::  the liveness graph build samples no out-degree (no BFS frontier)
   =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -6027,7 +6044,7 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~ !(draws defs.c)]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~ !(draws defs.c) ~]
   =/  cur  (explore-cursor is.c o budget)
   [gen.cur distinct.cur len.queue.cur depth.cur (od-stats outdeg.cur)]
 --

@@ -23,11 +23,14 @@
 ::  re-arms every running job, so a job whose wake was lost (an event
 ::  aborted by an interrupt consumes it) resumes within a minute instead of
 ::  sitting `running` forever
+::  `pace` (R4.QS): per job, when its last step began and the budget it
+::  ran with, from which the next budget is sized (`+pace-budget`)
 +$  state-0
   $:  %0
       jobs=(map req-id jobstate:job-lib)
       arms=(map req-id @ud)
       sweep=(unit @da)
+      pace=(map req-id [at=@da bud=@ud])
   ==
 +$  card     card:agent:gall
 ::
@@ -317,6 +320,7 @@
       [(fact id.act [%rejected id.act p.pin]) ~]
     =.  jobs.state
       (~(put by jobs.state) id.act (init:job-lib p.pin now.bowl))
+    =.  pace.state  (~(del by pace.state) id.act)
     =^  seq  state  (next-arm state id.act)
     =^  sw   state  (ensure-sweep state now.bowl)
     :_  this
@@ -342,6 +346,7 @@
       [(fact id.act [%rejected id.act 'job still active']) ~]
     =.  jobs.state  (~(del by jobs.state) id.act)
     =.  arms.state  (~(del by arms.state) id.act)
+    =.  pace.state  (~(del by pace.state) id.act)
     :_  this
     [(fact id.act [%deleted id.act]) ~]
   ==
@@ -419,7 +424,9 @@
             =(`(slav %ud i.t.t.t.wire) (~(get by arms.state) id))
         ==
       `this
-    =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
+    =/  bud  (pace-budget:job-lib (~(get by pace.state) id) now.bowl)
+    =.  pace.state  (~(put by pace.state) id [now.bowl bud])
+    =/  res  (step:job-lib u.cur bud now.bowl)
     =^  seq  state  (next-arm state id)
     =/  adv  (advance id res now.bowl seq)
     =.  jobs.state  (~(put by jobs.state) id +.adv)

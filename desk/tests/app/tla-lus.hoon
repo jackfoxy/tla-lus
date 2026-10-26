@@ -710,4 +710,18 @@
     !>(?=([%pass [%sweep @ ~] %arvo %b %wait *] (snag 1 caz)))
     (expect-eq !>(~) !>(cz3))
   ==
+::
+++  test-pace-budget
+  ::  R4.QS: a new job starts small, a short slice doubles the budget, a
+  ::  long one scales it toward the goal, never below 1 nor above the
+  ::  default
+  =/  t0  ~2026.7.12
+  ;:  weld
+    (expect-eq !>(16) !>((pace-budget:job-lib ~ t0)))
+    (expect-eq !>(32) !>((pace-budget:job-lib `[t0 16] (add t0 ~s1))))
+    (expect-eq !>(256) !>((pace-budget:job-lib `[t0 256] (add t0 ~s1))))
+    (expect-eq !>(64) !>((pace-budget:job-lib `[t0 256] (add t0 ~s40))))
+    (expect-eq !>(1) !>((pace-budget:job-lib `[t0 4] (add t0 ~m10))))
+    (expect-eq !>(100) !>((pace-budget:job-lib `[t0 100] (add t0 ~s15))))
+  ==
 --

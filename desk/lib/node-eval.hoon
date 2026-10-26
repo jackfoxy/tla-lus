@@ -175,13 +175,18 @@
       ::  R4.3: an `ilim`-bounded init assignment stopped before its domain
       ::  was exhausted
       trunc=?
+      ::  R4.QS: candidate partial states the solver produced, the work
+      ::  measure a slice is budgeted by beside the successors (one expansion
+      ::  can try 65,536 candidates for 3 successors); `+bfs-step` adds and
+      ::  clears it. Never part of a memo key (`+eval-sdef`)
+      wrk=@ud
   ==
 ::  a solver result carrying the run state, and its evaluator sibling. UNFACED,
 ::  like `[pres pst]` on the `-generate` path: a face on the head leaks into
 ::  whatever `=^` binds, so `p.r` on the bound result stops resolving
 +$  sout  [sres rst]
 +$  eout  [eres rst]
-++  empty-rst  ^-(rst [~ ~ 0 0 ~ ~ 0 |])
+++  empty-rst  ^-(rst [~ ~ 0 0 ~ ~ 0 | 0])
 ::  the single typed evaluation-diagnostic shape (WU6.8): a tlc2 EC number
 ::  and coarse category, message, source location, operator/evaluation stack,
 ::  and whether a checker may recover. Per-site emission (replacing the bare
@@ -1913,6 +1918,14 @@
   ::  a pure function of them, whatever the body does (a draw or a `TLCSet`
   ::  is part of the memoized carrier). What makes references HIT is
   ::  `+sdef-env`, which cuts the environment to what the body can read
+  ::  R4.QS: keyed with the work counter zeroed, which the hit adds back,
+  ::  so counting work never splits a key
+  |=  [b=sem:sm e=eenv rs=rst]
+  ^-  eout
+  =/  r  (eval-sdef-memo b e rs(wrk 0))
+  [-.r +.r(wrk (add wrk.rs wrk.+.r))]
+::
+++  eval-sdef-memo
   |=  [b=sem:sm e=eenv rs=rst]
   ^-  eout
   ~+
@@ -3768,6 +3781,7 @@
     ?^  sup  [u.sup s]
     (solve i.cs mode cur part e s)
   ?:  ?=(%| -.r)  [r s]
+  =.  wrk.s  (add wrk.s (lent p.r))
   =/  ps  p.r
   =|  out=(list state)
   |-  ^-  sout
@@ -4093,6 +4107,16 @@
   ^-  eenv
   (with-cdefs [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~] ~ 0])
 ::
+++  make-env-cd
+  ::  R4.QS: `+make-env` with its constant definitions already evaluated
+  ::  (`cdefs` of an earlier `+make-env` on the same inputs)
+  |=  $:  defs=(map @t sem-def:sm)  consts=(map @t value:v)  vars=(set @t)
+          cd=(map @t [def=sem-def:sm val=value:v])
+      ==
+  ^-  eenv
+  =/  e=eenv  [consts defs ~ default-fuel ~ ~ | | vars ~ 0 make-senv:so ~ ~ ~ [~ ~] ~ 0]
+  e(cdefs cd)
+::
 ++  with-cdefs
   ::  R4.P3 (H4): tlc2's `SpecProcessor.processConstantDefns` -- every
   ::  arity-0 definition whose body is CONSTANT-level is evaluated once,
@@ -4141,7 +4165,7 @@
   =/  r  (mule |.((eval-rs u.body.d e empty-rst)))
   ?.  ?=(%& -.r)  $(ds t.ds)
   =/  [res=eres rs=rst]  p.r
-  ?.  &(?=(%& -.res) =(empty-rst rs))  $(ds t.ds)
+  ?.  &(?=(%& -.res) =(empty-rst rs(wrk 0)))  $(ds t.ds)
   $(ds t.ds, acc (~(put by acc) nm [d p.res]))
 ::
 ++  lazy-set
