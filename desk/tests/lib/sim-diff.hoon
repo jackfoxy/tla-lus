@@ -424,4 +424,64 @@
   %+  expect-eq
     !>  `@ud`6
   !>  gen:(simulate-spec:check src-level cfg-level 3 1 40)
+++  src-iact  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 5\0aSpec == Init /\\ [][Next]_x\0aBad == x = 0 /\\ [][x\' > x]_x\0a====\0a'
+++  cfg-iact  'SPECIFICATION Spec\0aPROPERTY Bad\0a'
+++  test-sim-iact-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=0"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-iact cfg-iact 1 1 10))
+++  test-sim-gen-iact-1
+  %+  expect-eq
+    !>  `@ud`6
+  !>  gen:(simulate-spec:check src-iact cfg-iact 1 1 10)
+++  test-sim-iact-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3" "x=4" "x=0"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-iact cfg-iact 2 1 10))
+++  test-sim-gen-iact-2
+  %+  expect-eq
+    !>  `@ud`6
+  !>  gen:(simulate-spec:check src-iact cfg-iact 2 1 10)
+++  src-iactmix  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 5\0aSpec == Init /\\ [][Next]_x\0aMixed == x = 0 /\\ [][x\' # 3]_x /\\ <>(x = 4)\0a====\0a'
+++  cfg-iactmix  'SPECIFICATION Spec\0aPROPERTY Mixed\0a'
+++  test-sim-iactmix-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-iactmix cfg-iactmix 1 1 10))
+++  test-sim-gen-iactmix-1
+  %+  expect-eq
+    !>  `@ud`4
+  !>  gen:(simulate-spec:check src-iactmix cfg-iactmix 1 1 10)
+++  test-sim-iactmix-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-iactmix cfg-iactmix 2 1 10))
+++  test-sim-gen-iactmix-2
+  %+  expect-eq
+    !>  `@ud`4
+  !>  gen:(simulate-spec:check src-iactmix cfg-iactmix 2 1 10)
+++  src-boxprop  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x = 0\0aNext == x\' = (x + 1) % 5\0aSpec == Init /\\ [][Next]_x\0aBoxP == [](x < 3)\0a====\0a'
+++  cfg-boxprop  'SPECIFICATION Spec\0aPROPERTY BoxP\0a'
+++  test-sim-boxprop-1
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-boxprop cfg-boxprop 1 1 10))
+++  test-sim-gen-boxprop-1
+  %+  expect-eq
+    !>  `@ud`4
+  !>  gen:(simulate-spec:check src-boxprop cfg-boxprop 1 1 10)
+++  test-sim-boxprop-2
+  %+  expect-eq
+    !>  `(list tape)`~["x=0" "x=1" "x=2" "x=3"]
+  !>  %-  render-states:ne
+      path:(need viol:(simulate-spec:check src-boxprop cfg-boxprop 2 1 10))
+++  test-sim-gen-boxprop-2
+  %+  expect-eq
+    !>  `@ud`4
+  !>  gen:(simulate-spec:check src-boxprop cfg-boxprop 2 1 10)
 --

@@ -2209,6 +2209,45 @@
     !>((console-report spec cfg))
   !>((kernel-report spec cfg))
 ::
+++  kernel-report-at
+  ::  `+kernel-report` at a given slice budget
+  |=  [spec=@t cfg=@t budget=@ud]
+  ^-  @t
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec cfg) t0) budget)
+  =/  a  (~(get by artifacts.j) %report)
+  ?~  a  ''
+  ?.  ?=(%text -.u.a)  ''
+  text.u.a
+::
+::  R4.Q8b: the lasso search is sliced by PEMs once the product is built
+::  (`+lasso-step`), a budget/16 of them per slice (one at budget 1). Two
+::  fairness conjuncts give the OOS several PEMs; at budget 1 every PEM is its
+::  own slice, and the reports must be the console path's, held or violated
+++  pem-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  A == x' = (x + 1) % 3
+  B == x' = x
+  Next == A \/ B
+  Spec == Init /\ [][Next]_x /\ WF_x(A) /\ WF_x(B)
+  Holds == []<>(x = 2)
+  Fails == []<>(x = 5)
+  ====
+  '''
+++  test-kernel-report-pem-slices
+  =/  hc  'SPECIFICATION Spec\0aPROPERTY Holds\0a'
+  =/  fc  'SPECIFICATION Spec\0aPROPERTY Fails\0a'
+  ;:  weld
+    (expect-eq !>((console-report pem-spec hc)) !>((kernel-report-at pem-spec hc 1)))
+    (expect-eq !>((console-report pem-spec fc)) !>((kernel-report-at pem-spec fc 1)))
+    (expect-eq !>((console-report pem-spec fc)) !>((kernel-report-at pem-spec fc 256)))
+  ==
+::
 ::  a STUTTERING counterexample under INIT/NEXT: the console path appends the
 ::  EC 2257 hint, and the kernel used to drop it
 ++  test-kernel-report-equals-console-2257

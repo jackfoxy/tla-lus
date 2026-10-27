@@ -1830,7 +1830,7 @@
       ::  DEADLOCK -- a state with no surviving successor, which ends the whole
       ::  simulation when deadlock checking is on (R1.7c). `name` is '' for a
       ::  deadlock, which has none.
-      viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+      viol=(unit [kind=?(%invariant %action %property %deadlock) name=@t path=(list state)])
       ::  a typed engine REFUSAL that ends the run with no verdict at all
       ::  (R2.4.6). The deterministic walk has no such outcome -- a solver
       ::  failure there drops the action -- but the `-generate` walk does: tlc2
@@ -1865,6 +1865,11 @@
       ::  randomized order and stops at the first successor the functor accepts,
       ::  so a step generates one successor instead of all of them
       prob=?
+      ::  R4.Q8b: the IMPLIED ACTIONS of the PROPERTYs (`+bin-properties`),
+      ::  checked on every generated successor after the invariants, as
+      ::  `SimulationWorker.addElement` does. Implied INITS are not: the
+      ::  simulator never checks them (measured at the pin)
+      iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
   ==
 ::  everything required to resume a run byte-identically: the RNG is the raw
 ::  48-bit java.util.Random state (lib/rng), advanced only at step boundaries,
@@ -1937,29 +1942,45 @@
   ::  violating invocation from the run's states-generated total.
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne
       ==
-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
+  ^-  $%  [%viol name=@t st=state ngen=@ud act=?]
+          [%ok nx=(list state) ngen=@ud]
+          [%err msg=@t ngen=@ud]
+      ==
   =/  nr  (next-states:ne cur body.a (act-env e ctx.a))
   ?:  ?=(%| -.nr)  [%ok ~ 0]
   =/  gen  p.nr
   =/  ei  (succ-level e)
   =|  keep=(list state)
   =|  n=@ud
-  |-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
+  |-  ^-  $%  [%viol name=@t st=state ngen=@ud act=?]
+              [%ok nx=(list state) ngen=@ud]
+              [%err msg=@t ngen=@ud]
+          ==
   ?~  gen  [%ok (flop keep) n]
   =/  fv  (first-violated invs i.gen ei)
-  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n)]
+  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n) |]
+  ::  R4.Q8b: then the implied actions, on the transition (EC 2112)
+  =/  fa  (first-bad-action iacts cur i.gen e)
+  ?^  fa  [%viol ?-(-.u.fa %& p.u.fa, %| p.u.fa) i.gen +(n) &]
   =/  ch  (con-hold cons i.gen ei)
+  ::  R4.Q8b: a constraint that fails to EVALUATE ends the run with its
+  ::  error, as tlc2's does (`Tool.isInModel` throws out of `addElement`);
+  ::  dropping the successor masked SmokeEWD998's refused
+  ::  `TLCGet("duration")` as a clean run of one-state behaviors
+  ?:  ?=(%| -.ch)  [%err p.ch +(n)]
   =/  ah  (acon-hold acons cur i.gen e)
-  =/  in=?  &(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah)
+  ?:  ?=(%| -.ah)  [%err p.ah +(n)]
+  =/  in=?  &(p.ch p.ah)
   $(gen t.gen, n +(n), keep ?:(in [i.gen keep] keep))
 ::
 ::  what one action invocation yielded during a simulation step: a violating
 ::  successor, a non-empty surviving successor set, or nothing
 +$  step-res
-  $%  [%viol name=@t st=state]
+  $%  [%viol name=@t st=state act=?]
       [%ok nx=(list state)]
       [%none ~]
       ::  a typed engine refusal, reachable only on the `-generate` walk
@@ -1973,13 +1994,16 @@
   ::  the threaded `pst` instead of returned alongside
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne  p=pst:ne
       ==
   ^-  [step-res pst:ne]
-  =/  r  (sim-nexts cur a invs cons acons e)
+  =/  r  (sim-nexts cur a invs iacts cons acons e)
   ?:  ?=(%viol -.r)
-    [[%viol name.r st.r] p(ngen (add ngen.p ngen.r))]
+    [[%viol name.r st.r act.r] p(ngen (add ngen.p ngen.r))]
+  ?:  ?=(%err -.r)
+    [[%err msg.r] p(ngen (add ngen.p ngen.r))]
   =.  ngen.p  (add ngen.p ngen.r)
   ?~  nx.r  [[%none ~] p]
   [[%ok nx.r] p]
@@ -1995,6 +2019,7 @@
   ::  the whole run through `sim-result.err`
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne  p=pst:ne
       ==
@@ -2004,14 +2029,18 @@
     |=  st=state
     ^-  fres:ne
     =/  fv  (first-violated invs st ei)
-    ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv)]
+    ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) |]
+    =/  fa  (first-bad-action iacts cur st e)
+    ?^  fa  [%viol ?-(-.u.fa %& p.u.fa, %| p.u.fa) &]
     =/  ch  (con-hold cons st ei)
+    ?:  ?=(%| -.ch)  [%err p.ch]
     =/  ah  (acon-hold acons cur st e)
-    ?:(&(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah) %keep %drop)
+    ?:  ?=(%| -.ah)  [%err p.ah]
+    ?:(&(p.ch p.ah) %keep %drop)
   =^  r  p  (next-states-prob:ne cur body.a (act-env e ctx.a) p fil)
   ?-  -.r
     %found  [[%ok ~[st.r]] p]
-    %viol   [[%viol nm.r st.r] p]
+    %viol   [[%viol nm.r st.r act.r] p]
     %none   [[%none ~] p]
     %err    [[%err msg.p.r] p]
   ==
@@ -2035,7 +2064,7 @@
   ::  trace-length stats, as collectPostTrace runs only on a clean behavior).
   ::  Var(X) and SD use TLC's `genTrace + 1` div-by-zero guard.
   |=  $:  gt=@ud  cur=sim-cursor
-          viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+          viol=(unit [kind=?(%invariant %action %property %deadlock) name=@t path=(list state)])
           err=(unit @t)
       ==
   ^-  sim-result
@@ -2127,8 +2156,8 @@
     ?:  =(tries alen)  [[%none ~] pp]
     =/  a  (nth-action index actions.o)
     =^  r  pp
-      ?:  prob.o  (sim-nexts-prob cur.w a invs.o cons.o acons.o e pp)
-      (sim-nexts-det cur.w a invs.o cons.o acons.o e pp)
+      ?:  prob.o  (sim-nexts-prob cur.w a invs.o iacts.o cons.o acons.o e pp)
+      (sim-nexts-det cur.w a invs.o iacts.o cons.o acons.o e pp)
     ?.  ?=(%none -.r)  [r pp]
     $(tries +(tries), index (mod (add index p) alen))
   =/  found  -.fnd
@@ -2168,7 +2197,8 @@
     ::  `collectPreSuccessor` runs before `addElement` checks the invariant --
     ::  which the `gen.cur` fold above now does for every outcome
     :+  %done
-      (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])] ~)
+      =/  vk  ?:(act.found %action %invariant)
+      (mk-result +(t.cur) cur `[vk name.found (flop [st.found path.w])] ~)
     cur
   ::  d) pick one successor and make it the current state; every successor the
   ::  chosen action generated counts toward states-generated (collectPre)
@@ -2227,8 +2257,8 @@
   =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
   =/  pname  ?~(pp.c '' u.pp.c)
   =/  o=sim-opts
-    :*  actions  invs.c  cons.c  acons.c  ddl.c  oss.c  pname
-        defs.c  consts.c  vars.c  order.c  traces  depth  prob
+    :*  actions  (weld invs.c binvs.c)  cons.c  acons.c  ddl.c  oss.c  pname
+        defs.c  consts.c  vars.c  order.c  traces  depth  prob  iacts.c
     ==
   (simulate o is.c seed)
 ::

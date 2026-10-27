@@ -59,4 +59,58 @@
 ++  test-sim-no-violation
   =/  r  (simulate-spec:check cyc-spec cyc-cfg 99 5 20)
   (expect-eq !>(%.y) !>(?=(~ viol.r)))
+::
+::  R4.Q8b: in simulation a PROPERTY is binned as in the exhaustive check: an
+::  implied action is its own kind (`Action property ... is violated`), a
+::  box-state one an invariant, and an implied init is never checked (tlc2's
+::  simulator does not -- `Init`'s `x = 0` against `x = 1` passes there)
+++  prop-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = (x + 1) % 5
+  Spec == Init /\ [][Next]_x
+  Bad == [][x' > x]_x
+  BoxP == [](x < 3)
+  BadInit == x = 1 /\ [][TRUE]_x
+  ====
+  '''
+::
+++  test-sim-prop-kinds
+  =/  k
+    |=  p=@t
+    =/  r
+      %:  simulate-spec:check  prop-spec
+        (rap 3 ~['SPECIFICATION Spec\0aPROPERTY ' p '\0a'])
+        1  3  10
+      ==
+    ?~(viol.r %none kind.u.viol.r)
+  %+  expect-eq
+    !>  `(list @tas)`~[%action %invariant %none]
+  !>  `(list @tas)`~[(k 'Bad') (k 'BoxP') (k 'BadInit')]
+::
+::  R4.Q8b: a CONSTRAINT that fails to evaluate on a successor ends the run
+::  with the error (tlc2: `Tool.isInModel` throws out of `addElement`). It
+::  used to drop the successor, so every behavior ended after one state and
+::  the run reported success
+++  test-sim-constraint-error-ends-run
+  =/  src
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == x\' = x + 1'
+        'Constr == x = 0 \\/ x < (CHOOSE y \\in {} : TRUE)'
+        '===='
+    ==
+  =/  r
+    %:  simulate-spec:check  src
+      'INIT Init\0aNEXT Next\0aCONSTRAINT Constr\0aCHECK_DEADLOCK FALSE\0a'
+      1  3  10
+    ==
+  (expect-eq !>([%.y %.n]) !>([?=(^ err.r) ?=(^ viol.r)]))
 --

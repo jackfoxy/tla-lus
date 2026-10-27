@@ -157,6 +157,42 @@ Next == A \\/ B
 Inv == TLCGet("level") < 6
 ====
 """, "INIT Init\nNEXT Next\nINVARIANT Inv\n", 40, [1, 2, 3]),
+    # R4.Q8b: PROPERTYs in simulation, binned as the exhaustive path bins them
+    # (`SpecProcessor.processConfigProps` is mode-blind). An IMPLIED ACTION is
+    # checked on every successor after the invariants (`SimulationWorker.
+    # addElement`, EC 2112 `Action property ... is violated`); the port
+    # normalized the whole PROPERTY into the temporal engine and failed with
+    # EC 2214 (SmokeEWD998's `TDSpec`)
+    ("iact", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+Next == x' = (x + 1) % 5
+Spec == Init /\\ [][Next]_x
+Bad == x = 0 /\\ [][x' > x]_x
+====
+""", "SPECIFICATION Spec\nPROPERTY Bad\n", 10, [1, 2]),
+    # R4.Q8b: an implied action beside a temporal part in one PROPERTY
+    ("iactmix", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+Next == x' = (x + 1) % 5
+Spec == Init /\\ [][Next]_x
+Mixed == x = 0 /\\ [][x' # 3]_x /\\ <>(x = 4)
+====
+""", "SPECIFICATION Spec\nPROPERTY Mixed\n", 10, [1, 2]),
+    # R4.Q8b: a box-state PROPERTY is an INVARIANT in simulation too (`Error:
+    # Invariant BoxP is violated.`); the port ignored it there
+    ("boxprop", """---- MODULE spec ----
+EXTENDS Naturals
+VARIABLE x
+Init == x = 0
+Next == x' = (x + 1) % 5
+Spec == Init /\\ [][Next]_x
+BoxP == [](x < 3)
+====
+""", "SPECIFICATION Spec\nPROPERTY BoxP\n", 10, [1, 2]),
 ]
 
 

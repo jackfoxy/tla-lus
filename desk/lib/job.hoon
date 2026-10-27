@@ -205,6 +205,9 @@
           ::  R4.2i: the ALIAS body, for the lasso and a pre-empting safety
           ::  trace alike
           al=(unit sem:semantic)
+          ::  R4.Q8b: the bits the last finished OrderOfSolution computed,
+          ::  for the next one (`+seed:lv`)
+          lc=lcache:lv
       ==
       ::  seeded simulation
       $:  %sim
@@ -1819,13 +1822,20 @@
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
     =/  actions  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
-    ::  normalize the PROPERTY (if any) into the OrderOfSolution form; an
-    ::  unsupported property is a typed rejection, never a silent %ok
+    ::  R4.Q8b: the PROPERTYs binned as the exhaustive path and the console
+    ::  simulator bin them (`SpecProcessor.processConfigProps` is mode-blind):
+    ::  the box-state ones join the invariants, the implied actions are
+    ::  checked per successor, and only the TEMPORAL bin is normalized into
+    ::  OrderOfSolutions, under the spec's fairness. The whole first PROPERTY
+    ::  used to be normalized, so `TDSpec == Init /\ [][Next]_v /\ WF_v(A)`
+    ::  (SmokeEWD998) failed with EC 2214. Implied inits are not checked: the
+    ::  simulator never does (measured at the pin)
     =/  osr=(each (list oos:tp) aerr:tp)
-      ?~  pp  [%& ~]
-      =/  psb  (sem-body:check defs u.pp)
-      ?~  psb  [%| [0 (rap 3 ~['no definition for PROPERTY ' u.pp])]]
-      (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
+      ?~  temps.bins  [%& ~]
+      %:  oss-of:check
+        (turn temps.bins |=([* b=sem:semantic] b))
+        modn  fair  (make-env:ne defs consts vars)
+      ==
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=sim-opts:check
       ::  the effective deadlock flag. The exhaustive mode ANDs a request-side
@@ -1833,9 +1843,10 @@
       ::  `deadlock && getCheckDeadlock()`), but `[%simulate ...]` carries no
       ::  such toggle on this wire -- only `[%exhaustive deadlock=?]` does --
       ::  so here the cfg's CHECK_DEADLOCK is the whole story.
-      :*  actions  invs  cons  acons  deadlock.rs
+      :*  actions  (weld invs binvs.bins)  cons  acons  deadlock.rs
           p.osr  ?~(pp '' u.pp)
           defs  consts  vars  order  num.mode  dep  generate.mode
+          iacts
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
@@ -1929,7 +1940,7 @@
           temps.bins
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
-          sname  sloc  fair  aname  alb
+          sname  sloc  fair  aname  alb  *lcache:lv
       ==
     (more j pre)
   ::  no temporal property: a safety run, and the box-state properties are part
@@ -2306,15 +2317,20 @@
   ::  obtain this OOS's lasso, slicing a tf product build; %more persists the
   ::  cursor and continues, %done carries the (unit lasso)
   =/  res
-    ^-  $%([%more cur=pcursor:lv] [%done lasso=(unit lasso:lv)])
-    ?~  tf.o
-      :-  %done
-      %+  lasso-of-product:lv  o
-      (labeled-product:lv o states (flop inits.cur.kk) next.o.kk env order.o.kk)
-    =/  pc  ?~(pcur.kk (product-init:lv o states (flop inits.cur.kk) env) u.pcur.kk)
+    ^-  $%([%more cur=pcursor:lv] [%done lasso=(unit lasso:lv) pc=(unit pcursor:lv)])
+    ::  R4.Q8b: a no-tableau OOS is sliced too (`+flat-step:lv`)
+    =/  pc
+      ?^  pcur.kk  u.pcur.kk
+      (seed:lv (product-init:lv o states (flop inits.cur.kk) env) o lc.kk)
+    ::  R4.Q8b: the lasso search sliced by PEMs once the product is built
+    ?:  ?=(^ lp.pc)
+      =/  ls  (lasso-step:lv o pc (div budget 16))
+      ?.  done.ls  [%more cur.ls]
+      [%done lasso.ls `cur.ls]
     =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget succ.cur.kk)
     ?.  done.r  [%more cur.r]
-    [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]
+    ::  built: the first PEMs in this slice only when the build left room
+    [%more cur.r(lp `pems.o, oa (out-arcs:lv edges.cur.r))]
   ?:  ?=(%more -.res)
     ::  bound the persisted product cursor, like the safety search, as its
     ::  product node count grows
@@ -2328,7 +2344,10 @@
   =/  l  lasso.res
   ?~  l
     ::  this OOS has no accepting lasso → try the next one, fresh cursor
-    =.  cont.j  (save-kont kk(otodo t.otodo.kk, pcur ~))
+    =/  lc=lcache:lv
+      ?~  pc.res  lc.kk
+      [check-state.o check-action.o cb.u.pc.res ab.u.pc.res]
+    =.  cont.j  (save-kont kk(otodo t.otodo.kk, pcur ~, lc lc))
     (more j pre)
   =/  report
     %-  wain-text
@@ -2431,6 +2450,7 @@
   =/  headline=@t
     ?-  vk
       %invariant  (crip "Error: Invariant {(trip vname)} is violated.")
+      %action     (crip "Error: Action property {(trip vname)} is violated.")
       %property   (crip "Error: Temporal property {(trip vname)} is violated.")
       %deadlock   'Error: Deadlock reached.'
     ==
@@ -2465,6 +2485,7 @@
       ::  simulation reports what a BEHAVIOR violated; it has no
       ::  initial-predicate phase of its own (R2.7.1)
       %invariant  [%invariant vname %.n]
+      %action     [%action vname]
       %property   [%property vname %.n]
       %deadlock   [%deadlock ~]
     ==

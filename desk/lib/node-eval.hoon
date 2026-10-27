@@ -4395,10 +4395,11 @@
 ::  the next-state functor's verdict on one complete successor, i.e. what
 ::  `SimulationWorker.addElement` does after counting: check the invariants (a
 ::  violation throws), then CONSTRAINT / ACTION_CONSTRAINT (a failure drops it)
-+$  fres  $@(?(%keep %drop) [%viol nm=@t])
+::  R4.Q8b: `act` -- an implied ACTION property, not an invariant
++$  fres  $@(?(%keep %drop) $%([%viol nm=@t act=?] [%err msg=@t]))
 +$  pres
   $%  [%found st=state]
-      [%viol nm=@t st=state]
+      [%viol nm=@t st=state act=?]
       [%none ~]
       [%err p=eval-err:v]
   ==
@@ -4454,7 +4455,8 @@
   =/  f  (fil part)
   ?@  f
     ?:(?=(%keep f) [[%found part] p] [[%none ~] p])
-  [[%viol nm.f part] p]
+  ?:  ?=(%err -.f)  [[%err [0 msg.f]] p]
+  [[%viol nm.f part act.f] p]
 ::
 ++  pfilter
   ::  a boolean conjunct: it prunes, it never assigns
