@@ -1127,6 +1127,31 @@
         ~[['spec' sp]]
       'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
 ::
+++  test-cdefs-in-dependency-order
+  ::  R4.Q7: constant definitions are evaluated dependencies first, each
+  ::  with the values already found (`+cdef-order:ne`) -- the walk is over
+  ::  the definition MAP, whose order is not the source order; a failing
+  ::  one stays lazy and so does its dependent. x = C = (A * 2) + 1 = 7:
+  ::  one state and its stuttering step. Pin: 2/1/1
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'A == 3'
+        'B == A * 2'
+        'C == B + 1'
+        'Bad == CHOOSE y \\in {} : TRUE'
+        'Dep == Bad + 1'
+        'Init == x = C'
+        'Next == UNCHANGED x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [2 1 1]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0a'
+::
 ++  test-action-argument-solved
   ::  an ACTION passed as an operator argument is bound by name and solved
   ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`

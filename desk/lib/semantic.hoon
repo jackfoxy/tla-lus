@@ -3840,6 +3840,11 @@
   ::  instanced module's own tree), and theorem/assumption bodies
   |=  [tree=node c=ctx ctxs=(map @t ctx) mods=(map @t loaded:modules)]
   ^-  sem-module
+  ::  R4.Q7: memoized. `+generate-with` asks for the same module's graph
+  ::  from the root, `+l-deps`, `+ext-defs`, `+nested-defs` and
+  ::  `+mod-opdefs`, always with the same inputs -- each module was generated
+  ::  three or four times (EWD998ChanID: 22.6 s of semantic generation)
+  ~+
   =/  units  (body-of-module tree)
   =/  ed  (ext-decls tree mods)
   =/  consts  consts.ed

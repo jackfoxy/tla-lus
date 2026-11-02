@@ -4134,18 +4134,68 @@
   ::  drawing ones once, in tlc2's order, into `vals`.
   ::  `~+`: the environment is rebuilt per expansion (`+env-of`), and the
   ::  memo cache answers every rebuild after the first from the same inputs
+  ::  R4.Q7: in dependency order, each evaluated with the values already
+  ::  found (`+cdef-order`). In map order against the bare environment a
+  ::  definition re-evaluated every candidate it reaches: EWD998ChanID's
+  ::  `nat2node` and `node2nat` each re-ran `RingOfNodes` (a CHOOSE over
+  ::  5^5 functions, 5.6 s), 17 s for three values; `~+` entries made under
+  ::  `mule` do not outlive it
   |=  e=eenv
   ^-  eenv
   ~+
-  =/  ds  ~(tap by ops.e)
+  =/  ds  (cdef-order (skim ~(tap by ops.e) |=([nm=@t d=sem-def:sm] (cdef-cand nm d e))) ops.e)
   =|  acc=(map @t [def=sem-def:sm val=value:v])
   |-  ^-  eenv
   ?~  ds  e(cdefs acc)
   =/  nm  p.i.ds
   =/  d   q.i.ds
+  ?>  ?=(^ body.d)
+  =/  r  (mule |.((eval-rs u.body.d e(cdefs acc) empty-rst)))
+  ?.  ?=(%& -.r)  $(ds t.ds)
+  =/  [res=eres rs=rst]  p.r
+  ?.  &(?=(%& -.res) =(empty-rst rs(wrk 0)))  $(ds t.ds)
+  $(ds t.ds, acc (~(put by acc) nm [d p.res]))
+::
+++  cdef-order
+  ::  R4.Q7: the candidates, each after the candidates its body reaches
+  ::  (`+reach-names` is transitive), else in the order given. Values do not
+  ::  depend on the order; only how often a shared one is computed does
+  |=  [cs=(list [p=@t q=sem-def:sm]) ops=(map @t sem-def:sm)]
+  ^-  (list [p=@t q=sem-def:sm])
+  =/  bm=(map @t sem-def:sm)  (malt cs)
+  =|  st=[done=(set @t) out=(list [p=@t q=sem-def:sm])]
+  |-  ^-  (list [p=@t q=sem-def:sm])
+  ?~  cs  (flop out.st)
+  $(cs t.cs, st (cdef-visit p.i.cs bm ops st))
+::
+++  cdef-visit
+  |=  $:  nm=@t  bm=(map @t sem-def:sm)  ops=(map @t sem-def:sm)
+          st=[done=(set @t) out=(list [p=@t q=sem-def:sm])]
+      ==
+  ^+  st
+  ?:  (~(has in done.st) nm)  st
+  =.  done.st  (~(put in done.st) nm)
+  =/  d  (~(got by bm) nm)
+  =/  deps=(list @t)
+    ?~  body.d  ~
+    %+  murn  ~(tap in (reach-names u.body.d ops))
+    |=  x=@
+    =/  t=@t  `@t`x
+    ?.  &(!=(t nm) (~(has by bm) t))  ~
+    `t
+  =.  st
+    |-  ^+  st
+    ?~  deps  st
+    $(deps t.deps, st (cdef-visit i.deps bm ops st))
+  st(out [[nm d] out.st])
+::
+++  cdef-cand
+  ::  is `d` a constant definition `+with-cdefs` evaluates once?
+  |=  [nm=@t d=sem-def:sm e=eenv]
+  ^-  ?
   ::  R4.2ah: a named theorem (`$thm:`) is evaluated only where referenced;
   ::  tlc2's `processConstantDefns` walks `getOpDefs()`, which has none
-  ?.  ?&  ?=(~ params.d)
+  ?&  ?=(~ params.d)
           !=('$thm:' (end [3 5] nm))
           ::  R4.2c: not a definition that reaches an override with a
           ::  minLevel above 0 (`TLCGet`, `CounterExample`): SANY gives it
@@ -4161,12 +4211,6 @@
           ?=(~ (lookup:so ov.e [origin.d (bnm name.d) 0]))
           ?=(~ (node-op:so [origin.d (bnm name.d) 0]))
       ==
-    $(ds t.ds)
-  =/  r  (mule |.((eval-rs u.body.d e empty-rst)))
-  ?.  ?=(%& -.r)  $(ds t.ds)
-  =/  [res=eres rs=rst]  p.r
-  ?.  &(?=(%& -.res) =(empty-rst rs(wrk 0)))  $(ds t.ds)
-  $(ds t.ds, acc (~(put by acc) nm [d p.res]))
 ::
 ++  lazy-set
   ::  R4.3: does a body denote a set tlc2 keeps LAZY (the class rules of
