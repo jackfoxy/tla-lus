@@ -536,6 +536,12 @@
           ?=(~ (lookup:so ov.e [origin.u.d (bnm name.u.d) 0]))
           ?=(~ (node-op:so [origin.u.d (bnm name.u.d) 0]))
           (gth fuel.e 0)
+          ::  R4.QW: only a body that stays lazy here. Any other set
+          ::  (`{R \in SUBSET S : P}`) is materialized either way, and
+          ::  through the reference it is materialized ONCE per state cut
+          ::  (`+eval-sdef`). MCInnerSerial's `totalOpOrder'` was rebuilt for
+          ::  every candidate `opOrder'` of an expansion
+          (lazy-set u.body.u.d ops.e)
       ==
     $(n u.body.u.d, fuel.e (dec fuel.e))
   =/  key=op-key:so  [origin.u.d (bnm name.u.d) (lent args.n)]
@@ -1962,6 +1968,14 @@
   ::  MCInnerSerial's `totalOpOrder` reads only `opQ`, but keyed on the whole
   ::  successor it missed for each of up to 65,536 `opOrder'` candidates
   =?  e  ?=(~ psub.e)
+    ::  R4.QW: a body that reads the state only THROUGH arity-0 definitions
+    ::  it names is keyed on their VALUES, with no state at all.
+    ::  MCInnerSerial's `totalOpOrder` reads `opQ` only through `opId`, which
+    ::  depends on the queue LENGTHS: keyed on `opQ` every distinct queue
+    ::  rebuilt its 2^9..2^16 subsets, keyed on `opId` a few builds serve
+    ::  the run
+    =/  dk  (dep-vals b e)
+    ?^  dk  e(vals (~(uni by vals.e) u.dk), s0 ~, s1 ~)
     =/  rv=(set @)  (reach-names b ops.e)
     =/  cut
       |=  st=state
@@ -1972,6 +1986,79 @@
     e(s0 (cut s0.e), s1 (cut s1.e))
   ?:  |(primed.e enabled.e)  e
   e(s1 ~)
+::
+++  dep-vals
+  ::  R4.QW: the values of the arity-0 definitions `b` names directly, when
+  ::  every read of a state variable in its reach goes through one of them
+  ::  (`+reach-stop`); ~ otherwise. Bound in `vals`, a reference reads the
+  ::  value (`+eval-user`), so the body sees what it would have computed.
+  ::  Not for a definition that draws, fails, or is already a value
+  |=  [b=sem:sm e=eenv]
+  ^-  (unit (map @t value:v))
+  =/  cs=(list @t)
+    %+  skim  ~(tap in (top-names b))
+    |=  nm=@t
+    =/  d  (~(get by ops.e) nm)
+    ?&  ?=(^ d)
+        ?=(~ params.u.d)
+        ?=(^ body.u.d)
+        !(~(has by vals.e) nm)
+        !(~(has by cdefs.e) nm)
+        !=('$thm:' (end [3 5] nm))
+    ==
+  ?:  =(~ cs)  ~
+  =/  rs  (reach-stop b ops.e (silt cs))
+  ?:  (lien ~(tap in vars.e) |=(x=@t (~(has in rs) x)))  ~
+  ::  only those whose own reach reads the state: the rest key as before
+  =/  ds=(list @t)
+    %+  skim  cs
+    |=  nm=@t
+    =/  bd  (need body:(~(got by ops.e) nm))
+    =/  r2  (reach-names bd ops.e)
+    (lien ~(tap in vars.e) |=(x=@t (~(has in r2) x)))
+  ?:  =(~ ds)  ~
+  =|  out=(map @t value:v)
+  =/  dl=(list @t)  ds
+  |-  ^-  (unit (map @t value:v))
+  ?~  dl  `out
+  =/  bd  (need body:(~(got by ops.e) i.dl))
+  ?:  (sem-draws bd e)  ~
+  =/  r  (eval bd e(fuel ?:(=(0 fuel.e) 0 (dec fuel.e))))
+  ?:  ?=(%| -.r)  ~
+  $(dl t.dl, out (~(put by out) i.dl p.r))
+::
+++  top-names
+  ::  the atoms of `b` itself, not descending into what they name
+  |=  b=sem:sm
+  ^-  (set @t)
+  ~+
+  =|  out=(set @t)
+  =/  stk=(list *)  ~[b]
+  |-  ^-  (set @t)
+  ?~  stk  out
+  =/  x  i.stk
+  ?^  x  $(stk [-.x +.x t.stk])
+  ?.  ((sane %t) x)  $(stk t.stk)
+  $(stk t.stk, out (~(put in out) `@t`x))
+::
+++  reach-stop
+  ::  `+reach-names` that does not descend into the definitions in `stop`
+  |=  [b=sem:sm ops=(map @t sem-def:sm) stop=(set @t)]
+  ^-  (set @)
+  ~+
+  =|  out=(set @)
+  =|  seen=(set @t)
+  =/  stk=(list *)  ~[b]
+  |-  ^-  (set @)
+  ?~  stk  out
+  =/  x  i.stk
+  ?^  x  $(stk [-.x +.x t.stk])
+  =.  out  (~(put in out) x)
+  ?:  |((~(has in seen) x) (~(has in stop) x))  $(stk t.stk)
+  =/  d  (~(get by ops) x)
+  ?~  d  $(stk t.stk)
+  ?~  body.u.d  $(stk t.stk, seen (~(put in seen) x))
+  $(stk [u.body.u.d t.stk], seen (~(put in seen) x))
 ::
 ++  heavy-body
   ::  R4.Q1: is a body worth the memo? Its key (`+sdef-env`) rebuilds four

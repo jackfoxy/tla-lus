@@ -1152,6 +1152,30 @@
         ~[['spec' sp]]
       'INIT Init\0aNEXT Next\0a'
 ::
+++  test-memo-keyed-on-dependency-values
+  ::  R4.QW: `D` reads the state only through `O`, so its memo is keyed on
+  ::  `O`'s value (`+dep-vals:ne`). A wrong key would serve x = 0's `D` at
+  ::  x = 1: `Inv` would fail and `Bad` hold. Pins: 5/4/4; `Bad` violated
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, FiniteSets'
+        'VARIABLE x'
+        'O == x % 2'
+        'D == {y \\in SUBSET {1, 2, 3} : Cardinality(y) <= O}'
+        'Init == x = 0'
+        'Next == x\' = (x + 1) % 4'
+        'Inv == Cardinality(D) = IF x % 2 = 0 THEN 1 ELSE 4'
+        'Bad == Cardinality(D) = 1'
+        '===='
+    ==
+  ;:  weld
+    %+  expect-eq  !>([%& [5 4 4]])
+    !>((bundle-stats 'spec' ~[['spec' sp]] 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'))
+    %+  expect-eq  !>([%| 'not ok'])
+    !>((bundle-stats 'spec' ~[['spec' sp]] 'INIT Init\0aNEXT Next\0aINVARIANT Bad\0a'))
+  ==
+::
 ++  test-action-argument-solved
   ::  an ACTION passed as an operator argument is bound by name and solved
   ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`
