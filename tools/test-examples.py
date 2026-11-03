@@ -55,6 +55,18 @@ def main() -> int:
     lim = limits_of(e.request(large, 2, 20_000, 900))
     check("large model: max-states is the budget", lim[1][1][0] == 20_000)
 
+    #  R5.1: staging carries each upstream's license beside its files
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        e.stage_licenses(Path(td))
+        got = {d: (Path(td) / d / "license.txt").read_text()
+               for d in e.STAGE_LICENSES}
+    check("stage writes license.txt beside every staged library",
+          all(got[d] == (e.REPO / "licenses" / f).read_text()
+              for d, f in e.STAGE_LICENSES.items()))
+    check("staged licenses name their pinned commits",
+          all("Pinned commit: " in t for t in got.values()))
+
     #  classification
     check("limited time -> too slow", e.classify(row("limited time")) == "too slow")
     check("too slow -> too slow", e.classify(row("too slow")) == "too slow")

@@ -56,6 +56,14 @@ grep -qiE 'MIT' "$DESK/lib/stdmods.hoon" && pass "StandardModules carry MIT prov
   || fail "stdmods.hoon missing MIT provenance header"
 grep -qiE 'MIT' "$DESK/doc/compatibility.md" "$DESK/../README.md" 2>/dev/null \
   && pass "license noted in docs" || fail "license not noted in docs"
+#  R5.1: the upstream licenses beyond the tlaplus tools' MIT -- tlapm
+#  (BSD-2-Clause), tlauc (MIT), CommunityModules (MIT), Apalache (Apache-2.0
+#  with NOTICE), the Examples (MIT) -- are carried verbatim from their pinned
+#  commits under licenses/, and every tlapm- or tlauc-derived file in the
+#  repo has a license.txt beside it (tools/gen-licenses.py --check)
+python3 "$REPO/tools/gen-licenses.py" --check >/dev/null 2>&1 \
+  && pass "upstream licenses match their pins; tlapm/tlauc-derived files covered" \
+  || fail "upstream licenses: run tools/gen-licenses.py --check"
 
 echo "== gate 5: kelvin compatibility =="
 [ -f "$DESK/sys.kelvin" ] && pass "sys.kelvin present: $(head -1 "$DESK/sys.kelvin")" \

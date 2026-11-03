@@ -77,6 +77,23 @@ def low(p: str) -> str:
 
 
 # ------------------------------------------------------------------ stage ---
+#  R5.1: each staged upstream's LICENSE (from its pinned commit, with the pin
+#  named), beside what it covers; `licenses/` is written by
+#  tools/gen-licenses.py. `.txt`, since Clay casts every file by its extension
+STAGE_LICENSES = {
+    "tlapm": "tlapm-license.txt",
+    "community": "communitymodules-license.txt",
+    "apalache": "apalache-license.txt",
+    "specifications": "tlaplus-examples-license.txt",
+}
+
+
+def stage_licenses(out: Path):
+    for d, f in STAGE_LICENSES.items():
+        (out / d).mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO / "licenses" / f, out / d / "license.txt")
+
+
 def stage(out: Path):
     """The %tla-ex desk: corpus dirs, three library roots, marks."""
     work = json.loads(WORK.read_text())
@@ -110,6 +127,7 @@ def stage(out: Path):
             (out / "tlapm").mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, out / "tlapm" / low(f.name))
             n += 1
+    stage_licenses(out)
     mar = out / "mar"
     mar.mkdir(parents=True, exist_ok=True)
     for m in ("tla", "cfg", "txt", "txt-diff", "mime", "kelvin", "bill"):

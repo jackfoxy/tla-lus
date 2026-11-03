@@ -81,3 +81,9 @@ headline case (`excluded`). See
 The Java TLA+ sources used to generate test fixtures are MIT-licensed
 (`tlaplus`, `tlaplus-Examples`, `vscode-tlaplus`); their notices are retained
 with the vendored `StandardModules` and oracle fixtures.
+
+The other upstreams the Examples work uses are tlapm's library
+(BSD-2-Clause), tlauc (MIT), CommunityModules (MIT) and Apalache
+(Apache-2.0, with its `NOTICE`). Their license texts, verbatim from each
+pinned commit, are in [`licenses/`](licenses/), and a copy goes beside every
+library staged onto the `%tla-ex` desk.

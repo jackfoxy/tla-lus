@@ -52,9 +52,23 @@ So `tla2tools.jar`'s own `Json.tla` shadows CommunityModules' `Json.tla`, its
 take the same classpath minus the spec dir, plus `-workers auto -lncheck final`.
 
 Attribution: the original three upstreams are MIT-licensed. Of the R4 pins,
-tlapm's library is BSD-2-Clause and Apalache is Apache-2.0 with a `NOTICE`. Any translated code,
-copied fixture, or vendored StandardModule in this desk must retain the
-upstream copyright notice and a pointer to the pinned commit.
+tlapm's library is BSD-2-Clause, tlauc and CommunityModules are MIT, and
+Apalache is Apache-2.0 with a `NOTICE`. Any translated code, copied fixture,
+or vendored StandardModule in this desk must retain the upstream copyright
+notice and a pointer to the pinned commit.
+
+**R5.1 (2026-11-03): the license files.** `licenses/<upstream>-license.txt`
+carries each R4 upstream's LICENSE (and Apalache's NOTICE) verbatim from its
+pinned commit, under a header naming the repo, the pin and what the file
+covers; `tools/gen-licenses.py` writes them from the pins in
+`tools/r4-deps.sh`. `tools/examples.py --stage` puts the matching file beside
+every library it stages onto `%tla-ex` (`tlapm/`, `community/`, `apalache/`,
+`specifications/`, each as `license.txt`). The scaffold gate's provenance
+clause runs `gen-licenses.py --check`: the files must equal what the pins
+give, and any tlapm library module stored in the repo, or tlauc output under
+`desk/test-data/unicode/` (R4.4), must have a `license.txt` beside it. As of
+R5.1 the repo stores no tlapm module text and no tlauc output; both reach
+only the `%tla-ex` staging (tlapm) or will in R4.4 (tlauc).
 
 ## 2. Java Oracle Build And Invocation Forms
 
