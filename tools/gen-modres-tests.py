@@ -41,7 +41,9 @@ def golden(case: Path) -> str:
     out = r.stdout + r.stderr
     lines = []
     for l in out.split("\n"):
-        m = re.match(r"^Parsing file .*[/\\]([A-Za-z0-9_]+)\.tla.*$", l)
+        #  a monolith block prints `Parsing file B.tla (/path/A.tla)`: the
+        #  module is the one BEFORE the parenthesis
+        m = re.match(r"^Parsing file (?:.*[/\\])?([A-Za-z0-9_]+)\.tla(?: \(.*\))?$", l)
         if m:
             lines.append(f"Parsing file {m.group(1)}.tla")
         else:

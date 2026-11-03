@@ -1,0 +1,55 @@
+BINDINGS
+Folds!MapThenFoldSet/5|body
+Functions!AntiFunction/1|override:MethodValue
+Functions!Bijection/2|body
+Functions!ExistsBijection/2|body
+Functions!ExistsInjection/2|body
+Functions!ExistsSurjection/2|body
+Functions!FoldFunction/3|override:MethodValue
+Functions!FoldFunctionOnSet/4|override:MethodValue
+Functions!Injection/2|body
+Functions!Inverse/3|body
+Functions!IsInjective/1|override:MethodValue
+Functions!IsRestriction/2|body
+Functions!Pointwise/3|body
+Functions!Range/1|body
+Functions!Restrict/2|body
+Functions!RestrictDomain/2|body
+Functions!RestrictValues/2|body
+Functions!SumFunction/1|body
+Functions!SumFunctionOnSet/2|body
+Functions!Surjection/2|body
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+EVAL
+Anti FcnRcdValue [a |-> 1, b |-> 2]
+AntiFn FcnRcdValue (10 :> 1 @@ 20 :> 2)
+FF IntValue 123
+FFOS TupleValue <<5, 7>>
+FFOSE IntValue 0
+FFS TupleValue <<3, 1, 2>>
+FFSum IntValue 30
+Inj BoolValue TRUE
+InjEmpty BoolValue TRUE
+InjNo BoolValue FALSE
+InjRec ! EC2283 EvalException: The argument of IsInjective should be a function, but instead it is: [a |-> 1, b |-> 2]

@@ -24,6 +24,8 @@
 ++  dot-path     `path`~[%src `@ta`'.' %tla]
 ++  dollar-path  `path`~[%src `@ta`'$foo' %tla]
 ++  dotted-path  `path`~[%src `@ta`'spec.tla']
+++  tbx-path     `path`~[%src `@ta`'puzzle.toolbox' %model-1 %mc %tla]
+++  tbx-mark     `path`~[%src `@ta`'puzzle.toolbox' %mc `@ta`'t.la']
 ++  upper-path   `path`~[%src `@ta`'Spec' %tla]
 ++  empty-path   `path`~[%src `@ta`'' %tla]
 ++  esc-root     `path`~[%src `@ta`'..']
@@ -84,6 +86,18 @@
   %+  expect-eq
     !>([%| [%bad-segment 'spec.tla' 'dotted' dotted-path]])
   !>((ref ud+7 dotted-path))
+::
+::  R4.2r: a DIRECTORY may contain `.` (the Examples' Toolbox model
+::  directories); a file's name or mark segment may not
+++  test-dotted-directory-accepted
+  %+  expect-eq
+    !>([%& `source-ref`[~zod %spec ud+7 tbx-path]])
+  !>((ref ud+7 tbx-path))
+::
+++  test-dotted-mark-refused
+  %+  expect-eq
+    !>([%| [%bad-segment 't.la' 'dotted' tbx-mark]])
+  !>((ref ud+7 tbx-mark))
 ::
 ++  test-non-knot-segment
   ::  Clay segments are lowercase; an uppercase file name cannot exist

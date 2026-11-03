@@ -345,13 +345,13 @@
 ::  +|  R1.2.5: decoding a persisted continuation
 ::
 ::  The only surface where the hostile input is a STORED NOUN rather than a
-::  spec. `+load-kont` is `;;(kont (cue k.c))` -- a bare coercion over an atom
-::  that survived a restart, a state migration, or a disk. It crashes on
-::  anything that is not a valid `kont`, which is FINE only because every one of
-::  its three call sites wraps it in `mule` and treats the failure as a typed
-::  outcome (`+step` fails the job with a restart notice, the two read-routing
-::  arms fall through). This arm drives the PRODUCTION entry, `+step`, so it
-::  tests that contract rather than the unguarded internal arm.
+::  spec. `+load-kont` accepts only `[kont-tag kont]` as this build wrote it
+::  (R4.P2) and crashes on anything else -- an atom, or a cell under another
+::  tag -- which is FINE only because every one of its three call sites wraps
+::  it in `mule` and treats the failure as a typed outcome (`+step` fails the
+::  job with a restart notice, the two read-routing arms fall through). This
+::  arm drives the PRODUCTION entry, `+step`, so it tests that contract rather
+::  than the unguarded internal arm.
 ::
 ++  gen-atom
   ::  a random atom -- garbage where a jammed continuation should be. Includes
@@ -378,13 +378,14 @@
   [`@t`(end [0 b] base) rng]
 ::
 ++  fz-kont
-  ::  a corrupt continuation must fail the JOB, never the event
+  ::  a corrupt continuation must fail the JOB, never the event: the input
+  ::  is tried as an atom and as a cell under a foreign tag
   |=  inp=@t
   ^-  fz-outcome
   =/  j=jobstate:job  *jobstate:job
-  =.  cont.j  `[%1 `@`inp]
-  =/  r  (mule |.((step:job j 1 `@da`0)))
-  ?:  ?=(%| -.r)  %bailed
+  =/  r1  (mule |.((step:job j(cont `[%1 `@`inp]) 1 `@da`0)))
+  =/  r2  (mule |.((step:job j(cont `[%1 [`@`inp [%load *lcur:job]]]) 1 `@da`0)))
+  ?:  |(?=(%| -.r1) ?=(%| -.r2))  %bailed
   %ok
 ::
 ::
@@ -486,7 +487,7 @@
     (fz-run 0xbeef.0009 200 (gen-atom 64) fz-kont)
   0
 ::
-::  bit-flips and truncations of a REAL jammed continuation
+::  bit-flips and truncations of a real continuation's jam
 ++  test-fuzz-kont-corrupt
   %+  expect-clean
     (fz-run 0xbeef.000a 200 (gen-corrupt (jam `kont:job`[%load *lcur:job])) fz-kont)

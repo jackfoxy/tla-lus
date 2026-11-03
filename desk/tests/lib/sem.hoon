@@ -86,6 +86,33 @@
       '---- MODULE A ----\0a====\0a'
   ==
 ::
+++  test-sem-bare-op-ref
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def F arity=1 local=n L-1 2.1-2.9'
+        '    param y arity=0 L-1 2.3-2.3'
+        '    apply y opkind=FormalParamKind L-1 2.9-2.9'
+        '  def G arity=0 local=n L-1 3.1-3.6'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        'DIAGS'
+        'D 4204 ERROR 3.6-3.6 The operator F requires 1 arguments.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L-1 ml=? w=?'
+        'lvl G L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(y) == y\0aG == F\0a====\0a'
+  ==
+::
 ++  test-sem-bltopargs
   %+  expect-eq
     !>  ^-  wain
@@ -643,6 +670,90 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE f, g\0aE1 == [f EXCEPT ![1] = 2]\0aE2 == [f EXCEPT !.a = 3, ![2].b = 4]\0aE3 == [f EXCEPT ![1, 2] = 5]\0aE4 == [f EXCEPT ![1] = @ + 1]\0aE5 == [f EXCEPT ![1] = [g EXCEPT !.c = @]]\0a====\0a'
+  ==
+::
+++  test-sem-fair-inst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-6.4'
+        '  var x L1 2.10-2.10'
+        '  def R!vars arity=0 local=n L1 3.1-3.27'
+        '    substin subs=1 L1 3.1-3.27'
+        '      sub y <-'
+        '        apply x opkind=VariableDeclKind L1 3.27-3.27'
+        '      in'
+        '        apply y opkind=VariableDeclKind L1 3.9-3.9'
+        '  def F arity=0 local=n L3 4.1-4.22'
+        '    apply $WF opkind=BuiltInKind L3 4.6-4.22'
+        '      apply R!vars opkind=UserDefinedOpKind L1 4.9-4.14'
+        '      apply = opkind=BuiltInKind L2 4.16-4.21'
+        '        apply \' opkind=BuiltInKind L2 4.16-4.17'
+        '          apply x opkind=VariableDeclKind L1 4.16-4.16'
+        '        apply x opkind=VariableDeclKind L1 4.21-4.21'
+        '  def G arity=0 local=n L3 5.1-5.22'
+        '    apply $SF opkind=BuiltInKind L3 5.6-5.22'
+        '      apply R!vars opkind=UserDefinedOpKind L1 5.9-5.14'
+        '      apply = opkind=BuiltInKind L2 5.16-5.21'
+        '        apply \' opkind=BuiltInKind L2 5.16-5.17'
+        '          apply x opkind=VariableDeclKind L1 5.16-5.16'
+        '        apply x opkind=VariableDeclKind L1 5.21-5.21'
+        '  instance name=R module=B local=n L0 3.1-3.27'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl R!vars L1 lp={x}'
+        'lvl F L3 lc={x<=1} nlp={x}'
+        'lvl G L3 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aR == INSTANCE B WITH y <- x\0aF == WF_R!vars(x\' = x)\0aG == SF_R!vars(x\' = x)\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aVARIABLE y\0avars == y\0a====\0a'
+  ==
+::
+++  test-sem-fair-inst-param
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var x L1 2.10-2.10'
+        '  def I!vars arity=1 local=n L1 3.1-3.30'
+        '    param z arity=0 L0 3.3-3.3'
+        '    substin subs=1 L1 3.1-3.30'
+        '      sub y <-'
+        '        apply z opkind=FormalParamKind L0 3.30-3.30'
+        '      in'
+        '        apply y opkind=VariableDeclKind L1 3.9-3.9'
+        '  def F arity=0 local=n L3 4.1-4.25'
+        '    apply $WF opkind=BuiltInKind L3 4.6-4.25'
+        '      apply I!vars opkind=UserDefinedOpKind L1 4.9-4.17'
+        '        apply x opkind=VariableDeclKind L1 4.11-4.11'
+        '      apply = opkind=BuiltInKind L2 4.19-4.24'
+        '        apply \' opkind=BuiltInKind L2 4.19-4.20'
+        '          apply x opkind=VariableDeclKind L1 4.19-4.19'
+        '        apply x opkind=VariableDeclKind L1 4.24-4.24'
+        '  instance name=I module=B local=n L0 3.1-3.30'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={x<=1}'
+        'lvl I!vars L1 ml=[3] w=[1]'
+        'lvl F L3 lc={x<=1} nlp={x}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0aI(z) == INSTANCE B WITH y <- z\0aF == WF_I(x)!vars(x\' = x)\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aVARIABLE y\0avars == y\0a====\0a'
   ==
 ::
 ++  test-sem-fcndef
@@ -2649,6 +2760,56 @@
       '---- MODULE A ----\0aFoo(a, b) == a\0a====\0a'
   ==
 ::
+++  test-sem-new-opdecl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def F arity=2 local=n L0 2.1-2.23'
+        '    param g arity=2 L0 2.3-2.8'
+        '    param x arity=0 L0 2.11-2.11'
+        '    apply g opkind=FormalParamKind L0 2.17-2.23'
+        '      apply x opkind=FormalParamKind L0 2.19-2.19'
+        '      apply x opkind=FormalParamKind L0 2.22-2.22'
+        '  thmdef L local=n L0 3.1-4.39'
+        '    assumeprove L0 3.14-4.39'
+        '      newsymb op L0 3.21-3.31'
+        '      newsymb b L0 3.34-3.38'
+        '      prove'
+        '        apply = opkind=BuiltInKind L0 4.21-4.39'
+        '          apply F opkind=UserDefinedOpKind L0 4.21-4.28'
+        '            oparg op op=op arity=2 L0 4.23-4.24'
+        '            apply b opkind=NewConstantKind L0 4.27-4.27'
+        '          apply op opkind=NewConstantKind L0 4.32-4.39'
+        '            apply b opkind=NewConstantKind L0 4.35-4.35'
+        '            apply b opkind=NewConstantKind L0 4.38-4.38'
+        '  theorem name=L L0 3.1-4.39'
+        '    assumeprove L0 3.14-4.39'
+        '      newsymb op L0 3.21-3.31'
+        '      newsymb b L0 3.34-3.38'
+        '      prove'
+        '        apply = opkind=BuiltInKind L0 4.21-4.39'
+        '          apply F opkind=UserDefinedOpKind L0 4.21-4.28'
+        '            oparg op op=op arity=2 L0 4.23-4.24'
+        '            apply b opkind=NewConstantKind L0 4.27-4.27'
+        '          apply op opkind=NewConstantKind L0 4.32-4.39'
+        '            apply b opkind=NewConstantKind L0 4.35-4.35'
+        '            apply b opkind=NewConstantKind L0 4.38-4.38'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={b<=2,op<=2} alc={(op,0)>=0,(op,1)>=0} alp={(op,0,b),(op,1,b)}'
+        'lvl F L0 ml=[3,3] w=[1,1] mml=[0,0;] olc=[FFTT;]'
+        'lvl L L0 lp={b,op} lc={b<=2,op<=2} alc={(op,0)>=0,(op,1)>=0} alp={(op,0,b),(op,1,b)}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(g(_,_), x) == g(x, x)\0aTHEOREM L == ASSUME NEW op(_,_), NEW b\0a             PROVE  F(op, b) = op(b, b)\0a====\0a'
+  ==
+::
 ++  test-sem-nullary
   %+  expect-eq
     !>  ^-  wain
@@ -3145,6 +3306,40 @@
       '---- MODULE A ----\0aEXTENDS Naturals\0aRECURSIVE Fact(_)\0aFact(n) == IF n = 0 THEN 1 ELSE Fact(n - 1)\0aRECURSIVE Odd(_), Even(_)\0aOdd(n) == IF n = 0 THEN FALSE ELSE Even(n - 1)\0aEven(n) == IF n = 0 THEN TRUE ELSE Odd(n - 1)\0a====\0a'
   ==
 ::
+++  test-sem-sel-ext-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  const Q arity=0 L0 3.10-3.10'
+        '  def X arity=0 local=n L0 3.1-3.13'
+        '    apply LAMBDA opkind=UserDefinedOpKind L0 3.6-3.13'
+        '      num 3 L0 3.10-3.10'
+        '  def Y arity=0 local=n L0 4.1-4.16'
+        '    apply $Nop opkind=BuiltInKind L0 4.6-4.16'
+        '      apply $BoundedForall opkind=BuiltInKind L0 4.14-4.32'
+        '        bound q L0 4.17-4.17'
+        '          apply Q opkind=ConstantDeclKind L0 4.23-4.23'
+        '        apply /= opkind=BuiltInKind L0 4.27-4.32'
+        '          apply q opkind=FormalParamKind L0 4.27-4.27'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 4.31-4.32'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={Q} lc={Q<=3,n<=2,q<=3}'
+        'lvl X L0'
+        'lvl Y L0 lp={Q} lc={Q<=3,q<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aX == Pos(3)!1\0aY == QNonEmpty!:\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aEXTENDS Naturals\0aCONSTANT Q\0aQNonEmpty == \\A q \\in Q : q # {}\0aPos(n) == n > 0 /\\ n < 10\0a====\0a'
+  ==
+::
 ++  test-sem-selat
   %+  expect-eq
     !>  ^-  wain
@@ -3558,6 +3753,255 @@
       '---- MODULE A ----\0aINSTANCE B WITH c <- 0\0aBaz == Use\0a====\0a'
       :-  'B'
       '---- MODULE B ----\0aCONSTANT c\0aUse == c = 1\0a====\0a'
+  ==
+::
+++  test-sem-subst-arity
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def C arity=2 local=n L-1 2.1-2.12'
+        '    param x arity=0 L-1 2.3-2.3'
+        '    param y arity=0 L-1 2.6-2.6'
+        '    apply x opkind=FormalParamKind L-1 2.12-2.12'
+        '  def D arity=1 local=n L-1 3.1-3.10'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L-1 3.1-3.10'
+        '      sub C <-'
+        '        oparg C op=C arity=2 L-1 3.1-3.10'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance module=B local=n L0 3.1-3.10'
+        'DIAGS'
+        'D 4243 ERROR 3.1-3.10 An operator must be substituted for symbol \'C\', and it must have arity 1.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl C L-1 ml=? w=?'
+        'lvl D L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aC(x, y) == x\0aINSTANCE B\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-appl
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def F arity=1 local=n L-1 2.1-2.9'
+        '    param y arity=0 L-1 2.3-2.3'
+        '    apply y opkind=FormalParamKind L-1 2.9-2.9'
+        '  def I!D arity=1 local=n L-1 3.1-3.30'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L-1 3.1-3.30'
+        '      sub C <-'
+        '        oparg nullOpArg arity=-2 L-1 0.0-0.0'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance name=I module=B local=n L0 3.1-3.30'
+        'DIAGS'
+        'D 4004 ERROR 3.27-3.30 Arity 1 operator (not an expression) is expected'
+        'D 4243 ERROR 0.0-0.0 An operator must be substituted for symbol \'C\', and it must have arity 1.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L-1 ml=? w=?'
+        'lvl I!D L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(y) == y\0aI == INSTANCE B WITH C <- F(1)\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-arity
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def F arity=2 local=n L-1 2.1-2.12'
+        '    param x arity=0 L-1 2.3-2.3'
+        '    param y arity=0 L-1 2.6-2.6'
+        '    apply x opkind=FormalParamKind L-1 2.12-2.12'
+        '  def I!D arity=1 local=n L-1 3.1-3.27'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L-1 3.1-3.27'
+        '      sub C <-'
+        '        oparg nullOpArg arity=-2 L-1 0.0-0.0'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance name=I module=B local=n L0 3.1-3.27'
+        'DIAGS'
+        'D 4271 ERROR 3.27-3.27 Expected arity 1 but found operator of arity 2.'
+        'D 4243 ERROR 0.0-0.0 An operator must be substituted for symbol \'C\', and it must have arity 1.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L-1 ml=? w=?'
+        'lvl I!D L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(x, y) == x\0aI == INSTANCE B WITH C <- F\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-expr
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def I!D arity=1 local=n L-1 2.1-2.27'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L-1 2.1-2.27'
+        '      sub C <-'
+        '        oparg nullOpArg arity=-2 L-1 0.0-0.0'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance name=I module=B local=n L0 2.1-2.27'
+        'DIAGS'
+        'D 4004 ERROR 2.27-2.27 Arity 1 operator (not an expression) is expected'
+        'D 4243 ERROR 0.0-0.0 An operator must be substituted for symbol \'C\', and it must have arity 1.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl I!D L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aI == INSTANCE B WITH C <- 3\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-ok
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def F arity=1 local=n L0 2.1-2.9'
+        '    param y arity=0 L0 2.3-2.3'
+        '    apply y opkind=FormalParamKind L0 2.9-2.9'
+        '  def I!D arity=1 local=n L0 3.1-3.27'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L0 3.1-3.27'
+        '      sub C <-'
+        '        oparg F op=F arity=1 L0 3.27-3.27'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance name=I module=B local=n L0 3.1-3.27'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L0 ml=[3] w=[1]'
+        'lvl I!D L0 ml=[3] w=[1]'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(y) == y\0aI == INSTANCE B WITH C <- F\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-zarg
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def N arity=0 local=n L-1 2.1-2.6'
+        '    num 3 L-1 2.6-2.6'
+        '  def I!D arity=1 local=n L-1 3.1-3.27'
+        '    param x arity=0 L0 3.3-3.3'
+        '    substin subs=1 L-1 3.1-3.27'
+        '      sub C <-'
+        '        oparg nullOpArg arity=-2 L-1 0.0-0.0'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.9-3.12'
+        '          apply x opkind=FormalParamKind L0 3.11-3.11'
+        '  instance name=I module=B local=n L0 3.1-3.27'
+        'DIAGS'
+        'D 4271 ERROR 3.27-3.27 Expected arity 1 but found operator of arity 0.'
+        'D 4243 ERROR 0.0-0.0 An operator must be substituted for symbol \'C\', and it must have arity 1.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl N L-1'
+        'lvl I!D L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aN == 3\0aI == INSTANCE B WITH C <- N\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C(_)\0aD(x) == C(x)\0a====\0a'
+  ==
+::
+++  test-sem-subst-explicit-zero
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def F arity=1 local=n L-1 2.1-2.9'
+        '    param y arity=0 L-1 2.3-2.3'
+        '    apply y opkind=FormalParamKind L-1 2.9-2.9'
+        '  def I!D arity=0 local=n L-1 3.1-3.27'
+        '    substin subs=1 L-1 3.1-3.27'
+        '      sub C <-'
+        '        apply nullODN opkind=k0 L-1 0.0-0.0'
+        '      in'
+        '        apply C opkind=ConstantDeclKind L0 3.6-3.6'
+        '  instance name=I module=B local=n L0 3.1-3.27'
+        'DIAGS'
+        'D 4204 ERROR 3.27-3.27 The operator F requires 1 arguments.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L-1 ml=? w=?'
+        'lvl I!D L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF(y) == y\0aI == INSTANCE B WITH C <- F\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT C\0aD == C\0a====\0a'
   ==
 ::
 ++  test-sem-thmap

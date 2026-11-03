@@ -1,0 +1,28 @@
+BINDINGS
+IOUtils!Deserialize/2|override:EvaluatingValue
+IOUtils!IODeserialize/2|override:MethodValue
+IOUtils!IOEnv/0|override:MethodValue
+IOUtils!IOEnvExec/2|override:MethodValue
+IOUtils!IOEnvExecTemplate/3|override:MethodValue
+IOUtils!IOExec/1|override:MethodValue
+IOUtils!IOExecTemplate/2|override:MethodValue
+IOUtils!IOSerialize/3|override:MethodValue
+IOUtils!Serialize/3|override:PriorityEvaluatingValue
+IOUtils!atoi/1|override:MethodValue
+IOUtils!zeroPadN/2|body
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+A0 IntValue 0
+A42 IntValue 42
+ANeg IntValue -7

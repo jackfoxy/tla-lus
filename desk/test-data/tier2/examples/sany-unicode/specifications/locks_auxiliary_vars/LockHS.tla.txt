@@ -1,0 +1,7 @@
+SANY exit 0
+line 68, col 8 to line 68, col 10 of module Stuttering
+The field name "top" in the record constructor is identical to the existing definition or declaration
+named top, located at line 68, col 1 to line 68, col 19 of module Stuttering.
+The field in the record will not take the value of the top definition or declaration.
+In TLA+, field names in records are strings, regardless of any similarly named declarations or definitions.
+Therefore, DOMAIN [top |-> ...] = {"top"} holds true.

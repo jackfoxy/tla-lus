@@ -168,4 +168,34 @@
   ?&  (lien w |=(l=@t =('The coverage statistics ' (end [3 24] l))))
       (lien w |=(l=@t =('End of statistics.' l)))
   ==
+::
+::  R4.0d: a trace state holding a NON-SEQUENCE function -- a string domain
+::  (record form) and an integer domain off 1..n (the `:>` form). Rendering
+::  either through `+render:eval` recursed forever and ran the loom out
+::  (MissionariesAndCannibals). Expected lines from the pinned tla2tools.jar
+::  (`-workers 1`) on this spec, 2026-10-08
+++  fcn-trace
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE FcnTrace ----\0a"
+    "VARIABLES f, g\0a"
+    "Init == f = [b \\in \{\"E\", \"W\"} |-> 0]\0a"
+    "        /\\ g = [i \\in \{2, 3} |-> i]\0a"
+    "Next == f' = [f EXCEPT ![\"E\"] = 1] /\\ g' = g\0a"
+    "Inv == f[\"E\"] = 0\0a"
+    "====\0a"
+  ==
+::
+++  test-trace-renders-nonsequence-functions
+  %+  expect-eq
+    !>  ^-  (list @t)
+    :~  '/\\ f = [E |-> 0, W |-> 0]'
+        '/\\ g = (2 :> 2 @@ 3 :> 3)'
+        '/\\ f = [E |-> 1, W |-> 0]'
+        '/\\ g = (2 :> 2 @@ 3 :> 3)'
+    ==
+  !>
+  %+  skim  (check:check fcn-trace cfg)
+  |=(l=@t =('/\\ ' (end [3 3] l)))
 --

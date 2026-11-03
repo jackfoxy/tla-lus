@@ -1,0 +1,9 @@
+CONFIG
+deadlock true
+const N = 1000000
+const M = 1000
+RAW
+CONSTANT
+N = 1000000 
+M = 1000 
+---

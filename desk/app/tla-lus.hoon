@@ -12,13 +12,26 @@
   ::
 ::  +|  Types
 ::
-::  The agent's saved state is a VERSION-TAGGED union, which is the whole
-::  migration mechanism: to change the state's shape, add the new `state-N`
-::  here, keep the previous mold alongside it, and convert in `on-load`'s `?-`.
-::  Nothing has been released, so there is no history to carry and exactly one
-::  version exists — the one that ships. Pre-release reshapes are not versions.
-+$  versioned-state  $%(state-0)
-+$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
+::  ONE state shape and no migrations: the project is in development, so a
+::  shape change is made in place and `on-load` resets a state that no
+::  longer fits.
+::
+::  `arms` is each job's CURRENT wake number (R4.P2). A step wake carries it
+::  in its wire, and a wake with any other number is stale and ignored, so
+::  re-arming a job (at `on-load`, or by the sweep) can never fork a second
+::  step chain. `sweep` is the pending sweep timer, if any: once a minute it
+::  re-arms every running job, so a job whose wake was lost (an event
+::  aborted by an interrupt consumes it) resumes within a minute instead of
+::  sitting `running` forever
+::  `pace` (R4.QS): per job, when its last step began and the budget it
+::  ran with, from which the next budget is sized (`+pace-budget`)
++$  state-0
+  $:  %0
+      jobs=(map req-id jobstate:job-lib)
+      arms=(map req-id @ud)
+      sweep=(unit @da)
+      pace=(map req-id [at=@da bud=@ud])
+  ==
 +$  card     card:agent:gall
 ::
 ::  +|  Card Helpers
@@ -39,10 +52,59 @@
   (fact id [%job id ev])
 ::
 ++  wait
-  ::  Schedule the next bounded step for a job
-  |=  [id=req-id now=@da]
+  ::  Schedule the next bounded step for a job, under wake number `seq`
+  |=  [id=req-id seq=@ud now=@da]
   ^-  card
-  [%pass [%job id %step ~] %arvo %b %wait now]
+  [%pass [%job id %step (scot %ud seq) ~] %arvo %b %wait now]
+::
+++  sweep-gap  ~m1
+++  sweep-card
+  |=  at=@da
+  ^-  card
+  [%pass [%sweep (scot %da at) ~] %arvo %b %wait at]
+::
+++  rearmable
+  ::  a job the sweep may re-arm: running, and not paused on Clay reads (a
+  ::  `%modules` job is resumed by its `%writ`s, not by a wake)
+  |=  j=jobstate:job-lib
+  ^-  ?
+  &(?=(~ result.j) !=(%modules stage.j))
+::
+::  +|  Wake Numbering (R4.P2)
+::
+++  next-arm
+  ::  a fresh wake number for `id`, recorded as its current one
+  |=  [st=state-0 id=req-id]
+  ^-  [@ud state-0]
+  =/  n  +((~(gut by arms.st) id 0))
+  [n st(arms (~(put by arms.st) id n))]
+::
+++  rearm-all
+  ::  a fresh wake, now, for every job the sweep may re-arm
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
+  =/  js  ~(tap by jobs.st)
+  =|  caz=(list card)
+  |-  ^-  [(list card) state-0]
+  ?~  js  [(flop caz) st]
+  ?.  (rearmable q.i.js)  $(js t.js)
+  =^  seq  st  (next-arm st p.i.js)
+  $(js t.js, caz [(wait p.i.js seq now) caz])
+::
+++  start-sweep
+  ::  (re)start the sweep timer, superseding any pending one
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
+  ?.  (lien ~(val by jobs.st) rearmable)  [~ st(sweep ~)]
+  =/  at  (add now sweep-gap)
+  [~[(sweep-card at)] st(sweep `at)]
+::
+++  ensure-sweep
+  ::  start the sweep timer unless one is pending
+  |=  [st=state-0 now=@da]
+  ^-  [(list card) state-0]
+  ?^  sweep.st  [~ st]
+  (start-sweep st now)
 ::
 ++  read-card
   ::  One asynchronous Clay read for a paused job, tagged on its load
@@ -176,10 +238,10 @@
   ::  bounded step, nothing (terminal), or the Clay reads the job is
   ::  waiting on. Reads that cannot exist are answered immediately and a
   ::  step is scheduled, so a paused job always makes progress
-  |=  [id=req-id r=step-out:job-lib now=@da]
+  |=  [id=req-id r=step-out:job-lib now=@da seq=@ud]
   ^-  [(list card) jobstate:job-lib]
   ?-    -.r
-      %more  [(snoc (efacts id events.r) (wait id now)) job.r]
+      %more  [(snoc (efacts id events.r) (wait id seq now)) job.r]
       %stop  [(weld (efacts id events.r) (write-cards job.r)) job.r]
       %await
     =/  dr  (do-reads id started.job.r reads.r)
@@ -187,7 +249,7 @@
     ;:  weld
       (efacts id events.r)
       caz.dr
-      ?~(miss.dr ~ ~[(wait id now)])
+      ?~(miss.dr ~ ~[(wait id seq now)])
     ==
   ==
 --
@@ -208,19 +270,17 @@
 ++  on-load
   |=  old-vase=vase
   ^-  (quip card _this)
-  =/  res=(each state-0 tang)
-    %-  mule  |.
-    ::  the stored noun is COERCED (`;;`) rather than required to nest as
-    ::  stored, so a mold change anywhere inside a request cannot throw away
-    ::  completed results. A future version adds its `state-N` to
-    ::  `versioned-state` and its conversion arm to this `?-`.
-    =/  old  ;;(versioned-state q.old-vase)
-    ?-  -.old
-      %0  old
-    ==
-  ?:  ?=(%.y -.res)  `this(state p.res)
-  %-  (slog 'tla-lus: state corrupt, unable to migrate' ~)
-  `this(state *state-0)
+  ::  the stored noun is coerced to the one state shape; one that no longer
+  ::  fits (a shape changed during development) resets the agent to empty
+  =/  res  (mule |.(;;(state-0 q.old-vase)))
+  =.  state
+    ?:  ?=(%& -.res)  p.res
+    ((slog 'tla-lus: stored state does not fit this build; reset' ~) *state-0)
+  ::  re-arm every running job and restart the sweep. A wake that was pending
+  ::  is superseded by its new number, so nothing steps twice
+  =^  caz  state  (rearm-all state now.bowl)
+  =^  sw   state  (start-sweep state now.bowl)
+  [(weld caz sw) this]
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -260,9 +320,13 @@
       [(fact id.act [%rejected id.act p.pin]) ~]
     =.  jobs.state
       (~(put by jobs.state) id.act (init:job-lib p.pin now.bowl))
+    =.  pace.state  (~(del by pace.state) id.act)
+    =^  seq  state  (next-arm state id.act)
+    =^  sw   state  (ensure-sweep state now.bowl)
     :_  this
-    :~  (fact id.act [%ack id.act])
-        (wait id.act now.bowl)
+    :*  (fact id.act [%ack id.act])
+        (wait id.act seq now.bowl)
+        sw
     ==
   ::
       %cancel
@@ -281,6 +345,8 @@
       :_  this
       [(fact id.act [%rejected id.act 'job still active']) ~]
     =.  jobs.state  (~(del by jobs.state) id.act)
+    =.  arms.state  (~(del by arms.state) id.act)
+    =.  pace.state  (~(del by pace.state) id.act)
     :_  this
     [(fact id.act [%deleted id.act]) ~]
   ==
@@ -345,7 +411,7 @@
   |=  [=wire =sign-arvo]
   ^-  (quip card _this)
   ?+    wire  (on-arvo:default wire sign-arvo)
-      [%job @ %step ~]
+      [%job @ %step *]
     ?.  ?=([%behn %wake *] sign-arvo)
       (on-arvo:default wire sign-arvo)
     ::  jobs deleted or made terminal since scheduling are no-ops
@@ -353,8 +419,16 @@
     =/  cur  (~(get by jobs.state) id)
     ?~  cur  `this
     ?:  (terminal u.cur)  `this
-    =/  res  (step:job-lib u.cur default-budget:job-lib now.bowl)
-    =/  adv  (advance id res now.bowl)
+    ::  only the job's CURRENT wake steps it (R4.P2)
+    ?.  ?&  ?=([%job @ %step @ ~] wire)
+            =(`(slav %ud i.t.t.t.wire) (~(get by arms.state) id))
+        ==
+      `this
+    =/  bud  (pace-budget:job-lib (~(get by pace.state) id) now.bowl)
+    =.  pace.state  (~(put by pace.state) id [now.bowl bud])
+    =/  res  (step:job-lib u.cur bud now.bowl)
+    =^  seq  state  (next-arm state id)
+    =/  adv  (advance id res now.bowl seq)
     =.  jobs.state  (~(put by jobs.state) id +.adv)
     =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
@@ -378,15 +452,25 @@
     ?.  (awaiting:job-lib u.cur tag)  `this
     =/  j    (deliver:job-lib u.cur ~[[tag (writ-text p.sign-arvo)]])
     =/  res  (step:job-lib j default-budget:job-lib now.bowl)
-    =/  adv  (advance id res now.bowl)
+    =^  seq  state  (next-arm state id)
+    =/  adv  (advance id res now.bowl seq)
     =.  jobs.state  (~(put by jobs.state) id +.adv)
     =.  jobs.state  (retain +.adv jobs.state)
     [-.adv this]
   ::
       [%job @ %load *]
-    ::  a load wire this version does not recognise (an in-flight read
-    ::  from an older engine) is dropped, never a crashed event
+    ::  a malformed load wire is dropped, never a crashed event
     `this
+  ::
+      [%sweep @ ~]
+    ::  R4.P2: re-arm every running job, then reschedule while any remain.
+    ::  A superseded sweep timer (its time is not the pending one) is a no-op
+    ?.  ?=([%behn %wake *] sign-arvo)  `this
+    ?.  =(`(slav %da i.t.wire) sweep.state)  `this
+    =.  sweep.state  ~
+    =^  caz  state  (rearm-all state now.bowl)
+    =^  sw   state  (ensure-sweep state now.bowl)
+    [(weld caz sw) this]
   ==
 ::
 ++  on-fail  on-fail:default

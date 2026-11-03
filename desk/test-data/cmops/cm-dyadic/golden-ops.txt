@@ -1,0 +1,25 @@
+BINDINGS
+DyadicRationals!Add/2|body
+DyadicRationals!Half/1|body
+DyadicRationals!IsDyadicRational/1|body
+DyadicRationals!One/0|override:RecordValue
+DyadicRationals!PrettyPrint/1|body
+DyadicRationals!Zero/0|override:RecordValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+EVAL
+AddH RecordValue [num |-> 3, den |-> 4]
+AddOne RecordValue [den |-> 1, num |-> 1]
+AddZ RecordValue [num |-> 1, den |-> 2]
+HalfOne RecordValue [num |-> 1, den |-> 2]
+IsD BoolValue TRUE

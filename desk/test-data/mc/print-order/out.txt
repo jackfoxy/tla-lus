@@ -1,0 +1,13 @@
+"const K"
+"assume"  TRUE
+<<"ex", 1>>
+<<"ex", 2>>
+<<"init", 0>>
+<<"inv", 0>>
+<<"next", 0, 1>>
+<<"inv", 1>>
+<<"next", 1, 2>>
+<<"inv", 2>>
+Model checking completed. No error has been found.
+3 states generated, 3 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 3.

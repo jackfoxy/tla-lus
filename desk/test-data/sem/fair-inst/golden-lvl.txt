@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={x<=1}
+lvl R!vars L1 lp={x}
+lvl F L3 lc={x<=1} nlp={x}
+lvl G L3 lc={x<=1} nlp={x}

@@ -1,0 +1,8 @@
+CONSTANTS
+  Color = {c1, c2}
+  Faded = Faded
+  L = L
+  Leader <- L
+INIT Init
+NEXT Next
+INVARIANT TypeOK

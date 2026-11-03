@@ -176,5 +176,31 @@
   ::  surfaces the inventory carried as `later:`; the third,
   ::  TLCEvalDefinition, is an `@Evaluation` override and joins the node-op
   ::  table instead. 37 -> 39.
-  (expect-eq !>(39) !>(~(wyt by registry:so)))
+  ::  R4.2a: Print and PrintT leave for the node-op table -- they WRITE a line
+  ::  on the carrier, as TLCSet writes a register. 39 -> 37.
+  ::  R4.2f adds Json's three pure encoders (ToJson, ToJsonArray,
+  ::  ToJsonObject); its two writers are node-ops. 37 -> 40. Its two readers
+  ::  are typed refusals by name (approved difference). 40 -> 42.
+  ::  R4.2h: twelve CommunityModules process/file operators (IOUtils, CSV)
+  ::  are typed refusals by name. 42 -> 54.
+  ::  R4.2b: fourteen CommunityModules overrides ported natively (pure ones;
+  ::  the operator-argument ones are node-ops) and three refused by name.
+  ::  54 -> 71.
+  (expect-eq !>(71) !>(~(wyt by registry:so)))
+::
+++  test-cm-refusals
+  ::  R4.2b: three CommunityModules overrides are refused by name -- their
+  ::  answers are doubles or a Java layout library, and their TLA+ bodies
+  ::  are dummies that would answer wrongly
+  =/  msg
+    |=  k=op-key:so
+    ^-  tape
+    =/  im=op-impl:so  (~(got by registry:so) k)
+    =/  r  (gate.im ~)
+    ?:(?=(%| -.r) (trip msg.p.r) "")
+  ;:  weld
+    (expect !>(?=(^ (find "SVG!NodeOfRingNetwork; it rounds" (msg ['SVG' 'NodeOfRingNetwork' 5])))))
+    (expect !>(?=(^ (find "SVG!NodesOfDirectedMultiGraph; it is a jungrapht" (msg ['SVG' 'NodesOfDirectedMultiGraph' 3])))))
+    (expect !>(?=(^ (find "Statistics!ChiSquare; it is Apache" (msg ['Statistics' 'ChiSquare' 3])))))
+  ==
 --

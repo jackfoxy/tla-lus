@@ -1,0 +1,65 @@
+RESULT safety failure
+Error: Invariant NotSolved is violated.
+140897 states generated, 11566 distinct states found, 3737 states left on queue.
+The depth of the complete state graph search is 12.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ c1 = [j1 |-> 0, j2 |-> 0]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 0
+/\ s2 = 0
+State 2: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 5, j2 |-> 0]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 1
+/\ s2 = 0
+State 3: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 2, j2 |-> 3]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 2
+/\ s2 = 0
+State 4: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 2, j2 |-> 0]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 3
+/\ s2 = 0
+State 5: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 0, j2 |-> 2]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 4
+/\ s2 = 0
+State 6: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 5, j2 |-> 2]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 5
+/\ s2 = 0
+State 7: <NextInterleaved line 187, col 8 to line 187, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 0, j2 |-> 0, j3 |-> 0]
+/\ s1 = 6
+/\ s2 = 0
+State 8: <NextInterleaved line 188, col 8 to line 188, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 5, j2 |-> 0, j3 |-> 0]
+/\ s1 = 6
+/\ s2 = 1
+State 9: <NextInterleaved line 188, col 8 to line 188, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 2, j2 |-> 3, j3 |-> 0]
+/\ s1 = 6
+/\ s2 = 2
+State 10: <NextInterleaved line 188, col 8 to line 188, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 0, j2 |-> 3, j3 |-> 2]
+/\ s1 = 6
+/\ s2 = 3
+State 11: <NextInterleaved line 188, col 8 to line 188, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 5, j2 |-> 3, j3 |-> 2]
+/\ s1 = 6
+/\ s2 = 4
+State 12: <NextInterleaved line 188, col 8 to line 188, col 54 of module DieHardest>
+/\ c1 = [j1 |-> 4, j2 |-> 3]
+/\ c2 = [j1 |-> 4, j2 |-> 3, j3 |-> 3]
+/\ s1 = 6
+/\ s2 = 5

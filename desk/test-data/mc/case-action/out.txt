@@ -1,0 +1,24 @@
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ q = <<<<"r", 1>>, <<"x", 0>>, <<"w", 2>>, <<"r", 3>>>>
+/\ r = 0
+/\ w = 0
+State 2: <Step line 6, col 9 to line 11, col 23 of module spec>
+/\ q = <<<<"x", 0>>, <<"w", 2>>, <<"r", 3>>>>
+/\ r = 1
+/\ w = 0
+State 3: <Step line 6, col 9 to line 11, col 23 of module spec>
+/\ q = <<<<"w", 2>>, <<"r", 3>>>>
+/\ r = 1
+/\ w = 0
+State 4: <Step line 6, col 9 to line 11, col 23 of module spec>
+/\ q = <<<<"r", 3>>>>
+/\ r = 1
+/\ w = 2
+State 5: <Step line 6, col 9 to line 11, col 23 of module spec>
+/\ q = <<>>
+/\ r = 4
+/\ w = 2
+5 states generated, 5 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 5.

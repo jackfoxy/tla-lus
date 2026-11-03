@@ -83,9 +83,8 @@
 ::
 ::
 ++  knot-char
-  ::  the characters a Clay path segment may carry. `.` is excluded, so
-  ::  a dotted segment (a filesystem-style path smuggled into one knot)
-  ::  never reaches Clay; `$` likewise
+  ::  the characters a Clay path segment may carry; `.` is handled by
+  ::  +check-seg (a DIRECTORY may hold one, a file segment may not)
   |=  c=@t
   ^-  ?
   ?|  &((gte c 'a') (lte c 'z'))
@@ -96,7 +95,11 @@
   ==
 ::
 ++  check-seg
-  |=  [s=@ta at=path]
+  ::  `dir`: a DIRECTORY segment, which may contain `.` (R4.2r: the Examples'
+  ::  `CarTalkPuzzle.toolbox/Model_1` model directories). A file's own name
+  ::  and mark segments may not, so a filesystem-style `spec.tla` smuggled into
+  ::  one knot is still refused; `.` and `..` are never a segment
+  |=  [s=@ta at=path dir=?]
   ^-  (unit path-err)
   =/  t  (trip s)
   ?~  t  `[%bad-segment s 'empty' at]
@@ -104,22 +107,30 @@
     `[%escape s at]
   ?:  =('$' i.t)
     `[%bad-segment s 'reserved $ prefix' at]
-  ?:  (lien `tape`t |=(c=@t =('.' c)))
+  ?:  &(!dir (lien `tape`t |=(c=@t =('.' c))))
     `[%bad-segment s 'dotted' at]
-  ?.  (levy `tape`t knot-char)
+  ?.  (levy `tape`t |=(c=@t |(=('.' c) (knot-char c))))
     `[%bad-segment s 'not a Clay knot' at]
   ~
 ::
 ++  check-path
-  ::  every segment of one path, reported against the whole path
-  |=  pax=path
+  ::  every segment of one path, reported against the whole path. The first
+  ::  `dirs` segments are directories (+check-seg)
+  |=  [pax=path dirs=@ud]
   ^-  (unit path-err)
   =/  at  pax
   |-  ^-  (unit path-err)
   ?~  pax  ~
-  =/  e  (check-seg i.pax at)
+  =/  e  (check-seg i.pax at !=(0 dirs))
   ?^  e  e
-  $(pax t.pax)
+  $(pax t.pax, dirs ?:(=(0 dirs) 0 (dec dirs)))
+::
+++  file-dirs
+  ::  a file path's directory segments: all but its name and mark
+  |=  pax=path
+  ^-  @ud
+  =/  n  (lent pax)
+  ?:((lth n 2) 0 (sub n 2))
 ::
 ++  check-desk
   |=  d=desk
@@ -180,7 +191,7 @@
   ?.  ?=(%ud -.cas)  [%| [%unpinned cas]]
   =/  de  (check-desk desk)
   ?^  de  [%| u.de]
-  =/  pe  (check-path pax)
+  =/  pe  (check-path pax (file-dirs pax))
   ?^  pe  [%| u.pe]
   ?.  (under-root roots pax)  [%| [%out-of-root pax]]
   [%& [ship desk cas pax]]
@@ -201,7 +212,7 @@
   ^-  (each write-target path-err)
   =/  de  (check-desk desk)
   ?^  de  [%| u.de]
-  =/  pe  (check-path pax)
+  =/  pe  (check-path pax (file-dirs pax))
   ?^  pe  [%| u.pe]
   ::  overlap in EITHER direction is refused: a target under a read root
   ::  (`/spec` vs root `/`) and a read root under the target (`/out` root
@@ -234,7 +245,7 @@
   =/  re  (check-roots roots)
   ?^  re  re
   ?~  cfg  ~
-  =/  ce  (check-path u.cfg)
+  =/  ce  (check-path u.cfg (file-dirs u.cfg))
   ?^  ce  ce
   ?.  (under-root roots u.cfg)  `[%out-of-root u.cfg]
   ~
@@ -244,7 +255,7 @@
   ^-  (unit path-err)
   |-  ^-  (unit path-err)
   ?~  roots  ~
-  =/  e  (check-path i.roots)
+  =/  e  (check-path i.roots (lent i.roots))
   ?^  e  e
   $(roots t.roots)
 --

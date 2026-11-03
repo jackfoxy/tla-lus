@@ -1,0 +1,20 @@
+RESULT liveness failure
+Error: Temporal property ErrorTemporal was violated.
+696 states generated, 216 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 2.
+Error: The following behavior constitutes a counter-example:
+State 1: <Initial predicate>
+/\ hr = 2
+/\ now = 1
+/\ t = 0
+State 2: <BigNext line 23, col 12 to line 27, col 43 of module MCRealTimeHourClock>
+/\ hr = 2
+/\ now = 4
+/\ t = 3
+State 3: <BigNext line 23, col 12 to line 27, col 43 of module MCRealTimeHourClock>
+/\ hr = 3
+/\ now = 4
+/\ t = 0
+State 4: Stuttering
+(Use the -nowarning option to disable this warning.)
+Warning: The stuttering counterexample above may be caused by the absence of a behavior specification (SPECIFICATION). Only INIT and NEXT have been provided, so TLC permits infinite stuttering. To rule out such counterexamples, use SPECIFICATION Spec, with Spec asserting a suitable fairness constraint (compare Chapter 8, page 87ff of Specifying Systems at https://lamport.azurewebsites.net/tla/book.html).

@@ -1,0 +1,14 @@
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+x = <<0, 0>>
+State 2: <Inc(1) line 8, col 11 to line 8, col 53 of module spec>
+x = <<1, 0>>
+State 3: <Inc(1) line 8, col 11 to line 8, col 53 of module spec>
+x = <<2, 0>>
+State 4: <Op(1,"a") line 9, col 13 to line 9, col 78 of module spec>
+x = <<2, 1>>
+State 5: <Op(1,"a") line 9, col 13 to line 9, col 78 of module spec>
+x = <<2, 2>>
+5 states generated, 5 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 5.

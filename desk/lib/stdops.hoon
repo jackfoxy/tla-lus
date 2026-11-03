@@ -148,9 +148,52 @@
     ::  rejections that name what they would need, never silent no-ops
     [['TLC' 'Assert' 2] [| 0 |=(a=(list value:v) (assert-op a))]]
     [['TLC' 'ToString' 1] [| 0 |=(a=(list value:v) (to-string a))]]
+    ::  R4.2f: the pure half of tla2tools' `Json` module (tlc2/module/Json.java,
+    ::  which CI's module search puts ahead of CommunityModules' copy)
+    [['Json' 'ToJson' 1] [| 0 |=(a=(list value:v) (json-str %node a))]]
+    [['Json' 'ToJsonArray' 1] [| 0 |=(a=(list value:v) (json-str %array a))]]
+    [['Json' 'ToJsonObject' 1] [| 0 |=(a=(list value:v) (json-str %object a))]]
+    ::  R4.2f (user decision 2026-10-13): the two READERS are refused by name,
+    ::  an approved difference: a file read is not part of a run's sources
+    [['Json' 'JsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'JsonDeserialize'))]]
+    [['Json' 'ndJsonDeserialize' 1] [| 0 |=(a=(list value:v) (json-read-refused 'ndJsonDeserialize'))]]
+    ::  R4.2h: CommunityModules' process and file surfaces, refused by name
+    ::  (their TLA+ bodies are dummies; a run has no process and reads or
+    ::  writes only through its request and artifacts)
+    [['IOUtils' 'IOExec' 1] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOExec' 'it runs a process'))]]
+    [['IOUtils' 'IOEnvExec' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOEnvExec' 'it runs a process'))]]
+    [['IOUtils' 'IOExecTemplate' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOExecTemplate' 'it runs a process'))]]
+    [['IOUtils' 'IOEnvExecTemplate' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOEnvExecTemplate' 'it runs a process'))]]
+    [['IOUtils' 'IOSerialize' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IOSerialize' 'it writes a file'))]]
+    [['IOUtils' 'IODeserialize' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'IODeserialize' 'it reads a file'))]]
+    [['IOUtils' 'Serialize' 3] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'Serialize' 'it writes a file'))]]
+    [['IOUtils' 'Deserialize' 2] [| 0 |=(a=(list value:v) (io-refused 'IOUtils' 'Deserialize' 'it reads a file'))]]
+    [['CSV' 'CSVWrite' 3] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVWrite' 'it writes a file'))]]
+    [['CSV' 'CSVWriteRecord' 4] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVWriteRecord' 'it writes a file'))]]
+    [['CSV' 'CSVRead' 3] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRead' 'it reads a file'))]]
+    [['CSV' 'CSVRecords' 1] [| 0 |=(a=(list value:v) (io-refused 'CSV' 'CSVRecords' 'it reads a file'))]]
     [['TLC' 'Permutations' 1] [| 0 |=(a=(list value:v) (permutations a))]]
-    [['TLC' 'Print' 2] [| 0 |=(a=(list value:v) (print-op 'Print' a))]]
-    [['TLC' 'PrintT' 1] [| 0 |=(a=(list value:v) (print-op 'PrintT' a))]]
+    ::  R4.2b: CommunityModules' Java overrides (the pinned deps jar's), ported
+    ::  where the TLA+ body answers differently -- measured by
+    ::  tools/gen-cm-tests.py against the pin with the jar bound
+    [['SequencesExt' 'SetToSeq' 1] [| 0 |=(a=(list value:v) (cm-set-to-seq a))]]
+    [['SequencesExt' 'SetToSeqs' 1] [| 0 |=(a=(list value:v) (cm-set-to-seqs a))]]
+    [['SequencesExt' 'Contains' 2] [| 0 |=(a=(list value:v) (cm-contains a))]]
+    [['SequencesExt' 'IsPrefix' 2] [| 0 |=(a=(list value:v) (cm-is-prefix a))]]
+    [['SequencesExt' 'LongestCommonPrefix' 1] [| 0 |=(a=(list value:v) (cm-lcp a))]]
+    [['SequencesExt' 'Suffixes' 1] [| 0 |=(a=(list value:v) (cm-suffixes a))]]
+    [['SequencesExt' 'AllSubSeqs' 1] [| 0 |=(a=(list value:v) (cm-all-sub-seqs a))]]
+    [['SequencesExt' 'RemoveFirst' 2] [| 0 |=(a=(list value:v) (cm-remove-first a))]]
+    [['Functions' 'IsInjective' 1] [| 0 |=(a=(list value:v) (cm-is-injective a))]]
+    [['Functions' 'AntiFunction' 1] [| 0 |=(a=(list value:v) (cm-anti-function a))]]
+    [['FiniteSetsExt' 'kSubset' 2] [| 0 |=(a=(list value:v) (cm-k-subset a))]]
+    [['IOUtils' 'atoi' 1] [| 0 |=(a=(list value:v) (cm-atoi a))]]
+    [['SVG' 'SVGElemToString' 1] [| 0 |=(a=(list value:v) (cm-svg-elem a))]]
+    [['SVG' 'PointOnLine' 3] [| 0 |=(a=(list value:v) (cm-point-on-line a))]]
+    ::  refused by name: answers this engine cannot reproduce
+    [['SVG' 'NodeOfRingNetwork' 5] [| 0 |=(a=(list value:v) (cm-refused 'SVG' 'NodeOfRingNetwork' 'it rounds java.lang.Math.cos/sin doubles'))]]
+    [['SVG' 'NodesOfDirectedMultiGraph' 3] [| 0 |=(a=(list value:v) (cm-refused 'SVG' 'NodesOfDirectedMultiGraph' 'it is a jungrapht graph layout'))]]
+    [['Statistics' 'ChiSquare' 3] [| 0 |=(a=(list value:v) (cm-refused 'Statistics' 'ChiSquare' 'it is Apache Commons Math\'s chi-square test over doubles'))]]
     ::  TLCExt!TLCNoOp is the identity function in the pin -- `return val` and
     ::  nothing else (R2.6.3)
     [['TLCExt' 'TLCNoOp' 1] [| 0 |=(a=(list value:v) (tlc-no-op a))]]
@@ -175,7 +218,7 @@
 ++  ordinal
   |=  i=@ud
   ^-  @t
-  ?:(=(i 2) 'second' ?:(=(i 3) 'third' 'first'))
+  ?:(=(i 2) 'second' ?:(=(i 3) 'third' ?:(=(i 4) 'fourth' 'first')))
 ::
 ++  arg-error
   ::  "The <n> argument of <op> should be a[n] <what>, but instead it is:
@@ -323,6 +366,17 @@
       =(k ['Sequences' 'Seq' 1])
   ==
 ::
+++  node-op-modules
+  ::  the modules `+node-op` has keys in
+  ^-  (set @t)
+  ^~
+  %-  silt
+  ^-  (list @t)
+  :~  'Bags'  'BagsExt'  'FiniteSets'  'FiniteSetsExt'  'Functions'
+      'IOUtils'  'Json'  'Randomization'  'Sequences'  'SequencesExt'
+      'TLC'  'TLCExt'  'VectorClocks'
+  ==
+::
 ++  node-op
   ::  StandardModule operators the evaluator itself must run, because the
   ::  override needs something a value cannot carry: an OPERATOR argument
@@ -334,11 +388,31 @@
   ::  argument contract is recorded for every implemented operator
   |=  k=op-key
   ^-  (unit [tag=@tas lazy=? level=@ud])
+  ::  R4.Q1: a module with no node-op answers at once -- every user
+  ::  operator call asked all forty keys below
+  ?.  (~(has in node-op-modules) module.k)  ~
   ?:  =(k ['Sequences' 'SelectSeq' 2])     `[%select-seq | 0]
   ?:  =(k ['Bags' 'BagOfAll' 2])           `[%bag-of-all | 0]
   ?:  =(k ['FiniteSets' 'Cardinality' 1])  `[%cardinality | 0]
   ?:  =(k ['FiniteSets' 'IsFiniteSet' 1])  `[%is-finite-set | 0]
   ?:  =(k ['TLC' 'SortSeq' 2])             `[%sort-seq | 0]
+  ::  R4.2b: CommunityModules overrides that take an operator argument
+  ?:  =(k ['SequencesExt' 'FoldLeft' 3])           `[%fold-left | 0]
+  ?:  =(k ['SequencesExt' 'FoldLeftDomain' 3])     `[%fold-left-dom | 0]
+  ?:  =(k ['SequencesExt' 'FoldRight' 3])          `[%fold-right | 0]
+  ?:  =(k ['SequencesExt' 'FoldRightDomain' 3])    `[%fold-right-dom | 0]
+  ?:  =(k ['SequencesExt' 'FoldSeq' 3])            `[%fold-seq | 0]
+  ?:  =(k ['SequencesExt' 'RemoveFirstMatch' 2])   `[%remove-first-match | 0]
+  ?:  =(k ['SequencesExt' 'SelectInSeq' 2])        `[%select-in-seq | 0]
+  ?:  =(k ['SequencesExt' 'SelectLastInSeq' 2])    `[%select-last-in-seq | 0]
+  ?:  =(k ['SequencesExt' 'SelectInSubSeq' 4])     `[%select-in-subseq | 0]
+  ?:  =(k ['SequencesExt' 'SelectLastInSubSeq' 4])  `[%select-last-in-subseq | 0]
+  ?:  =(k ['Functions' 'FoldFunction' 3])          `[%fold-function | 0]
+  ?:  =(k ['Functions' 'FoldFunctionOnSet' 4])     `[%fold-function-on-set | 0]
+  ?:  =(k ['FiniteSetsExt' 'FoldSet' 3])           `[%fold-set | 0]
+  ?:  =(k ['FiniteSetsExt' 'Quantify' 2])          `[%quantify | 0]
+  ?:  =(k ['BagsExt' 'FoldBag' 3])                 `[%fold-bag | 0]
+  ?:  =(k ['VectorClocks' 'CausalOrder' 4])        `[%causal-order | 0]
   ::  the one `@Evaluation` override in scope: tlc2 hands it the node, the
   ::  context, and the states, and it decides what to evaluate
   ?:  =(k ['TLC' 'TLCEval' 1])             `[%tlc-eval & 0]
@@ -366,6 +440,19 @@
   ::  the carrier holds, and its argument is a SET, so it needs both the
   ::  carrier and the lazy-domain treatment `Cardinality` gets
   ?:  =(k ['TLC' 'RandomElement' 1])        `[%random-element | 0]
+  ::  R4.2a: `Print` / `PrintT` WRITE the console at the moment of evaluation,
+  ::  which here is a line on the carrier (`out`), so they are node-ops for the
+  ::  same reason `TLCSet` is. Plain `@TLAPlusOperator`s at the pin
+  ?:  =(k ['TLC' 'Print' 2])                `[%print | 0]
+  ?:  =(k ['TLC' 'PrintT' 1])               `[%print-t | 0]
+  ::  R4.2f: `JsonSerialize` / `ndJsonSerialize` WRITE a file at the pin; here
+  ::  the file is a job artifact, written through the carrier (`files`)
+  ?:  =(k ['Json' 'JsonSerialize' 2])       `[%json-serialize | 0]
+  ::  R4.2c: CommunityModules' `IOUtils!IOEnv`, the process environment as a
+  ::  record. A node-op because the value is the RUN's (the request's `env`),
+  ::  which only the evaluator's env carries
+  ?:  =(k ['IOUtils' 'IOEnv' 0])            `[%io-env | 0]
+  ?:  =(k ['Json' 'ndJsonSerialize' 2])     `[%nd-json-serialize | 0]
   ?:  =(k ['TLC' 'TLCSet' 2])               `[%tlc-set | 0]
   ?:  =(k ['TLCExt' 'TLCGetOrDefault' 2])   `[%tlc-get-or-default | 0]
   ?:  =(k ['TLCExt' 'TLCGetAndSet' 4])      `[%tlc-get-and-set | 0]
@@ -823,6 +910,500 @@
   %^  rap  3  'The first argument of Assert evaluated to FALSE; '
   ~['the second argument was: ' (crip (render:v i.t.as))]
 ::
+++  cm-refused
+  ::  R4.2b: a CommunityModules override whose answer this engine cannot
+  ::  reproduce (floating point, a Java graph-layout library, HashMap order),
+  ::  refused by name rather than answered by its dummy TLA+ body
+  |=  [mod=@t nm=@t why=@t]
+  ^-  eres
+  [%| 0 (rap 3 ~['unsupported CommunityModules operator: ' mod '!' nm '; ' why])]
+::
+++  cm-set-to-seq
+  ::  SequencesExt!SetToSeq: the set's elements in normalized order
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SetToSeq expects one argument.']
+  ?.  (set-like:v i.as)  [%| (one-arg-error 'SetToSeq' 'set' i.as)]
+  [%& [%seq (set-elems:v (normalize:v i.as))]]
+::
+++  cm-set-to-seqs
+  ::  SequencesExt!SetToSeqs: every ordering of the set, as tuples;
+  ::  `{<<>>}` for the empty set
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SetToSeqs expects one argument.']
+  ?.  (set-like:v i.as)
+    [%| (wrong-value-error 'SetToSeqs' 'a finite set' i.as)]
+  =/  es  (set-elems:v (normalize:v i.as))
+  ?~  es  [%& (normalize:v [%set %set-enum ~[[%seq ~]]])]
+  [%& (normalize:v [%set %set-enum (turn (orderings es) |=(o=(list value:v) [%seq o]))])]
+::
+++  cm-contains
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'Contains expects two arguments.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'Contains' 'sequence' i.as)]
+  [%& [%bool (lien u.t |=(x=value:v (equal:v x i.t.as)))]]
+::
+++  cm-is-prefix
+  ::  strings by `startsWith`, else element-wise over tuples
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'IsPrefix expects two arguments.']
+  ?:  &(?=(%str -.i.as) ?=(%str -.i.t.as))
+    =/  n  (met 3 p.i.as)
+    [%& [%bool =(p.i.as (end [3 n] p.i.t.as))]]
+  =/  s  (to-tuple:v i.as)
+  =/  t  (to-tuple:v i.t.as)
+  ?~  s  [%| (arg-error 2.169 1 'IsPrefix' 'sequence' | i.as)]
+  ?~  t  [%| (arg-error 2.169 2 'IsPrefix' 'sequence' | i.t.as)]
+  ?:  (gth (lent u.s) (lent u.t))  [%& [%bool |]]
+  =/  ss  u.s
+  =/  tt  u.t
+  |-  ^-  eres
+  ?~  ss  [%& [%bool &]]
+  ?~  tt  [%& [%bool |]]
+  ?.  (equal:v i.ss i.tt)  [%& [%bool |]]
+  $(ss t.ss, tt t.tt)
+::
+++  cm-lcp
+  ::  SequencesExt!LongestCommonPrefix: the prefix of the FIRST element in
+  ::  normalized order shared by every other (strings by character)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'LongestCommonPrefix expects one argument.']
+  =/  bad  (one-arg-error 'LongestCommonPrefix' 'non-empty set' i.as)
+  ?.  (set-like:v i.as)  [%| bad]
+  =/  es  (set-elems:v (normalize:v i.as))
+  ?~  es  [%| bad]
+  ?:  ?=(%str -.i.es)
+    =/  pre=tape  (trip p.i.es)
+    =/  up  (lent pre)
+    =/  os  t.es
+    |-  ^-  eres
+    ?~  os  [%& [%str (crip (scag up pre))]]
+    ?.  ?=(%str -.i.os)  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+    $(os t.os, up (common-len (scag up pre) (trip p.i.os)))
+  =/  f  (to-tuple:v i.es)
+  ?~  f  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+  =/  up  (lent u.f)
+  =/  os  t.es
+  |-  ^-  eres
+  ?~  os  [%& [%seq (scag up u.f)]]
+  =/  o  (to-tuple:v i.os)
+  ?~  o  [%| (one-arg-error 'LongestCommonPrefix' 'sequence' i.as)]
+  $(os t.os, up (common-vals (scag up u.f) u.o))
+::
+++  common-len
+  |=  [a=tape b=tape]
+  ^-  @ud
+  =|  n=@ud
+  |-  ^-  @ud
+  ?~  a  n
+  ?~  b  n
+  ?.  =(i.a i.b)  n
+  $(a t.a, b t.b, n +(n))
+::
+++  common-vals
+  |=  [a=(list value:v) b=(list value:v)]
+  ^-  @ud
+  =|  n=@ud
+  |-  ^-  @ud
+  ?~  a  n
+  ?~  b  n
+  ?.  (equal:v i.a i.b)  n
+  $(a t.a, b t.b, n +(n))
+::
+++  cm-suffixes
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'Suffixes expects one argument.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'Suffixes' 'sequence' i.as)]
+  =|  out=(list value:v)
+  =/  s  u.t
+  |-  ^-  eres
+  ?~  s  [%& (normalize:v [%set %set-enum [[%seq ~] out]])]
+  $(s t.s, out [[%seq s] out])
+::
+++  cm-all-sub-seqs
+  ::  every subsequence (elements kept in order), 2^n of them
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'AllSubSeqs expects one argument.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (one-arg-error 'AllSubSeqs' 'sequence' i.as)]
+  =/  subs=(list (list value:v))
+    =/  xs  (flop u.t)
+    =/  acc=(list (list value:v))  [~ ~]
+    |-  ^-  (list (list value:v))
+    ?~  xs  acc
+    $(xs t.xs, acc (weld acc (turn acc |=(l=(list value:v) `(list value:v)`[i.xs l]))))
+  [%& (normalize:v [%set %set-enum (turn subs |=(l=(list value:v) [%seq l]))])]
+::
+++  cm-remove-first
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'RemoveFirst expects two arguments.']
+  =/  t  (to-tuple:v i.as)
+  ?~  t  [%| (arg-error 2.169 1 'RemoveFirst' 'sequence' | i.as)]
+  =|  out=(list value:v)
+  =/  s  u.t
+  |-  ^-  eres
+  ?~  s  [%& [%seq (flop out)]]
+  ?:  (equal:v i.s i.t.as)  [%& [%seq (weld (flop out) t.s)]]
+  $(s t.s, out [i.s out])
+::
+++  cm-is-injective
+  ::  Functions!IsInjective: a tuple or a function's VALUES pairwise
+  ::  distinct; a record is not a function to the override (EC 2283)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'IsInjective expects one argument.']
+  =/  vs=(unit (list value:v))
+    ?+  -.i.as  ~
+      %seq  `p.i.as
+      %fcn  `(turn p.i.as |=(p=vpair:v r.p))
+    ==
+  ?~  vs  [%| (one-arg-error 'IsInjective' 'function' i.as)]
+  =/  l  u.vs
+  |-  ^-  eres
+  ?~  l  [%& [%bool &]]
+  ?:  (lien t.l |=(x=value:v (equal:v x i.l)))  [%& [%bool |]]
+  $(l t.l)
+::
+++  cm-anti-function
+  ::  Functions!AntiFunction: the function's values mapped back to its domain
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'AntiFunction expects one argument.']
+  =/  ps  (to-fcn-pairs:v (normalize:v i.as))
+  ?~  ps  [%| (one-arg-error 'AntiFunction' 'functions' i.as)]
+  [%& (normalize:v [%fcn (turn u.ps |=(p=vpair:v [r.p d.p]))])]
+::
+++  cm-k-subset
+  ::  FiniteSetsExt!kSubset: the k-element subsets, a KSubsetValue; `{}` when
+  ::  k is out of range and the SubsetValue `{{}}` for k = 0
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * ~] as)  [%| 0 'kSubset expects two arguments.']
+  ?.  (set-like:v i.t.as)  [%| (one-arg-error 'kSubset' 'set' i.t.as)]
+  ?.  ?=(%int -.i.as)
+    [%| (arg-error 2.169 1 'kSubset' 'natural number' | i.as)]
+  =/  es  (set-elems:v (normalize:v i.t.as))
+  ?.  (syn:si p.i.as)  [%& [%set %set-enum ~]]
+  =/  k  (abs:si p.i.as)
+  ?:  (gth k (lent es))  [%& [%set %set-enum ~]]
+  ?:  =(0 k)  [%& [%set %subset ~[[%set %set-enum ~]]]]
+  =/  cs  (k-combos k es)
+  =/  n  (normalize:v [%set %set-enum (turn cs |=(c=(list value:v) [%set %set-enum c]))])
+  ?.  ?=(%set -.n)  [%& n]
+  [%& n(cls %k-subset)]
+::
+++  k-combos
+  |=  [k=@ud es=(list value:v)]
+  ^-  (list (list value:v))
+  ?:  =(0 k)  ~[~]
+  ?~  es  ~
+  %+  weld
+    (turn $(k (dec k), es t.es) |=(c=(list value:v) [i.es c]))
+  $(es t.es)
+::
+++  cm-atoi
+  ::  IOUtils!atoi: java.lang.Integer.parseInt -- an optional sign and
+  ::  decimal digits, within the 32-bit range
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'atoi expects one argument.']
+  =/  bad  [%| (one-arg-error 'atoi' 'string' i.as)]
+  ?.  ?=(%str -.i.as)  bad
+  =/  t=tape  (trip p.i.as)
+  =/  neg  ?=([%'-' *] t)
+  =?  t  ?=([?(%'-' %'+') *] t)  t.t
+  ?~  t  bad
+  ?.  (levy `tape`t |=(c=@t &((gte c '0') (lte c '9'))))  bad
+  =/  m  (rash (crip t) dem)
+  =/  x  (new:si !neg m)
+  ?.  (in-range x)  bad
+  [%& [%int x]]
+::
+++  cm-svg-elem
+  ::  SVG!SVGElemToString: `<name attrs>innerText children</name>`, the
+  ::  attributes in the RECORD's field order (`_` in a name becomes `-`)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'SVGElemToString expects one argument.']
+  =/  r  (svg-string i.as)
+  ?:  ?=(%| -.r)  r
+  [%& [%str p.r]]
+::
+++  svg-string
+  |=  el=value:v
+  ^-  (each @t eval-err:v)
+  =/  bad
+    |=  why=@t
+    ^-  (each @t eval-err:v)
+    [%| 0 (rap 3 ~['SVGElemToString: ' why])]
+  ?.  ?=(%rec -.el)  (bad 'an SVG element must be a record')
+  =/  fld
+    |=  k=@t
+    ^-  (unit value:v)
+    =/  h  (skim p.el |=(f=vfield:v =(k k.f)))
+    ?~(h ~ `v.i.h)
+  =/  nm  (fld 'name')
+  ?.  ?=([~ %str *] nm)  (bad 'the element has no string `name`')
+  =/  at  (fld 'attrs')
+  ::  `attrs` as the override's `toRcd()` sees it: a record, or a function
+  ::  over strings (`Merge`'s `[x \in D |-> ...]`)
+  =/  attrs=(list vfield:v)
+    ?:  ?=([~ %rec *] at)  p.u.at
+    ?.  ?=([~ %fcn *] at)  ~
+    %+  murn  p.u.at
+    |=  p=vpair:v
+    ?.  ?=(%str -.d.p)  ~
+    `[p.d.p r.p]
+  =/  astr=tape
+    %-  zing
+    %+  turn  attrs
+    |=  f=vfield:v
+    =/  k=tape  (turn (trip k.f) |=(c=@t ?:(=(c '_') '-' c)))
+    =/  val=tape  ?:(?=(%str -.v.f) (trip p.v.f) (render:v v.f))
+    :(weld " " k "='" val "'")
+  =/  ch  (fld 'children')
+  =/  kids=(list value:v)
+    ?~  ch  ~
+    ?:  ?=(%seq -.u.ch)  p.u.ch
+    ?:  ?=(%rec -.u.ch)  (turn p.u.ch |=(f=vfield:v v.f))
+    ?:  ?=(%fcn -.u.ch)  (turn p.u.ch |=(p=vpair:v r.p))
+    ~
+  =|  cstr=tape
+  |-  ^-  (each @t eval-err:v)
+  ?^  kids
+    =/  c  (svg-string i.kids)
+    ?:  ?=(%| -.c)  c
+    $(kids t.kids, cstr (weld cstr (trip p.c)))
+  =/  it  (fld 'innerText')
+  =/  inner=tape  ?:(?=([~ %str *] it) (svg-escape (trip p.u.it)) "")
+  =/  name=tape  (trip p.u.nm)
+  [%& (crip ;:(weld "<" name astr ">" inner cstr "</" name ">"))]
+::
+++  svg-escape
+  ::  `<<` and `>>` as entities, as the override's two replaceAll calls do
+  |=  t=tape
+  ^-  tape
+  ?~  t  ~
+  ?:  ?=([%'<' %'<' *] t)  (weld "&lt;&lt;" $(t t.t.t))
+  ?:  ?=([%'>' %'>' *] t)  (weld "&gt;&gt;" $(t t.t.t))
+  [i.t $(t t.t)]
+::
+++  cm-point-on-line
+  ::  SVG!PointOnLine: `(int)(f + (t - f) / (idx * 1.0))` per coordinate --
+  ::  the double quotient truncated toward zero (the TLA+ body floors)
+  |=  as=(list value:v)
+  ^-  eres
+  ?.  ?=([* * * ~] as)  [%| 0 'PointOnLine expects three arguments.']
+  ?.  ?=(%int -.i.t.t.as)  [%| (arg-error 2.169 3 'PointOnLine' 'integer' | i.t.t.as)]
+  =/  d  p.i.t.t.as
+  ?:  =(--0 d)  [%| 0 'PointOnLine: a zero segment count.']
+  =/  co
+    |=  [r=value:v k=@t]
+    ^-  (unit @s)
+    ?.  ?=(%rec -.r)  ~
+    =/  h  (skim p.r |=(f=vfield:v =(k k.f)))
+    ?~  h  ~
+    ?.  ?=(%int -.v.i.h)  ~
+    `p.v.i.h
+  =/  fx  (co i.as 'x')
+  =/  fy  (co i.as 'y')
+  =/  tx  (co i.t.as 'x')
+  =/  ty  (co i.t.as 'y')
+  ?.  &(?=(^ fx) ?=(^ fy) ?=(^ tx) ?=(^ ty))
+    [%| 0 'PointOnLine: the points must be records with integer x and y.']
+  =/  pt
+    |=  [f=@s t=@s]
+    ^-  @s
+    ::  (f*d + (t - f)) / d, truncated toward zero
+    =/  num  (sum:si (pro:si f d) (dif:si t f))
+    (fra:si num d)
+  (mk-rec:v ~[['x' [%int (pt u.fx u.tx)]] ['y' [%int (pt u.fy u.ty)]]])
+::
+++  io-refused
+  ::  R4.2h: a CommunityModules process or file operator, refused by name
+  |=  [mod=@t nm=@t why=@t]
+  ^-  eres
+  :-  %|
+  :-  0
+  %+  rap  3
+  :~  'unsupported CommunityModules operator: '  mod  '!'  nm  '; '  why
+      ', and a run has no process and touches no file outside its request'
+  ==
+::
+++  json-read-refused
+  ::  R4.2f: `JsonDeserialize` / `ndJsonDeserialize` read a FILE by a path
+  ::  relative to tlc2's working directory. A run here reads only the sources
+  ::  its request names, so the operator is refused by name (approved
+  ::  difference, compatibility.md), never answered with an invented value
+  |=  nm=@t
+  ^-  eres
+  :-  %|
+  :-  0
+  %+  rap  3
+  :~  'unsupported StandardModule operator: Json!'  nm
+      '; it reads a file, and a run reads only the sources its request names'
+  ==
+::
+++  json-str
+  ::  R4.2f: `ToJson` / `ToJsonArray` / `ToJsonObject` -- the value as Gson's
+  ::  compact JSON text, a string value
+  |=  [k=?(%node %array %object) as=(list value:v)]
+  ^-  eres
+  ?.  ?=([* ~] as)  [%| 0 'expects one argument.']
+  =/  r
+    ?-  k
+      %node    (json-node i.as)
+      %array   (json-array i.as)
+      %object  (json-object i.as)
+    ==
+  ?:  ?=(%| -.r)  [%| 0 p.r]
+  [%& [%str (crip p.r)]]
+::
+++  json-node
+  ::  R4.2f: `Json.getNode` -- a record is an object, a tuple an array, a
+  ::  string or model value a JSON string, an integer a number, a boolean a
+  ::  boolean, a function an object (an ARRAY when its domain is 1..n), any
+  ::  finite set an array of its normalized elements
+  |=  x=value:v
+  ^-  (each tape @t)
+  ?-  -.x
+    %rec    (json-object x)
+    %seq    (json-array x)
+    %str    [%& (json-quote p.x)]
+    %model  [%& (json-quote p.x)]
+    %int    [%& (render:v x)]
+    %bool   [%& ?:(p.x "true" "false")]
+    %fcn    (json-object x)
+    %set    (json-array x)
+    %intv   (json-array x)
+  ==
+::
+++  json-array
+  ::  R4.2f: `Json.getArrayNode`
+  |=  x=value:v
+  ^-  (each tape @t)
+  =/  els=(unit (list value:v))
+    ?+  -.x  ~
+      %seq   `p.x
+      %set   `(set-elems:v (normalize:v x))
+      %intv  `(set-elems:v (normalize:v x))
+      %fcn   ?.((json-seq-fcn x) ~ `(turn p.x |=(q=vpair:v r.q)))
+    ==
+  ?~  els
+    ?:  ?=(%fcn -.x)  (json-object x)
+    [%| (json-unsupported x)]
+  =/  ns  (json-list u.els)
+  ?:  ?=(%| -.ns)  ns
+  [%& :(weld "[" (join-json p.ns) "]")]
+::
+++  json-object
+  ::  R4.2f: `Json.getObjectNode`: a record by its fields; a TUPLE by its
+  ::  0-based positions ("0", "1", ...); a function by its domain (a string key
+  ::  as itself, any other as its `toString`), unless its domain is 1..n, in
+  ::  which case it is an array
+  |=  x=value:v
+  ^-  (each tape @t)
+  =/  kvs=(unit (list [k=tape v=value:v]))
+    ?+  -.x  ~
+        %rec
+      `(turn p.x |=(f=vfield:v [(trip k.f) v.f]))
+        %seq
+      =|  i=@ud
+      =/  es  p.x
+      =|  out=(list [k=tape v=value:v])
+      |-  ^-  (unit (list [k=tape v=value:v]))
+      ?~  es  `(flop out)
+      $(es t.es, i +(i), out [[(a-co:co i) i.es] out])
+        %fcn
+      ?:  (json-seq-fcn x)  ~
+      %-  some
+      %+  turn  p.x
+      |=  q=vpair:v
+      :_  r.q
+      ?:(?=(%str -.d.q) (trip p.d.q) (render:v d.q))
+    ==
+  ?~  kvs
+    ?:  &(?=(%fcn -.x) (json-seq-fcn x))  (json-array x)
+    [%| (json-unsupported x)]
+  =|  out=(list tape)
+  =/  ks  u.kvs
+  |-  ^-  (each tape @t)
+  ?~  ks  [%& :(weld "\{" (join-json (flop out)) "}")]
+  =/  n  (json-node v.i.ks)
+  ?:  ?=(%| -.n)  n
+  $(ks t.ks, out [:(weld (json-quote (crip k.i.ks)) ":" p.n) out])
+::
+++  json-seq-fcn
+  ::  `Json.isValidSequence`: every domain point an integer, and the domain
+  ::  exactly 1..n in order
+  |=  x=value:v
+  ^-  ?
+  ?.  ?=(%fcn -.x)  |
+  =/  i  1
+  =/  ps  p.x
+  |-  ^-  ?
+  ?~  ps  &
+  ?.  ?=(%int -.d.i.ps)  |
+  ?.  =(d.i.ps [%int (sun:si i)])  |
+  $(ps t.ps, i +(i))
+::
+++  json-list
+  |=  vs=(list value:v)
+  ^-  (each (list tape) @t)
+  =|  out=(list tape)
+  |-  ^-  (each (list tape) @t)
+  ?~  vs  [%& (flop out)]
+  =/  n  (json-node i.vs)
+  ?:  ?=(%| -.n)  n
+  $(vs t.vs, out [p.n out])
+::
+++  join-json
+  |=  ts=(list tape)
+  ^-  tape
+  ?~  ts  ~
+  ?~  t.ts  i.ts
+  :(weld i.ts "," $(ts t.ts))
+::
+++  json-unsupported
+  |=  x=value:v
+  ^-  @t
+  (rap 3 ~['Cannot convert value: unsupported value type ' (crip (render:v x))])
+::
+++  json-quote
+  ::  Gson's string escaping (`JsonWriter.string`, not HTML-safe): `"` and `\`
+  ::  escaped, \t \b \n \r \f by name, every other control character below
+  ::  0x20 as \u00XX (byte-wise: Gson's escapes of U+2028/U+2029 are not
+  ::  reproduced)
+  |=  t=@t
+  ^-  tape
+  =/  cs  (trip t)
+  =|  out=tape
+  |-  ^-  tape
+  ?~  cs  :(weld "\"" (flop out) "\"")
+  =/  c  i.cs
+  =/  rep=tape
+    ?:  =(c '"')   "\\\""
+    ?:  =(c '\\')  "\\\\"
+    ?:  =(c '\09')  "\\t"
+    ?:  =(c '\08')  "\\b"
+    ?:  =(c '\0a')  "\\n"
+    ?:  =(c '\0d')  "\\r"
+    ?:  =(c '\0c')  "\\f"
+    ?:  (lth c 0x20)
+      =/  h  ((x-co:co 4) c)
+      (weld "\\u" h)
+    [c ~]
+  $(cs t.cs, out (weld (flop rep) out))
+::
 ++  to-string
   ::  TLC!ToString: the canonical rendering, as a string value
   |=  as=(list value:v)
@@ -882,18 +1463,6 @@
     ?~  ss  acc
     $(ss t.ss, acc [[i.l i.ss] acc])
   $(l t.l, out o2)
-::
-++  print-op
-  ::  TLC!Print / TLC!PrintT write to TLC's console. Gall owns effects here
-  ::  and the evaluation path has no output channel yet, so this is a typed
-  ::  rejection naming what is missing — never a silent no-op that returns
-  ::  the value (plan-2 invariant 8)
-  |=  [nm=@t as=(list value:v)]
-  ^-  eres
-  :-  %|
-  :-  0
-  %^  rap  3  'unsupported StandardModule operator: TLC!'
-  ~[nm '; it writes to the TLC console and this engine has no output channel']
 ::
 ++  tlc-get-keys
   ::  the named TLCGet values the pin defines (tlc2.module.TLCGetSet)

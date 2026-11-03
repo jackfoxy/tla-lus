@@ -183,12 +183,101 @@
 ::  +|  Equality (total, cross-representation)
 ::
 ++  equal
+  ::  `+ekey` is normalization-invariant, so nothing is normalized here.
+  ::  R4.Q3 (H14): the cheap answers first; the key is built only when
+  ::  none of them decides. Each is exact: identical nouns have one key; a
+  ::  scalar's key is its noun; two lists equal position by position are
+  ::  the same set (or function); a nonempty interval is its bounds
   |=  [a=value b=value]
   ^-  ?
-  (equal-norm (normalize a) (normalize b))
+  ?:  =(a b)  &
+  ?:  |((scalar a) (scalar b))  |
+  ?:  &(?=(%intv -.a) ?=(%intv -.b))
+    &((slth hi.a lo.a) (slth hi.b lo.b))
+  ?:  &(?=(%seq -.a) ?=(%seq -.b))
+    (list-equal p.a p.b)
+  ?:  ?&  ?=(%set -.a)  ?=(%set -.b)
+          (list-equal p.a p.b)
+      ==
+    &
+  ?:  ?&  ?=(%fcn -.a)  ?=(%fcn -.b)
+          (pairs-equal p.a p.b)
+      ==
+    &
+  ?:  ?&  ?=(%rec -.a)  ?=(%rec -.b)
+          (fields-equal p.a p.b)
+      ==
+    &
+  =((ekey a) (ekey b))
 ::
 ++  equal-norm
   ::  both inputs already normalized
+  |=  [a=value b=value]
+  ^-  ?
+  (equal a b)
+::
+++  scalar  |=(v=value ?=(?(%bool %int %str %model) -.v))
+::
+++  list-equal
+  ::  R4.Q3: equal position by position (same length)
+  |=  [a=(list value) b=(list value)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  (equal i.a i.b)  |
+  $(a t.a, b t.b)
+::
+++  pairs-equal
+  |=  [a=(list vpair) b=(list vpair)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  &((equal d.i.a d.i.b) (equal r.i.a r.i.b))  |
+  $(a t.a, b t.b)
+::
+++  fields-equal
+  |=  [a=(list vfield) b=(list vfield)]
+  ^-  ?
+  ?~  a  ?=(~ b)
+  ?~  b  |
+  ?.  &(=(k.i.a k.i.b) (equal v.i.a v.i.b))  |
+  $(a t.a, b t.b)
+::
+++  ekey
+  ::  R4.P4 (H5): an EXACT equality key -- `(ekey a)` = `(ekey b)` iff
+  ::  `+equal-norm-ref` holds of their normal forms. It mirrors that relation
+  ::  case for case: set-likes (sets, intervals) compare as element SETS,
+  ::  fcn-likes (functions, tuples, records) as SETS of domain->value pairs,
+  ::  scalars by kind and payload. Order- and duplicate-blind, so it needs no
+  ::  normalization; building it is O(n log n). The old pairwise relation
+  ::  made `+norm-set`'s dedup and `+equal` O(n^2) in set size (measured:
+  ::  151 ms to compare two 100-sets)
+  |=  v=value
+  ^-  *
+  ?:  (set-like v)
+    [%set (key-set (turn (set-elems v) ekey))]
+  ?:  (fcn-like v)
+    :-  %fcn
+    %-  key-set
+    (turn (fcn-pairs v) |=(pr=vpair `*`[(ekey d.pr) (ekey r.pr)]))
+  ?+  -.v  !!
+    %bool   [%bool p.v]
+    %int    [%int p.v]
+    %str    [%str p.v]
+    %model  [%model p.v]
+  ==
+::
+++  key-set
+  ::  a canonical form of a set of keys: the `+silt` treap itself. A treap's
+  ::  shape is fixed by its elements (`+gor` orders keys, `+mor` priorities,
+  ::  both total), so equal key sets give identical nouns with no sort
+  |=  ks=(list *)
+  ^-  (set *)
+  (silt ks)
+::
+++  equal-norm-ref
+  ::  the PAIRWISE relation `+ekey` encodes, kept as its specification and
+  ::  for the differential test (both inputs already normalized)
   |=  [a=value b=value]
   ^-  ?
   ?:  &((set-like a) (set-like b))
@@ -212,8 +301,8 @@
   |=  [a=(list value) b=(list value)]
   ^-  ?
   ?.  =((lent a) (lent b))  |
-  ?&  (levy a |=(x=value (lien b |=(y=value (equal-norm x y)))))
-      (levy b |=(y=value (lien a |=(x=value (equal-norm x y)))))
+  ?&  (levy a |=(x=value (lien b |=(y=value (equal-norm-ref x y)))))
+      (levy b |=(y=value (lien a |=(x=value (equal-norm-ref x y)))))
   ==
 ::
 ++  fcn-equal
@@ -225,7 +314,7 @@
   |=  pa=vpair
   %+  lien  b
   |=  pb=vpair
-  &((equal-norm d.pa d.pb) (equal-norm r.pa r.pb))
+  &((equal-norm-ref d.pa d.pb) (equal-norm-ref r.pa r.pb))
 ::
 ++  rec-equal
   ::  same key set, equal value per key (field-order independent)
@@ -236,7 +325,7 @@
   |=  fa=vfield
   %+  lien  b
   |=  fb=vfield
-  &(=(k.fa k.fb) (equal-norm v.fa v.fb))
+  &(=(k.fa k.fb) (equal-norm-ref v.fa v.fb))
 ::
 ::  +|  Normalization (representation-preserving canonical form)
 ::
@@ -246,6 +335,9 @@
   ::  Intervals and tuples keep their representation (views, not eager).
   |=  v=value
   ^-  value
+  ::  R4.Q3 (H14): a set already in normal form is returned as it is; a
+  ::  forced set was normalized once as an image and again by `+force`
+  ?:  &(?=(%set -.v) (normal v))  v
   ?-  -.v
     %bool   v
     %int    v
@@ -254,13 +346,9 @@
     %intv   v
     %seq  [%seq (turn p.v normalize)]
       %rec
-    :-  %rec
-    %+  sort  (turn p.v |=(f=vfield [k.f (normalize v.f)]))
-    |=([x=vfield y=vfield] (strlth k.x k.y))
+    [%rec (fsort (turn p.v |=(f=vfield [k.f (normalize v.f)])))]
       %fcn
-    :-  %fcn
-    %+  sort  (turn p.v |=(pr=vpair [(normalize d.pr) (normalize r.pr)]))
-    |=([x=vpair y=vpair] (vlth d.x d.y))
+    [%fcn (psort (turn p.v |=(pr=vpair [(normalize d.pr) (normalize r.pr)])))]
       %set
     ::  R2.7.2: `cls` survives normalization. Normalizing reorders and dedups
     ::  ELEMENTS; it does not change what the set was BUILT as, and resetting
@@ -268,20 +356,185 @@
     [%set cls.v (norm-set (turn p.v normalize))]
   ==
 ::
+++  normal
+  ::  R4.Q3: `(normalize v)` would return `v` itself: every component is
+  ::  normal and each sorted list is strictly `+rising` (so stable sorts keep
+  ::  it and dedup finds nothing). Conservative: `|` only costs the sort
+  |=  v=value
+  ^-  ?
+  ?-  -.v
+    %bool   &
+    %int    &
+    %str    &
+    %model  &
+    %intv   &
+    %seq    (levy p.v normal)
+    %set    &((rising p.v) (levy p.v normal))
+      %rec
+    ?&  (keys-rising p.v)
+        (levy p.v |=(f=vfield (normal v.f)))
+    ==
+      %fcn
+    ?&  (rising (turn p.v |=(pr=vpair d.pr)))
+        (levy p.v |=(pr=vpair &((normal d.pr) (normal r.pr))))
+    ==
+  ==
+::
+++  keys-rising
+  |=  fs=(list vfield)
+  ^-  ?
+  ?~  fs  &
+  |-  ^-  ?
+  ?~  t.fs  &
+  ?.  (strlth k.i.fs k.i.t.fs)  |
+  $(fs t.fs)
+::
 ++  norm-set
-  ::  elements already normalized: keep-first dedup by equality, then sort
-  ::  into the private storage order
+  ::  elements already normalized: dedup by equality, keeping the LAST of
+  ::  equal elements, then sort into the private storage order. R4.P4: the
+  ::  dedup walks the list backwards through a set of `+ekey`s, O(n log n);
+  ::  it was a `lien` over the rest per element, O(n^2)
   |=  vs=(list value)
   ^-  (list value)
-  =/  uniq
-    |-  ^-  (list value)
-    ?~  vs  ~
-    ?:  (lien t.vs |=(x=value (equal-norm i.vs x)))
-      $(vs t.vs)
-    [i.vs $(vs t.vs)]
-  (sort uniq vlth)
+  ?:  (sorted-scalars vs)  vs
+  ::  R4.Q3 (H14): already in order, or in reverse order (`+force`
+  ::  accumulates backwards), so distinct and needing no keys
+  ?:  (rising vs)  vs
+  ?:  (falling vs)  (flop vs)
+  ::  R4.Q3: scalars are equal only when identical, so sorting first puts
+  ::  every duplicate beside its twin; no keys
+  ?:  (levy vs scalar)  (drop-twins (vsort vs))
+  =/  rev  (flop vs)
+  =|  seen=(set *)
+  =|  uniq=(list value)
+  |-  ^-  (list value)
+  ?~  rev  (vsort uniq)
+  =/  k  (ekey i.rev)
+  ?:  (~(has in seen) k)  $(rev t.rev)
+  $(rev t.rev, seen (~(put in seen) k), uniq [i.rev uniq])
+::
+++  drop-twins
+  ::  a sorted list without its adjacent repeats
+  |=  vs=(list value)
+  ^-  (list value)
+  =|  out=(list value)
+  |-  ^-  (list value)
+  ?~  vs  (flop out)
+  ?:  &(?=(^ out) =(i.vs i.out))  $(vs t.vs)
+  $(vs t.vs, out [i.vs out])
+::
+++  rising
+  ::  R4.Q3: strictly increasing in storage order, and so distinct. `+vlth`
+  ::  is a strict total order consistent with `+equal` except where an
+  ::  interval meets a set of the same elements (they rank by kind) or
+  ::  another interval (by `lo` alone): `<<{1, 2}>> < <<{1, 3}>> < <<1..2>>`
+  ::  rises, yet its ends are equal. So no interval may occur anywhere
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  ?.  (no-intv i.vs)  |
+  |-  ^-  ?
+  ?~  t.vs  &
+  ?.  (vlth i.vs i.t.vs)  |
+  ?.  (no-intv i.t.vs)  |
+  $(vs t.vs)
+::
+++  falling
+  ::  `+rising` read backwards, without reversing the list
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  ?.  (no-intv i.vs)  |
+  |-  ^-  ?
+  ?~  t.vs  &
+  ?.  (vlth i.t.vs i.vs)  |
+  ?.  (no-intv i.t.vs)  |
+  $(vs t.vs)
+::
+++  no-intv
+  |=  v=value
+  ^-  ?
+  ?-  -.v
+    %bool   &
+    %int    &
+    %str    &
+    %model  &
+    %intv   |
+    %set    (levy p.v no-intv)
+    %seq    (levy p.v no-intv)
+    %rec    (levy p.v |=(f=vfield (no-intv v.f)))
+    %fcn    (levy p.v |=(pr=vpair &((no-intv d.pr) (no-intv r.pr))))
+  ==
+::
+++  sorted-scalars
+  ::  R4.P5: integers only, or strings only, already strictly increasing in
+  ::  storage order -- so distinct and in place, which is +norm-set's
+  ::  answer. A re-normalized set (every fingerprint) skips the sort
+  |=  vs=(list value)
+  ^-  ?
+  ?~  vs  &
+  =/  k  -.i.vs
+  ?.  ?=(?(%int %str) k)  |
+  =/  prev=value  i.vs
+  =/  rest=(list value)  t.vs
+  |-  ^-  ?
+  ?~  rest  &
+  ?.  =(k -.i.rest)  |
+  ?.  (vlth prev i.rest)  |
+  $(prev i.rest, rest t.rest)
 ::
 ::  +|  Private Storage Order (total; distinct from TLC +compare)
+::
+++  psort
+  ::  pairs by domain point (`+vlth`), stable merge sort; see `+vsort`
+  |=  ps=(list vpair)
+  ^-  (list vpair)
+  =/  n  (lent ps)
+  ?:  (lth n 2)  ps
+  =/  h  (div n 2)
+  =/  a  $(ps (scag h ps))
+  =/  b  $(ps (slag h ps))
+  =|  out=(list vpair)
+  |-  ^-  (list vpair)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (vlth d.i.b d.i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
+::
+++  fsort
+  ::  fields by name (`+strlth`), stable merge sort; see `+vsort`
+  |=  fs=(list vfield)
+  ^-  (list vfield)
+  =/  n  (lent fs)
+  ?:  (lth n 2)  fs
+  =/  h  (div n 2)
+  =/  a  $(fs (scag h fs))
+  =/  b  $(fs (slag h fs))
+  =|  out=(list vfield)
+  |-  ^-  (list vfield)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (strlth k.i.b k.i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
+::
+++  vsort
+  ::  R4.P4: a STABLE merge sort by `+vlth`, O(n log n). The stdlib `+sort`
+  ::  with a `+vlth` gate measured 48 ms for 100 integers (about 70 us per
+  ::  comparison through the gate). Stable, like the `skid` partition of the
+  ::  stdlib quicksort it replaces, so the order of ties is unchanged
+  |=  vs=(list value)
+  ^-  (list value)
+  =/  n  (lent vs)
+  ?:  (lth n 2)  vs
+  =/  h  (div n 2)
+  =/  a  $(vs (scag h vs))
+  =/  b  $(vs (slag h vs))
+  =|  out=(list value)
+  |-  ^-  (list value)
+  ?~  a  (weld (flop out) b)
+  ?~  b  (weld (flop out) a)
+  ?:  (vlth i.b i.a)  $(b t.b, out [i.b out])
+  $(a t.a, out [i.a out])
 ::
 ++  vlth
   ::  a total strict order over normalized values, used only for stable
@@ -300,6 +553,9 @@
   ::  sort and dedup. Same-kind pairs are equivalent either way (a tuple's
   ::  domain is 1..n on both sides; a record's is its keys in `strlth` order),
   ::  so the fast paths below stay exact
+  ::  R4.P4: the commonest pairs first; each is exactly the arm below reaches
+  ?:  &(?=(%int -.a) ?=(%int -.b))  (slth p.a p.b)
+  ?:  &(?=(%str -.a) ?=(%str -.b))  (strlth p.a p.b)
   ?:  ?&(?!(=(-.a -.b)) (fcn-like a) (fcn-like b))
     (pair-lth (fcn-pairs a) (fcn-pairs b))
   =/  ra  (kind-rank a)
@@ -418,12 +674,22 @@
   ==
 ::
 ++  esc-str
-  ::  TLC re-escapes the double quote in a string body
+  ::  tlc2's `StringValue.PrintVersion`: `"` and `\` escaped, and tab,
+  ::  newline, form feed and carriage return by name (R4.2f: the port escaped
+  ::  only the quote, so a JSON string from `ToJson` printed differently)
   |=  s=@t
   ^-  tape
   %-  zing
   %+  turn  (trip s)
-  |=(c=@tD ?:(=('"' c) "\\\"" ~[c]))
+  |=  c=@tD
+  ^-  tape
+  ?:  =('"' c)  "\\\""
+  ?:  =('\\' c)  "\\\\"
+  ?:  =('\09' c)  "\\t"
+  ?:  =('\0a' c)  "\\n"
+  ?:  =('\0c' c)  "\\f"
+  ?:  =('\0d' c)  "\\r"
+  ~[c]
 ::
 ++  sort-fields
   |=  fs=(list vfield)
@@ -531,12 +797,49 @@
   ?.(-.o 0 +.o)
 ::
 ++  find-image
-  ::  the image of x under function pairs (domain compared with +equal)
+  ::  the image of x under function pairs (domain compared with +equal);
+  ::  R4.P3: a large function is looked up through its memoized key index
   |=  [ps=(list vpair) x=value]
   ^-  (unit value)
+  ?:  (gth-n ps 8)  (~(get by (fcn-index ps)) (ekey x))
+  |-  ^-  (unit value)
   ?~  ps  ~
   ?:  (equal d.i.ps x)  `r.i.ps
   $(ps t.ps)
+::
+++  gth-n
+  ::  has the list more than n elements? (stops after n+1)
+  |=  [l=(list) n=@ud]
+  ^-  ?
+  |-  ^-  ?
+  ?~  l  |
+  ?:  =(0 n)  &
+  $(l t.l, n (dec n))
+::
+++  fcn-index
+  ::  R4.P3: domain key -> image, the FIRST pair winning as in the scan.
+  ::  `~+`: a function value reused across states (a constant definition, a
+  ::  state component that did not change) is indexed once
+  |=  ps=(list vpair)
+  ^-  (map * value)
+  ~+
+  (malt (flop (turn ps |=(pr=vpair `[* value]`[(ekey d.pr) r.pr]))))
+::
+++  set-index
+  ::  R4.P3: a set's element keys, and whether any element is a TYPED model
+  ::  value -- the only case in which `+val-eq` can fail rather than answer.
+  ::  `~+`, as `+fcn-index`
+  |=  s=value
+  ^-  [keys=(set *) typed=?]
+  ~+
+  =/  es  (set-elems s)
+  :-  (silt (turn es ekey))
+  (lien es typed-mv)
+::
+++  typed-mv
+  |=  v=value
+  ^-  ?
+  &(?=(%model -.v) !=(0 (mv-type p.v)))
 ::
 ++  int-dom-msg
   ::  tlc2's wording when a function whose domain is all integers is applied to
@@ -782,6 +1085,15 @@
   ^-  (each ? eval-err)
   ?.  (set-like s)
     [%| 0 (rap 3 ~['Attempted to check membership in the non-set value ' (crip (render s)) '.'])]
+  ::  R4.P3: an integer in an interval is a range check, and a set holding no
+  ::  typed model value (with `x` not one) answers through its key index --
+  ::  exactly the scan's answer, since `+val-eq` cannot fail there
+  ?:  &(?=(%intv -.s) ?=(%int -.x))
+    [%& &(!(slth p.x lo.s) !(slth hi.s p.x))]
+  =/  ix=(unit [keys=(set *) typed=?])
+    ?.  ?&(?=(%set -.s) !(typed-mv x) (gth-n p.s 8))  ~
+    `(set-index s)
+  ?:  &(?=(^ ix) !typed.u.ix)  [%& (~(has in keys.u.ix) (ekey x))]
   =/  es  (set-elems s)
   |-  ^-  (each ? eval-err)
   ?~  es  [%& |]
@@ -859,8 +1171,9 @@
 ::  a resumable, jam-safe enumeration cursor (WU1 continuation state). Every
 ::  sub-enumeration is a finite value's element list, so the cursor is flat.
 +$  ecur
-  $%  ::  a precomputed ordered element list at index `i` (linear
-      ::  constructors: explicit set, interval, cup, cap, diff, union)
+  $%  ::  a precomputed ordered element list; `es` is the not-yet-taken rest
+      ::  and `i` counts the elements taken (linear constructors: explicit
+      ::  set, interval, cup, cap, diff, union)
       [%elems es=(list value) i=@ud]
       ::  an odometer over per-dimension element lists (exponential
       ::  constructors: product, set-of-functions, set-of-records);
@@ -906,6 +1219,10 @@
   ::  structural membership of x in a set-like value (equality-based)
   |=  [x=value s=value]
   ^-  ?
+  ?:  &(?=(%intv -.s) ?=(%int -.x))
+    &(!(slth p.x lo.s) !(slth hi.s p.x))
+  ?:  &(?=(%set -.s) (gth-n p.s 8))
+    (~(has in keys:(set-index s)) (ekey x))
   (lien (set-elems s) |=(e=value (equal x e)))
 ::
 ::  +|  Cursor Construction (sexp -> ecur)
@@ -1097,8 +1414,11 @@
   ^-  [estep ecur]
   ?-  -.cur
       %elems
-    ?:  (gte i.cur (lent es.cur))  [[%done ~] cur]
-    [[%item (snag i.cur es.cur)] cur(i +(i.cur))]
+    ::  R4.P1 (H11): consume the list; `(lent es)` + `(snag i es)` per element
+    ::  made enumerating an explicit set O(n^2). `es` is the REMAINDER, `i`
+    ::  still counts the elements taken
+    ?~  es.cur  [[%done ~] cur]
+    [[%item i.es.cur] cur(es t.es.cur, i +(i.cur))]
   ::
       %odo
     ?:  done.cur  [[%done ~] cur]
@@ -1742,9 +2062,17 @@
   ::  ints; Extend folds the low byte first)
   |=  n=@sd
   ^-  (list @D)
-  =/  o  (old:si n)
-  =/  u  (mod ?:(-.o +.o (sub (bex 32) (mod +.o (bex 32)))) (bex 32))
+  =/  u  (i32 n)
   ~[(cut 3 [0 1] u) (cut 3 [1 1] u) (cut 3 [2 1] u) (cut 3 [3 1] u)]
+::
+++  i32
+  ::  the low 32 bits of a Java int's two's complement. An @sd is 2a for
+  ::  +a and 2a-1 for -a, so bit 0 is the sign (R4.P5: bit arithmetic in
+  ::  place of +old:si and +bex per integer)
+  |=  n=@sd
+  ^-  @
+  ?:  =(0 (end 0 n))  (end 5 (rsh 0 n))
+  (end 5 (sub 0x1.0000.0000 (end 5 (rsh 0 +(n)))))
 ::
 ++  fp-input
   ::  the canonical fingerprint-input byte stream for a value

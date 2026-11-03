@@ -1,0 +1,25 @@
+RESULT safety failure
+Error: Invariant NoSolutions is violated.
+62 states generated, 40 distinct states found, 25 states left on queue.
+The depth of the complete state graph search is 5.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ pc = "nxtQ"
+/\ sols = {}
+/\ todo = {<<>>}
+State 2: <nxtQ line 78, col 9 to line 92, col 48 of module QueensPluscal>
+/\ pc = "nxtQ"
+/\ sols = {}
+/\ todo = {<<1>>, <<2>>, <<3>>, <<4>>}
+State 3: <nxtQ line 78, col 9 to line 92, col 48 of module QueensPluscal>
+/\ pc = "nxtQ"
+/\ sols = {}
+/\ todo = {<<1>>, <<3>>, <<4>>, <<2, 4>>}
+State 4: <nxtQ line 78, col 9 to line 92, col 48 of module QueensPluscal>
+/\ pc = "nxtQ"
+/\ sols = {}
+/\ todo = {<<1>>, <<3>>, <<4>>, <<2, 4, 1>>}
+State 5: <nxtQ line 78, col 9 to line 92, col 48 of module QueensPluscal>
+/\ pc = "nxtQ"
+/\ sols = {<<2, 4, 1, 3>>}
+/\ todo = {<<1>>, <<3>>, <<4>>}

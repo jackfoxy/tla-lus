@@ -1,0 +1,79 @@
+  50  refused (?)
+   6  too slow
+   5  refused (tlc 2105)
+   4  absent
+   3  agree
+   2  wrong answer
+   1  cancelled
+   1  refused (tlc 2226)
+   1  refused (tlc 0)
+  refused (?)              specifications/Bakery-Boulangerie/MCBakery.cfg  no definition for INVARIANT MutualExclusion
+  refused (?)              specifications/Bakery-Boulangerie/MCBoulanger.cfg  no definition for INVARIANT MutualExclusion
+  absent                   specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.cfg  
+  absent                   specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/MC.cfg  
+  refused (tlc 2105)       specifications/Chameneos/Chameneos.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 27, col 8 to line 27, col 45 of module Chameneos failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/CheckpointCoordination/MCCheckpointCoordination.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/CheckpointCoordination/MCCheckpointCoordinationFailure.cfg  no definition for INVARIANT TypeInvariant
+  too slow                 specifications/CoffeeCan/CoffeeCan1000Beans.cfg  
+  too slow                 specifications/CoffeeCan/CoffeeCan100Beans.cfg  
+  cancelled                specifications/CoffeeCan/CoffeeCan3000Beans.cfg  
+  refused (?)              specifications/DieHard/MCDieHarder.cfg  no definition for INVARIANT TypeOK
+  refused (?)              specifications/DieHard/MCDieHardest.cfg  no definition for INVARIANT NotSolved
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_MPMC.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 25, col 8 to line 25, col 33 of module Disruptor_MPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_MPMC_liveliness.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 25, col 8 to line 25, col 33 of module Disruptor_MPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_SPMC.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 27, col 8 to line 27, col 33 of module Disruptor_SPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/FiniteMonotonic/MCCRDT.cfg  no definition for INVARIANT TypeOK
+  refused (?)              specifications/FiniteMonotonic/MCDistributedReplicatedLog.cfg  unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)
+  refused (?)              specifications/FiniteMonotonic/MCReplicatedLog.cfg  no definition for INVARIANT TypeOK
+  too slow                 specifications/GameOfLife/GameOfLife.cfg  
+  refused (?)              specifications/Huang/Huang.cfg  undefined operator: Rational
+  refused (?)              specifications/KeyValueStore/MCKVSSafetyLarge.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/KeyValueStore/MCKVSSafetyMedium.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/KeyValueStore/MCKVSSafetySmall.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/KeyValueStore/MCKVsnap.cfg  no definition for INVARIANT TypeOK
+  refused (?)              specifications/LearnProofs/MCFindHighest.cfg  no definition for INVARIANT TypeOK
+  refused (?)              specifications/LeastCircularSubstring/MCLeastCircularSubstringMedium.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/LeastCircularSubstring/MCLeastCircularSubstringSmall.cfg  no definition for INVARIANT TypeInvariant
+  refused (?)              specifications/LoopInvariance/MCBinarySearch.cfg  no definition for INVARIANT resultCorrect
+  refused (?)              specifications/LoopInvariance/MCQuicksort.cfg  no definition for INVARIANT PCorrect
+  refused (tlc 2226)       specifications/Majority/MCMajority.cfg  {'code': 'tlc 2226', 'stage': 'config', 'message': 'In the configuration file, the identifier Seq does not appear in the specification.'}
+  refused (tlc 0)          specifications/MisraReachability/MCParReach.cfg  {'code': 'tlc 0', 'stage': 'config', 'message': 'internal: module generation failed'}
+  refused (?)              specifications/MisraReachability/MCReachabilityTestAllGraphs.cfg  no INIT in config
+  refused (?)              specifications/MisraReachability/MCReachabilityTestRandomGraphs.cfg  no INIT in config
+  refused (?)              specifications/MisraReachability/MCReachable.cfg  no definition for INVARIANT TypeOK
+  wrong answer             specifications/Moving_Cat_Puzzle/CatEvenBoxes.cfg  
+  wrong answer             specifications/Moving_Cat_Puzzle/CatOddBoxes.cfg  
+  refused (?)              specifications/MultiCarElevator/ElevatorLivenessLarge.cfg  TLC cannot handle the temporal formula line 221, col 8 to line 221, col 49 of module Elevator
+  refused (?)              specifications/MultiCarElevator/ElevatorLivenessMedium.cfg  TLC cannot handle the temporal formula line 221, col 8 to line 221, col 49 of module Elevator
+  too slow                 specifications/MultiCarElevator/ElevatorSafetyLarge.cfg  
+  too slow                 specifications/MultiCarElevator/ElevatorSafetyMedium.cfg  
+  refused (?)              specifications/MultiCarElevator/ElevatorSafetySmall.cfg  undefined operator: pState
+  refused (?)              specifications/MultiPaxos-SMR/MultiPaxos_MC.cfg  variable is unassigned in the current state: msgs
+  refused (?)              specifications/MultiPaxos-SMR/MultiPaxos_MC_small.cfg  variable is unassigned in the current state: msgs
+  absent                   specifications/N-Queens/Queens.toolbox/FourQueens/MC.cfg  
+  absent                   specifications/N-Queens/QueensPluscal.toolbox/FourQueens/MC.cfg  
+  refused (?)              specifications/NanoBlockchain/MCNanoLarge.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/NanoBlockchain/MCNanoMedium.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/NanoBlockchain/MCNanoSmall.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/Paxos/MCConsensus.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/Paxos/MCPaxos.cfg  variable is unassigned in the current state: maxBal
+  refused (?)              specifications/Paxos/MCVoting.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCConsensus.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCPaxosSmall.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCPaxosTiny.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCVoting.cfg  no definition for INVARIANT Inv
+  refused (?)              specifications/Prisoners/Prisoners.cfg  TLC cannot handle the temporal formula line 158, col 6 to line 158, col 56 of module Prisoners
+  refused (?)              specifications/Prisoners_Single_Switch/Prisoner.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerLightUnknown.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerSolo.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerSoloLightUnknown.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/ReadersWriters/MC.cfg  no definition for INVARIANT TypeOK
+  refused (?)              specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.cfg  no definition for INVARIANT SPASafeLaw
+  refused (?)              specifications/SDP_Verification/SDP_Attack_Spec/MC.cfg  no definition for INVARIANT SPASafeLaw
+  refused (tlc 2105)       specifications/SimplifiedFastPaxos/FastPaxos.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 34, col 8 to line 34, col 32 of module FastPaxos failed.\na theorem/assumption is not an evaluable value.'}
+  too slow                 specifications/SimplifiedFastPaxos/Paxos.cfg  
+  refused (?)              specifications/SingleLaneBridge/MC.cfg  no definition for INVARIANT Invariants
+  refused (?)              specifications/SlidingPuzzles/SlidingPuzzles.cfg  Attempted to construct a set with too many elements (>1.000.000).
+  refused (?)              specifications/SlidingPuzzles/SlidingPuzzles_anim.cfg  no definition for INIT Init
+  refused (?)              specifications/SpanningTree/SpanTree.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/SpanningTree/SpanTreeRandom.cfg  internal: unexpected graph outcome

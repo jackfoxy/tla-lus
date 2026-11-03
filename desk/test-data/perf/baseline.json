@@ -38,6 +38,22 @@
    "min_ms": 2068.8,
    "max_ms": 2271.1,
    "spread_pct": 6.3
+  },
+  "ex-coffeecan": {
+   "n": 5,
+   "median_ms": 3718.4,
+   "min_ms": 3671.2,
+   "max_ms": 3789.8,
+   "spread_pct": 1.9,
+   "source": "R4.P9 warm leg only (2026-10-12)"
+  },
+  "ex-gameoflife": {
+   "n": 5,
+   "median_ms": 2749.6,
+   "min_ms": 2718.3,
+   "max_ms": 2900.7,
+   "spread_pct": 5.5,
+   "source": "R4.P9 warm leg only (2026-10-12)"
   }
  }
 }

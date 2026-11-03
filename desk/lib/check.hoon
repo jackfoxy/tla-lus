@@ -212,8 +212,10 @@
       [%action gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state) name=@t]
       [%deadlock gen=@ud distinct=@ud queued=@ud depth=@ud trace=(list state)]
       [%limited what=?(%states %depth) gen=@ud distinct=@ud queued=@ud depth=@ud]
-      ::  a typed evaluation failure during the search (WU6.9)
-      [%error msg=@t]
+      ::  a typed evaluation failure during the search (WU6.9). R4.2j: `ec` is
+      ::  the pin's error code (0 when the port has none to report) and
+      ::  `trace` the behavior tlc2 prints with it (`~` when it prints none)
+      [%error msg=@t ec=@ud trace=(list state)]
   ==
 ::  one `Tool.getActions` leaf action: its name, its next-state body, and the
 ::  bound-variable CONTEXT the decomposition bound into it. Non-empty only for
@@ -286,6 +288,17 @@
       ::  the transition, an implied action REPORTS it. Same hook, opposite
       ::  answer to a false predicate
       iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
+      ::  R4.P5c: key `seen` on the identity key (`+state-key:fp`) rather than
+      ::  FP64. Only where no output reads a fingerprint: set for the safety
+      ::  search of a spec that never draws (`+draws`), never for a temporal
+      ::  graph build (lasso choice follows map order) or a spec whose
+      ::  per-state reseed is `fingerPrint ^ seed`. `_|`: off unless asked
+      hkey=_|
+      ::  R4.QS: the constant definitions `+with-cdefs:ne` evaluated, carried
+      ::  so that `+env-of` does not depend on its `~+` entry surviving a
+      ::  slice: per-state memo entries evict it, and EWD998ChanID re-ran
+      ::  them for 13 s at every slice. Empty: `+env-of` evaluates them
+      cd=(map @t [def=sem-def:sem-lib val=value])
   ==
 ::
 +$  cov-opts
@@ -328,7 +341,15 @@
   ::  the node-eval evaluation context for a search
   |=  o=bfs-opts
   ^-  eenv:ne
-  (with-setmax:ne (make-env:ne defs.o consts.o vars.o) setmax.o)
+  (with-setmax:ne (cenv-of o) setmax.o)
+::
+++  cenv-of
+  ::  R4.QS: `+make-env:ne` on the search's inputs, from the constant
+  ::  definitions the options carry when they carry them
+  |=  o=bfs-opts
+  ^-  eenv:ne
+  ?~  cd.o  (make-env:ne defs.o consts.o vars.o)
+  (make-env-cd:ne defs.o consts.o vars.o cd.o)
 ::
 ++  run-stats-at
   ::  the live `TLC!TLCGet` statistics for the state about to be expanded
@@ -338,7 +359,7 @@
   ::  expansion's successors
   |=  [cur=bfs-cursor lvl=@ud]
   ^-  tlc-run:so:ne
-  [| lvl `[depth.cur distinct.cur (lent queue.cur) gen.cur]]
+  [| lvl `[depth.cur distinct.cur len.queue.cur gen.cur]]
 ::
 ++  env-at
   ::  `+env-of` carrying those statistics
@@ -348,9 +369,11 @@
 ::  everything required to resume a search byte-identically
 +$  bfs-cursor
   $:  init-todo=(list state)  ::  initial states not yet registered
-      queue=(list @t)         ::  frontier fingerprints, BFS order
+      queue=fifo              ::  frontier fingerprints, BFS order
       seen=(map @t visit)
-      inits=(list @t)         ::  registered initial states, in order
+      ::  registered initial states, NEWEST FIRST (R4.P1: a `snoc` per initial
+      ::  state was O(inits)); readers `flop` it back to registration order
+      inits=(list @t)
       gen=@ud
       distinct=@ud
       depth=@ud
@@ -403,6 +426,12 @@
       ::  Neither is part of the checked state: neither enters a fingerprint,
       ::  and two states differing only in them are the same state
       rs=rst:ne
+      ::  R4.Q8: each state's successor keys, REVERSED, deduplicated in first-
+      ::  occurrence order, constraint-pruned transitions excluded -- recorded
+      ::  on a liveness graph build (FP64 keys, `!hkey`), so the product build
+      ::  reads the edges instead of solving every state's successors again
+      ::  (tlc2's LiveCheck records them while the search runs)
+      succ=(map @t (list @t))
   ==
 +$  bfs-slice
   $%  [%more cur=bfs-cursor]
@@ -415,7 +444,23 @@
   ::  registration is budgeted in +bfs-step
   |=  is=(list state)
   ^-  bfs-cursor
-  [is ~ ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne]
+  [is *fifo ~ ~ (lent is) 0 0 ~ ~ ~ ~ ~ empty-rst:ne ~]
+::
+::  R4.P1 (H1/H2): the BFS frontier as a two-list FIFO with its length kept,
+::  so enqueue, dequeue and the `states left on queue` count are O(1)
+::  (amortized). A `(list @t)` made each `snoc` and each per-state `lent`
+::  O(queue), quadratic over a run (measured: c = 5.2e-8 s/state^2)
++$  fifo  [front=(list @t) back=(list @t) len=@ud]
+++  fi-put
+  |=  [q=fifo x=@t]
+  ^-  fifo
+  q(back [x back.q], len +(len.q))
+++  fi-pop
+  |=  q=fifo
+  ^-  (unit [i=@t q=fifo])
+  =?  q  ?=(~ front.q)  q(front (flop back.q), back ~)
+  ?~  front.q  ~
+  `[i.front.q [t.front.q back.q (dec len.q)]]
 ::
 ++  bfs-init-regs
   ::  a fresh cursor that INHERITS the carrier the initial-state solve already
@@ -716,6 +761,11 @@
   |=  [o=bfs-opts cur=bfs-cursor st=state d=@ud pred=@t prev=(unit state)]
   ^-  [out=(unit outcome) cur=bfs-cursor]
   =/  e  (env-of o)
+  ::  R4.2c: the constraints see the run too -- `TLCGet("level")` in a
+  ::  CONSTRAINT is the level of the state being checked (measured: `Lvl ==
+  ::  TLCGet("level") < 4` keeps 3 distinct states). Without the run it read
+  ::  the constant-context 0, so such a constraint pruned nothing
+  =/  ce  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   ::  the CONSTRAINT counters are tallied where the loop runs (R2.7.4.2b):
   ::  tlc2 counts a FALSE constraint as the primary and a TRUE one as the
   ::  secondary, and its loop stops at the first false, so a later constraint
@@ -726,16 +776,16 @@
   ::  through action constraints. Tracked BEFORE the constraint check, since a
   ::  constraint-pruned state was still discovered
   =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (lte l 1))) st ~ e rs.cur)
-  =^  ch  rs.cur  (con-hold-rs cons.o st e rs.cur)
-  ?:  ?=(%| -.ch)  [`[%error p.ch] cur]
+  =^  ch  rs.cur  (con-hold-rs cons.o st ce rs.cur)
+  ?:  ?=(%| -.ch)  [`[%error p.ch 0 ~] cur]
   =.  cvc.cur  (cov-tally cvc.cur on.cov.o ok.p.ch n.p.ch)
   ?.  ok.p.ch  (check-pruned o cur st pred e d)
   ?^  prev
     ::  and the ACTION-level ones are action constraints, evaluated on every
     ::  transition
     =.  rs.cur  (track-possible (skim poss.o |=([* * l=@ud] (gth l 1))) u.prev `st e rs.cur)
-    =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st e rs.cur)
-    ?:  ?=(%| -.ah)  [`[%error p.ah] cur]
+    =^  ah  rs.cur  (acon-hold-rs acons.o u.prev st ce rs.cur)
+    ?:  ?=(%| -.ah)  [`[%error p.ah 0 ~] cur]
     =.  cva.cur  (cov-tally cva.cur on.cov.o ok.p.ah n.p.ah)
     ?.  ok.p.ah  [~ cur]
     ::  R2.7.15a: the IMPLIED ACTIONS, at the same hook and with the opposite
@@ -756,13 +806,16 @@
   ^-  [out=(unit outcome) cur=bfs-cursor]
   ::  a CONSTRAINT-pruned state is not counted or entered, so the statistics it
   ::  sees are the ones standing before it (R2.6.1)
-  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
   =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?~  iv  [~ cur]
-  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+  ::  R4.2j: an invariant that fails to EVALUATE is tlc2's EC 2103 (`The
+  ::  error occurred when TLC was evaluating the nested expressions ...`),
+  ::  whose cause is the evaluation message
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv 2.103 ~] cur]
   :_  cur
   :-  ~
-  :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+  :*  %inv  gen.cur  distinct.cur  len.queue.cur  depth.cur
       (weld (trace-to seen.cur pred) ~[st])  p.u.iv  =('' pred)
   ==
 ::
@@ -777,16 +830,16 @@
   ^-  [out=(unit outcome) cur=bfs-cursor]
   ::  the state's identity is its symmetry-orbit representative (7.5); with no
   ::  symmetry group `canon` is `st` and `fp` is the plain FP64 state fingerprint
-  =/  ob   (orbit-fp:fp perms.o order.o st)
-  =/  cst  canon.ob
+  =/  cst  (canonicalize:fp perms.o order.o st)
   ::  under a VIEW the identity is the view's VALUE, evaluated on the
   ::  symmetry representative — tlc2's order exactly (R2.3.1). A view that
   ::  fails to evaluate falls back to the plain fingerprint rather than
   ::  silently conflating states
   =/  fp=@t
-    ?~  view.o  (@t fp.ob)
+    ?~  view.o  (state-id o cst)
     =/  vr  (eval:ne u.view.o e(s0 cst, s1 cst, primed |))
-    ?:  ?=(%| -.vr)  (@t fp.ob)
+    ?:  ?=(%| -.vr)  (state-id o cst)
+    ?:  hkey.o  (@t (view-key:fp p.vr))
     (@t (view-fp:fp p.vr))
   ::  R2.7.15b: the IMPLIED ACTIONS are checked on EVERY TRANSITION, whether or
   ::  not the successor is new -- tlc2's DFID comment says so in as many words
@@ -795,51 +848,63 @@
   ::  `[][x' = x + 1]_x` on the 3 -> 0 step, and state 0 was seen at depth 1.
   ::  Checking only new successors reported nothing at all.
   =/  ia0  ?~(prev ~ (first-bad-action iacts.o u.prev st (env-of o)))
+  =?  succ.cur  &(!hkey.o !=('' pred))
+    =/  ss=(list @t)  (~(gut by succ.cur) pred ~)
+    ?:  (lien ss |=(x=@t =(x fp)))  succ.cur
+    (~(put by succ.cur) pred [fp ss])
   ?:  (~(has by seen.cur) fp)
     ::  a REVISITED successor: nothing is counted or enqueued, so the statistics
     ::  are the ones standing before it, and the trace runs through THIS
     ::  predecessor rather than the one that first discovered the state
     ?~  ia0  [~ cur]
-    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0 0 ~] cur]
     ?:  cont.o  [~ cur]
     :_  cur
     :-  ~
-    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %action  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (weld (trace-to seen.cur pred) ~[st])  p.u.ia0
     ==
   ?:  &(!=(0 maxd.o) (gth d maxd.o))
-    [`[%limited %depth gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
+    [`[%limited %depth gen.cur distinct.cur len.queue.cur depth.cur] cur]
   ::  TLC order (doNext): the state is counted distinct and its invariants are
   ::  checked BEFORE it is enqueued, so a violating state is counted but never
   ::  enqueued (fixing the states-left-on-queue count)
   =.  distinct.cur  +(distinct.cur)
   =.  depth.cur     (max depth.cur d)
-  =.  seen.cur      (~(put by seen.cur) fp [d pred cst])
-  ::  the invariant is checked on the orbit representative (sound for the
-  ::  symmetry-invariant predicates TLC requires; identical to `st` when there
-  ::  is no symmetry group)
+  ::  R4.P6a: the ACTUAL state is stored and later expanded, as tlc2 enqueues
+  ::  `succState`; only the identity (`fp`, and a VIEW's `minVals`) uses the
+  ::  orbit representative. Successors register in action order from their
+  ::  stored predecessor, so `+trace-to` walks the very trace tlc2 rebuilds
+  ::  (`TLCTrace.getTrace`: first match in action order). Storing the
+  ::  representative printed it in symmetry traces, with `<unknown action>`
+  =.  seen.cur      (~(put by seen.cur) fp [d pred st])
+  ::  the invariant is checked on the actual state (`isValid(inv,
+  ::  succState)`); identical to the representative without a symmetry group
   ::  R2.6.1/R2.6.3: the INVARIANT is evaluated here, so it needs the run
   ::  statistics too -- `TLCGet("distinct")` in an invariant is as legal as in a
   ::  next-state relation. tlc2 checks the invariant right after the state is
   ::  entered in the set, so `distinct` INCLUDES this state, which is why the
   ::  counters are read after the increments above. `level` is the state's own
   ::  depth: `isValid(inv, succState)` passes it as s0
-  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur (lent queue.cur) gen.cur]])
-  =^  iv  rs.cur  (first-violated-rs invs.o cst ie rs.cur)
+  =/  ie  (with-run:ne e [| d `[depth.cur distinct.cur len.queue.cur gen.cur]])
+  =^  iv  rs.cur  (first-violated-rs invs.o st ie rs.cur)
   ?^  iv
-    ?:  ?=(%| -.u.iv)  [`[%error p.u.iv] cur]
+    ::  R4.2j: an invariant that fails to EVALUATE is tlc2's EC 2103 (`The
+  ::  error occurred when TLC was evaluating the nested expressions ...`),
+  ::  whose cause is the evaluation message
+  ?:  ?=(%| -.u.iv)  [`[%error p.u.iv 2.103 ~] cur]
     ::  `-continue` (R2.4.2): record the violation and carry on. The state is
     ::  still ENQUEUED below -- measured at the pin, a violator's successors are
     ::  explored and can violate in turn, which is how the same spec reports at
     ::  depth 3 and again at depth 4
     ?:  cont.o
       =.  viols.cur  (snoc viols.cur [p.u.iv fp])
-      =.  queue.cur  (snoc queue.cur fp)
-      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      =.  queue.cur  (fi-put queue.cur fp)
+      =?  inits.cur  =('' pred)  [fp inits.cur]
       [~ cur]
     :_  cur
     :-  ~
-    :*  %inv  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %inv  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (trace-to seen.cur fp)  p.u.iv  =('' pred)
     ==
   ::  R2.7.15b: the IMPLIED ACTIONS, here and not at the caller. ORDER is
@@ -850,19 +915,156 @@
   ::  caller (R2.7.15a's first attempt) reported `1 states left on queue`
   ::  where the pin reports 0
   ?^  ia0
-    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0] cur]
+    ?:  ?=(%| -.u.ia0)  [`[%error p.u.ia0 0 ~] cur]
     ?:  cont.o
-      =.  queue.cur  (snoc queue.cur fp)
-      =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+      =.  queue.cur  (fi-put queue.cur fp)
+      =?  inits.cur  =('' pred)  [fp inits.cur]
       [~ cur]
     :_  cur
     :-  ~
-    :*  %action  gen.cur  distinct.cur  (lent queue.cur)  depth.cur
+    :*  %action  gen.cur  distinct.cur  len.queue.cur  depth.cur
         (trace-to seen.cur fp)  p.u.ia0
     ==
-  =.  queue.cur  (snoc queue.cur fp)
-  =?  inits.cur  =('' pred)  (snoc inits.cur fp)
+  =.  queue.cur  (fi-put queue.cur fp)
+  =?  inits.cur  =('' pred)  [fp inits.cur]
   [~ cur]
+::
+++  state-id
+  ::  a state's identity in `seen`: FP64, or the identity key (R4.P5c)
+  |=  [o=bfs-opts st=state]
+  ^-  @t
+  ?:  hkey.o  (@t (state-key:fp order.o st))
+  (@t (state-fp:fp order.o st))
+::
+++  draws
+  ::  R4.P5c: may the search draw a random value? Then the per-state reseed
+  ::  (`fingerPrint ^ seed`) is observable and FP64 must stay the key.
+  ::  Static and conservative: a drawing operator (`+draw-op`) is in scope
+  ::  and its name, or its base name, appears anywhere in another
+  ::  definition's body. A false positive only keeps FP64
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  ?
+  =/  ds  ~(tap by defs)
+  =/  dn  (draw-names defs)
+  ?~  dn  |
+  %+  lien  ds
+  |=  [nm=@t d=sem-def:sem-lib]
+  ?~  body.d  |
+  ?:  (draw-op origin.d nm)  |
+  (lien `(list @t)`dn |=(x=@t (has-atom u.body.d x)))
+::
+++  draw-names
+  ::  the names under which a drawing operator (`+draw-op`) is in scope,
+  ::  qualified and base
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  (list @t)
+  %-  zing
+  %+  murn  ~(tap by defs)
+  |=  [nm=@t d=sem-def:sem-lib]
+  ^-  (unit (list @t))
+  ?.  (draw-op origin.d nm)  ~
+  `~[nm (base-name nm)]
+::
+++  print-names
+  ::  R4.2a: the names under which `TLC!Print` / `TLC!PrintT` are in scope
+  |=  defs=(map @t sem-def:sem-lib)
+  ^-  (list @t)
+  %-  zing
+  %+  murn  ~(tap by defs)
+  |=  [nm=@t d=sem-def:sem-lib]
+  ^-  (unit (list @t))
+  ?.  =('TLC' origin.d)  ~
+  =/  b  (base-name nm)
+  ?.  |(=('Print' b) =('PrintT' b))  ~
+  `~[nm b]
+::
+++  may-draw
+  ::  R4.2aa: may STARTUP draw -- a definition (`+draws`) or an ASSUME
+  ::  naming a drawing operator? Static and conservative, as `+draws` is;
+  ::  when it says no, the startup pass and the ASSUME pre-pass are skipped
+  ::  and the initial-state solve starts from the seed, which is then exact
+  |=  [defs=(map @t sem-def:sem-lib) asmz=(list sem-thm:sem-lib)]
+  ^-  ?
+  ?:  (draws defs)  &
+  ::  R4.2a: or prints: `Print`/`PrintT` named anywhere (a definition or an
+  ::  ASSUME), whose lines must come out in startup order
+  =/  dn  (weld (draw-names defs) (print-names defs))
+  ?~  dn  |
+  ?:  %+  lien  ~(tap by defs)
+      |=  [nm=@t d=sem-def:sem-lib]
+      ?~  body.d  |
+      (lien `(list @t)`dn |=(x=@t (has-atom u.body.d x)))
+    &
+  %+  lien  asmz
+  |=  t=sem-thm:sem-lib
+  ?~  body.t  |
+  (lien `(list @t)`dn |=(x=@t (has-atom u.body.t x)))
+::
+++  startup-order
+  ::  R4.2aa: the order tlc2's `processConstantDefns` reaches definitions
+  ::  in (see `+startup-draws:ne`): the EXTENDS closure dependency-first
+  ::  (`imports`), then the root's constant substitutions (`C <- R`, in
+  ::  CONSTANT declaration order), then the root's own definitions. A
+  ::  substitution for a constant an EXTENDed module declares is placed with
+  ::  the root's, ahead of the root's definitions: tlc2 would evaluate it
+  ::  with that module, so this differs only when that module also draws
+  |=  [mo=sem-module:sem-lib ov=(map @t @t) defs=(map @t sem-def:sem-lib)]
+  ^-  (list sem-def:sem-lib)
+  =/  subs=(list sem-def:sem-lib)
+    %+  murn  consts.mo
+    |=  [name=@t arity=@ud at=sspan:sem-lib]
+    ^-  (unit sem-def:sem-lib)
+    =/  r  (~(get by ov) name)
+    ?~  r  ~
+    (~(get by defs) u.r)
+  (weld imports.mo (weld subs defs.mo))
+::
+++  assume-rs
+  ::  R4.2aa: the RNG state after the ASSUMEs, which tlc2 evaluates on the
+  ::  same stream between the startup definitions and the initial-state
+  ::  solve (measured: `ASSUME ... RandomElement(0..99) ...` takes the draw
+  ::  after the constant definitions', and Init the next). Same walk as
+  ::  `+check-assumes`: an AXIOM is skipped, the first false or failing
+  ::  assumption ends it (the run stops there)
+  ::  R4.2a: the whole carrier, so an ASSUME's PRINTS come out too
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne rs=rst:ne]
+  ^-  rst:ne
+  ?~  asmz  rs
+  ?:  axiom.i.asmz  $(asmz t.asmz)
+  ?~  body.i.asmz  $(asmz t.asmz)
+  =/  r  (mule |.((eval-bool-rs:ne u.body.i.asmz e rs)))
+  ?.  ?=(%& -.r)  rs
+  =/  [b=bres:ne rs2=rst:ne]  p.r
+  ?.  &(?=(%& -.b) p.b)  rs2
+  $(asmz t.asmz, rs rs2)
+::
+++  draw-op
+  ::  the StandardModule operators that spend the enumeration RNG
+  ::  (`+eval-node-op-rs`: %random-element, %random-subset,
+  ::  %random-set-of-subsets, %test-rsos)
+  |=  [origin=@t nm=@t]
+  ^-  ?
+  =/  b  (base-name nm)
+  ?|  &(=('TLC' origin) =('RandomElement' b))
+      ?&  =('Randomization' origin)
+          ?|  =('RandomSubset' b)
+              =('RandomSetOfSubsets' b)
+              =('TestRandomSetOfSubsets' b)
+      ==  ==
+  ==
+::
+++  base-name
+  ::  an instance-qualified name without its prefixes: `R!S!Op` -> `Op`
+  |=  nm=@t
+  ^-  @t
+  =/  t  (flop (trip nm))
+  (crip (flop (scag (fall (find "!" t) (lent t)) t)))
+::
+++  has-atom
+  |=  [n=* a=@]
+  ^-  ?
+  ?@  n  =(n a)
+  |($(n -.n) $(n +.n))
 ::
 ++  viols-of
   ::  the recorded `-continue` violations with their traces rebuilt from
@@ -909,18 +1111,21 @@
   =/  spent  0
   |-  ^-  bfs-slice
   ?:  (gte spent budget)  [%more cur]
+  ::  the state bound before anything else: R4.3 -- checked only after the
+  ::  initial states, a model with more of them than the bound (MCLeast-
+  ::  CircularSubstringMedium) ran out of time registering them instead
+  ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
+    [%done [%limited %states gen.cur distinct.cur len.queue.cur depth.cur] cur]
   ::  register pending initial states first (depth 1, no predecessor)
   =/  todo  init-todo.cur
   ?^  todo
     =/  rr  (register o cur(init-todo t.todo) i.todo 1 '' ~)
     ?^  out.rr  [%done u.out.rr cur.rr]
     $(cur cur.rr, spent +(spent))
-  ?:  ?&(!=(0 cap.o) (gth distinct.cur cap.o))
-    [%done [%limited %states gen.cur distinct.cur (lent queue.cur) depth.cur] cur]
-  =/  q  queue.cur
+  =/  q  (fi-pop queue.cur)
   ?~  q
     [%done [%ok gen.cur distinct.cur 0 depth.cur (viols-of cur)] cur]
-  =/  fp   i.q
+  =/  fp   i.u.q
   =/  vis  (~(got by seen.cur) fp)
   ::  the statistics `TLCGet` reads are those standing BEFORE this expansion,
   ::  so the environment is built once for the whole state and not per action
@@ -935,7 +1140,8 @@
   ::  produce two DIFFERENT values, which a fresh-per-evaluation RNG cannot
   ::  through `+scramble:rng`, because `es` is the RAW 48-bit LCG state and
   ::  `Random.setSeed` stores `(seed ^ multiplier) & (2^48-1)`, not the seed
-  =.  es.rs.cur  (scramble:rng (mix `@`fp seed.o))
+  ::  R4.P5c: under the identity key the spec never draws, so no reseed
+  =?  es.rs.cur  !hkey.o  (scramble:rng (mix `@`fp seed.o))
   =/  before  distinct.cur
   ::  each action's successors are registered as they are generated, so a
   ::  violation found under an earlier action pre-empts a later one -- tlc2's
@@ -944,17 +1150,40 @@
   =/  rr
     =/  as  acts
     =/  ix  0
-    =/  c2  cur(queue t.q)
+    =/  c2  cur(queue q.u.q)
     |-  ^-  [out=(unit outcome) cur=bfs-cursor]
     ?~  as  [~ c2]
     ::  R2.7.4.3: the expansion reads AND writes the run-scoped store, so a
     ::  `TLCSet` in one action is visible to the next action, the next state,
     ::  and the constraints/invariants that follow
-    =^  nr  rs.c2  (next-states-rs:ne st.vis body.i.as (act-env e ctx.i.as) rs.c2)
-    ?:  ?=(%| -.nr)  [`[%error msg.p.nr] c2]
+    =^  nr  rs.c2  (next-states-raw-rs:ne st.vis body.i.as (act-env e ctx.i.as) rs.c2)
+    ::  R4.2j: a successor that fails to EVALUATE is the error's own code
+    ::  (`\div` by 0 is EC 2179) with the behavior up to the state being
+    ::  expanded, as tlc2 prints it
+    ?:  ?=(%| -.nr)  [`[%error msg.p.nr code.p.nr (trace-to seen.c2 fp)] c2]
+    ::  R4.2j: an INCOMPLETE successor is EC 2109, naming its unassigned
+    ::  variables (sorted, `TLCStateMutExt.getUnassigned`) and the action when
+    ::  the relation has several (`ModelChecker.doNextSetErr`); the behavior
+    ::  printed ends WITH the incomplete successor
+    =/  bad  (skim p.nr |=(s=state !(complete:ne s vars.o)))
+    ?^  bad
+      =/  miss=(list @t)
+        %+  sort  (skip ~(tap in vars.o) |=(v=@t (~(has by i.bad) v)))
+        aor
+      =/  msg=@t
+        %+  rap  3
+        :~  'Successor state is not completely specified by '
+            ?:(?=([* ~] acts) 'the next-state action' (rap 3 ~['action ' name.i.as ' of the next-state relation']))
+            '. The following variable'  ?:(?=([* ~] miss) ' is' 's are')
+            ' not defined: '  (rap 3 (join ', ' miss))  '.'
+        ==
+      [`[%error msg 2.109 (snoc (trace-to seen.c2 fp) i.bad)] c2]
     =/  ng  (lent p.nr)
     =/  d0  distinct.c2
     =.  gen.c2  (add gen.c2 ng)
+    ::  R4.2g: and the intermediate states an action composition generated
+    =.  gen.c2  (add gen.c2 xgen.rs.c2)
+    =.  xgen.rs.c2  0
     =/  r  (register-all o c2 p.nr +(depth.vis) fp `st.vis)
     ::  the coverage tally for THIS action: every successor it generated, and
     ::  how many of those were newly distinct. Recorded even when the
@@ -969,14 +1198,18 @@
     $(as t.as, ix +(ix), c2 c3)
   ?^  out.rr  [%done u.out.rr cur.rr]
   =/  cost  (sub gen.cur.rr gen.cur)
+  ::  R4.QS: and the solver's candidates, a sixteenth of a unit each, so a
+  ::  slice of expensive expansions ends after a few of them, not 256
+  =/  wk  (div wrk.rs.cur.rr 16)
+  =.  wrk.rs.cur.rr  0
   ?:  =(0 cost)
     ::  a dequeued state with NO successors still contributes a 0 out-degree
     ::  sample: TLC calls outDegree.addSample(unseenSuccessorStates) for every
     ::  state it dequeues, so a sink pulls the distribution's min to 0 (R1.5.12b)
     =.  outdeg.cur.rr  (~(put by outdeg.cur.rr) 0 +((~(gut by outdeg.cur.rr) 0 0)))
-    ?.  deadlock.o  $(cur cur.rr, spent +(spent))
+    ?.  deadlock.o  $(cur cur.rr, spent :(add spent 1 wk))
     :+  %done
-      :*  %deadlock  gen.cur.rr  distinct.cur.rr  (lent queue.cur.rr)
+      :*  %deadlock  gen.cur.rr  distinct.cur.rr  len.queue.cur.rr
           depth.cur.rr  (trace-to seen.cur.rr fp)
       ==
     cur.rr
@@ -985,7 +1218,7 @@
   =/  sample  (sub distinct.cur.rr before)
   =.  outdeg.cur.rr
     (~(put by outdeg.cur.rr) sample +((~(gut by outdeg.cur.rr) sample 0)))
-  $(cur cur.rr, spent (add spent cost))
+  $(cur cur.rr, spent :(add spent cost wk))
 ::
 ++  explore
   ::  deterministic BFS from the initial states; stops at the first
@@ -1070,7 +1303,7 @@
     aor
   %+  turn  (weld named rest)
   |=  k=@t
-  [k (crip (render:ev (~(got by st) k)))]
+  [k (crip (render:vl (~(got by st) k)))]
 ::
 ++  alias-state
   ::  ALIAS rendering (R2.3.2), a faithful port of `Tool.evalAlias`.
@@ -1132,7 +1365,7 @@
   ^-  wain
   ?^  vw
     =/  r  (eval:ne u.vw e(s0 st, s1 st, primed |))
-    ?:  ?=(%& -.r)  ~[(crip (render:ev p.r))]
+    ?:  ?=(%& -.r)  ~[(crip (render:vl p.r))]
     $(vw ~)
   ^-  wain
   =/  ps0  (state-pairs order st)
@@ -1141,7 +1374,7 @@
     %+  skip  ps0
     |=  [k=@t v=@t]
     =/  o  (~(get by u.dif) k)
-    ?~(o | =(v (crip (render:ev u.o))))
+    ?~(o | =(v (crip (render:vl u.o))))
   =/  bare=?  ?=([* ~] ps)
   %+  turn  ps
   |=  [k=@t v=@t]
@@ -1537,7 +1770,7 @@
   |-  ^-  graph
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+    [seen.cur.r (flop inits.cur.r) gen.cur.r distinct.cur.r depth.cur.r]
   $(cur cur.r)
 ::
 ++  live-graph-cap
@@ -1576,7 +1809,7 @@
   |-  ^-  [g=graph capped=? out=outcome rs=rst:ne]
   =/  r  (bfs-step o cur 1.024)
   ?:  ?=(%done -.r)
-    :^    [seen.cur.r inits.cur.r gen.cur.r distinct.cur.r depth.cur.r]
+    :^    [seen.cur.r (flop inits.cur.r) gen.cur.r distinct.cur.r depth.cur.r]
         ?=(%limited -.out.r)
       out.r
     rs.cur.r
@@ -1597,7 +1830,7 @@
       ::  DEADLOCK -- a state with no surviving successor, which ends the whole
       ::  simulation when deadlock checking is on (R1.7c). `name` is '' for a
       ::  deadlock, which has none.
-      viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+      viol=(unit [kind=?(%invariant %action %property %deadlock) name=@t path=(list state)])
       ::  a typed engine REFUSAL that ends the run with no verdict at all
       ::  (R2.4.6). The deterministic walk has no such outcome -- a solver
       ::  failure there drops the action -- but the `-generate` walk does: tlc2
@@ -1632,6 +1865,11 @@
       ::  randomized order and stops at the first successor the functor accepts,
       ::  so a step generates one successor instead of all of them
       prob=?
+      ::  R4.Q8b: the IMPLIED ACTIONS of the PROPERTYs (`+bin-properties`),
+      ::  checked on every generated successor after the invariants, as
+      ::  `SimulationWorker.addElement` does. Implied INITS are not: the
+      ::  simulator never checks them (measured at the pin)
+      iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
   ==
 ::  everything required to resume a run byte-identically: the RNG is the raw
 ::  48-bit java.util.Random state (lib/rng), advanced only at step boundaries,
@@ -1669,6 +1907,15 @@
   ^-  act
   (snag i l)
 ::
+++  succ-level
+  ::  R4.2as: the env a SUCCESSOR's invariants and constraints see -- its own
+  ::  level, one above the expanded state's (`TLCGet("level")` is the
+  ::  evaluated state's `getLevel()`)
+  |=  e=eenv:ne
+  ^-  eenv:ne
+  ?~  run.e  e
+  e(run `u.run.e(level +(level.u.run.e)))
+::
 ++  sim-nexts
   ::  SimulationWorker's next-state functor for one action, in generation order.
   ::  Per successor it does exactly what `SimulationWorker.addElement` does, in
@@ -1695,28 +1942,45 @@
   ::  violating invocation from the run's states-generated total.
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne
       ==
-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
+  ^-  $%  [%viol name=@t st=state ngen=@ud act=?]
+          [%ok nx=(list state) ngen=@ud]
+          [%err msg=@t ngen=@ud]
+      ==
   =/  nr  (next-states:ne cur body.a (act-env e ctx.a))
   ?:  ?=(%| -.nr)  [%ok ~ 0]
   =/  gen  p.nr
+  =/  ei  (succ-level e)
   =|  keep=(list state)
   =|  n=@ud
-  |-  ^-  $%([%viol name=@t st=state ngen=@ud] [%ok nx=(list state) ngen=@ud])
+  |-  ^-  $%  [%viol name=@t st=state ngen=@ud act=?]
+              [%ok nx=(list state) ngen=@ud]
+              [%err msg=@t ngen=@ud]
+          ==
   ?~  gen  [%ok (flop keep) n]
-  =/  fv  (first-violated invs i.gen e)
-  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n)]
-  =/  ch  (con-hold cons i.gen e)
+  =/  fv  (first-violated invs i.gen ei)
+  ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) i.gen +(n) |]
+  ::  R4.Q8b: then the implied actions, on the transition (EC 2112)
+  =/  fa  (first-bad-action iacts cur i.gen e)
+  ?^  fa  [%viol ?-(-.u.fa %& p.u.fa, %| p.u.fa) i.gen +(n) &]
+  =/  ch  (con-hold cons i.gen ei)
+  ::  R4.Q8b: a constraint that fails to EVALUATE ends the run with its
+  ::  error, as tlc2's does (`Tool.isInModel` throws out of `addElement`);
+  ::  dropping the successor masked SmokeEWD998's refused
+  ::  `TLCGet("duration")` as a clean run of one-state behaviors
+  ?:  ?=(%| -.ch)  [%err p.ch +(n)]
   =/  ah  (acon-hold acons cur i.gen e)
-  =/  in=?  &(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah)
+  ?:  ?=(%| -.ah)  [%err p.ah +(n)]
+  =/  in=?  &(p.ch p.ah)
   $(gen t.gen, n +(n), keep ?:(in [i.gen keep] keep))
 ::
 ::  what one action invocation yielded during a simulation step: a violating
 ::  successor, a non-empty surviving successor set, or nothing
 +$  step-res
-  $%  [%viol name=@t st=state]
+  $%  [%viol name=@t st=state act=?]
       [%ok nx=(list state)]
       [%none ~]
       ::  a typed engine refusal, reachable only on the `-generate` walk
@@ -1730,13 +1994,16 @@
   ::  the threaded `pst` instead of returned alongside
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne  p=pst:ne
       ==
   ^-  [step-res pst:ne]
-  =/  r  (sim-nexts cur a invs cons acons e)
+  =/  r  (sim-nexts cur a invs iacts cons acons e)
   ?:  ?=(%viol -.r)
-    [[%viol name.r st.r] p(ngen (add ngen.p ngen.r))]
+    [[%viol name.r st.r act.r] p(ngen (add ngen.p ngen.r))]
+  ?:  ?=(%err -.r)
+    [[%err msg.r] p(ngen (add ngen.p ngen.r))]
   =.  ngen.p  (add ngen.p ngen.r)
   ?~  nx.r  [[%none ~] p]
   [[%ok nx.r] p]
@@ -1752,22 +2019,28 @@
   ::  the whole run through `sim-result.err`
   |=  $:  cur=state  a=act
           invs=(list [name=@t body=sem:sem-lib])
+          iacts=(list [name=@t body=sem:sem-lib sub=(unit sem:sem-lib)])
           cons=(list sem:sem-lib)  acons=(list sem:sem-lib)
           e=eenv:ne  p=pst:ne
       ==
   ^-  [step-res pst:ne]
+  =/  ei  (succ-level e)
   =/  fil
     |=  st=state
     ^-  fres:ne
-    =/  fv  (first-violated invs st e)
-    ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv)]
-    =/  ch  (con-hold cons st e)
+    =/  fv  (first-violated invs st ei)
+    ?^  fv  [%viol ?-(-.u.fv %& p.u.fv, %| p.u.fv) |]
+    =/  fa  (first-bad-action iacts cur st e)
+    ?^  fa  [%viol ?-(-.u.fa %& p.u.fa, %| p.u.fa) &]
+    =/  ch  (con-hold cons st ei)
+    ?:  ?=(%| -.ch)  [%err p.ch]
     =/  ah  (acon-hold acons cur st e)
-    ?:(&(?=(%& -.ch) p.ch ?=(%& -.ah) p.ah) %keep %drop)
+    ?:  ?=(%| -.ah)  [%err p.ah]
+    ?:(&(p.ch p.ah) %keep %drop)
   =^  r  p  (next-states-prob:ne cur body.a (act-env e ctx.a) p fil)
   ?-  -.r
     %found  [[%ok ~[st.r]] p]
-    %viol   [[%viol nm.r st.r] p]
+    %viol   [[%viol nm.r st.r act.r] p]
     %none   [[%none ~] p]
     %err    [[%err msg.p.r] p]
   ==
@@ -1791,7 +2064,7 @@
   ::  trace-length stats, as collectPostTrace runs only on a clean behavior).
   ::  Var(X) and SD use TLC's `genTrace + 1` div-by-zero guard.
   |=  $:  gt=@ud  cur=sim-cursor
-          viol=(unit [kind=?(%invariant %property %deadlock) name=@t path=(list state)])
+          viol=(unit [kind=?(%invariant %action %property %deadlock) name=@t path=(list state)])
           err=(unit @t)
       ==
   ^-  sim-result
@@ -1875,12 +2148,16 @@
     ::  `ne`, the library core, not on the arm's product
     =/  rs0=rst:ne  empty-rst:ne
     =/  pp=pst:ne  [rs0(es es.cur) s.cur 0]
+    ::  R4.2as: `TLCGet("level")` is the expanded state's position in the
+    ::  behavior (the initial state is level 1); it read the constant 0, so
+    ::  EWD840_anim's `TLCGet("level") < 20` held on every behavior
+    =/  e  (with-run:ne e [& +(n.w) ~])
     |-  ^-  [step-res pst:ne]
     ?:  =(tries alen)  [[%none ~] pp]
     =/  a  (nth-action index actions.o)
     =^  r  pp
-      ?:  prob.o  (sim-nexts-prob cur.w a invs.o cons.o acons.o e pp)
-      (sim-nexts-det cur.w a invs.o cons.o acons.o e pp)
+      ?:  prob.o  (sim-nexts-prob cur.w a invs.o iacts.o cons.o acons.o e pp)
+      (sim-nexts-det cur.w a invs.o iacts.o cons.o acons.o e pp)
     ?.  ?=(%none -.r)  [r pp]
     $(tries +(tries), index (mod (add index p) alen))
   =/  found  -.fnd
@@ -1920,7 +2197,8 @@
     ::  `collectPreSuccessor` runs before `addElement` checks the invariant --
     ::  which the `gen.cur` fold above now does for every outcome
     :+  %done
-      (mk-result +(t.cur) cur `[%invariant name.found (flop [st.found path.w])] ~)
+      =/  vk  ?:(act.found %action %invariant)
+      (mk-result +(t.cur) cur `[vk name.found (flop [st.found path.w])] ~)
     cur
   ::  d) pick one successor and make it the current state; every successor the
   ::  chosen action generated counts toward states-generated (collectPre)
@@ -1979,8 +2257,8 @@
   =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
   =/  pname  ?~(pp.c '' u.pp.c)
   =/  o=sim-opts
-    :*  actions  invs.c  cons.c  acons.c  ddl.c  oss.c  pname
-        defs.c  consts.c  vars.c  order.c  traces  depth  prob
+    :*  actions  (weld invs.c binvs.c)  cons.c  acons.c  ddl.c  oss.c  pname
+        defs.c  consts.c  vars.c  order.c  traces  depth  prob  iacts.c
     ==
   (simulate o is.c seed)
 ::
@@ -2111,6 +2389,12 @@
       ::  happens once at %config, before any cursor exists, so it is carried
       ::  here and seeded into the cursor
       irs=rst:ne
+      ::  R4.2aa: the RNG state after the startup definitions, where the
+      ::  ASSUMEs start drawing (`+check-assumes`)
+      ses=@
+      ::  R4.2a: what the startup definitions and the ASSUMEs PRINTED, oldest
+      ::  first -- the whole console output of a run whose ASSUME fails
+      aout=(list @t)
       oss=(list oos:tp)                      ::  the normalized temporal
                                              ::  decomposition (unit 8.1), built
                                              ::  from the PROPERTY + fairness via
@@ -2524,7 +2808,7 @@
   ?^  kwd  [%| msg.u.kwd]
   =/  ukw  (unsupported-kw:config ca)
   ?^  ukw  [%| u.ukw]
-  =/  defs  (defmap-of:ne u.mo)
+  =/  defs  (apply-overrides (defmap-of:ne u.mo) overrides.ca mod-overrides.ca)
   ::  R3.0a: a config that declares NO behaviour spec AT ALL -- neither an
   ::  INIT/NEXT pair nor a SPECIFICATION -- is not an error. tlc2 runs it as an
   ::  ordinary breadth-first search over ZERO initial states and reports
@@ -2552,7 +2836,9 @@
   =/  noinit  ?=(%nullodn -.isb)
   =/  nsb   next.p.rt
   =/  fair  fair.p.rt
-  =/  consts  (const-map cfg)
+  =/  consts
+    %-  ~(uni by (override-consts (const-map cfg) overrides.ca))
+    (mod-const-vals defs mod-constants.ca)
   =/  nb  ?~(nname.p.rt ~ (body-of-def tree u.nname.p.rt))
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY now WARNS AND CONTINUES, as
   ::  tlc2 does (EC 2279), instead of type-rejecting.
@@ -2577,11 +2863,10 @@
   ::  `Prop == []Inv` under `SYMMETRY Perms`: no warning, `ok`, 1 distinct. The
   ::  guard therefore asks for a GENUINE temporal property, the same test
   ::  `+check` uses to route between the safety and liveness engines
-  =/  genuine-temporal
-    ?.  ?=(^ pp)  |
-    =/  psb  (sem-body defs u.pp)
-    ?.  ?=(^ psb)  |
-    ?=(~ (box-state-inner:tp u.psb))
+  ::  R4.2n: "genuine" is the temporal bin being non-empty, now that a
+  ::  property is binned part by part
+  =/  gbins  (bin-properties properties.ca defs)
+  =/  genuine-temporal  ?=(^ temps.gbins)
   =/  symwarn=(list @t)
     ?.  &(?=(^ symmetry.ca) genuine-temporal)  ~
     :_  ~
@@ -2601,8 +2886,22 @@
   ::  fingerprints (`+succ-fps`, `+trace-graph`) that would not match a
   ::  view-keyed graph. That is the same latent mismatch symmetry+liveness is
   ::  refused for; it is narrowed, not ignored
-  ?:  &(?=(^ view.ca) ?=(^ pp))
-    [%| 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
+  ::  R4.2e: no longer refused -- the liveness product keys a state by the
+  ::  same identity the graph build used (`+live-key:lv`, the env's `idk`)
+  ::  R4.2aa: the drawing constant definitions, once, in tlc2's order; the
+  ::  ASSUMEs and then the initial-state solve continue the same stream
+  =/  rs00=rst:ne  empty-rst:ne
+  =.  es.rs00  (scramble:rng seed)
+  =/  sd=[vals=(map @t value) rs=rst:ne]
+    ?.  (may-draw defs assumes.u.mo)  [consts rs00]
+    %:  startup-draws:ne
+      (startup-order u.mo overrides.ca defs)
+      defs  consts  vars  rs00
+    ==
+  =.  consts  vals.sd
+  =/  irs0=rst:ne
+    ?.  (may-draw defs assumes.u.mo)  rs.sd
+    (assume-rs assumes.u.mo (make-env:ne defs consts vars) rs.sd)
   =/  pr  (symmetry-perms defs consts vars symmetry.ca)
   ?:  ?=(%| -.pr)  [%| p.pr]
   =/  perms  p.pr
@@ -2611,9 +2910,9 @@
     ::  no behaviour spec: no initial-state solve to run, and the `%nullodn`
     ::  bodies above are never evaluated because the search has nothing to
     ::  expand from. R3.0a
-    ?:  noinit  [[%& ~] rs0(es (scramble:rng seed))]
+    ?:  noinit  [[%& ~] irs0]
     %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es (scramble:rng seed))
+    irs0
   =/  ir   -.irc
   ?:  ?=(%| -.ir)  [%| msg.p.ir]
   =/  invs   (resolve-invs defs invariants.ca)
@@ -2698,6 +2997,8 @@
       ?~  body.u.d  ~
       `[nm u.body.u.d lvl.u.d]
       +.irc
+      es.rs.sd
+      (flop out.irs0)
       p.or
   ==
 ::
@@ -2731,6 +3032,81 @@
   ^-  (each (list oos:tp) aerr:tp)
   (normalize:tp pbods modn fair env)
 ::
+++  apply-overrides
+  ::  R4.2m: the config's `lhs <- rhs` substitutions, which were validated
+  ::  (EC 2223-2226) and then IGNORED: `Nat <- NatOverride`,
+  ::  `Seq <- LimitedSeq`, `Acceptor <- MCAcceptor` (123 in the Examples
+  ::  corpus). tlc2 makes the name `lhs` denote `rhs`'s definition
+  ::  (`SpecProcessor`'s override of the OpDefNode, and of a CONSTANT's
+  ::  value -- `processConstantDefns` then evaluates a constant-level one
+  ::  once). Here `lhs` is rebound to `rhs`'s definition in the operator
+  ::  map; a CONSTANT reference with no value reads it (`+apply-const:ne`),
+  ::  and R4.P3's `+with-cdefs` evaluates it once when it is constant-level.
+  ::  `lhs <-[M] rhs` overrides a definition `lhs` that module `M` supplies
+  |=  $:  defs=(map @t sem-def:sem-lib)
+          ov=(map @t @t)
+          mov=(map @t (map @t @t))
+      ==
+  ^-  (map @t sem-def:sem-lib)
+  =/  os  ~(tap by ov)
+  =/  out  defs
+  =.  out
+    |-  ^-  (map @t sem-def:sem-lib)
+    ?~  os  out
+    =/  d  (~(get by defs) q.i.os)
+    ?~  d  $(os t.os)
+    $(os t.os, out (~(put by out) p.i.os u.d))
+  =/  ms  ~(tap by mov)
+  |-  ^-  (map @t sem-def:sem-lib)
+  ?~  ms  out
+  =/  ps  ~(tap by q.i.ms)
+  =.  out
+    |-  ^-  (map @t sem-def:sem-lib)
+    ?~  ps  out
+    =/  d  (~(get by defs) q.i.ps)
+    ?~  d  $(ps t.ps)
+    ::  R4.2 (MCPaxos): EVERY entry that is `M`'s `lhs`, under whatever
+    ::  instance qualification imported it (`V!Ballot` from `V == INSTANCE
+    ::  Voting`) -- tlc2 overrides the OpDefNode itself, which each
+    ::  instantiation shares
+    =/  named=(list [k=@t v=sem-def:sem-lib])
+      (skim ~(tap by out) |=([k=@t *] =(p.i.ps (bnm:ne k))))
+    =/  hits=(list @t)
+      %+  murn  named
+      |=  [k=@t v=sem-def:sem-lib]
+      ^-  (unit @t)
+      ?.  =(p.i.ms origin.v)  ~
+      `k
+    ::  R4.2 (LeastCircularSubstring): an `lhs` that `M` INHERITS
+    ::  (`Nat <- [ZSequences]ZSeqNat`, Nat from Naturals): tlc2 sets the
+    ::  override on that one definition's body (`opDefs[j].getBody()
+    ::  .setToolObject`), a node every module shares, so every reference to
+    ::  it takes `rhs`. Taken when `lhs` has a single defining module
+    =?  hits  ?&  ?=(~ hits)
+                  ?=(^ named)
+                  (levy t.named |=([* v=sem-def:sem-lib] =(origin.v origin.v.i.named)))
+              ==
+      (turn named |=([k=@t *] k))
+    =.  out
+      %+  roll  hits
+      |=  [k=@t o=_out]
+      (~(put by o) k u.d)
+    $(ps t.ps)
+  $(ms t.ms)
+::
+++  override-consts
+  ::  R4.2v: `lhs <- rhs` where `rhs` is itself a CONSTANT with a value
+  ::  (`Leader <- L`, `L = L`): `lhs` takes that value
+  |=  [consts=(map @t value) ov=(map @t @t)]
+  ^-  (map @t value)
+  =/  os  ~(tap by ov)
+  =/  out  consts
+  |-  ^-  (map @t value)
+  ?~  os  out
+  =/  v  (~(get by consts) q.i.os)
+  ?~  v  $(os t.os)
+  $(os t.os, out (~(put by out) p.i.os u.v))
+::
 ++  consts-of
   ::  config constant assignments as an evaluation binding map (WU6.9 task 1).
   ::  An arity-0 assignment binds a value directly; `F(a,..) = v` assignments (a
@@ -2761,6 +3137,29 @@
   =/  pr  (parse-cfg:config cfg)
   ?:(?=(%| -.pr) ~ (consts-of constants.p.pr))
 ::
+++  mod-const-vals
+  ::  R4.2u: module-scoped value assignments (`NoBlock = [Nano]NoBlockVal`),
+  ::  parsed into `mod-constants` and never applied. Each definition module
+  ::  `M` supplies under that name -- `NoBlock` when EXTENDed, `N!NoBlock`
+  ::  through `N == INSTANCE Nano` (an instance member keeps its module as
+  ::  origin) -- takes the value, as a root `NoBlock = v` does
+  |=  [defs=(map @t sem-def:sem-lib) mc=(map @t (list cfg-const:config))]
+  ^-  (map @t value)
+  =/  ds  ~(tap by defs)
+  =/  ms  ~(tap by mc)
+  =|  out=(map @t value)
+  |-  ^-  (map @t value)
+  ?~  ms  out
+  =/  vs  (consts-of q.i.ms)
+  =/  hits
+    %+  murn  ds
+    |=  [k=@t d=sem-def:sem-lib]
+    ^-  (unit [@t value])
+    ?.  =(p.i.ms origin.d)  ~
+    =/  v  (~(get by vs) (bnm:ne k))
+    ?~(v ~ `[k u.v])
+  $(ms t.ms, out (~(uni by out) (malt hits)))
+::
 ++  kind-name
   ::  the tlc2 value class a value corresponds to, the stable kind
   ::  discriminator the oracle projection prints (unit 6C.8)
@@ -2781,6 +3180,7 @@
       ::  and not of the language (`ev-lazyclass`, R2.7.13)
       ?+  cls.x  "SetEnumValue"
         %subset    "SubsetValue"
+        %k-subset  "KSubsetValue"
         %prod      "SetOfTuplesValue"
         %set-pred  "SetPredValue"
         %set-cup   "SetCupValue"
@@ -2865,7 +3265,15 @@
   ::  the graph is generated ONCE for the whole case
   |=  [spec=@t cfg=@t skip=(list @t)]
   ^-  (list tape)
-  =/  mo  (generate:sem-lib 'A' (malt ~[['A' spec]]))
+  (project-defs-with spec cfg ~ skip)
+::
+++  project-defs-with
+  ::  +project-defs over a module set: `mods` are the other modules the root
+  ::  `A` reaches (R4.2b: the CommunityModules sources the pin loads from its
+  ::  jar)
+  |=  [spec=@t cfg=@t mods=(list [@t @t]) skip=(list @t)]
+  ^-  (list tape)
+  =/  mo  (generate:sem-lib 'A' (malt [['A' spec] mods]))
   ?~  mo  ~["! no semantic graph"]
   =/  defs  (defmap-of:ne u.mo)
   =/  e  (make-env:ne defs (const-map cfg) (vars-of:ne u.mo))
@@ -2912,15 +3320,29 @@
   ::  isAxiom only when the source keyword image is literally `AXIOM`
   ::  (AssumeNode.java:65), so `ASSUME`/`ASSUMPTION` are still checked and a
   ::  false AXIOM does not fail the run. R1.5.13
-  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne]
-  ^-  (unit [ec=@ud msg=@t])
+  ::
+  ::  The messages are tlc2's MP templates with the assumption's LOCATION as
+  ::  `%1%` (R4.2j: they had been `An assumption is false.` and `Evaluating an
+  ::  assumption failed: ...`, which no test compared against the pin).
+  ::  `at` is that location, which the job kernel reports as the violated
+  ::  assumption's name. The module is the root's: `sem-thm` carries no
+  ::  origin, so an ASSUME imported through EXTENDS is located in the root
+  ::
+  ::  R4.2aa: `es` is the RNG state the startup definitions left
+  ::  (`+startup-draws:ne`); an assumption that draws continues it
+  |=  [asmz=(list sem-thm:sem-lib) e=eenv:ne modn=@t es=@]
+  ^-  (unit [ec=@ud msg=@t at=@t])
   ?~  asmz  ~
   ?:  axiom.i.asmz  $(asmz t.asmz)
   ?~  body.i.asmz  $(asmz t.asmz)
-  =/  r  (pred-bool:ne u.body.i.asmz ~ ~ e)
-  ?:  ?=(%| -.r)  `[2.105 (cat 3 'Evaluating an assumption failed: ' msg.p.r)]
-  ?.  p.r  `[2.104 'An assumption is false.']
-  $(asmz t.asmz)
+  ::  the BODY's span, not the declaration's: tlc2 locates the expression
+  ::  (`col 8` past `ASSUME `), measured
+  =/  loc  (locn-tape (sem-at u.body.i.asmz) modn)
+  =/  [r=bres:ne rs=rst:ne]  (eval-bool-rs:ne u.body.i.asmz e `rst:ne`[~ ~ es 0 ~ ~ 0 | 0])
+  ?:  ?=(%| -.r)
+    `[2.105 (rap 3 ~['Evaluating assumption ' loc ' failed.\0a' msg.p.r]) loc]
+  ?.  p.r  `[2.104 (rap 3 ~['Assumption ' loc ' is false.']) loc]
+  $(asmz t.asmz, es es.rs)
 ::
 ++  out-stats
   ::  the four counters off an outcome. Each arm carries them, but `%limited`
@@ -3122,10 +3544,10 @@
   ::  oos tableau via lib/liveness
   |=  c=sctx
   ^-  (list [nodes=@ud inits=@ud])
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  oss  oss.c
   |-  ^-  (list [nodes=@ud inits=@ud])
   ?~  oss  ~
@@ -3165,10 +3587,10 @@
   ::  SET and not a traversal artifact
   |=  c=sctx
   ^-  (list wain)
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  ranks   (fp-ranks states)
   =/  oss  oss.c
   |-  ^-  (list wain)
@@ -3203,10 +3625,10 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   ?:  (live-verdict:lv oss.c states inits.g nsb.c env order.c)
     ~['VERDICT violated-property' 'EC 2116']
   ~['VERDICT ok' 'EC 0']
@@ -3221,10 +3643,10 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  l  (find-lasso:lv oss.c states inits.g nsb.c env order.c)
   ?~  l  ~['(no lasso)']
   =/  modn     (module-name-of tree.c)
@@ -3306,7 +3728,7 @@
   =|  out=(list @t)
   |-  ^-  (list @t)
   ?~  props  (flop out)
-  =/  lr  (ast:tp body.i.props [modn 0] env)
+  =/  lr  (ast:tp body.i.props [modn 0 ~ ~ ~] env)
   ?:  ?=(%| -.lr)  $(props t.props)
   ?:  (eval-on-lasso:lv p.lr sts cyc 0 env)  $(props t.props)
   ?:  (lien out |=(n=@t =(n name.i.props)))  $(props t.props)
@@ -3358,6 +3780,8 @@
           ::  -- handing the caller one would mean building the product twice
           pcs=(list @t)  rs=rst:ne
           poss=(list [name=@t body=sem:sem-lib lvl=@ud])
+          ::  R4.2i: the ALIAS the lasso is rendered through
+          al=(unit sem:sem-lib)
       ==
   ^-  [lasso=(unit lasso:lv) report=wain]
   ::  find the lasso AND the OrderOfSolution that produced it: tlc2 tests the
@@ -3404,6 +3828,7 @@
       aname
       (box-free-tf o.hit)
       pcl
+      al
   ==
 ::
 ++  live-render
@@ -3431,6 +3856,8 @@
           ::  temporal violation too, and its line sits between the EC
           ::  2257/2259 hint and the counts. `~` when every postcondition holds
           pcl=wain
+          ::  R4.2i: the ALIAS each prefix state is rendered through
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   =/  footer  (counts-lines gen distinct 0 depth)
@@ -3445,8 +3872,14 @@
   =/  stut     =(%stuttering class.u.l)
   ::  the numbered prefix states (factored out by R2.7.5: the post-error
   ::  second block renders the same prefix with no closer and no counts)
+  ::  R4.2i, measured: under an ALIAS the last prefix state is paired with
+  ::  the state the cycle returns to, and with itself under a stuttering or
+  ::  suppressed closer
+  =/  lsuc=(unit @t)
+    ?:  |(stut noclose)  ~
+    `(snag (dec loop.u.l) prefix.u.l)
   =/  body=wain
-    (live-prefix-lines prefix.u.l states actions env order modn)
+    (live-prefix-lines prefix.u.l states actions env order modn al lsuc)
   ::  the closer: a stuttering self-loop is a new numbered `State`, a
   ::  back-to-state cycle is `Back to state <loop>: <action reaching it>`
   =/  closer=wain
@@ -3477,8 +3910,13 @@
   ::  the numbered prefix states of a lasso: state 1 is the initial predicate,
   ::  each later state labeled with the action that generated it (no
   ::  fingerprint line). Shared by `+live-render` and `+post-error-live`
+  ::  R4.2i: under an ALIAS (`al`) each state is rendered as `+alias-state`
+  ::  renders a safety trace -- paired with the next prefix state, and the
+  ::  LAST with `lsuc` (the state the cycle returns to; ~ is itself), as the
+  ::  pin pairs them (`LiveWorker`)
   |=  $:  prefix=(list @t)  states=(map @t state:ne)  actions=(list act)
           env=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:sem-lib)  lsuc=(unit @t)
       ==
   ^-  wain
   =/  i  1
@@ -3490,10 +3928,16 @@
   =/  label=@t
     ?~  prev  '<Initial predicate>'
     (edge-action-label (~(got by states) u.prev) i.ps actions env order modn)
+  =/  shown=[order=(list @t) st=state:ne]
+    ?~  al  [order st]
+    =/  suc=state:ne
+      ?^  t.ps  (~(got by states) i.t.ps)
+      ?~(lsuc st (~(got by states) u.lsuc))
+    (alias-state u.al env st suc)
   %+  weld
     ;:  weld
       ~[(crip "State {(a-tape i)}: {(trip label)}")]
-      (render-state order st ~ *eenv:ne ~)
+      (render-state order.shown st.shown ~ *eenv:ne ~)
     ==
   $(ps t.ps, i +(i), prev `i.ps)
 ::
@@ -3525,6 +3969,7 @@
           inits=(list @t)  nsb=sem:sem-lib  env=eenv:ne
           order=(list @t)  modn=@t  defs=(map @t sem-def:sem-lib)
           pname=@t  props=(list [name=@t body=sem:sem-lib])  aname=@t
+          al=(unit sem:sem-lib)
       ==
   ^-  wain
   ?.  ?=(?(%inv %deadlock) -.out)  ~
@@ -3545,7 +3990,7 @@
     ~['Error: The following behavior constitutes a counter-example:']
     %-  live-prefix-lines
     :*  prefix.u.l.hit  states  (get-actions nsb aname defs env)
-        env  order  modn
+        env  order  modn  al  ~
     ==
   ==
 ::
@@ -3624,10 +4069,10 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~]
+  =/  o=bfs-opts  [nsb.c ~ cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c | 0 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  g       (build-graph is.c o)
   =/  states  (states-of seen.g)
-  =/  env     (make-env:ne defs.c consts.c vars.c)
+  =/  env     (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
   =/  modn    (module-name-of tree.c)
   =/  pname   ?~(pp.c '' u.pp.c)
   =/  r
@@ -3637,7 +4082,7 @@
         gen.g  distinct.g  depth.g  sname.c  sloc.c  fair.c  aname.c
         ::  the `live-message-lines` differential renders the lasso alone, so
         ::  it declares no postconditions (R2.7.14)
-        ~  empty-rst:ne  ~
+        ~  empty-rst:ne  ~  ~
     ==
   ::  R2.7.5: the `swarn` channel prints BEFORE the verdict on the production
   ::  path (`+check-in`), so the differential wrapper carries it too -- else
@@ -3802,9 +4247,11 @@
   ?:(=(0 setmax.o) e (with-setmax:ne e setmax.o))
 ::
 ++  dfid-fp
+  ::  R4.P5c: DFID reads no fingerprint (no reseed, no graph, no symmetry),
+  ::  so its visited set is keyed on the identity key
   |=  [o=dfid-opts st=state]
   ^-  @t
-  (@t (state-fp:fp order.o st))
+  (@t (state-key:fp order.o st))
 ::
 ++  dfid-trace
   ::  the behavior the DFS stack currently holds, oldest first, extended by
@@ -4100,7 +4547,7 @@
   =/  bins  (bin-properties props defs)
   ?^  temps.bins  [%| dfid-refusal]
   :-  %&
-  :_  (turn iinits.bins |=([n=@t *] (state-level-warn n)))
+  :_  (turn (swarn-names props defs) state-level-warn)
   %=  base
     invs    (weld invs binvs.bins)
     iinits  iinits.bins
@@ -4307,8 +4754,8 @@
   =*  c  p.sc
   =/  su  (dfid-setup c maxd 0)
   ?:  ?=(%| -.su)  ~[(cat 3 'Error: ' p.su)]
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
-  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
+  ?^  ae  (snoc aout.c (cat 3 'Error: ' msg.u.ae))
   =/  o   o.p.su
   =/  e   (dfid-env o)
   =/  ci  (dfid-cursor-init o is.c e)
@@ -4343,7 +4790,19 @@
           e=eenv:ne  ctx=(map @t value)
       ==
   ^-  (list act)
-  ?:  ?=(%letin -.n)  ?~(body.n ~[[nm n ctx]] $(n u.body.n))
+  ?:  ?=(%letin -.n)
+    ?~  body.n  ~[[nm n ctx]]
+    ::  R4.2n: descend, as `getActions` does, but put each action back under
+    ::  the LET. tlc2's nodes LINK to the LET's definitions; the port names
+    ::  them, so a stripped LET left `x' = b` with no `b` ("undefined
+    ::  operator", MultiCarElevator's `CallElevator`). The wrapper takes the
+    ::  body's span, which is the action's location at the pin
+    =/  as  $(n u.body.n)
+    =|  out=(list act)
+    |-  ^-  (list act)
+    ?~  as  (flop out)
+    =/  w=sem:sem-lib  n(body `body.i.as, at (sspan-of:tp body.i.as))
+    $(as t.as, out [[name.i.as w ctx.i.as] out])
   ?.  ?=(%apply -.n)  ~[[nm n ctx]]
   =/  op  name.op.n
   ::  operator inlining is BOUNDED by the environment's `fuel`, the same
@@ -4505,8 +4964,33 @@
   =/  r  (next-states:ne s0 body.i.actions (act-env e ctx.i.actions))
   ?:  ?=(%| -.r)  $(actions t.actions)
   ?:  (lien p.r |=(st=state =(s1fp (@t (state-fp:fp order st)))))
-    (action-label name.i.actions (sem-span:config body.i.actions) modn)
+    =/  nm  (cat 3 name.i.actions (act-sig i.actions e))
+    (action-label nm (sem-span:config body.i.actions) modn)
   $(actions t.actions)
+::
+++  act-sig
+  ::  R4.2n: tlc2 `Action.getLocation` prints the action operator's FORMAL
+  ::  PARAMETERS bound in its context, `Inc(1)` or `Op(1,"a")` (joined by `,`
+  ::  with no space, each value's `toString`), and nothing when there are none.
+  ::  A trace through a parametrized action was labelled `Inc` here. (The
+  ::  coverage block's labels carry no arguments at the pin, and use their
+  ::  own arm.)
+  |=  [a=act e=eenv:ne]
+  ^-  @t
+  =/  d  (~(get by ops.e) name.a)
+  ?~  d  ''
+  =/  vs=(list tape)
+    %+  murn  params.u.d
+    |=  p=spar:sem-lib
+    ^-  (unit tape)
+    =/  v  (~(get by ctx.a) name.p)
+    ?~(v ~ `(render:vl u.v))
+  ?~  vs  ''
+  =/  out=tape  i.vs
+  =/  rest  t.vs
+  |-  ^-  @t
+  ?~  rest  (crip :(weld "(" out ")"))
+  $(out :(weld out "," i.rest), rest t.rest)
 ::
 ++  edge-action
   ::  the STRUCTURED form of +edge-action-label: the action that generates
@@ -4666,7 +5150,7 @@
   =/  modn  (module-name-of tree)
   =/  mo  (generate:sem-lib modn (malt ~[[modn spec]]))
   ?~  mo  [%| 'semantic error']
-  =/  defs  (defmap-of:ne u.mo)
+  =/  defs  (apply-overrides (defmap-of:ne u.mo) overrides.ca mod-overrides.ca)
   ::  the raw oos path needs no subscript warning -- it renders the temporal
   ::  decomposition, never a verdict
   =/  rt  (resolve-targets [init.ca next.ca spec.ca] defs ~)
@@ -4720,6 +5204,19 @@
   ^-  wain
   (check-in spec cfg | seed)
 ::
+++  init-progress
+  ::  R4.2n: `DoInitFunctor.addElement` prints EC 2269 `Computed N initial
+  ::  states...` before adding a state when the count so far is a power of two
+  ::  above 1 -- so for each power of two p with 2 <= p < n. Always ahead of
+  ::  any verdict: the initial states are all generated before it
+  |=  n=@ud
+  ^-  wain
+  =/  p  2
+  |-  ^-  wain
+  ?:  (gte p n)  ~
+  :-  (rap 3 ~['Computed ' (crip ((d-co:co 1) p)) ' initial states...'])
+  $(p (mul 2 p))
+::
 ++  check-in
   ::  `+check` carrying the coverage flag and the run's `-seed`
   |=  [spec=@t cfg=@t cvg=? seed=@ud]
@@ -4727,8 +5224,8 @@
   =/  sc  (search-ctx-seed spec cfg seed)
   ?:  ?=(%| -.sc)  (err-lines p.sc)
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
-  ?^  ae  ~[(cat 3 'Error: ' msg.u.ae)]
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
+  ?^  ae  (snoc aout.c (cat 3 'Error: ' msg.u.ae))
   ::  coverage alongside a temporal PROPERTY is refused BY NAME rather than
   ::  silently dropped: the counters this port collects live on the safety
   ::  search's BFS cursor, and the liveness / implied-init / implied-action
@@ -4746,6 +5243,13 @@
   ::  change it — today the EC 2145 subscript-coverage one (R2.3.5). tlc2
   ::  emits them while processing the config, ahead of every run line
   %+  weld  swarn.c
+  ::  R4.2a: what `Print`/`PrintT` wrote while the constant definitions, the
+  ::  ASSUMEs and the initial states were evaluated, in that order (the pin
+  ::  prints at the moment of evaluation). The search's own lines follow from
+  ::  `+safety-run`
+  %+  weld  (flop out.irs.c)
+  ::  R4.2n: EC 2269, printed while the initial states are computed
+  %+  weld  (init-progress (lent is.c))
   ::  a temporal PROPERTY: a pure []P box-state is a state invariant, rendered
   ::  through the safety terminal output; every other form runs the 8.2–8.6
   ::  engine and renders tlc2.TLC's temporal console diagnostic (unit 8.9)
@@ -4766,7 +5270,7 @@
   ::  tlc2 never tests. The EC 2255 state-level warning is emitted for EVERY one
   ::  of them, in config order, whether or not it holds; measured at the pin
   ::  (`prop-init-second`), where the FAILING implied init is declared SECOND
-  =/  iwarn  (turn iinits.c |=([n=@t *] (state-level-warn n)))
+  =/  iwarn  (turn (swarn-names pnames.c defs.c) state-level-warn)
   =/  ilines=(unit wain)
     ?~  iinits.c  ~
     =/  b
@@ -4796,7 +5300,7 @@
     =/  o=bfs-opts
       :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c
           vars.c  order.c  perms.c  defs.c  consts.c  ddl.c  0  0  view.c  0  |
-          ~  *cov-opts  0  iacts.c
+          ~  *cov-opts  0  iacts.c  !(draws defs.c)  ~
       ==
     =/  actions  (get-actions nsb.c aname.c defs.c (make-env:ne defs.c consts.c vars.c))
     =/  env      (make-env:ne defs.c consts.c vars.c)
@@ -4821,20 +5325,28 @@
   ::  verdict, while the port -- which routed on the HEAD of the list -- gave
   ::  two different ones.
   ::
+  ::  R4.2n: and binned PART BY PART. tlc2 first decomposes a property
+  ::  (`+prop-parts`) through INSTANCE substitutions, LET, zero-arity
+  ::  definitions and conjunctions, and bins each part; the port binned each
+  ::  property whole, so `HCini /\ [][HCnxt]_hr` or a refinement `P!Spec`
+  ::  (`Init /\ [][Next]_v /\ WF_v(Next)`) reached the liveness converter
+  ::  as one formula and was refused there.
+  ::
   ::  The four bins, in tlc2's own order of preference:
   ::
   ::    `[]P` with a state-level P  -> the INVARIANT vector (and it is reported
   ::                                   as an `Invariant`, not as a temporal
-  ::                                   property -- measured)
+  ::                                   property -- measured); named for `P`
+  ::                                   when `P` is a bare operator name
   ::    level <= 1                  -> an IMPLIED INIT, checked while computing
-  ::                                   the initial states, and warned about
+  ::                                   the initial states
   ::    `[][A]_v`                   -> an IMPLIED ACTION, checked on every
   ::                                   transition
   ::    anything else               -> the liveness engine
   ::
-  ::  A name with no definition is DROPPED here, as `+implied-temporals` and
-  ::  `+resolve-invs` already drop theirs -- the config validator owns that
-  ::  diagnostic and reports it before any of this runs
+  ::  A name with no definition is DROPPED here, as `+resolve-invs` already
+  ::  drops its own -- the config validator owns that diagnostic and reports
+  ::  it before any of this runs
   |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
   ^-  $:  binvs=(list [name=@t body=sem:sem-lib])
           iinits=(list [name=@t body=sem:sem-lib])
@@ -4845,35 +5357,211 @@
   =/  rest  $(props t.props)
   =/  b  (sem-body defs i.props)
   ?~  b  rest
-  =/  binner  (box-state-inner:tp u.b)
+  =/  ps  (flop (prop-parts i.props u.b defs))
+  |-
+  ?~  ps  rest
+  =/  nm  name.i.ps
+  =/  x   body.i.ps
+  =/  ws  ws.i.ps
+  ::  R4.2af: `processConfigProps` UNROLLS `\A i \in S : P(i)` over a
+  ::  constant S into one part per element, each named by the location of
+  ::  `P(i)` (`expr.toString()`) and binned on ITS shape. Every element part
+  ::  carries the same name and the same bin, so one part `\A i \in S :
+  ::  P'(i)` -- P' the binned form -- is observationally the same (measured:
+  ::  `\A i \in {1, 2} : [](x < i + 1)` is `Invariant line 7, col 24 to line
+  ::  7, col 36 of module spec is violated`, a safety stop). A part that bins
+  ::  as TEMPORAL keeps the whole formula and its property name, as the
+  ::  liveness report names the PROPERTY
+  =/  fa  (const-forall x)
+  ?^  fa
+    =/  fb  body.u.fa
+    =/  fnm  (loc-str:config mo.i.ps (sspan-of:tp fb))
+    =/  wrap  |=(b=sem:sem-lib (rewrap ws (rebound q.u.fa b)))
+    =/  fbinner  (box-state-inner:tp fb)
+    ?^  fbinner
+      =/  bn=@t
+        ?.  ?&(?=(%apply -.u.fbinner) ?=(~ args.u.fbinner) ?=(%user-op kind.op.u.fbinner))
+          fnm
+        name.op.u.fbinner
+      $(ps t.ps, binvs.rest [[bn (wrap u.fbinner)] binvs.rest])
+    ?:  (lte (sem-lvl:sem-lib fb) 1)
+      $(ps t.ps, iinits.rest [[fnm (wrap fb)] iinits.rest])
+    =/  fia  (implied-action-parts fb)
+    ?^  fia
+      =/  ia=[name=@t body=sem:sem-lib sub=(unit sem:sem-lib)]
+        :+  fnm  (wrap body.u.fia)
+        ?~(sub.u.fia ~ `(rewrap ws u.sub.u.fia))
+      $(ps t.ps, iacts.rest [ia iacts.rest])
+    $(ps t.ps, temps.rest [[i.props (rewrap ws x)] temps.rest])
+  =/  binner  (box-state-inner:tp x)
   ?^  binner
-    rest(binvs [[i.props u.binner] binvs.rest])
-  ?:  (lte (sem-lvl:sem-lib u.b) 1)
-    rest(iinits [[i.props u.b] iinits.rest])
-  =/  iact  (implied-action-parts u.b)
+    =/  bn=@t
+      ?.  ?&(?=(%apply -.u.binner) ?=(~ args.u.binner) ?=(%user-op kind.op.u.binner))
+        nm
+      name.op.u.binner
+    $(ps t.ps, binvs.rest [[bn (rewrap ws u.binner)] binvs.rest])
+  ?:  (lte (sem-lvl:sem-lib x) 1)
+    $(ps t.ps, iinits.rest [[nm (rewrap ws x)] iinits.rest])
+  =/  iact  (implied-action-parts x)
   ?^  iact
-    rest(iacts [[i.props body.u.iact sub.u.iact] iacts.rest])
-  rest(temps [[i.props u.b] temps.rest])
+    =/  ia=[name=@t body=sem:sem-lib sub=(unit sem:sem-lib)]
+      :+  nm  (rewrap ws body.u.iact)
+      ?~(sub.u.iact ~ `(rewrap ws u.sub.u.iact))
+    $(ps t.ps, iacts.rest [ia iacts.rest])
+  ::  a TEMPORAL part keeps the configured PROPERTY's name: tlc2's
+  ::  violation report names the property (`Temporal property Prop was
+  ::  violated.` for `Prop == Live`), not the part (measured)
+  $(ps t.ps, temps.rest [[i.props (rewrap ws x)] temps.rest])
+::
+++  prop-parts
+  ::  R4.2n: `SpecProcessor.processConfigProps`' structural decomposition of
+  ::  one PROPERTY, in source order. Each part is the conjunct, its name, and
+  ::  the INSTANCE-substitution / LET wrappers it was found under
+  ::  (innermost first), which `+rewrap` puts back so the part evaluates as it
+  ::  did inside the whole -- tlc2's `Specs.addSubsts(pred, subs)`. Through:
+  ::  a substitution wrapper, a LET, a zero-arity definition (renaming the
+  ::  part, as tlc2 does), `/\` (infix and bulleted) and `$Nop`. A
+  ::  conjunction member is named by its location (`conj.toString()`, a
+  ::  SemanticNode's Location), in the module that defines it -- which is
+  ::  why `mo` is threaded: a span carries no module.
+  ::  Not ported: tlc2 also unrolls a `\A` over a constant set into per-element
+  ::  parts, and inlines a parameterized instance's arguments; such a
+  ::  property stays whole here and its parts reach the liveness converter,
+  ::  which expands the quantifier itself (`+quant-of:tp`)
+  |=  [name=@t s=sem:sem-lib defs=(map @t sem-def:sem-lib)]
+  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
+  =|  ws=(list sem:sem-lib)
+  =|  seen=(set @t)
+  =/  mo=@t
+    =/  d  (~(get by defs) name)
+    ?~(d '' origin.u.d)
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
+  ?:  ?=(%letin -.s)
+    ?~  body.s  ~[[name s ws mo]]
+    $(s u.body.s, ws [s ws])
+  ?.  ?=(%apply -.s)  ~[[name s ws mo]]
+  ?^  (anysubstin-mod:sem-lib name.op.s)
+    =/  sp  (substin-parts:sem-lib s)
+    ?~  sp  ~[[name s ws mo]]
+    $(s inner.u.sp, ws [s ws], mo mod.u.sp)
+  ?:  ?&  ?=(~ args.s)
+          ?=(%user-op kind.op.s)
+          !(~(has in seen) name.op.s)
+      ==
+    =/  d  (~(get by defs) name.op.s)
+    ?~  d  ~[[name s ws mo]]
+    ?~  body.u.d  ~[[name s ws mo]]
+    ?.  ?=(~ params.u.d)  ~[[name s ws mo]]
+    %=  $
+      name  name.op.s
+      s     u.body.u.d
+      seen  (~(put in seen) name.op.s)
+      mo    ?:(=('' origin.u.d) mo origin.u.d)
+    ==
+  ::  R4.2af: a parameterized operator applied with arguments, outside any
+  ::  substitution (`Check(x, 2)`, `SM(42)!Spec`): `processConfigProps` binds
+  ::  the formals to the arguments (`getOpContext`, lazily) and recurses into
+  ::  the body. The binding rides as a substitution wrapper over the formals,
+  ::  which `+bind-substs` evaluates the same lazy way, and `+rewrap` puts it
+  ::  back around every part. Only for CONSTANT-level arguments: the body's
+  ::  levels were computed with constant formals, so a state-level argument
+  ::  (`Check(x, 2)`) would leave a temporal leaf looking constant; such a
+  ::  property stays whole, as before
+  ?:  ?&  ?=(^ args.s)
+          ?=(%user-op kind.op.s)
+          ?=(~ ws)
+          !(~(has in seen) name.op.s)
+          (levy `(list sem:sem-lib)`args.s |=(a=sem:sem-lib =(0 (sem-lvl:sem-lib a))))
+      ==
+    =/  d  (~(get by defs) name.op.s)
+    ?~  d  ~[[name s ws mo]]
+    ?~  body.u.d  ~[[name s ws mo]]
+    ::  not a recursive operator (`!odn.getInRecursive()`): its body reaches
+    ::  its own name
+    ?:  (~(has in (reach-names:ne u.body.u.d defs)) name.op.s)  ~[[name s ws mo]]
+    ?.  =((lent params.u.d) (lent args.s))  ~[[name s ws mo]]
+    ?.  (levy params.u.d |=(p=spar:sem-lib =(0 arity.p)))  ~[[name s ws mo]]
+    =/  om  ?:(=('' origin.u.d) mo origin.u.d)
+    =/  w=sem:sem-lib
+      :*  %apply  [(cat 3 '$SubstIn:' om) %builtin]  lvl.s  at.s
+          (turn params.u.d |=(p=spar:sem-lib `sbind:sem-lib`[name.p | ~]))
+          ~
+          (snoc args.s u.body.u.d)
+      ==
+    %=  $
+      name  name.op.s
+      s     u.body.u.d
+      ws    [w ws]
+      seen  (~(put in seen) name.op.s)
+      mo    om
+    ==
+  ?:  =('$Nop' name.op.s)
+    ?~  args.s  ~[[name s ws mo]]
+    $(s i.args.s)
+  ?.  |(=('$ConjList' name.op.s) =('\\land' name.op.s))
+    ~[[name s ws mo]]
+  =/  as=(list sem:sem-lib)  args.s
+  =|  out=(list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
+  |-  ^-  (list [name=@t body=sem:sem-lib ws=(list sem:sem-lib) mo=@t])
+  ?~  as  out
+  =/  nm  (loc-str:config mo (sspan-of:tp i.as))
+  $(as t.as, out (weld out ^$(s i.as, name nm)))
+::
+++  const-forall
+  ::  R4.2af: `\A i \in S : P` whose domains are constant-level -- the shape
+  ::  `processConfigProps` unrolls (`opDefEvaluator.contexts` succeeds)
+  |=  s=sem:sem-lib
+  ^-  (unit [q=sem-apply:sem-lib body=sem:sem-lib])
+  ?.  ?=(%apply -.s)  ~
+  ?.  =('$BoundedForall' name.op.s)  ~
+  ?.  ?=([* ~] args.s)  ~
+  ?~  bound.s  ~
+  ?.  %+  levy  `(list sem-bound:sem-lib)`bound.s
+      |=  b=sem-bound:sem-lib
+      ?~(range.b | =(0 (sem-lvl:sem-lib u.range.b)))
+    ~
+  `[s i.args.s]
+::
+++  rebound
+  ::  the quantifier `q` around a new body
+  |=  [q=sem-apply:sem-lib b=sem:sem-lib]
+  ^-  sem:sem-lib
+  q(args ~[b], lvl (sem-lvl:sem-lib b))
+::
+++  rewrap
+  ::  put a part back under the wrappers it was found in (innermost first);
+  ::  each wrapper takes the part's own level, so a part binned as an
+  ::  implied init still reads as state level
+  |=  [ws=(list sem:sem-lib) x=sem:sem-lib]
+  ^-  sem:sem-lib
+  ?~  ws  x
+  =/  w  i.ws
+  =/  lv  (sem-lvl:sem-lib x)
+  =/  y=sem:sem-lib
+    ?:  ?=(%letin -.w)  w(body `x, lvl lv)
+    ?.  ?=(%apply -.w)  x
+    w(args (snoc (scag (lent ubound.w) `(list sem:sem-lib)`args.w) x), lvl lv)
+  $(ws t.ws, x y)
+::
+++  swarn-names
+  ::  EC 2255's subjects: tlc2 warns for a PROPERTY whose DEFINITION is state
+  ::  level, once per property, before any decomposition -- so a state-level
+  ::  part of a temporal property (a spec's `Init`) draws no warning
+  |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
+  ^-  (list @t)
+  %+  skim  props
+  |=  p=@t
+  =/  b  (sem-body defs p)
+  ?~(b | (lte (sem-lvl:sem-lib u.b) 1))
 ::
 ++  implied-temporals
-  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTIES that reach the
-  ::  liveness engine, with their bodies, in declaration order. The three
-  ::  exclusions are `SpecProcessor.processConfigProps`': a `[]P` box-state
-  ::  goes to the INVARIANT vector, a level<=1 predicate is an IMPLIED INIT and
-  ::  a `[][A]_v` an IMPLIED ACTION. Same three tests `+check`'s routing uses,
-  ::  applied to EVERY property rather than to the first.
-  ::
-  ::  This is what post-hoc attribution asks about (`+violated-props`), so both
-  ::  the console and the job kernel build it here rather than each their own
+  ::  R2.7.12: `Tool.getImpliedTemporals()` -- the PROPERTY parts that reach
+  ::  the liveness engine, with their bodies, in declaration order: the
+  ::  temporal bin of `+bin-properties`, which is what post-hoc attribution
+  ::  asks about (`+violated-props`)
   |=  [props=(list @t) defs=(map @t sem-def:sem-lib)]
   ^-  (list [name=@t body=sem:sem-lib])
-  ?~  props  ~
-  =/  b  (sem-body defs i.props)
-  ?~  b  $(props t.props)
-  ?^  (box-state-inner:tp u.b)  $(props t.props)
-  ?:  (lte (sem-lvl:sem-lib u.b) 1)  $(props t.props)
-  ?^  (implied-action-inner u.b)  $(props t.props)
-  [[i.props u.b] $(props t.props)]
+  temps:(bin-properties props defs)
 ::
 ++  implied-action-parts
   ::  R2.7.15b: BOTH halves of a `[][A]_v` implied action -- the action AND its
@@ -5050,23 +5738,15 @@
   ::  state search and aborts the run, so the final liveness check never runs:
   ::  `Github710d`/`Github710e` report `Deadlock reached`, not the temporal
   ::  violation the port used to report over the same state count.
-  ::  ALIAS is LIVE on every SAFETY path (R2.3.2) -- including the implied
-  ::  init / implied action / box-state branches above, which all render
-  ::  through `+render-outcome`. It is REFUSED here, on the genuine temporal
-  ::  path: tlc2 aliases the lasso trace too (`LiveWorker.java:876-972`), but
-  ::  `+live-report` renders its prefix and cycle itself and takes no alias,
-  ::  so accepting one would print an UNALIASED trace -- exactly the silent
-  ::  wrong trace R1.8.6's blanket rejection existed to prevent. Narrowed,
-  ::  not ignored, the same shape as VIEW's liveness refusal (R2.3.1)
-  ?^  alias.c
-    ~['Error: unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
+  ::  ALIAS is live on the temporal path too (R4.2i): the lasso's prefix
+  ::  states render through it (`+live-prefix-lines`), as `LiveWorker` does
   ::  R2.3.4: the graph build carries the config's INVARIANTs. It used to
   ::  pass `~`, so an INVARIANT alongside a temporal PROPERTY was simply not
   ::  checked -- which is why the kernel refused the combination rather than
   ::  running it. `+bfs-step` already checks `invs` and stops at the first
   ::  violation, so no new checking machinery was needed here, only the list
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c invs.c cons.c acons.c ~ vars.c order.c perms.c defs.c consts.c ddl.c live-graph-cap 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  bg    (build-graph-out is.c o)
   =/  modn  (module-name-of tree.c)
   ?:  capped.bg
@@ -5086,8 +5766,9 @@
     =/  post=wain
       %-  post-error-live
       :*  out.bg  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-          (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c
-          pname  props.c  aname.c
+          (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+          order.c  modn  defs.c
+          pname  props.c  aname.c  alias.c
       ==
     ::  R2.7.7.3: the postconditions run here too -- measured, they run
     ::  after a VIOLATION as well as on a clean run
@@ -5117,10 +5798,11 @@
   =/  r
     %-  live-report
     :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-        (make-env:ne defs.c consts.c vars.c)  order.c  modn  defs.c  pname
+        (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+        order.c  modn  defs.c  pname
         props.c
         gen.g.bg  distinct.g.bg  depth.g.bg  sname.c  sloc.c  fair.c  aname.c
-        pcs.c  rs.bg  poss.c
+        pcs.c  rs.bg  poss.c  alias.c
     ==
   report.r
 ::
@@ -5141,6 +5823,7 @@
   =/  o=bfs-opts
     :*  nsb.c  invs.c  cons.c  acons.c  poss.c  vars.c  order.c  perms.c  defs.c
         consts.c  ddl.c  0  0  view.c  0  |  actions  (cov-of c cvg)  seed  ~
+        !(draws defs.c)  cdefs.env
     ==
   =/  r  (explore-full-regs is.c irs.c o)
   ::  R2.7.7.3: the postconditions see the run's FINAL statistics -- that is
@@ -5157,6 +5840,11 @@
       rs.cur.r
       poss.c
     ==
+  ::  R4.2a: the search's prints (the carrier began with the initial-state
+  ::  solve's, which `+check-in` has already written), before the verdict
+  =/  sout  out.rs.cur.r
+  =/  bp=wain  (flop (scag (sub (lent sout) (lent out.irs.c)) sout))
+  %+  weld  bp
   %-  render-outcome
   :*  out.r  nl.c  actions  env  order.c  modn  alias.c  vrend.c  |
       (cov-report o cur.r actions)  ~  pcl
@@ -5311,7 +5999,7 @@
   =/  sc  (search-ctx spec cfg)
   ?:  ?=(%| -.sc)  [[%failed p.sc] *run-stats]
   =*  c  p.sc
-  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c))
+  =/  ae  (check-assumes asmz.c (make-env:ne defs.c consts.c vars.c) (module-name-of tree.c) ses.c)
   ?^  ae  [[%failed msg.u.ae] *run-stats]
   ::  a temporal property: a pure []P box-state is a state invariant (checked by
   ::  the safety search, unit 8.9); every other form runs the 8.2–8.6 engine
@@ -5334,7 +6022,7 @@
   =/  o=bfs-opts
     :*  nsb.c  (weld invs.c binvs.c)  cons.c  acons.c  poss.c  vars.c  order.c
         perms.c  defs.c  consts.c  ddl.c  cap  0  view.c  0  |  ~  *cov-opts  0
-        iacts.c
+        iacts.c  !(draws defs.c)  ~
     ==
   =/  er  (explore is.c o)
   ?.  ?=(%ok -.out.er)  (explore-outcome out.er od.er)
@@ -5344,7 +6032,7 @@
   ::  (R1.5.5): a capped build yields %limited rather than a lasso verdict on a
   ::  partial graph
   =/  lo=bfs-opts
-    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c ~ cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c | cap 0 view.c 0 | ~ *cov-opts 0 ~ | ~]
   =/  bg  (build-graph-cap is.c lo)
   ::  the liveness graph build samples no out-degree (no BFS frontier)
   =/  st  [gen.g.bg distinct.g.bg 0 depth.g.bg [0 0 0 0]]
@@ -5352,7 +6040,8 @@
   =/  l
     %-  find-lasso:lv
     :*  oss.c  (states-of seen.g.bg)  inits.g.bg  nsb.c
-        (make-env:ne defs.c consts.c vars.c)  order.c
+        (with-idk:ne (make-env:ne defs.c consts.c vars.c) perms.c view.c)
+        order.c
     ==
   ?~  l  [[%ok st] st]
   ::  R2.7.12: the name is the post-hoc attribution's, `pp` only a fallback
@@ -5385,8 +6074,8 @@
   ?:  ?=(%| -.sc)  [0 0 0 0 [0 0 0 0]]
   =*  c  p.sc
   =/  o=bfs-opts
-    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~]
+    [nsb.c invs.c cons.c acons.c poss.c vars.c order.c perms.c defs.c consts.c ddl.c cap 0 view.c 0 | ~ *cov-opts 0 ~ !(draws defs.c) ~]
   =/  cur  (explore-cursor is.c o budget)
-  [gen.cur distinct.cur (lent queue.cur) depth.cur (od-stats outdeg.cur)]
+  [gen.cur distinct.cur len.queue.cur depth.cur (od-stats outdeg.cur)]
 --
 

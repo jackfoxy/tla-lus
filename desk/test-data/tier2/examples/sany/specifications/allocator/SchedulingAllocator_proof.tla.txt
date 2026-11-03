@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 70, col 1 to line 70, col 37 of module Functions
+Warning: the definition of 'Range' conflicts with
+its definition at line 54, col 1 to line 54, col 37 of module SchedulingAllocator.

@@ -65,6 +65,11 @@
     !>  `@t`'CONFIG\0ainit I\0anext N\0adeadlock true\0aRAW\0a'
   !>  (dump-cfg:config '\\* line comment\0aINIT I\0a(* block *)\0aNEXT N\0a')
 ::
+++  test-cfg-pos-const-bigint
+  %+  expect-eq
+    !>  `@t`'CONFIG\0adeadlock true\0aconst N = 1000000\0aconst M = 1000\0aRAW\0aCONSTANT\0aN = 1000000 \0aM = 1000 \0a---\0a'
+  !>  (dump-cfg:config 'CONSTANT\0a  N = 1000000\0a  M = 1000\0a')
+::
 ++  test-cfg-pos-const-bool
   %+  expect-eq
     !>  `@t`'CONFIG\0adeadlock true\0aconst B = TRUE\0aRAW\0aCONSTANT\0aB = TRUE \0a---\0a'

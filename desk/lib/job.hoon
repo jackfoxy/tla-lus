@@ -52,7 +52,8 @@
       artifacts=(map artifact-name artifact)
       result=(unit result)
       started=@da
-      cont=(unit [%1 k=@])
+      ::  R4.P2: `k` is `[kont-tag kont]`, stored as is (no jam)
+      cont=(unit [%1 k=*])
   ==
 +$  step-out
   $%  [%more events=(list event) job=jobstate]
@@ -69,6 +70,9 @@
   $:  root=module-name
       modules=(map module-name @t)
       cfg=(unit @t)
+      ::  R4.P12: the trees the %clay loader already parsed, by text hash,
+      ::  so no later stage parses a module again (`~` for an inline bundle)
+      pc=pcache:mod
   ==
 ::  one Clay read in flight: the module it stands for (the path being
 ::  tried and the search roots left after it) or the config file
@@ -123,8 +127,10 @@
       asked=(set module-name)
       bytes=@ud
       next=@ud
+      ::  R4.P12: every module parsed so far, by text hash (`+parse-cached`)
+      pc=pcache:mod
   ==
-::  in-flight pipeline state; versioned via the [%1 k=@] wrapper above
+::  in-flight pipeline state; versioned by the `kont-tag` in its `cont` wrapper
 +$  kont
   $%  ::  asynchronous Clay source load
       [%load cur=lcur]
@@ -196,6 +202,12 @@
           sloc=sspan:semantic
           fair=(list sem:semantic)
           aname=@t
+          ::  R4.2i: the ALIAS body, for the lasso and a pre-empting safety
+          ::  trace alike
+          al=(unit sem:semantic)
+          ::  R4.Q8b: the bits the last finished OrderOfSolution computed,
+          ::  for the next one (`+seed:lv`)
+          lc=lcache:lv
       ==
       ::  seeded simulation
       $:  %sim
@@ -206,6 +218,12 @@
           ::  `-difftrace` (R2.4.3): tlc2 honours it in SIMULATION only, so it
           ::  rides on this kont and nowhere else
           df=?
+          ::  R4.2i: the ALIAS the simulated behavior is rendered through
+          al=(unit sem:semantic)
+          ::  R4.2as: the initial state's label -- the simulator names the Init
+          ::  definition (`<AnimInit line ... of module M>`), where the BFS
+          ::  trace says `<Initial predicate>`
+          il=@t
       ==
       ::  depth-first iterative deepening (R2.5). Its own kont because its
       ::  visited set is not the BFS one: each fingerprint carries a status
@@ -239,14 +257,39 @@
 ::  work units one Gall event may spend; engine configuration,
 ::  deliberately separate from the request's user-facing limits
 ++  default-budget  256
+::  R4.QS: a Gall event cannot be preempted, and a step's budget counts states, so
+::  a model whose expansions cost seconds each held the ship for half an
+::  hour per slice (256 of MCInnerSerial's), the class two king crashes
+::  followed. The time between a job's consecutive wakes is the length of
+::  the slice between them (the wake is set for `now`), so each budget is
+::  sized from the last: scaled toward `pace-goal` when it ran over twice
+::  that, doubled when it ran under it (a slice's fixed cost alone must not
+::  pin the budget low), between 1 and `default-budget`. A new job starts at
+::  `pace-start`, so its first slice cannot be the long one
+++  pace-goal   ~s10
+++  pace-start  16
+++  pace-budget
+  |=  [p=(unit [at=@da bud=@ud]) now=@da]
+  ^-  @ud
+  =/  top  default-budget
+  ?~  p  pace-start
+  =/  d=@dr  ?:((gth now at.u.p) (sub now at.u.p) `@dr`1)
+  =/  b
+    ?:  (gth d (mul 2 pace-goal))
+      (div (mul bud.u.p pace-goal) d)
+    ?:  (lth d pace-goal)
+      (mul 2 bud.u.p)
+    bud.u.p
+  (max 1 (min top b))
 ::  Clay reads one slice may request, bounding a wide dependency fan-out
 ::  independently of the work budget
 ++  default-load-budget  8
 ::  the largest a persisted continuation (jammed BFS or source-load cursor)
 ::  may grow before a run is stopped %limited — a defense-in-depth bound on
 ::  the in-flight noun, above what max-states already implies, checked at
-::  each slice boundary
-++  max-noun-bytes  16.000.000
+::  each slice boundary. R4.P13: 256 MB, since the continuation is no longer
+::  jammed per slice (R4.P2, R4.P8) and so bounds only loom growth
+++  max-noun-bytes  256.000.000
 ::  agent-wide bounds, across all jobs. A request's own `limits` bound one job;
 ::  these bound the ship, so one caller cannot starve it by submitting many
 ::  small jobs or by never collecting its results. Engine configuration, like
@@ -356,24 +399,53 @@
   $(js (~(put by js) id.i.cands jr), cands t.cands)
 ::
 ++  noun-over
-  ::  has a persisted continuation outgrown the in-flight noun bound?
-  |=  [c=(unit [%1 k=@]) cap=@ud]
+  ::  has a persisted continuation outgrown the in-flight noun bound? The
+  ::  measure is its jam size, as before R4.P2, so the bound is unchanged
+  |=  [c=(unit [%1 k=*]) cap=@ud]
   ^-  ?
   ?~  c  |
-  (gth (met 3 k.u.c) cap)
+  (gth (met 3 (jam k.u.c)) cap)
+::
+++  noun-due
+  ::  R4.P8: should this slice measure? A jam of the whole continuation is
+  ::  O(state space) -- 0.4-0.5 s per slice at 90k states, more than the
+  ::  slice's own work -- so a growing search measures only when its count
+  ::  (`a` before the slice, `b` after) crosses one of 16 log-spaced
+  ::  checkpoints per doubling: below 32 at every change, then about every
+  ::  4.4% of growth. The bound is still enforced, at most one checkpoint
+  ::  late
+  |=  [a=@ud b=@ud]
+  ^-  ?
+  =/  bucket
+    |=  d=@ud
+    ^-  [@ud @ud]
+    =/  m  (met 0 d)
+    [m (rsh [0 (sub m (min m 5))] d)]
+  !=((bucket a) (bucket b))
 ::
 ::  +|  Continuation Persistence
 ::
 ::
+::  R4.P2 (H3): a continuation is stored as the noun itself, tagged with a
+::  hash of the `kont` TYPE. Jamming it every slice, and `cue`-ing and then
+::  CLAMMING it (`;;` over a recursive mold) on the next, cost O(state space)
+::  per slice -- measured at 8k states: cue 15 ms, clam 140 ms, jam 16 ms. A
+::  matching tag means this build wrote it, so it is loaded through `!<`
+::  (one type check, no walk of the value). Anything else -- a kont from
+::  another build, or hostile input -- crashes, which every caller already
+::  turns into the restart notice; nothing is converted
+++  kont-tag  ^~(`@uvH`(sham -:!>(*kont)))
 ++  save-kont
   |=  k=kont
-  ^-  (unit [%1 k=@])
-  `[%1 (jam k)]
+  ^-  (unit [%1 k=*])
+  `[%1 [kont-tag k]]
 ::
 ++  load-kont
-  |=  c=[%1 k=@]
+  |=  c=[%1 k=*]
   ^-  kont
-  ;;(kont (cue k.c))
+  ?>  ?=(^ k.c)
+  ?>  =(kont-tag -.k.c)
+  !<(kont [-:!>(*kont) +.k.c])
 ::
 ::  +|  Validation
 ::
@@ -432,9 +504,9 @@
   ?:  ?&(coverage.opts.op.req !?=(%exhaustive -.mode.opts.op.req))
     `'unsupported: -coverage outside exhaustive mode (the counters live on the safety search)'
   ?:  ?=(%clay -.src.req)
-    ::  a %clay bundle selects its config by PATH, not by name: the desk has
-    ::  no `%cfg` mark, so the file's mark is part of the reference (hence
-    ::  `/spec-cfg/txt`) and a bare name cannot supply it. The capability is
+    ::  a %clay bundle selects its config by PATH, not by name: a Clay path
+    ::  ends in its mark (`/spec/cfg`, or `/spec-cfg/txt`), so the reference
+    ::  needs it and a bare name cannot supply it. The capability is
     ::  present on this bundle, spelled `src.cfg` -- refused, not missing
     ?:  ?=(^ cfg.opts.op.req)
       `'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)'
@@ -564,7 +636,7 @@
   |=  req=request
   ^-  ?
   ?.  ?=(%inline -.src.req)  |
-  =/  ct  (cfg-of req [root.src.req modules.src.req cfg.src.req])
+  =/  ct  (cfg-of req [root.src.req modules.src.req cfg.src.req ~])
   ?~  ct  |
   =/  pr  (parse-cfg:config u.ct)
   ?&(?=(%& -.pr) ?=(^ properties.p.pr))
@@ -615,7 +687,16 @@
   ^-  (unit srcs)
   ?^  s  s
   ?.  ?=(%inline -.src.request.j)  ~
-  `[root.src.request.j modules.src.request.j cfg.src.request.j]
+  `[root.src.request.j modules.src.request.j cfg.src.request.j ~]
+::
+++  parse-typed-cached
+  ::  R4.P12: `+parse-typed` answered from the loader's parse cache when it
+  ::  holds the text; a cached tree parsed cleanly, so it has no diagnostics
+  |=  [text=@t pc=pcache:mod]
+  ^-  [tree=(unit node:check) diags=(list diagnostic) fatal=?]
+  =/  hit  (~(get by pc) (shax text))
+  ?^  hit  [hit ~ |]
+  (parse-typed:syntax text)
 ::
 ++  carry
   ::  loaded Clay sources travel with the continuation; an inline bundle
@@ -640,7 +721,7 @@
     (finish j [%limited %time stats.j] ~)
   ::  a continuation jammed by an incompatible engine version (e.g. an older
   ::  BFS-cursor shape) cannot be revived; fail the job with a restart notice
-  ::  rather than crash the agent event (Work Unit 7.7 migration contract)
+  ::  rather than crash the agent event (a kont from another build is refused, never converted)
   =/  lr=(each (unit kont) tang)
     ?~  cont.j  [%& ~]
     =/  m  (mule |.((load-kont u.cont.j)))
@@ -651,7 +732,7 @@
   =/  own=(unit stage)  ?~(k ~ (kont-stage u.k))
   ::  mid-stage resume: no entry events
   ?:  ?&(?=(^ own) =(u.own stage.j))
-    (run j k budget ~)
+    (run-safe j k budget ~)
   ::  stage entry
   ?~  pending.j
     (finish j [%failed 'no pending work'] ~)
@@ -660,7 +741,32 @@
   =/  j
     ^-  jobstate
     j(stage s, pending t.pending.j, progress prog)
-  (run j k budget ~[[%stage s] [%progress prog]])
+  (run-safe j k budget ~[[%stage s] [%progress prog]])
+::
+++  run-safe
+  ::  R4.2y: a crash in a slice seals the job %failed. Uncaught, Gall rolls
+  ::  the whole event back, the behn wake that drove it is gone, and the job
+  ::  sits `running` forever (three census models, 16 min each)
+  |=  [j=jobstate k=(unit kont) budget=@ud pre=(list event)]
+  ^-  step-out
+  =/  m  (mule |.((run j k budget pre)))
+  ?:  ?=(%& -.m)  p.m
+  (crash-fail j p.m pre)
+::
+++  crash-fail
+  ::  the crash tags with a tlc2 error behind them become that typed error;
+  ::  any other crash is an internal failure naming the stage
+  |=  [j=jobstate tan=tang pre=(list event)]
+  ^-  step-out
+  =/  txt=tape  (zing (turn tan |=(t=tank ~(ram re t))))
+  ?^  (find "tlc-live-wrong-formula-format" txt)
+    =/  msg=@t  'Temporal formulas containing actions must be of forms <>[]A or []<>A.'
+    =/  r  (add-diags j ~[[[%tlc 2.214] %error %liveness msg ~ ~]])
+    (finish j.r [%failed msg] (weld pre evs.r))
+  =/  top=tape  ?~(tan "" ~(ram re i.tan))
+  %^  finish  j
+    [%failed (crip "internal: crashed in %{(trip stage.j)}: {top}")]
+  pre
 ::
 ++  run
   ::  execute one bounded slice of the active stage
@@ -820,6 +926,7 @@
       asked=(silt ~[root.s])
       bytes=0
       next=0
+      pc=~
   ==
 ::
 ++  load-ask
@@ -876,6 +983,16 @@
   ::
       %module
     ?:  ?=(%| -.res.r)
+      ::  R4.1a: SANY's order is the SPEC directory (the first root), then
+      ::  the StandardModules, then the library roots (`SimpleFilenameToStream`
+      ::  over CI's classpath; measured in R4.0a). So a standard name missing
+      ::  from the spec directory is the vendored module, and never a library
+      ::  root's copy (tlapm's `FiniteSets`/`Bags`, CommunityModules' `Json`)
+      ?:  ?&  (~(has by standard-modules:stdmods) name.u.p)
+              =(try.u.p (slag 1 roots.c))
+          ==
+        =.  have.c  (~(put in have.c) name.u.p)
+        $
       ::  not under this search root: try the next one
       =/  tr  try.u.p
       ?^  tr
@@ -889,7 +1006,20 @@
       ?:  (~(has by standard-modules:stdmods) name.u.p)
         =.  have.c  (~(put in have.c) name.u.p)
         $
-      [c (flop reads) `[%fail (missing-msg name.u.p from.u.p)]]
+      ::  last, a block in the root file itself (R4.1c, `tlc-monolith`):
+      ::  delivered back to this loop as if it had been read, so it is
+      ::  registered, size-checked and parsed exactly as a file is
+      =/  rtxt  (~(get by mods.c) root.c)
+      =/  mono=(unit @t)
+        ?~(rtxt ~ (monolith-module:mod u.rtxt name.u.p))
+      ?~  mono
+        [c (flop reads) `[%fail (missing-msg name.u.p from.u.p)]]
+      =/  tag  next.c
+      =.  next.c  +(next.c)
+      =/  at=path  (~(gut by refs.c) root.c /)
+      =.  pend.c  (~(put by pend.c) tag [%module name.u.p from.u.p at ~])
+      =.  inbox.c  [[tag [%& u.mono]] inbox.c]
+      $
     =/  txt  p.res.r
     =.  bytes.c  (add bytes.c (met 3 txt))
     ?:  (gth bytes.c max-source.lims)
@@ -902,9 +1032,10 @@
     ::  an unparsable module is registered as it arrived and contributes
     ::  no references: the %parse stage then reports SANY's own error
     ::  text, exactly as it does for an inline bundle
-    =/  pr  (mule |.((parse:syntax txt)))
-    ?.  ?&(?=(%& -.pr) ?=(%& -.p.pr))  $
-    =/  tree  p.p.pr
+    =/  pr  (mule |.((parse-cached:mod txt pc.c)))
+    ?.  ?&(?=(%& -.pr) ?=(%& -.res.p.pr))  $
+    =.  pc.c  cache.p.pr
+    =/  tree  p.res.p.pr
     ::  SANY's file-name check: the file is named for the lowercased
     ::  module, but the declared name must match the requested one
     =/  dec  (module-name-of:mod tree)
@@ -1040,6 +1171,18 @@
   ?~  cfg.s  ~
   `[[%inline ''] (shax u.cfg.s)]
 ::
+++  cfg-text
+  ::  the config a loaded file yields: a `.tla` path carries it in a
+  ::  `CONFIG` block (R4.2ab, `tlc-monolith`); provenance still hashes
+  ::  the whole file as read (+clay-provs)
+  |=  c=lcur
+  ^-  (unit @t)
+  ?~  cfg.c  ~
+  ?~  cfg-path.c  cfg.c
+  =/  p  (flop u.cfg-path.c)
+  ?.  ?=([%tla @ *] p)  cfg.c
+  `(monolith-config:mod u.cfg.c i.t.p)
+::
 ++  close-load
   ::  the module graph is closed: record what was read, then hand the
   ::  sources to %parse exactly as an inline bundle would
@@ -1103,7 +1246,7 @@
     (load-fail j 'Cannot find the config file.' pre)
   ::  `j` is narrowed to the %clay bundle here, so the hand-off happens
   ::  in a gate of its own rather than by writing back into it
-  (close-load j (clay-provs c) [root.c mods.c cfg.c] pre)
+  (close-load j (clay-provs c) [root.c mods.c (cfg-text c) pc.c] pre)
 ::
 ::  +|  Stage: %parse
 ::
@@ -1132,7 +1275,7 @@
     =/  text  (~(get by modules.src) root.src)
     ?~  text
       (finish j [%failed 'root module not in bundle'] pre)
-    =/  pr  (mule |.((parse-typed:syntax u.text)))
+    =/  pr  (mule |.((parse-typed-cached u.text pc.src)))
     ?:  ?=(%| -.pr)
       (finish j [%failed 'parse error: parser crashed'] pre)
     =/  pt  p.pr
@@ -1163,7 +1306,7 @@
     (more j evs)
   =/  nm  i.todo.kk
   =/  ds=(list diagnostic)
-    =/  pr  (mule |.((parse-typed:syntax (~(got by modules.src) nm))))
+    =/  pr  (mule |.((parse-typed-cached (~(got by modules.src) nm) pc.src)))
     ?:  ?=(%| -.pr)
       [[%lus 400] %error %parse (rap 3 ~['parser crashed in ' nm]) ~ ~]~
     diags.p.pr
@@ -1218,7 +1361,7 @@
     (finish j [%failed 'internal: %semantic without loaded sources'] pre)
   =/  src    u.so
   =/  flags  flags.op.request.j
-  =/  ag  (analyze-graph:semantic root.src modules.src)
+  =/  ag  (analyze-graph-with:semantic root.src modules.src pc.src)
   ?~  ag
     ::  resolution failed. If the parse stage already reported errors,
     ::  they drive the terminal verdict; otherwise surface a resolution
@@ -1227,8 +1370,19 @@
     ?:  %+  lien  diags.j
         |=(d=diagnostic &(=(%error severity.d) ?=(?(%parse %modules) stage.d)))
       (more j pre)
-    =/  d=diagnostic
-      [[%lus 401] %error %modules 'module resolution failed' ~ ~]
+    ::  R4.2j: name the failure in SANY's words, as the %clay loader does
+    ::  (`+missing-msg`, `+mismatch-msg`); only a cycle or an unparsable
+    ::  module keeps the generic text, the parse stage having reported
+    ::  the latter already
+    =/  why=@t
+      =/  rr  (resolve:mod root.src (inline-resolver:mod modules.src) pc.src)
+      ?.  ?=(%| -.out.rr)  'module resolution failed'
+      =/  e  p.out.rr
+      ?+  -.e  'module resolution failed'
+        %missing   (missing-msg what.e in.e)
+        %mismatch  (mismatch-msg file.e module.e)
+      ==
+    =/  d=diagnostic  [[%lus 401] %error %modules why ~ ~]
     =/  r  (add-diags j ~[d])
     (more j.r (weld pre evs.r))
   =/  as-diags
@@ -1268,13 +1422,18 @@
   (finish j.r [%failed msg.d] (weld pre evs.r))
 ::
 ++  assume-fail
-  ::  a false (EC 2104) or non-boolean (EC 2105) ASSUME is a typed TLC failure
-  ::  at the model-checking stage, recorded like a config diagnostic
-  |=  [j=jobstate ec=@ud msg=@t pre=(list event)]
+  ::  a non-boolean ASSUME (EC 2105) is a typed TLC failure at the
+  ::  model-checking stage, recorded like a config diagnostic. A FALSE one
+  ::  (EC 2104) is a VERDICT: tlc2 exits 10, CI calls it `assumption
+  ::  failure`, and the wire has `[%assumption name]` for exactly this -- it
+  ::  had never been produced (R4.2j). Its name is the assumption's location
+  |=  [j=jobstate ae=[ec=@ud msg=@t at=@t] pre=(list event)]
   ^-  step-out
-  =/  dg=diagnostic  [[%tlc ec] %error %explore msg ~ ~]
+  =/  dg=diagnostic  [[%tlc ec.ae] %error %explore msg.ae ~ ~]
   =/  r  (add-diags j ~[dg])
-  (finish j.r [%failed msg] (weld pre evs.r))
+  ?.  =(2.104 ec.ae)
+    (finish j.r [%failed msg.ae] (weld pre evs.r))
+  (finish j.r [%violated [%assumption at.ae] *run-stats] (weld pre evs.r))
 ::
 ++  do-config
   ::  consume the parsed root tree and build the engine continuation.
@@ -1307,7 +1466,7 @@
   ::  the semantic graph is generated once and reused by the config
   ::  assembly and the checker (it used to be built twice, reparsing
   ::  every module both times)
-  =/  mo  (generate:semantic root.src modules.src)
+  =/  mo  (generate-with:semantic root.src modules.src pc.src)
   ?~  mo  (config-fail j [0 'internal: module generation failed'] pre)
   =/  rso  (run-spec-with:config u.mo cfg)
   ?:  ?=(%| -.rso)  (config-fail j p.rso pre)
@@ -1329,6 +1488,13 @@
   ::  resolve through the SAME +resolve-targets the console path uses, so a
   ::  SPECIFICATION decomposes here exactly as it does there (R1.8.3 --
   ::  this branch used to be a flat typed rejection)
+  ::  R4.2k: NO behaviour spec at all (`SpecifyingSystems/SimpleMath`: a
+  ::  module of ASSUMEs) is not an error -- tlc2 checks the assumptions and
+  ::  completes over zero initial states, as the console path has since
+  ::  R3.0a. The kernel refused it (`no INIT in config`), an entry-point
+  ::  divergence
+  ?:  ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs) ?=(~ next.mode.rs))
+    (config-run j tree src rs iv pp u.mo pre)
   ?:  ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs))
     (finish j [%failed 'no INIT in config'] pre)
   ?:  ?&(?=(%init-next -.mode.rs) ?=(~ next.mode.rs))
@@ -1338,12 +1504,35 @@
     =/  nx  next.mode.rs
     ?~  in  (finish j [%failed 'no INIT in config'] pre)
     ?~  nx  (finish j [%failed 'no NEXT in config'] pre)
-    =/  ib  (body-of-def:check tree u.in)
-    ?~  ib  (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
-    =/  nb  (body-of-def:check tree u.nx)
-    ?~  nb  (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
+    ::  R4.2l: resolved through the semantic graph, which holds what EXTENDS
+    ::  imports; the root's syntax tree alone refused every MC-style model
+    ::  whose Init/Next live in the module it extends
+    =/  dm  (defmap-of:ne u.mo)
+    ?.  (~(has by dm) u.in)
+      (finish j [%failed (rap 3 ~['no definition for INIT ' u.in])] pre)
+    ?.  (~(has by dm) u.nx)
+      (finish j [%failed (rap 3 ~['no definition for NEXT ' u.nx])] pre)
     (config-run j tree src rs iv pp u.mo pre)
   (config-run j tree src rs iv pp u.mo pre)
+::
+++  def-node
+  ::  the syntax node of definition `nm` and the module that holds it: the
+  ::  root's own, else the module the semantic graph says defines it (an
+  ::  EXTENDS import), parsed from the bundle (R4.2l)
+  |=  [tree=node:check modn=@t defs=(map @t sem-def:semantic) src=srcs nm=@t]
+  ^-  (unit [nod=node:check mod=@t])
+  =/  own  (body-of-def:check tree nm)
+  ?^  own  `[u.own modn]
+  =/  d  (~(get by defs) nm)
+  ?~  d  ~
+  =/  text  (~(get by modules.src) origin.u.d)
+  ?~  text  ~
+  =/  pr  (mule |.((parse-typed-cached u.text pc.src)))
+  ?:  ?=(%| -.pr)  ~
+  ?~  tree.p.pr  ~
+  =/  b  (body-of-def:check u.tree.p.pr nm)
+  ?~  b  ~
+  `[u.b origin.u.d]
 ::
 ++  config-run
   ::  the mode-independent half of +do-config: everything from the resolved
@@ -1378,14 +1567,17 @@
   ::  (simulation and the genuine temporal lasso), each at its own branch below
   ::  rather than here, because a `[]P` box-state PROPERTY runs on the SAFETY
   ::  path and does render the alias — a `?=(^ pp)` guard here would over-refuse
-  ?:  &(?=(^ view.rs) ?=(^ pp))
-    %^  finish  j
-      [%failed 'unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)']
-    pre
-  =/  vars  (var-names:check tree)
-  =/  order  (var-order:check tree)
+  ::  R4.2e: VIEW with a temporal PROPERTY runs; the liveness product keys
+  ::  states as the graph build did (`+live-key:lv`)
+  ::  R4.2l: the VARIABLEs of the whole EXTENDS closure, from the semantic
+  ::  graph (the root's own first, in declaration order, then the imported
+  ::  ones); the root tree alone dropped an extended module's variables
+  =/  order  (turn vars.mo head)
+  =/  vars   (silt order)
   =/  modn  (module-name-of:check tree)
-  =/  defs    (defmap-of:ne mo)
+  ::  R4.2m: the config's `<-` overrides, applied
+  =/  defs
+    (apply-overrides:check (defmap-of:ne mo) overrides.rs mod-overrides.rs)
   ::  R2.7.7.4b: `_POSSIBLE`'s predicates with their levels, resolved the same
   ::  way the console resolves them
   =/  poss
@@ -1418,8 +1610,7 @@
   =/  xpc  (cli-postconditions:check postconditions.opts.op.request.j defs)
   ?:  ?=(%| -.xpc)  (finish j [%failed p.xpc] pre)
   =/  pcs=(list @t)  (weld postconditions.rs p.xpc)
-  =/  ivb=(unit node:check)  ?~(iv ~ (body-of-def:check tree u.iv))
-  ?:  &(?=(^ iv) ?=(~ ivb))
+  ?:  ?&(?=(^ iv) !(~(has by defs) u.iv))
     %^  finish  j
       [%failed (rap 3 ~['no definition for INVARIANT ' u.iv])]
     pre
@@ -1434,7 +1625,13 @@
   ::  `order` goes in so the SPECIFICATION decomposition can raise the EC 2145
   ::  subscript-coverage warning here too (R2.3.5) -- the kernel's report is
   ::  compared to the console's, so a warning on one path must appear on both
-  =/  rt  (resolve-targets:check tg defs order)
+  =/  nospec
+    ?&(?=(%init-next -.mode.rs) ?=(~ init.mode.rs) ?=(~ next.mode.rs))
+  =/  rt
+    ?:  nospec
+      ::  R4.2k: the console's no-behaviour marker (`+search-ctx-seed`)
+      `(each [init=sem:semantic next=sem:semantic fair=(list sem:semantic) nname=(unit @t) warn=(list @t)] @t)`[%& [%nullodn ~] [%nullodn ~] ~ ~ ~]
+    (resolve-targets:check tg defs order)
   ?:  ?=(%| -.rt)  (finish j [%failed p.rt] pre)
   =.  swarn.j  warn.p.rt
   =/  isb=sem:semantic  init.p.rt
@@ -1450,19 +1647,60 @@
     ?~  sname  ~
     =/  d  (~(get by defs) u.sname)
     ?~(d ~ at.u.d)
-  =/  nb  ?~(nname ~ (body-of-def:check tree u.nname))
-  =/  nl    ?~(nb '' (next-span-label:check aname u.nb modn))
+  ::  the NEXT body's syntax node and the module that holds it, so the
+  ::  action label names an imported Next's own module (R4.2l)
+  =/  nd=(unit [nod=node:check mod=@t])
+    ?~(nname ~ (def-node tree modn defs src u.nname))
+  =/  nl  ?~(nd '' (next-span-label:check aname nod.u.nd mod.u.nd))
   =/  act=next-act
-    ?~  nb  ~
-    =/  sp  (span-of:ast u.nb)
-    `[?~(nname '' u.nname) ?~(sp ~ `[modn u.sp])]
+    ?~  nd  ~
+    =/  sp  (span-of:ast nod.u.nd)
+    `[?~(nname '' u.nname) ?~(sp ~ `[mod.u.nd u.sp])]
   ::  safety, liveness, and simulation all run on the Work Unit 3 SEMANTIC
   ::  graph via node-eval (unit 9.2 retired simulation's CST solver).
-  =/  consts  (consts-of:check constants.rs)
+  =/  consts
+    %-  ~(uni by (override-consts:check (consts-of:check constants.rs) overrides.rs))
+    (mod-const-vals:check defs mod-constants.rs)
+  ::  R4.2c/g: the request's environment and Java system properties, as the
+  ::  records `IOEnv` and `TLCGet("-D...")` read. `$`-names, which no source
+  ::  or config can spell
+  =.  consts
+    %-  ~(gas by consts)
+    :~  ['$env' (str-rec env.request.j)]
+        ['$props' (str-rec props.request.j)]
+        ['$config' (run-config mode deadlock.rs)]
+    ==
+  ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode.
+  ::  `%dfid` carries no seed on this wire, so it runs from the 0 default
+  =/  eseed=@ud
+    ?-  -.mode
+      %exhaustive  seed.mode
+      %simulate    seed.mode
+      %dfid        0
+    ==
+  ::  R4.2aa: the drawing constant definitions, once, in tlc2's order
+  ::  (`+startup-draws:ne`); the ASSUMEs and then the initial-state solve
+  ::  continue the same stream
+  =/  mdraw  (may-draw:check defs assumes.mo)
+  =/  rs00=rst:ne  empty-rst:ne
+  =.  es.rs00  (scramble:rng eseed)
+  =/  sd=[vals=(map @t value:check) rs=rst:ne]
+    ?.  mdraw  [consts rs00]
+    %:  startup-draws:ne
+      (startup-order:check mo overrides.rs defs)
+      defs  consts  vars  rs00
+    ==
+  =.  consts  vals.sd
+  =/  irs0=rst:ne
+    ?.  mdraw  rs.sd
+    (assume-rs:check assumes.mo (make-env:ne defs consts vars) rs.sd)
   ::  TLC checks module assumptions before the search (Tool.checkAssumptions);
   ::  a false or non-boolean ASSUME is a typed TLC failure, never a silent skip
-  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars))
-  ?^  ae  (assume-fail j ec.u.ae msg.u.ae pre)
+  =/  ae  (check-assumes:check assumes.mo (make-env:ne defs consts vars) modn es.rs.sd)
+  ::  R4.2a: what the startup and the ASSUMEs printed is kept either way
+  =^  arts  irs0  (drain-output j irs0)
+  =.  artifacts.j  arts
+  ?^  ae  (assume-fail j u.ae pre)
   ::  R2.7.5: SYMMETRY with a temporal PROPERTY WARNS AND CONTINUES (EC 2279),
   ::  matching tlc2 and the console path. Unit 8.7.2's engine blocker was
   ::  re-measured and is stale -- see `+search-ctx-seed`'s note. The warning
@@ -1472,11 +1710,9 @@
   ::  a `[]P` box-state PROPERTY is folded into the invariants and never
   ::  reaches the liveness checker, so it draws no warning -- same test the
   ::  console path uses (`+search-ctx-seed`'s `genuine-temporal`)
-  =/  genuine-temporal
-    ?.  ?=(^ pp)  |
-    =/  psb  (sem-body:check defs u.pp)
-    ?.  ?=(^ psb)  |
-    ?=(~ (box-state-inner:tp u.psb))
+  ::  R4.2n: the temporal bin being non-empty (`+bin-properties`)
+  =/  gbins  (bin-properties:check properties.rs defs)
+  =/  genuine-temporal  ?=(^ temps.gbins)
   =?  swarn.j  &(?=(^ symmetry.rs) genuine-temporal)
     :_  swarn.j
     %^    cat  3
@@ -1500,23 +1736,39 @@
   ::  R2.7.4.2b: the carrier-keeping variant, for the INIT coverage counts --
   ::  `irej` is the candidates the initial predicate rejected once they were
   ::  already fully assigned, which is the `secondary` half of the INIT line
-  ::  R2.7.4.4: `RandomEnumerableValues.setSeed(seed)` runs for EVERY run mode,
-  ::  and the INITIAL-state solve draws from that seed alone -- off a worker
+  ::  R2.7.4.4: the INITIAL-state solve runs off a worker --
   ::  `IdThread.getCurrentState()` is null, so `TLCStateRandom` never reseeds
-  ::  and the whole init phase runs from `new Random(randomSeed)`. `%dfid`
-  ::  carries no seed on this wire, so it runs from the 0 default
-  =/  eseed=@ud
-    ?-  -.mode
-      %exhaustive  seed.mode
-      %simulate    seed.mode
-      %dfid        0
-    ==
-  =/  rs0=rst:ne  empty-rst:ne
-  =/  isc
-    %^  init-states-rs:ne  isb  (make-env:ne defs consts vars)
-    rs0(es (scramble:rng eseed))
+  ::  and the init phase continues the main thread's `new Random(randomSeed)`
+  ::  where the startup definitions and the ASSUMEs left it (R4.2aa)
+  =/  isc=sout:ne
+    ::  R4.2k/R3.2: nothing to solve -- no behaviour spec, or a SPECIFICATION
+    ::  with no initial predicate: zero initial states
+    ?:  ?=(%nullodn -.isb)  [[%& ~] irs0]
+    ::  R4.3: under a state bound, an init assignment takes at most one more
+    ::  element than the bound (`ilim`); solved again unbounded only if that
+    ::  cut a set which then yields fewer distinct states than it, so a
+    ::  truncated init set is never explored
+    =/  ie  (make-env:ne defs consts vars)
+    =/  lim=@ud  ?:(=(0 max-states.lims) 0 +(max-states.lims))
+    =/  r1=sout:ne  (init-states-rs:ne isb ie(ilim lim) irs0)
+    =/  ok
+      ?.  trunc.+.r1  &
+      ?.  ?=(%& -.-.r1)  &
+      (gte ~(wyt in (silt p.-.r1)) lim)
+    ?:  ok  r1
+    (init-states-rs:ne isb ie irs0)
   =/  isr  -.isc
-  ?:  ?=(%| -.isr)  (finish j [%failed msg.p.isr] pre)
+  ?:  ?=(%| -.isr)
+    ::  R4.2j: the pin's code on the wire -- EC 2102 (`current state is not a
+    ::  legal state`) for an initial state left incomplete, else the
+    ::  evaluation error's own
+    =/  ec=@ud
+      ?:  =('incomplete initial state: a variable is unassigned.' msg.p.isr)
+        2.102
+      code.p.isr
+    ?:  =(0 ec)  (finish j [%failed msg.p.isr] pre)
+    =/  dm  (add-diags j ~[[[%tlc ec] %error %explore msg.p.isr ~ ~]])
+    (finish j.dm [%failed msg.p.isr] (weld pre evs.dm))
   =/  is  p.isr
   ::  R2.7.4.2b: everything the coverage block needs and the search does not
   ::  otherwise carry. `irej` is the R2.7.4.1a carrier's INIT rejection count
@@ -1567,23 +1819,23 @@
       ==
     (more j pre)
   ?:  ?=(%simulate -.mode)
-    ::  `+trace-states` renders the simulated behavior with no alias, and
-    ::  tlc2 does apply one there (`SimulationWorker.java:163`), so an ALIAS
-    ::  here would print a wrong trace. Refused, narrowly (R2.3.2)
-    ?^  alias.rs
-      %^  finish  j
-        [%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)']
-      pre
     =/  dep
       ?:(=(0 max-depth.lims) depth.mode (min depth.mode max-depth.lims))
     =/  actions  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
-    ::  normalize the PROPERTY (if any) into the OrderOfSolution form; an
-    ::  unsupported property is a typed rejection, never a silent %ok
+    ::  R4.Q8b: the PROPERTYs binned as the exhaustive path and the console
+    ::  simulator bin them (`SpecProcessor.processConfigProps` is mode-blind):
+    ::  the box-state ones join the invariants, the implied actions are
+    ::  checked per successor, and only the TEMPORAL bin is normalized into
+    ::  OrderOfSolutions, under the spec's fairness. The whole first PROPERTY
+    ::  used to be normalized, so `TDSpec == Init /\ [][Next]_v /\ WF_v(A)`
+    ::  (SmokeEWD998) failed with EC 2214. Implied inits are not checked: the
+    ::  simulator never does (measured at the pin)
     =/  osr=(each (list oos:tp) aerr:tp)
-      ?~  pp  [%& ~]
-      =/  psb  (sem-body:check defs u.pp)
-      ?~  psb  [%| [0 (rap 3 ~['no definition for PROPERTY ' u.pp])]]
-      (oss-of:check ~[u.psb] modn ~ (make-env:ne defs consts vars))
+      ?~  temps.bins  [%& ~]
+      %:  oss-of:check
+        (turn temps.bins |=([* b=sem:semantic] b))
+        modn  fair  (make-env:ne defs consts vars)
+      ==
     ?:  ?=(%| -.osr)  (finish j [%failed msg.p.osr] pre)
     =/  o=sim-opts:check
       ::  the effective deadlock flag. The exhaustive mode ANDs a request-side
@@ -1591,13 +1843,14 @@
       ::  `deadlock && getCheckDeadlock()`), but `[%simulate ...]` carries no
       ::  such toggle on this wire -- only `[%exhaustive deadlock=?]` does --
       ::  so here the cfg's CHECK_DEADLOCK is the whole story.
-      :*  actions  invs  cons  acons  deadlock.rs
+      :*  actions  (weld invs binvs.bins)  cons  acons  deadlock.rs
           p.osr  ?~(pp '' u.pp)
           defs  consts  vars  order  num.mode  dep  generate.mode
+          iacts
       ==
     ::  `-difftrace` rides on the SIM kont, the only path tlc2 honours it on
     =.  cont.j
-      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j])
+      (save-kont [%sim nl act o (sim-cursor-init:check is seed.mode) difftrace.opts.op.request.j alb (sim-init-label isb defs modn)])
     (more j pre)
   ::  R2.7.15c: the IMPLIED INITS, which this kernel used to compute and drop.
   ::  tlc2 checks a level<=1 PROPERTY only while computing the INITIAL STATES
@@ -1612,7 +1865,7 @@
   ::  its own implied inits state-major in `+dfid-cursor-init`, so reaching it
   ::  from here would check them twice
   =.  swarn.j
-    (weld swarn.j (turn iinits.bins |=([n=@t *] (state-level-warn:check n))))
+    (weld swarn.j (turn (swarn-names:check properties.rs defs) state-level-warn:check))
   =/  ib=(unit (each [kind=?(%inv %prop) name=@t st=state:check] @t))
     ?~  iinits.bins  ~
     %-  first-bad-init:check
@@ -1642,13 +1895,6 @@
   ::  wired below, where the opts are built); the LIVENESS stage is planned
   ::  only when a genuine temporal property was declared.
   ?^  temps.bins
-    ::  the lasso trace is rendered by the %liveness stage, which takes no
-    ::  alias, and tlc2 does alias it (`LiveWorker.java:876-972`). Refused
-    ::  narrowly, matching the console path's guard (R2.3.2)
-    ?^  alias.rs
-      %^  finish  j
-        [%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)']
-      pre
     ::  a genuine temporal property runs the 8.2-8.6 engine in the %liveness
     ::  stage; a %clay run could not know it needs that stage until its config
     ::  is read, so the plan grows here, honestly, with its total
@@ -1669,10 +1915,24 @@
     ::  INVARIANT alongside a PROPERTY is CHECKED rather than refused. R2.7.15a
     ::  adds the box-state properties and the implied actions to the same
     ::  build, so a spec declaring both kinds gets both checked in ONE run
+    ::  R4.P7: the console path's graph (`check.hoon` +search-ctx users):
+    ::  the CONSTRAINTs, action constraints and SYMMETRY group, and the
+    ::  safety path's deadlock flag (`deadlock && getCheckDeadlock()`). All
+    ::  four were off here, so a deadlocking spec reported its PROPERTY
+    ::  violated where tlc2 stops at `Deadlock reached`
+    ::  R4.QS: the getActions decomposition built ONCE and carried, as the
+    ::  safety path's is (R2.7.4.2b). Left empty, `+bfs-step` rebuilt it at
+    ::  every slice -- 12.8 s each for EWD998ChanID
+    =/  acts  (get-actions:check nsb aname defs (make-env:ne defs consts vars))
     =/  o=bfs-opts:check
-      :*  nsb  (weld invs binvs.bins)  ~  ~  ~  vars  order  ~  defs  consts  |
-          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  ~
+      :*  nsb  (weld invs binvs.bins)  cons  acons  ~  vars  order  perms
+          defs  consts
+          ?&(deadlock.mode deadlock.rs)
+          max-states.lims  max-depth.lims  vwb  max-set-size.lims  |  acts
           *cov-opts:check  0  iacts
+          ::  R4.P5c: a temporal graph keeps FP64 (lasso choice reads map order)
+          |
+          cdefs:(make-env:ne defs consts vars)
       ==
     =.  cont.j
       %-  save-kont
@@ -1680,7 +1940,7 @@
           temps.bins
           modn  act  nl
           o  (bfs-init:check is)  ~  ~
-          sname  sloc  fair  aname
+          sname  sloc  fair  aname  alb  *lcache:lv
       ==
     (more j pre)
   ::  no temporal property: a safety run, and the box-state properties are part
@@ -1708,6 +1968,10 @@
         seed.mode
         ::  R2.7.15a: the IMPLIED ACTIONS, checked on every transition
         iacts
+        ::  R4.P5c: the identity key, unless the spec can draw
+        !(draws:check defs)
+        ::  R4.QS: the constant definitions, evaluated once for every slice
+        cdefs:(make-env:ne defs consts vars)
     ==
   ::  R2.7.4.3: the cursor inherits the register store the initial-state solve
   ::  wrote, so an `Init` conjunct's `TLCSet` is visible to the first `Next`
@@ -1718,23 +1982,119 @@
 ::  +|  Stage: %explore
 ::
 ::
+++  max-output-bytes
+  ::  R4.2a: the `Print` output a job keeps; past it one marker line ends it
+  ^-  @ud
+  1.000.000
+::
+++  file-art
+  ::  R4.2f: the artifact name for a file the spec wrote: `file-` and the
+  ::  path, lower-cased, every character a knot cannot hold made `-`
+  |=  p=@t
+  ^-  artifact-name
+  %-  crip
+  %+  weld  "file-"
+  %+  turn  (cass (trip p))
+  |=  c=@tD
+  ?:  ?|  &((gte c 'a') (lte c 'z'))
+          &((gte c '0') (lte c '9'))
+          =(c '.')  =(c '_')  =(c '~')  =(c '-')
+      ==
+    c
+  '-'
+::
+++  run-config
+  ::  R4.2w: `TLCGet("config")`, the record the pin's checker builds
+  ::  (`AbstractChecker.createConfig`; the simulator's own for -simulate and
+  ::  -generate). Measured with tla2tools.jar: an exhaustive run is [mode
+  ::  "bfs", deadlock, worker 1, seed (a string), fingerprint (the FP64
+  ::  polynomial of `-fp 0`, a string), install]; DFID reports "bfs" too; a
+  ::  simulation is [mode "simulate"/"generate", deadlock, seed, worker 1,
+  ::  traces, depth, aril "0", sched "random", install]. `install` is the
+  ::  jar's path at the pin; here it names this engine (approved difference)
+  |=  [m=check-mode cfg-ddl=?]
+  ^-  value:check
+  =/  inst=value:check  [%str '%tla-lus']
+  =/  sd  |=(s=@ud `value:check`[%str (crip (a-co:co s))])
+  %-  normalize:vl:check
+  :-  %rec
+  ?-  -.m
+      %exhaustive
+    :~  ['mode' [%str 'bfs']]  ['deadlock' [%bool &(deadlock.m cfg-ddl)]]
+        ['worker' [%int --1]]  ['seed' (sd seed.m)]
+        ['fingerprint' [%str '-7992595565342442794']]  ['install' inst]
+    ==
+      %dfid
+    :~  ['mode' [%str 'bfs']]  ['deadlock' [%bool &(deadlock.m cfg-ddl)]]
+        ['worker' [%int --1]]  ['seed' (sd 0)]
+        ['fingerprint' [%str '-7992595565342442794']]  ['install' inst]
+    ==
+      %simulate
+    :~  ['mode' [%str ?:(generate.m 'generate' 'simulate')]]
+        ['deadlock' [%bool cfg-ddl]]  ['seed' (sd seed.m)]  ['worker' [%int --1]]
+        ['traces' [%int (sun:si num.m)]]  ['depth' [%int (sun:si depth.m)]]
+        ['aril' [%str '0']]  ['sched' [%str 'random']]  ['install' inst]
+    ==
+  ==
+::
+++  str-rec
+  ::  R4.2c/g: a string map as a record value
+  |=  m=(map @t @t)
+  ^-  value:check
+  %-  normalize:vl:check
+  [%rec (turn ~(tap by m) |=([k=@t w=@t] [k [%str w]]))]
+::
+++  drain-output
+  ::  R4.2a: move the lines `Print`/`PrintT` wrote (the carrier's `out`,
+  ::  newest first) into the job's `%output` text artifact, in print order, and
+  ::  empty the carrier -- so the persisted continuation never grows with the
+  ::  output, and a job that ends early still shows what it printed
+  ::  R4.2f: and each file `JsonSerialize`/`ndJsonSerialize` wrote, as the
+  ::  `%text` artifact `file-<path>` (`+file-art`), the latest write winning
+  |=  [j=jobstate rs=rst:ne]
+  ^-  [(map artifact-name artifact) rst:ne]
+  =/  fs=(list [p=@t c=@t])  ~(tap by files.rs)
+  =.  artifacts.j
+    %-  ~(gas by artifacts.j)
+    (turn fs |=([p=@t c=@t] [(file-art p) [%text c]]))
+  =.  files.rs  ~
+  ?~  out.rs  [artifacts.j rs]
+  =/  old=@t
+    =/  a  (~(get by artifacts.j) %output)
+    ?~(a '' ?:(?=(%text -.u.a) text.u.a ''))
+  =/  mark=@t  '(output truncated: max-output-bytes reached)'
+  =/  full  &(!=('' old) =(mark (rear (to-wain:format old))))
+  ?:  full  [artifacts.j rs(out ~)]
+  =/  add=@t  (of-wain:format (flop out.rs))
+  =/  new=@t  ?:(=('' old) add (rap 3 ~[old '\0a' add]))
+  =?  new  (gth (met 3 new) max-output-bytes)
+    (rap 3 ~[(end [3 max-output-bytes] new) '\0a' mark])
+  :_  rs(out ~)
+  (~(put by artifacts.j) %output [%text new])
+::
 ++  do-explore
   |=  [j=jobstate k=(unit kont) budget=@ud pre=(list event)]
   ^-  step-out
   ?:  ?&(?=(^ k) ?=(%bfs -.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
+    =/  dr  (drain-output j ?-(-.r %more rs.cur.r, %done rs.cur.r))
+    =.  artifacts.j  -.dr
+    =.  r  ?-(-.r %more r(rs.cur +.dr), %done r(rs.cur +.dr))
     ?:  ?=(%more -.r)
+      =/  d0  distinct.stats.j
       ::  live statistics at the slice boundary (deterministic, resumable): the
       ::  public view reflects search progress, not just the final report
       =.  stats.j
-        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+        :*  gen.cur.r  distinct.cur.r  len.queue.cur.r  depth.cur.r
             (od-stats:check outdeg.cur.r)
         ==
       =.  cont.j  (save-kont kk(cur cur.r))
       ::  bound the persisted noun: a search whose cursor outgrows the limit is
       ::  stopped %limited with the limiting resource, never carried unbounded
-      ?:  (noun-over cont.j max-noun-bytes)
+      ?:  ?&  (noun-due d0 distinct.cur.r)
+              (noun-over cont.j max-noun-bytes)
+          ==
         (finish j [%limited %noun stats.j] pre)
       (more j pre)
     %:  finish-bfs
@@ -1744,11 +2104,14 @@
   ?:  ?&(?=(^ k) ?=(%live -.u.k) =(%build phase.u.k))
     =/  kk  u.k
     =/  r  (bfs-step:check o.kk cur.kk budget)
+    =/  dr  (drain-output j ?-(-.r %more rs.cur.r, %done rs.cur.r))
+    =.  artifacts.j  -.dr
+    =.  r  ?-(-.r %more r(rs.cur +.dr), %done r(rs.cur +.dr))
     ?:  ?=(%more -.r)
       ::  partial statistics at the slice boundary (as in do-explore), so a
       ::  max-time interruption of the graph build reports progress (9.5)
       =.  stats.j
-        :*  gen.cur.r  distinct.cur.r  (lent queue.cur.r)  depth.cur.r
+        :*  gen.cur.r  distinct.cur.r  len.queue.cur.r  depth.cur.r
             (od-stats:check outdeg.cur.r)
         ==
       =.  cont.j  (save-kont kk(cur cur.r))
@@ -1760,18 +2123,20 @@
     ::  R2.3.4: with INVARIANTs carried here, `%inv` is now reachable and is a
     ::  real verdict -- the safety violation pre-empts the temporal check, as
     ::  `ModelChecker.doNext` returning pre-empts tlc2's. `+finish-bfs` renders
-    ::  it exactly as the plain safety path does. ALIAS is refused alongside a
-    ::  temporal PROPERTY (R2.3.2), so `~` is the whole story for the alias
-    ?:  ?=(%inv -.out.r)
+    ::  it exactly as the plain safety path does, through the ALIAS (R4.2i)
+    ::  R4.P7: and so does every other end of the search -- a deadlock, an
+    ::  implied-action violation, an evaluation error -- exactly as
+    ::  `ModelChecker.doNext` aborts the run before the final liveness check.
+    ::  Only `%inv` reached here before; the rest reported "unexpected graph
+    ::  outcome" (10 census models, R4.2q)
+    ?.  ?=(%ok -.out.r)
       %:  finish-bfs
         j  out.r  (od-stats:check outdeg.cur.r)  o.kk  cur.r
         ::  the %live kont carries no postcondition names: the liveness path
-        ::  keeps them on its own kont, and this branch is the safety
-        ::  violation that pre-empts it (R2.3.4)
-        nl.kk  act.kk  aname.kk  ~  ~  ~  pre
+        ::  keeps them on its own kont, and this branch is the search outcome
+        ::  that pre-empts it (R2.3.4)
+        nl.kk  act.kk  aname.kk  al.kk  ~  ~  pre
       ==
-    ?.  ?=(%ok -.out.r)
-      (finish j [%failed 'internal: unexpected graph outcome'] pre)
     =/  st=run-stats  [gen.out.r distinct.out.r 0 depth.out.r (od-stats:check outdeg.cur.r)]
     =.  stats.j  st
     ::  the graph is built; hand off to the 8.2–8.6 %check phase (unit 8.8)
@@ -1792,7 +2157,20 @@
           pre=(list event)
       ==
   ^-  step-out
-  ?:  ?=(%error -.out)  (finish j [%failed msg.out] pre)
+  ?:  ?=(%error -.out)
+    ::  R4.2j: a run that fails to evaluate carries the pin's error code as a
+    ::  diagnostic and, where tlc2 prints one, the behavior as a `%trace`
+    ::  artifact (EC 2109 / 2179 during the search)
+    ?:  =(0 ec.out)  (finish j [%failed msg.out] pre)
+    =/  dm  (add-diags j ~[[[%tlc ec.out] %error %explore msg.out ~ ~]])
+    =.  j  j.dm
+    =?  artifacts.j  ?=(^ trace.out)
+      =/  env   (cenv-of:check o)
+      =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
+      =/  modn  ?~(act '' ?~(at.u.act '' src.u.at.u.act))
+      %+  ~(put by artifacts.j)  %trace
+      [%trace [%safety (trace-states trace.out act acts env order.o modn al) ~]]
+    (finish j [%failed msg.out] (weld pre evs.dm))
   =/  st=run-stats
     ?-  -.out
       %ok        [gen.out distinct.out queued.out depth.out od]
@@ -1814,7 +2192,7 @@
   ::  per-action attribution for the wire trace: the getActions leaves plus the
   ::  evaluation env they are re-solved against (R1.5.12b). The report artifact
   ::  keeps the whole-Next label it has always rendered.
-  =/  env   (make-env:ne defs.o consts.o vars.o)
+  =/  env   (cenv-of:check o)
   ::  R2.7.4.2b: `+do-config` built this list once and put it on the opts, so
   ::  the trace labels and the coverage counters index the SAME decomposition
   =/  acts  ?^(acts.o acts.o (get-actions:check next.o aname defs.o env))
@@ -1894,7 +2272,9 @@
   ::  the first violated one render tlc2.TLC's console diagnostic + typed result.
   =/  st      stats.j
   =/  states  (states-of:check seen.cur.kk)
-  =/  env     (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+  ::  R4.2e: the liveness product keys states as the graph build did
+  =/  env
+    (with-idk:ne (cenv-of:check o.kk) perms.o.kk view.o.kk)
   ::  R2.7.14a/b: the POSTCONDITION lines, in tlc2's slot (between the EC
   ::  2257/2259 hint and the counts). The run's FINAL carrier and statistics,
   ::  for the same reason R2.7.7.4a threaded them on the safety path -- a
@@ -1930,30 +2310,44 @@
       :*  ~  states  next.o.kk  env  order.o.kk  modn.kk  defs.o.kk  pname.kk
           props.kk
           generated.st  distinct.st  depth.st  ~  aname.kk  |  (pcl-of ~)
+          al.kk
       ==
     (finish-arts j [%ok st] report ~ pre)
   =/  o  i.otodo.kk
   ::  obtain this OOS's lasso, slicing a tf product build; %more persists the
   ::  cursor and continues, %done carries the (unit lasso)
   =/  res
-    ^-  $%([%more cur=pcursor:lv] [%done lasso=(unit lasso:lv)])
-    ?~  tf.o
-      :-  %done
-      %+  lasso-of-product:lv  o
-      (labeled-product:lv o states inits.cur.kk next.o.kk env order.o.kk)
-    =/  pc  ?~(pcur.kk (product-init:lv o states inits.cur.kk env) u.pcur.kk)
-    =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget)
+    ^-  $%([%more cur=pcursor:lv] [%done lasso=(unit lasso:lv) pc=(unit pcursor:lv)])
+    ::  R4.Q8b: a no-tableau OOS is sliced too (`+flat-step:lv`)
+    =/  pc
+      ?^  pcur.kk  u.pcur.kk
+      (seed:lv (product-init:lv o states (flop inits.cur.kk) env) o lc.kk)
+    ::  R4.Q8b: the lasso search sliced by PEMs once the product is built
+    ?:  ?=(^ lp.pc)
+      =/  ls  (lasso-step:lv o pc (div budget 16))
+      ?.  done.ls  [%more cur.ls]
+      [%done lasso.ls `cur.ls]
+    =/  r   (product-step:lv o states next.o.kk env order.o.kk pc budget succ.cur.kk)
     ?.  done.r  [%more cur.r]
-    [%done (lasso-of-product:lv o [nodes.cur.r edges.cur.r inits.cur.r])]
+    ::  built: the first PEMs in this slice only when the build left room
+    [%more cur.r(lp `pems.o, oa (out-arcs:lv edges.cur.r))]
   ?:  ?=(%more -.res)
-    ::  bound the persisted product cursor, like the safety search
+    ::  bound the persisted product cursor, like the safety search, as its
+    ::  product node count grows
+    =/  n0  ?~(pcur.kk 0 ~(wyt by nodes.u.pcur.kk))
     =.  cont.j  (save-kont kk(pcur `cur.res))
-    ?:  (noun-over cont.j max-noun-bytes)  (finish j [%limited %noun st] pre)
+    ?:  ?&  (noun-due n0 ~(wyt by nodes.cur.res))
+            (noun-over cont.j max-noun-bytes)
+        ==
+      (finish j [%limited %noun st] pre)
     (more j pre)
   =/  l  lasso.res
   ?~  l
     ::  this OOS has no accepting lasso → try the next one, fresh cursor
-    =.  cont.j  (save-kont kk(otodo t.otodo.kk, pcur ~))
+    =/  lc=lcache:lv
+      ?~  pc.res  lc.kk
+      [check-state.o check-action.o cb.u.pc.res ab.u.pc.res]
+    =.  cont.j  (save-kont kk(otodo t.otodo.kk, pcur ~, lc lc))
     (more j pre)
   =/  report
     %-  wain-text
@@ -1983,10 +2377,19 @@
           modn.kk
           ?:((box-free-tf:check ~[o]) 0 loop.u.l)
         ==
+        al.kk
     ==
   =/  tr-states=(list state:check)
     (turn prefix.u.l |=(fp=@t (~(got by states) fp)))
-  =/  typed=trace  [%lasso (trace-states tr-states act.kk ~ *eenv:ne ~ '' ~) `loop.u.l]
+  ::  R4.2i: aliased as the report is -- the last state paired with the
+  ::  cycle's target, or itself for a stuttering or suppressed closer
+  =/  lsuc=(unit state:check)
+    ?:  |(=(%stuttering class.u.l) (box-free-tf:check ~[o]))  ~
+    `(~(got by states) (snag (dec loop.u.l) prefix.u.l))
+  =/  typed=trace
+    :+  %lasso
+      (trace-states-to tr-states act.kk ~ ?~(al.kk *eenv:ne env) ~ '' al.kk lsuc)
+    `loop.u.l
   ::  R2.7.12: the TYPED result names the same property the report does. The
   ::  wire carries ONE name where the console can now print several, so it
   ::  takes the first attributed one; `pname` remains the fallback
@@ -2047,6 +2450,7 @@
   =/  headline=@t
     ?-  vk
       %invariant  (crip "Error: Invariant {(trip vname)} is violated.")
+      %action     (crip "Error: Action property {(trip vname)} is violated.")
       %property   (crip "Error: Temporal property {(trip vname)} is violated.")
       %deadlock   'Error: Deadlock reached.'
     ==
@@ -2055,15 +2459,33 @@
     ;:  weld
       ~[headline]
       ~['Error: The behavior up to this point is:']
-      (render-trace:check vpath nl.kk ~ *eenv:ne ~ '' ~ ~ df.kk)
+      ::  R4.2i: through the ALIAS, each state paired with its successor
+      ::  and the last with itself, as `SimulationWorker` prints it
+      ::  R4.2as: with the actions, env, order and module the console path
+      ::  renders with, so each step names the action that generated it
+      ::  (`<AnimSendMsg(8) ...>`) rather than the whole Next
+      =/  rt=wain
+        %:  render-trace:check
+          vpath  nl.kk  actions.o.kk
+          (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+          order.o.kk
+          ?~(act.kk '' ?~(at.u.act.kk '' src.u.at.u.act.kk))
+          al.kk  ~  df.kk
+        ==
+      ?~  rt  rt
+      [(rap 3 ~['State 1: ' il.kk]) t.rt]
       ~[head]
     ==
-  =/  typed=trace  [%simulate (trace-states vpath act.kk ~ *eenv:ne ~ '' ~) ~]
+  =/  typed=trace
+    =/  se  (make-env:ne defs.o.kk consts.o.kk vars.o.kk)
+    =/  mn  ?~(act.kk '' ?~(at.u.act.kk '' src.u.at.u.act.kk))
+    [%simulate (trace-states vpath act.kk actions.o.kk se order.o.kk mn al.kk) ~]
   =/  vn
     ?-  vk
       ::  simulation reports what a BEHAVIOR violated; it has no
       ::  initial-predicate phase of its own (R2.7.1)
       %invariant  [%invariant vname %.n]
+      %action     [%action vname]
       %property   [%property vname %.n]
       %deadlock   [%deadlock ~]
     ==
@@ -2089,9 +2511,12 @@
     ::  live statistics at the slice boundary. DFID reports no queue, no graph
     ::  depth and no out-degree -- its summary line carries two numbers -- so
     ::  those slots stay zero rather than holding something tlc2 never produced
+    =/  d0  distinct.stats.j
     =.  stats.j  [gen.cur.r ~(wyt by fps.cur.r) 0 0 [0 0 0 0]]
     =.  cont.j   (save-kont kk(cur cur.r))
-    ?:  (noun-over cont.j max-noun-bytes)
+    ?:  ?&  (noun-due d0 distinct.stats.j)
+            (noun-over cont.j max-noun-bytes)
+        ==
       (finish j [%limited %noun stats.j] pre)
     (more j pre)
   (finish-dfid j out.r kk pre)
@@ -2225,6 +2650,17 @@
           al=(unit sem:semantic)
       ==
   ^-  (list trace-state)
+  (trace-states-to sts act acts e order modn al ~)
+::
+++  trace-states-to
+  ::  +trace-states with the LAST state's alias successor given: a lasso's
+  ::  last state pairs with the state its cycle returns to (R4.2i)
+  |=  $:  sts=(list state:check)  act=next-act
+          acts=(list act:check)
+          e=eenv:ne  order=(list @t)  modn=@t
+          al=(unit sem:semantic)  lsuc=(unit state:check)
+      ==
+  ^-  (list trace-state)
   =/  i  1
   =/  prev=(unit state:check)  ~
   |-  ^-  (list trace-state)
@@ -2248,9 +2684,29 @@
   ::  `+render-trace` uses, so report and wire trace never disagree
   =/  shown=[order=(list @t) st=state:check]
     ?~  al  [order i.sts]
-    (alias-state:check u.al e i.sts ?~(t.sts i.sts i.t.sts))
+    (alias-state:check u.al e i.sts ?^(t.sts i.t.sts ?~(lsuc i.sts u.lsuc)))
   :_  $(sts t.sts, i +(i), prev `i.sts)
   [i a (state-pairs:check order.shown st.shown)]
+::
+++  sim-init-label
+  ::  R4.2as: the label the simulator prints on a behavior's first state: the
+  ::  Init definition's name and its BODY's location, as an action label
+  ::  (measured: `<AnimInit line 11, col 3 to line 15, col 31 of module
+  ::  EWD840_anim>`); the BFS's `<Initial predicate>` when Init is no bare
+  ::  definition reference
+  ::  definition reference. The SPECIFICATION decomposition (and INIT's
+  ::  `+sem-body`) hands on the definition's BODY, so the definition is the
+  ::  one whose body it is
+  |=  [isb=sem:semantic defs=(map @t sem-def:semantic) modn=@t]
+  ^-  @t
+  =/  dflt  '<Initial predicate>'
+  =/  hit
+    %+  skim  ~(val by defs)
+    |=(d=sem-def:semantic &(?=(~ params.d) =(`isb body.d)))
+  ?~  hit  dflt
+  =/  d  i.hit
+  =/  mo  ?:(=('' origin.d) modn origin.d)
+  (rap 3 ~['<' name.d ' ' (loc-str:config mo (sem-at:check isb)) '>'])
 ::
 ++  wain-text
   |=  w=wain

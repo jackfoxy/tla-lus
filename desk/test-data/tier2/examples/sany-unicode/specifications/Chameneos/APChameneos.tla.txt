@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 35, col 1 to line 35, col 18 of module APChameneos
+Multiple declarations or definitions for symbol Sum.
+This duplicates the one at line 31, col 1 to line 33, col 54 of module APChameneos.

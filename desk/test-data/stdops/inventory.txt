@@ -44,17 +44,17 @@ Integers|\geq|2|undeclared|Integers.GEQ|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_
 Integers|\leq|2|undeclared|Integers.LE|Value,Value|-|TLC_MODULE_ARGUMENT_ERROR_AN|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
 Integers|^|2|undeclared|Integers.Expt|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR,TLC_MODULE_NULL_POWER_NULL,TLC_MODULE_OVERFLOW|excluded|unreachable: no TLA+ declaration binds this method|n/a:unreachable, not a scope decision
 Json|IsSequence|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|JsonDeserialize|1|public|Json.deserialize|StringValue|TLAPlusOperator(Json!JsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|JsonSerialize|2|public|Json.serialize|StringValue,Value|TLAPlusOperator(Json!JsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|ToJson|1|public|Json.toJson|IValue|TLAPlusOperator(Json!ToJson,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonArray|1|public|Json.toJsonArray|IValue|TLAPlusOperator(Json!ToJsonArray,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|JsonDeserialize|1|public|Json.deserialize|StringValue|TLAPlusOperator(Json!JsonDeserialize,minLevel=0,warn=false)|-|required|R4.2f: a typed refusal by name (approved difference, user decision 2026-10-13): it reads a file by a working-directory path, and a run reads only the sources its request names|in:already ported
+Json|JsonSerialize|2|public|Json.serialize|StringValue,Value|TLAPlusOperator(Json!JsonSerialize,minLevel=0,warn=false)|-|required|R4.2f: writes ToJson(v) of a sequence or record; the file is a job artifact (carrier `files`); TRUE|in:already ported
+Json|ToJson|1|public|Json.toJson|IValue|TLAPlusOperator(Json!ToJson,minLevel=0,warn=false)|-|required|R4.2f: Json.getNode, Gson compact text|in:already ported
+Json|ToJsonArray|1|public|Json.toJsonArray|IValue|TLAPlusOperator(Json!ToJsonArray,minLevel=0,warn=false)|-|required|R4.2f: Json.getArrayNode|in:already ported
 Json|ToJsonArrayString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
 Json|ToJsonKeyValue|2|local|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|ToJsonObject|1|public|Json.toJsonObject|IValue|TLAPlusOperator(Json!ToJsonObject,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ToJsonObject|1|public|Json.toJsonObject|IValue|TLAPlusOperator(Json!ToJsonObject,minLevel=0,warn=false)|-|required|R4.2f: Json.getObjectNode (a tuple keyed by 0-based position)|in:already ported
 Json|ToJsonObjectString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
 Json|ToJsonString|2|public|-|-|-|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|ndJsonDeserialize|1|public|Json.ndDeserialize|StringValue|TLAPlusOperator(Json!ndJsonDeserialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
-Json|ndJsonSerialize|2|public|Json.ndSerialize|StringValue,Value|TLAPlusOperator(Json!ndJsonSerialize,minLevel=0,warn=false)|-|excluded|filesystem/JSON IO surface, not a checking semantic|out:filesystem/JSON IO surface, not a checking semantic
+Json|ndJsonDeserialize|1|public|Json.ndDeserialize|StringValue|TLAPlusOperator(Json!ndJsonDeserialize,minLevel=0,warn=false)|-|required|R4.2f: a typed refusal by name, as JsonDeserialize|in:already ported
+Json|ndJsonSerialize|2|public|Json.ndSerialize|StringValue,Value|TLAPlusOperator(Json!ndJsonSerialize,minLevel=0,warn=false)|-|required|R4.2f: one ToJson line per element of a sequence; the file is a job artifact; TRUE|in:already ported
 Naturals|%|2|public|Naturals.Mod|IntValue,IntValue|-|TLC_MODULE_ARGUMENT_ERROR|required|arithmetic core (C1.2)|in:already ported
 Naturals|*|2|public|Naturals.Times|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported
 Naturals|+|2|public|Naturals.Plus|IntValue,IntValue|-|TLC_MODULE_OVERFLOW|required|arithmetic core (C1.2)|in:already ported

@@ -63,9 +63,12 @@ python3 tools/validate.py --check      ::  regenerate + verify goldens vs the pi
 
 ## Status
 
-The parity ledger is **closed — 134 rows, none owed (2026-09-05)**;
-`tools/release-gate.sh` passes every clause and `tools/r3-acceptance.py
---suite-log` reports **R3 ACCEPTED** on 5/5. See
+The parity ledger was **closed at R3 — 134 rows, none owed (2026-09-05)**, when
+`tools/release-gate.sh` passed every clause and `tools/r3-acceptance.py
+--suite-log` reported **R3 ACCEPTED** on 5/5. **R4 (in progress) re-opened two
+rows on measurement and created a third** (`tlc-monolith`, `semantic-graph`,
+`op-wire-failure`; 2026-10-08), so the release gate's ledger
+clause is red until R4.1c closes it. See
 [parity-manifest.md](desk/doc/parity-manifest.md) for the ledger and
 [port-map.md](desk/doc/port-map.md) for which units own what. Everything
 unsupported is unsupported by decision and is a **typed rejection naming what
@@ -78,3 +81,9 @@ headline case (`excluded`). See
 The Java TLA+ sources used to generate test fixtures are MIT-licensed
 (`tlaplus`, `tlaplus-Examples`, `vscode-tlaplus`); their notices are retained
 with the vendored `StandardModules` and oracle fixtures.
+
+The other upstreams the Examples work uses are tlapm's library
+(BSD-2-Clause), tlauc (MIT), CommunityModules (MIT) and Apalache
+(Apache-2.0, with its `NOTICE`). Their license texts, verbatim from each
+pinned commit, are in [`licenses/`](licenses/), and a copy goes beside every
+library staged onto the `%tla-ex` desk.

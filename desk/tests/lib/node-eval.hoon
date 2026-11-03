@@ -188,4 +188,53 @@
   %+  expect-eq
     !>  '1'
   !>  (crip (eval-text:ne '[a |-> 1, b |-> 2].a'))
+::
+::  R4.Q3: the sorted-input shortcut in `+norm-set` and `+normalize` must
+::  not trust `+vlth` across an interval and a set of the same elements:
+::  this list rises, yet its first and last tuples are equal
+++  test-q3-rising-skips-intervals
+  %+  expect-eq
+    !>  '2'
+  !>  (crip (eval-text:ne 'Cardinality({<<1..2>>, <<5>>, <<{1, 2}>>})'))
+::
+::  R4.Q3: `+equal`'s fast paths stay exact across representations
+++  test-q3-equal-across-forms
+  %+  expect-eq
+    !>  'TRUE'
+  !>  %-  crip
+      %-  eval-text:ne
+      %+  rap  3
+      :~  '/\\ <<1..2>> = <<{1, 2}>>  /\\ (1..0) = (5..4)  /\\ 1..3 # 1..2'
+          '  /\\ [i \\in 1..2 |-> i] = <<1, 2>>'
+          '  /\\ [a |-> 1, b |-> 2] = [b |-> 2, a |-> 1]'
+          '  /\\ {<<1, 2>>, <<1, 2>>} = {<<1, 2>>}'
+      ==
+::
+::  R4.Q4: a recursive function over several binders, one of them `Nat`
+::  (TransitiveClosure's `CR[n \in Nat, v \in S]`), applied lazily
+++  test-q4-recfcn-two-binders-nat
+  %+  expect-eq
+    !>  '5'
+  !>  %-  crip
+      %-  eval-text:ne
+      'LET f[n \\in Nat, v \\in {1, 2}] == IF n = 0 THEN v ELSE f[n - 1, v] + 1 IN f[3, 2]'
+::
+++  test-q4-recfcn-two-binders-cross
+  %+  expect-eq
+    !>  '<<TRUE, FALSE>>'
+  !>  %-  crip
+      %-  eval-text:ne
+      %+  rap  3
+      :~  'LET g[n \\in Nat, v \\in {1, 2, 3}] == IF n = 0 THEN v = 1 '
+          'ELSE g[n - 1, v] \\/ \\E u \\in {1, 2, 3} : g[n - 1, u] /\\ u + 1 = v '
+          'IN <<g[2, 3], g[1, 3]>>'
+      ==
+::
+::  R4.Q4: over finite binders the whole product is swept
+++  test-q4-recfcn-two-binders-finite
+  %+  expect-eq
+    !>  '4'
+  !>  %-  crip
+      %-  eval-text:ne
+      'LET f[n \\in 0..2, v \\in {1, 2}] == IF n = 0 THEN v ELSE f[n - 1, v] * 2 IN f[2, 1]'
 --

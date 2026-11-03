@@ -1,0 +1,9 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def F arity=1 local=n L-1 2.1-2.9
+    param y arity=0 L-1 2.3-2.3
+    apply y opkind=FormalParamKind L-1 2.9-2.9
+  def G arity=0 local=n L-1 3.1-3.6
+    apply nullODN opkind=k0 L-1 0.0-0.0
+DIAGS
+D 4204 ERROR 3.6-3.6 The operator F requires 1 arguments.

@@ -1,0 +1,3 @@
+CONSTANT Seq <- LimitedSeq
+INIT Init
+NEXT Next

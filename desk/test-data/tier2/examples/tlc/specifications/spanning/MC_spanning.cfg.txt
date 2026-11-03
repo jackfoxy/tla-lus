@@ -1,0 +1,17 @@
+RESULT safety failure
+Error: Invariant TypeOK is violated.
+19 states generated, 5 distinct states found, 2 states left on queue.
+The depth of the complete state graph search is 3.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ msg = {}
+/\ prnt = <<NoPrnt, NoPrnt, NoPrnt>>
+/\ rpt = <<FALSE, FALSE, FALSE>>
+State 2: <Next line 25, col 27 to line 28, col 62 of module spanning>
+/\ msg = {<<1, 2>>}
+/\ prnt = <<NoPrnt, NoPrnt, NoPrnt>>
+/\ rpt = <<FALSE, FALSE, FALSE>>
+State 3: <Next line 25, col 27 to line 28, col 62 of module spanning>
+/\ msg = {<<1, 2>>}
+/\ prnt = <<NoPrnt, 1, NoPrnt>>
+/\ rpt = <<FALSE, FALSE, FALSE>>

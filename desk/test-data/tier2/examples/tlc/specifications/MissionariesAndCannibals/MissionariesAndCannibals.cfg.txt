@@ -1,0 +1,41 @@
+RESULT safety failure
+Error: Invariant Solution is violated.
+225 states generated, 61 distinct states found, 11 states left on queue.
+The depth of the complete state graph search is 12.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {m1, m2, m3, c1, c2, c3}, W |-> {}]
+State 2: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {m2, m3, c2, c3}, W |-> {m1, c1}]
+State 3: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {m1, m2, m3, c2, c3}, W |-> {c1}]
+State 4: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {m1, m2, m3}, W |-> {c1, c2, c3}]
+State 5: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {m1, m2, m3, c1}, W |-> {c2, c3}]
+State 6: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {m3, c1}, W |-> {m1, m2, c2, c3}]
+State 7: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {m1, m3, c1, c2}, W |-> {m2, c3}]
+State 8: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {c1, c2}, W |-> {m1, m2, m3, c3}]
+State 9: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {c1, c2, c3}, W |-> {m1, m2, m3}]
+State 10: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {c3}, W |-> {m1, m2, m3, c1, c2}]
+State 11: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "E"
+/\ who_is_on_bank = [E |-> {m1, c3}, W |-> {m2, m3, c1, c2}]
+State 12: <Next line 188, col 9 to line 189, col 33 of module MissionariesAndCannibals>
+/\ bank_of_boat = "W"
+/\ who_is_on_bank = [E |-> {}, W |-> {m1, m2, m3, c1, c2, c3}]

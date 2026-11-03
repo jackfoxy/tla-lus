@@ -1,0 +1,8 @@
+Error: Invariant Inv is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+U = {{3}, {4}, {1, 2}}
+State 2: <Next line 8, col 9 to line 8, col 70 of module spec>
+U = {{1, 2}, {2, 3, 4}}
+4 states generated, 4 distinct states found, 2 states left on queue.
+The depth of the complete state graph search is 2.
