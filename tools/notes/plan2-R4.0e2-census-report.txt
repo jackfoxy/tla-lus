@@ -1,0 +1,142 @@
+  96  refused (?)
+  18  refused (tlc 2105)
+  18  agree
+   7  absent
+   7  too slow
+   2  wrong answer
+   1  refused (tlc 2226)
+   1  refused (tlc 0)
+   1  runaway
+  refused (?)              specifications/Bakery-Boulangerie/MCBakery.cfg  unsupported StandardModule operator: Naturals!Nat/0
+  refused (?)              specifications/Bakery-Boulangerie/MCBoulanger.cfg  unsupported StandardModule operator: Naturals!Nat/0
+  absent                   specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.cfg  
+  absent                   specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/MC.cfg  
+  refused (tlc 2105)       specifications/Chameneos/Chameneos.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 27, col 8 to line 27, col 45 of module Chameneos failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/CheckpointCoordination/MCCheckpointCoordination.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/CheckpointCoordination/MCCheckpointCoordinationFailure.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/DieHard/MCDieHarder.cfg  undefined identifier: Jug
+  refused (?)              specifications/DieHard/MCDieHardest.cfg  undefined identifier: Goal
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_MPMC.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 25, col 8 to line 25, col 33 of module Disruptor_MPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_MPMC_liveliness.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 25, col 8 to line 25, col 33 of module Disruptor_MPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/Disruptor/Disruptor_SPMC.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 27, col 8 to line 27, col 33 of module Disruptor_SPMC failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/FiniteMonotonic/MCCRDT.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 9, col 8 to line 9, col 52 of module MCCRDT failed.\nTLCGet(-Dtlc2.tool.impl.Tool.cdot) was undefined.'}
+  refused (?)              specifications/FiniteMonotonic/MCDistributedReplicatedLog.cfg  unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)
+  refused (tlc 2105)       specifications/FiniteMonotonic/MCReplicatedLog.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 9, col 8 to line 9, col 52 of module MCReplicatedLog failed.\nTLCGet(-Dtlc2.tool.impl.Tool.cdot) was undefined.'}
+  refused (?)              specifications/Huang/Huang.cfg  undefined operator: Rational
+  refused (?)              specifications/KeyValueStore/MCKVSSafetyLarge.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/KeyValueStore/MCKVSSafetyMedium.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/KeyValueStore/MCKVSSafetySmall.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/KeyValueStore/MCKVsnap.cfg  TLC cannot handle the temporal formula line 143, col 12 to line 143, col 46 of module MCKVsnap
+  refused (?)              specifications/LearnProofs/MCFindHighest.cfg  unsupported StandardModule operator: Naturals!Nat/0
+  refused (?)              specifications/LeastCircularSubstring/MCLeastCircularSubstringMedium.cfg  undefined identifier: CharacterSet
+  refused (?)              specifications/LeastCircularSubstring/MCLeastCircularSubstringSmall.cfg  undefined identifier: CharacterSet
+  refused (?)              specifications/LoopInvariance/MCBinarySearch.cfg  Attempted to enumerate the non-enumerable set Seq({1, 2, 3, 4, 5}).
+  refused (?)              specifications/LoopInvariance/MCQuicksort.cfg  unsupported StandardModule operator: Sequences!Seq/1
+  refused (tlc 2226)       specifications/Majority/MCMajority.cfg  {'code': 'tlc 2226', 'stage': 'config', 'message': 'In the configuration file, the identifier Seq does not appear in the specification.'}
+  refused (tlc 0)          specifications/MisraReachability/MCParReach.cfg  {'code': 'tlc 0', 'stage': 'config', 'message': 'internal: module generation failed'}
+  refused (?)              specifications/MisraReachability/MCReachabilityTestAllGraphs.cfg  no INIT in config
+  refused (?)              specifications/MisraReachability/MCReachabilityTestRandomGraphs.cfg  no INIT in config
+  refused (?)              specifications/MisraReachability/MCReachable.cfg  internal: unexpected graph outcome
+  wrong answer             specifications/Moving_Cat_Puzzle/CatEvenBoxes.cfg  
+  wrong answer             specifications/Moving_Cat_Puzzle/CatOddBoxes.cfg  
+  refused (?)              specifications/MultiCarElevator/ElevatorLivenessLarge.cfg  TLC cannot handle the temporal formula line 221, col 8 to line 221, col 49 of module Elevator
+  refused (?)              specifications/MultiCarElevator/ElevatorLivenessMedium.cfg  TLC cannot handle the temporal formula line 221, col 8 to line 221, col 49 of module Elevator
+  refused (?)              specifications/MultiCarElevator/ElevatorSafetySmall.cfg  undefined operator: pState
+  refused (?)              specifications/MultiPaxos-SMR/MultiPaxos_MC.cfg  undefined identifier: MaxBallot
+  refused (?)              specifications/MultiPaxos-SMR/MultiPaxos_MC_small.cfg  undefined identifier: MaxBallot
+  absent                   specifications/N-Queens/Queens.toolbox/FourQueens/MC.cfg  
+  absent                   specifications/N-Queens/QueensPluscal.toolbox/FourQueens/MC.cfg  
+  refused (?)              specifications/NanoBlockchain/MCNanoLarge.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/NanoBlockchain/MCNanoMedium.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/NanoBlockchain/MCNanoSmall.cfg  undefined identifier: $OpArg
+  refused (?)              specifications/Paxos/MCPaxos.cfg  undefined identifier: Acceptor
+  refused (tlc 2105)       specifications/Paxos/MCVoting.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption module MCVoting failed.\nunresolved operator (nullODN).'}
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCConsensus.cfg  undefined identifier: Value
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCPaxosSmall.cfg  undefined identifier: Acceptor
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCPaxosTiny.cfg  undefined identifier: Acceptor
+  refused (?)              specifications/PaxosHowToWinATuringAward/MCVoting.cfg  undefined identifier: Acceptor
+  refused (?)              specifications/Prisoners/Prisoners.cfg  TLC cannot handle the temporal formula line 158, col 6 to line 158, col 56 of module Prisoners
+  refused (?)              specifications/Prisoners_Single_Switch/Prisoner.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerLightUnknown.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerSolo.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/Prisoners_Single_Switch/PrisonerSoloLightUnknown.cfg  TLC cannot handle the temporal formula line 162, col 6 to line 162, col 48 of module Prisoner
+  refused (?)              specifications/ReadersWriters/MC.cfg  TLC cannot handle the temporal formula line 91, col 8 to line 91, col 52 of module MC
+  refused (?)              specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.cfg  undefined identifier: ClientCfg
+  refused (?)              specifications/SDP_Verification/SDP_Attack_Spec/MC.cfg  undefined identifier: ClientCfg
+  refused (tlc 2105)       specifications/SimplifiedFastPaxos/FastPaxos.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 34, col 8 to line 34, col 32 of module FastPaxos failed.\na theorem/assumption is not an evaluable value.'}
+  refused (?)              specifications/SingleLaneBridge/MC.cfg  undefined identifier: CarsRight
+  refused (?)              specifications/SlidingPuzzles/SlidingPuzzles.cfg  Attempted to construct a set with too many elements (>1.000.000).
+  refused (?)              specifications/SlidingPuzzles/SlidingPuzzles_anim.cfg  Attempted to construct a set with too many elements (>1.000.000).
+  refused (?)              specifications/SpanningTree/SpanTree.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/SpanningTree/SpanTreeRandom.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/SpanningTree/SpanTreeTest4Nodes.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/SpecifyingSystems/AdvancedExamples/MCInnerSequential.cfg  TLC cannot handle the temporal formula line 68, col 6 to line 70, col 66 of module MCInnerSequential
+  refused (?)              specifications/SpecifyingSystems/AdvancedExamples/MCInnerSerial.cfg  TLC cannot handle the temporal formula line 112, col 6 to line 114, col 67 of module MCInnerSerial
+  refused (?)              specifications/SpecifyingSystems/AsynchronousInterface/PrintValues.cfg  no INIT in config
+  refused (?)              specifications/SpecifyingSystems/CachingMemory/MCInternalMemory.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/SpecifyingSystems/CachingMemory/MCWriteThroughCache.cfg  unsupported builtin operator: $UnboundedChoose
+  too slow                 specifications/SpecifyingSystems/HourClock/HourClock2.cfg  
+  refused (?)              specifications/SpecifyingSystems/Liveness/LiveHourClock.cfg  TLC cannot handle the temporal formula line 22, col 13 to line 22, col 41 of module LiveHourClock
+  refused (?)              specifications/SpecifyingSystems/Liveness/MCLiveInternalMemory.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/SpecifyingSystems/RealTime/MCRealTimeHourClock.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/SpecifyingSystems/SimpleMath/SimpleMath.cfg  no INIT in config
+  refused (?)              specifications/SpecifyingSystems/TLC/MCAlternatingBit.cfg  TLC cannot handle the temporal formula line 4, col 1 to line 4, col 22 of module MCAlternatingBit
+  refused (?)              specifications/Stones/Stones.cfg  no INIT in config
+  refused (?)              specifications/TLC/TestGraphs.cfg  unsupported builtin operator: STRING
+  refused (?)              specifications/TLC/TestMCReachability.cfg  unsupported builtin operator: STRING
+  refused (?)              specifications/TransitiveClosure/TransitiveClosure.cfg  no INIT in config
+  refused (?)              specifications/TwoPhase/MCTwoPhase.cfg  undefined operator: $OpArg
+  refused (?)              specifications/YoYo/MCYoYoNoPruning.cfg  TLC cannot handle the temporal formula line 16, col 1 to line 16, col 22 of module MCYoYoNoPruning
+  refused (?)              specifications/YoYo/MCYoYoPruning.cfg  TLC cannot handle the temporal formula line 16, col 1 to line 16, col 20 of module MCYoYoPruning
+  refused (tlc 2105)       specifications/YoYo/YoYoAllGraphs.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 15, col 8 to line 15, col 22 of module YoYoAllGraphs failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/aba-asyn-byz/aba_asyn_byz.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/acp/ACP_NB_TLC.cfg  TLC cannot handle the temporal formula line 160, col 18 to line 160, col 112 of module ACP_NB_TLC
+  too slow                 specifications/acp/ACP_SB_TLC.cfg  
+  refused (?)              specifications/allocator/AllocatorImplementation.cfg  TLC cannot handle the temporal formula line 140, col 6 to line 140, col 71 of module AllocatorImplementation
+  refused (?)              specifications/allocator/AllocatorRefinement.cfg  TLC cannot handle the temporal formula line 119, col 6 to line 119, col 66 of module AllocatorRefinement
+  refused (?)              specifications/allocator/SchedulingAllocator.cfg  TLC cannot handle the temporal formula line 119, col 6 to line 119, col 66 of module SchedulingAllocator
+  refused (?)              specifications/allocator/SimpleAllocator.cfg  TLC cannot handle the temporal formula line 73, col 6 to line 73, col 51 of module SimpleAllocator
+  too slow                 specifications/barriers/Barrier.cfg  
+  refused (?)              specifications/bcastByz/bcastByz.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/bcastByz/bcastByzNoBcast.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/bcastFolklore/bcastFolklore.cfg  TLC cannot handle the temporal formula line 147, col 7 to line 148, col 82 of module bcastFolklore
+  too slow                 specifications/bosco/bosco.cfg  
+  refused (?)              specifications/braf/BufferedRandomAccessFile.cfg  unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)
+  refused (?)              specifications/btree/btree.cfg  unsupported builtin operator: $UnboundedChoose
+  refused (?)              specifications/btree/kvstore.cfg  undefined operator: key
+  refused (?)              specifications/byihive/VoucherIssue.cfg  TLC cannot handle the temporal formula line 276, col 1 to line 276, col 25 of module VoucherIssue
+  refused (?)              specifications/cf1s-folklore/cf1s_folklore.cfg  internal: unexpected graph outcome
+  runaway                  specifications/chang_roberts/MCChangRoberts.cfg  
+  refused (?)              specifications/dag-consensus/BlockDagTest.cfg  no INIT in config
+  refused (?)              specifications/dag-consensus/TLCSailfish1.cfg  undefined operator: $OpArg
+  refused (?)              specifications/dag-consensus/TLCSailfish2.cfg  undefined operator: $OpArg
+  refused (?)              specifications/detector_chan96/EnvironmentController.cfg  unsupported StandardModule operator: Integers!Int/0
+  absent                   specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/MC.cfg  
+  absent                   specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/MC.cfg  
+  refused (?)              specifications/echo/MCEcho.cfg  undefined identifier: R
+  refused (tlc 2105)       specifications/ewd426/TokenRing.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 9, col 23 to line 9, col 37 of module TokenRing failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/ewd687a/EWD687a_anim.cfg  undefined identifier: Procs
+  refused (?)              specifications/ewd687a/MCEWD687a.cfg  undefined identifier: Procs
+  refused (tlc 2105)       specifications/ewd840/EWD840.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 11, col 23 to line 11, col 37 of module EWD840 failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  too slow                 specifications/ewd840/EWD840_anim.cfg  
+  refused (?)              specifications/ewd840/EWD840_json.cfg  unsupported builtin operator: $Label
+  refused (tlc 2105)       specifications/ewd840/SyncTerminationDetection.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 9, col 23 to line 9, col 37 of module SyncTerminationDetection failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/ewd998/AsyncTerminationDetection.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 10, col 23 to line 10, col 37 of module AsyncTerminationDetection failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/ewd998/EWD998.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 13, col 23 to line 13, col 37 of module EWD998 failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/ewd998/EWD998Small.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 13, col 23 to line 13, col 37 of module EWD998 failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (tlc 2105)       specifications/ewd998/EWD998Chan.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 11, col 23 to line 11, col 37 of module EWD998Chan failed.\nunsupported StandardModule operator: Naturals!Nat/0'}
+  refused (?)              specifications/ewd998/EWD998ChanID.cfg  unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)
+  refused (tlc 2105)       specifications/ewd998/EWD998ChanTrace.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 6, col 8 to line 6, col 36 of module EWD998ChanTrace failed.\nunsupported StandardModule operator: TLC!TLCGet; the key config reports engine state the evaluator cannot reach'}
+  refused (tlc 2105)       specifications/ewd998/SmokeEWD998.cfg  {'code': 'tlc 2105', 'stage': 'explore', 'message': 'Evaluating assumption line 5, col 8 to line 5, col 57 of module SmokeEWD998 failed.\nunsupported StandardModule operator: TLC!TLCGet; the key config reports engine state the evaluator cannot reach'}
+  refused (?)              specifications/glowingRaccoon/product.cfg  TLC cannot handle the temporal formula line 200, col 15 to line 200, col 33 of module product
+  refused (?)              specifications/glowingRaccoon/stages.cfg  TLC cannot handle the temporal formula line 100, col 14 to line 100, col 31 of module stages
+  refused (?)              specifications/lamport_mutex/MCLamportMutex.cfg  unsupported StandardModule operator: Naturals!Nat/0
+  refused (?)              specifications/locks_auxiliary_vars/LockHS.cfg  TLC cannot handle the temporal formula line 130, col 10 to line 130, col 15 of module LockHS
+  refused (?)              specifications/nbacg_guer01/nbacg_guer01.cfg  internal: unexpected graph outcome
+  refused (?)              specifications/spanning/MC_spanning.cfg  undefined identifier: nbrs
+  too slow                 specifications/sums_even/MC_sums_even.cfg  
+  refused (?)              specifications/tcp/MCtcp.cfg  undefined identifier: Peers
+  absent                   specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/MC.cfg  
+  refused (?)              specifications/tower_of_hanoi/Hanoi_anim.cfg  undefined operator: And
+  too slow                 specifications/transaction_commit/PaxosCommit.cfg  

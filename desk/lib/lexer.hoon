@@ -186,11 +186,28 @@
   ==
 ::
 ++  fixed-table
+  ::  folded at compile time (R4.P10): as a plain arm it was rebuilt -- every
+  ::  lexeme decoded to codepoints -- on each token, about 3.5 ms a token
   ^-  (list entry)
+  ^~
   %+  turn  fixed-raw
   |=  [t=@t k=@tas]
   ^-  entry
   [(codepoints:src t) k]
+::
+++  fixed-index
+  ::  the fixed lexemes by first character, each bucket in TABLE order, so
+  ::  +match-fixed's first-longest choice is unchanged; a lexeme starting with
+  ::  another character can neither match nor leave a live prefix
+  ^-  (map @c (list entry))
+  ^~
+  =|  m=(map @c (list entry))
+  =/  tbl  (flop fixed-table)
+  |-  ^-  (map @c (list entry))
+  ?~  tbl  m
+  ?~  cs.i.tbl  $(tbl t.tbl)
+  =/  c  i.cs.i.tbl
+  $(tbl t.tbl, m (~(put by m) c [i.tbl (~(gut by m) c ~)]))
 ::
 ::  +|  Character Classes
 ::
@@ -268,7 +285,7 @@
   ^-  [best=(unit [len=@ud kind=@tas]) alive=@ud]
   =/  best=(unit [len=@ud kind=@tas])  ~
   =/  alive=@ud  0
-  =/  tbl  fixed-table
+  =/  tbl=(list entry)  ?~(s ~ (~(gut by fixed-index) c.i.s ~))
   |-
   ?~  tbl  [best alive]
   =/  elen  (lent cs.i.tbl)

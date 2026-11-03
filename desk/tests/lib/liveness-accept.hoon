@@ -9,7 +9,7 @@
 ::  a state leaf and its <>-promise, to build particles
 ::  R2.7.6.3: `%state` carries the translation-time bindings an expanded
 ::  user-operator call needs; a synthetic probe leaf has none
-++  stp  |=(c=@ud `live-expr:tp`[%state [%lit %num '0' `[[1 c] [1 +(c)]]] ~ ~])
+++  stp  |=(c=@ud `live-expr:tp`[%state [%lit %num '0' `[[1 c] [1 +(c)]]] ~ ~ ~])
 ++  evn  |=(x=live-expr:tp `live-expr:tp`[%even x])
 ::  a pem `[ae-action ae-state ea-action]` and an empty-particle node list
 ++  pm   |=([aea=(list @ud) aes=(list @ud) eaa=(list @ud)] `pem:tp`[aea aes eaa])

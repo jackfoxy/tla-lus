@@ -23,6 +23,10 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 
 ## Actions (poke `%tla-lus-action`)
 
+Only the ship itself may poke: `+on-poke` asserts `src.bowl = our.bowl`, so a
+poke from any other ship is nacked. A poke under any other mark, or whose vase
+is not an `action`, is nacked too.
+
 ```hoon
 +$  action
   $%  [%submit id=req-id =request]
@@ -33,9 +37,10 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 
 - **`%submit`** — validate `request` and start a job under `id`. Re-submitting
   an `id` whose job is still active is rejected (`%rejected … 'duplicate active
-  id'`); re-submitting a terminal id is allowed. Validation failures reject with
-  a reason. On success the agent emits `%ack` and schedules the first bounded
-  slice.
+  id'`), and so is re-submitting a **terminal** id (`'a result for this id
+  already exists; delete it first'`): an id names one run. Validation failures
+  reject with a reason. On success the agent emits `%ack` and schedules the
+  first bounded slice.
 - **`%cancel`** — idempotent. An unknown or already-terminal id is a no-op; an
   active job is sealed with `[%cancelled ~]` and emits a `%result` update.
 - **`%delete-result`** — remove a **terminal** job's stored result and
@@ -44,7 +49,7 @@ Both agent marks are `%noun` marks (`mar/tla-lus/action.hoon`,
 ### `request`
 
 ```hoon
-+$  request  [=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]
++$  request  [=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code) env=(map @t @t) props=(map @t @t)]
 +$  write-target  [=desk pax=path]
 +$  op
   $%  [%translate opts=pcal-opts]      ::  PlusCal → TLA+
@@ -114,6 +119,7 @@ is idempotent. Subscribing to an unknown id fails the watch.
 
 | Path | Returns |
 |---|---|
+| `/x/version` | `[api=@ud state=@ud]` — the public API revision and the agent's state tag (`[1 0]`; one state shape, no migrations during development) |
 | `/x/jobs` | `(list [req-id stage])` — all jobs and their current stage |
 | `/x/job/<id>` | `(unit job)` — the public job projection (internal cursors are never exposed) |
 | `/x/job/<id>/artifact/<name>` | `artifact` — a terminal job's artifact (`%report` text; `%trace` on a violation) |
@@ -147,18 +153,24 @@ Next == x' = (x + 1) % 4
 Inv  == x < 4
 ====
 '''
-=req  :*  op=[%check [translate=| cfg=~ mode=[%exhaustive deadlock=&]]]
+::  check-opts is [translate view difftrace continue cfg coverage
+::  postconditions mode]; request is [op src limits write promote env props]
+=req  :*  op=[%check [| | | | ~ | ~ [%exhaustive & 0]]]
           src=[%inline 'Counter' (malt ~[['Counter' spec]]) `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a']
           limits=*limits          ::  or default-limits:job-lib
           write=~                  ::  or `[%base /tlaout] to persist artifacts
+          promote=~                ::  diagnostic codes to raise to errors
+          env=~                    ::  the environment IOUtils!IOEnv reads
+          props=~                  ::  Java -D properties (TLCGet("-Dk"), \cdot)
       ==
 ::  the request id is a @ta of your choosing
 :tla-lus &tla-lus-action [%submit ~.counter req]
 
 ::  peek results (the %gx care supplies the %x head of the on-peek path)
-.^((list [req-id stage]) %gx /=tla-lus=/jobs)
-.^((unit job) %gx /=tla-lus=/job/counter)
-.^(artifact %gx /=tla-lus=/job/counter/artifact/report)
+.^([api=@ud state=@ud] %gx /=tla-lus=/version/noun)
+.^((list [req-id stage]) %gx /=tla-lus=/jobs/noun)
+.^((unit job) %gx /=tla-lus=/job/counter/noun)
+.^(artifact %gx /=tla-lus=/job/counter/artifact/report/noun)
 
 ::  cancel / clean up
 :tla-lus &tla-lus-action [%cancel ~.counter]
@@ -217,13 +229,13 @@ wire and not listed here.
 | `check-mode` | `$%([%exhaustive deadlock=? seed=@ud] [%simulate seed num depth generate=?] [%dfid depth deadlock=?])` | `[%exhaustive & 0]` / `[%simulate 42 100 20 \|]`. `generate` is tlc2's `-generate`: the same seeded run with PROBABILISTIC successor picking (`Tool.probabilistic`) — one successor per step instead of all of them. It is a field on `%simulate` rather than a mode of its own because tlc2 spells it that way too (both flags set `RunMode.SIMULATE`). A `CASE` in probabilistic position is a typed `%failed`, as tlc2 aborts there. `%dfid` is tlc2's `-dfid num`: depth-first iterative deepening, a run mode rather than a flag (`RunMode.DFID` selects `DFIDModelChecker` over `ModelChecker`). `depth` is the deepest LEVEL a sweep may reach; below 2 no sweep runs, so 0 and 1 explore the initial states and stop. A run that ends AT the bound is `[%limited %depth …]` and never `%ok` — tlc2 prints no completion line there. DFID does not support liveness and refuses a genuine temporal PROPERTY verbatim (upstream issue 548); a `[]P` box-state one runs, because it is an invariant. `-continue` with `%dfid` is a typed rejection. **`seed` is tlc2's `-seed` (R2.7.4.4)**, and it is not simulation-only: `RandomEnumerableValues.setSeed` runs for the BFS too, so it is the seed `TLC!RandomElement` draws from while the search expands states. The generator is reseeded to `fingerprint ^ seed` once per PREDECESSOR state — not once per evaluation — so two draws in one action give two values, exactly as at the pin. A spec with no `RandomElement` in it is unaffected by the field. Unseeded tlc2 picks a seed it never prints; the default here is `0`, so a run is reproducible. Comparing against the pin needs `-fp 0` as well, since the fingerprint is half the reseed |
 | `check-opts` | `[translate=? view=? difftrace=? continue=? cfg=(unit source-name) coverage=? postconditions=(list [module=@t op=@t]) mode=check-mode]` | `[\| \| \| \| ~ \| ~ [%exhaustive & 0]]`. `postconditions` is tlc2's `-postCondition mod!op` (R2.7.14b): operators to evaluate after state-space exploration, in ADDITION to any the `.cfg` declares and after them, because tlc2 appends both to one `POST_CONDITIONS` list. A **list of pairs** rather than the `mod!op` text — splitting on `!` and rejecting an empty half or an embedded dot is CLI-argument hygiene, not a property of the postcondition. A `module` naming somewhere other than where the operator is defined is a typed rejection: the port resolves definitions by bare name, so honouring it would silently run a different operator. `coverage` is tlc2's `-coverage` (R2.7.4.2b): it adds the per-action / per-constraint coverage block to the `%report` artifact. A **boolean**, not tlc2's interval argument — `TLCGlobals.coverageInterval` gates only *periodic* reporting and the end-of-run block is byte-identical for `-coverage 0`, `1` and `2`, so the interval is a wall-clock behaviour and has no field here. It is a typed rejection outside `%exhaustive`, alongside a temporal `PROPERTY`, and under a `SPECIFICATION`-form config |
 | `op` | `$%(%translate %analyze %check)` | `[%check [\| \| \| \| ~ \| [%exhaustive & 0]]]` |
-| `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path** |
+| `source-bundle` | `%inline` or `%clay` | see the Dojo example below; **`%clay`'s `root` is a module NAME, not a path**; a `%clay` `cfg` path ending in `/tla` is read as tlc2's `-config X.tla`: the config is its `---- CONFIG x ----` block (name case-folded against the file segment), and no block is an empty config |
 | `source-ref` | `[=ship =desk cas=case =path]` | `[~zod %tla-lus da+now /counter/tla]` — only `lib/source-path` builds one |
 | `read-request` | `[tag=@ud =source-ref]` | `[1 [~zod %tla-lus da+now /counter/tla]]` |
 | `read-response` | `[tag=@ud res=(each @t @t)]` | `[1 [%& '---- MODULE Counter ----…']]` |
 | `limits` | six bounds | `default-limits:job-lib` = `[1.000.000 64 100.000 1.000 ~m10 1.000.000]` |
 | `write-target` | `[=desk pax=path]` | `[%base /tlaout]` — no `case`: a write lands at the head. `%report` lands at `<pax>/report/txt`, a `%trace` at `<pax>/trace/noun` |
-| `request` | `[=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code)]` | see the Dojo example. `promote` is tlc2's `-messagesAsErrors`: diagnostic codes to raise to errors. It is on `request` rather than `check-opts` because it applies to `%analyze` and `%check` alike, and it is **not** a display concern — promotion aborts the run at the moment the diagnostic is emitted and reports the statistics reached so far, which a caller filtering severities off a finished result cannot reproduce. Only WARNINGS are promotable, which is tlc2's rule too |
+| `request` | `[=op src=source-bundle =limits write=(unit write-target) promote=(set diag-code) env=(map @t @t) props=(map @t @t)]` | see the Dojo example. `env` (R4.2c) is the process environment CommunityModules' `IOUtils!IOEnv` reads, as a record; `~` is an empty environment (tlc2 reads the JVM's real one, which no reproducible run may observe). `props` (R4.2g) are tlc2's `-D<key>=<value>` Java system properties: `TLCGet("-D<key>")` reads one and answers the key itself when it is unset, as the pin does, and `tlc2.tool.impl.Tool.cdot` = `"true"` enables action composition (`A \cdot B`), which is otherwise the pin's refusal. `promote` is tlc2's `-messagesAsErrors`: diagnostic codes to raise to errors. It is on `request` rather than `check-opts` because it applies to `%analyze` and `%check` alike, and it is **not** a display concern — promotion aborts the run at the moment the diagnostic is emitted and reports the statistics reached so far, which a caller filtering severities off a finished result cannot reproduce. Only WARNINGS are promotable, which is tlc2's rule too |
 
 ### Result and job
 
@@ -268,12 +280,21 @@ parity gap needs a field the contract cannot express (most recently the
 state-graph out-degree distribution in `run-stats`). It freezes at release.
 
 The pipeline behind it is now filled in: the parity ledger
-(`parity-manifest.md`) is closed — 125 rows, none owed — so `%check` runs the
-real safety, liveness and simulation engines over **both** `%inline` and
-`%clay` sources, and `%analyze` runs the real semantic/level/lint pipeline.
+(`parity-manifest.md`) was closed at R3 — **134 rows, 134 terminal, none owed
+(2026-09-05, R3.0d)**; R4.0b re-opened two rows (`tlc-monolith`, a root file
+carrying trailing modules; `semantic-graph`, INSTANCE inside LET and an
+operator-constant arity check) and R4.0f created a third (`op-wire-failure`:
+how a failing run reaches the wire), so 3 are owed — and `%check` runs the real safety, liveness, simulation
+and DFID engines over **both** `%inline` and `%clay` sources, `%analyze` runs
+the real semantic/level/lint pipeline, and a terminal run's artifacts can be
+written back to Clay. `VIEW`, `ALIAS` and the cfg source override are live;
+each is refused only in the narrow combination it cannot serve faithfully.
+
 What remains unsupported is unsupported **by decision**, not by omission, and
-every case is a typed rejection naming what is missing: PlusCal translation,
-`VIEW`, `ALIAS`, and a cfg source override. `compatibility.md` carries the full
-support matrix — every one of the thirteen approved differences with its
-evidence — and its "Typed-rejected / unsupported public options" table is the
-list of things a caller can ask for and not get. Nothing degrades silently.
+every case is a typed rejection naming what is missing — most visibly PlusCal
+translation, which the ledger marks `excluded` rather than absent.
+`compatibility.md` carries the full support matrix — every one of the ten
+approved-difference rows with its evidence — and its "Typed-rejected /
+unsupported public options" table is the list of things a caller can ask for
+and not get. `release-gate.sh` checks that table against the desk **in both
+directions**, so it cannot drift. Nothing degrades silently.

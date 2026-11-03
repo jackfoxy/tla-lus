@@ -230,14 +230,16 @@ is validated back through units 4–7.
 
 ## Persistence and recovery
 
-State is a versioned tagged union (`versioned-state = $%(state-0)` — one arm,
-since nothing has been released), so upgrades are explicit migrations, never
-in-place reshaping: a future version adds its `state-N` alongside the frozen
-copy of this one and converts in `on-load`'s `?-`. A
+State has ONE shape (`state-0`: the jobs, each job's current wake number,
+and the pending sweep timer). The project is in development, so there are no
+migrations: a shape change is made in place, and `on-load` coerces the stored
+noun to the current shape (`;;` inside `mule`) and resets to empty if it no
+longer fits. `on-load` then re-arms every running job and restarts the sweep
+(R4.P2). A
 job's noun contains everything needed to resume byte-identically: the
 request, the current stage, the remaining `pending` stages, accumulated
-stats/diags/artifacts, the submit time (for `max-time`), the jammed in-stage
-continuation (search queue, visited set, scan worklist, or RNG sample), and
+stats/diags/artifacts, the submit time (for `max-time`), the in-stage
+continuation (stored as itself, tagged with a hash of its type; R4.P2) (search queue, visited set, scan worklist, or RNG sample), and
 (once set) the terminal result. Recovery is therefore "reload state, keep
 stepping": interrupting after any slice — including mid-search — never
 changes the event stream or the final job, and scheduled wakes for deleted

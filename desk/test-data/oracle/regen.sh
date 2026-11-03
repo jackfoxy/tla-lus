@@ -71,7 +71,7 @@ run() {
   shift  # the --
   local work; work="$(mktemp -d)"
   cp "$HERE/cases/$name/"* "$work/"
-  rm -f "$work/SOURCE"
+  rm -f "$work/SOURCE.txt"
   local code=0
   ( cd "$work" && "$@" ) >"$work/.out" 2>&1 || code=$?
   {

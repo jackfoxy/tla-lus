@@ -5,7 +5,7 @@ differential-test oracle for the Hoon port. Pin, build instructions,
 invocation forms, and normalization rules: `desk/doc/port-map.md`.
 
 - `cases/<name>/` — one fixture per pipeline area. Hand-written specs are
-  original; copied specs carry a `SOURCE` file with upstream commit and
+  original; copied specs carry a `SOURCE.txt` file with upstream commit and
   license (MIT).
 - `golden/<name>.txt` — normalized oracle output plus `exit-code:`; for the
   PlusCal case, also the full rewritten `.tla`.

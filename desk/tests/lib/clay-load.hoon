@@ -129,13 +129,13 @@
   ^-  request
   :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  ~  ~
+      lim  ~  ~  ~  ~
   ==
 ::
 ++  inline-req
   |=  [root=module-name mods=(list [module-name @t]) cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline root (malt mods) `cfg] lim ~ ~ ~ ~]
 ::
 ::  +|  Harness
 ::
@@ -322,6 +322,28 @@
     (expect-eq !>([5 5]) !>(progress.j))
   ==
 ::
+::  R4.P12: the loader's trees travel with the sources, keyed by text hash,
+::  and the later stages answer a parse from them
+++  test-clay-load-carries-parse-cache
+  =/  k  1
+  |-  ^-  tang
+  ?:  (gth k 12)  ~['no %src hand-off within 12 slices']
+  =/  j  +:(run-clay-k multi-fs (clay-req 'spec' `/src/cfg/txt ~[/src]) 256 k)
+  ?~  cont.j  $(k +(k))
+  =/  kk  (load-kont:job-lib u.cont.j)
+  ?.  ?=(%src -.kk)  $(k +(k))
+  =/  pc  pc.s.kk
+  =/  t  (~(got by pc) (shax spec-mod))
+  ;:  weld
+    %+  expect-eq
+      !>(`(list @)`(sort ~[(shax spec-mod) (shax helper-mod)] lth))
+    !>(`(list @)`(sort ~(tap in ~(key by pc)) lth))
+    ::  a cache hit is answered without parsing (the text here is not TLA+)
+    %+  expect-eq
+      !>(`(unit node:mod)``t)
+    !>(tree:(parse-typed-cached:job-lib 'not a module' (malt ~[[(shax 'not a module') t]])))
+  ==
+::
 ::  +|  The Await Protocol
 ::
 ::
@@ -408,6 +430,16 @@
     !>(`[%ok [5 4 0 4 [0 1 1 1]]])
   !>((clay-result f (clay-req 'spec' `/src/cfg/txt ~[/src /alt])))
 ::
+++  test-clay-monolith-trailing-module
+  ::  R4.1c: a module with no file under any root, and not a standard
+  ::  module, is taken from the ROOT file's trailing block -- SANY's last
+  ::  resort (ParseUnit -> MonolithSpecExtractor.module)
+  =/  mono  (rap 3 ~[spec-mod '\0a\0a' helper-mod '\0a'])
+  =/  f  (mk-fs ~[[/src/spec/tla mono] [/src/cfg/txt mc-cfg]])
+  %+  expect-eq
+    !>(`[%ok [5 4 0 4 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/cfg/txt ~[/src])))
+::
 ++  test-clay-standard-module-needs-no-file
   ::  a user file shadows a standard module, so the read is attempted;
   ::  when no root has it, the vendored module answers and the run stands
@@ -418,6 +450,28 @@
     %+  expect-eq
       !>(`[%ok [5 4 0 4 [0 1 1 1]]])
     !>((clay-result multi-fs req))
+  ==
+::
+::  R4.1a: SANY looks in the SPEC directory, then the StandardModules, and
+::  only then the library roots. A library root's copy of a standard module
+::  (tlapm's `FiniteSets`, CommunityModules' `Json`) is never read: the run
+::  takes the vendored one, and asks the second root for nothing
+++  test-clay-standard-module-before-library-roots
+  =/  f
+    %-  mk-fs
+    :~  [/src/spec/tla spec-mod]
+        [/src/helper/tla helper-mod]
+        [/src/cfg/txt mc-cfg]
+        [/lib/naturals/tla '---- MODULE Naturals ----\0aBOGUS ==\0a====\0a']
+    ==
+  =/  req  (clay-req 'spec' `/src/cfg/txt ~[/src /lib])
+  =/  paths  (read-paths f req 256)
+  ;:  weld
+    (expect !>((lien paths |=(p=path =(p /src/naturals/tla)))))
+    (expect !>(!(lien paths |=(p=path =(p /lib/naturals/tla)))))
+    %+  expect-eq
+      !>(`[%ok [5 4 0 4 [0 1 1 1]]])
+    !>((clay-result f req))
   ==
 ::
 ::  +|  Typed Failures At The %modules Stage
@@ -475,6 +529,55 @@
   %+  expect-eq
     !>(`'path /secrets/cfg/txt is not under a declared search root')
   !>((validate:job-lib (clay-req 'spec' `/secrets/cfg/txt ~[/src])))
+::
+++  test-clay-monolith-config
+  ::  R4.2ab: a `.tla` given as the config yields its `CONFIG <name>`
+  ::  block, `<name>` the file name minus `.tla` (tlc2 `-config spec.tla`)
+  =/  mono
+    (rap 3 ~[single-mod '\0a---- CONFIG spec ----\0a' mc-cfg '====\0a'])
+  =/  f  (mk-fs ~[[/src/spec/tla mono]])
+  %+  expect-eq
+    !>(`[%ok [4 3 0 3 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/spec/tla ~[/src])))
+::
+++  test-clay-monolith-config-other-file
+  ::  the name comes from the CONFIG file, not the root module (pin:
+  ::  `-config M1.tla M2` reads `CONFIG M1`); a Clay segment is the
+  ::  lowercased name, so the header matches it case-folded
+  =/  conf
+    %+  rap  3
+    :~  '---- CONFIG Spec ----\0aINIT Init\0a====\0a'
+        '---- CONFIG Conf ----\0a'  mc-cfg  '====\0a'
+    ==
+  =/  f  (mk-fs ~[[/src/spec/tla single-mod] [/src/conf/tla conf]])
+  %+  expect-eq
+    !>(`[%ok [4 3 0 3 [0 1 1 1]]])
+  !>((clay-result f (clay-req 'spec' `/src/conf/tla ~[/src])))
+::
+++  test-clay-monolith-config-missing-block
+  ::  no matching block is an EMPTY config (pin: EC 2231, the same
+  ::  failure an empty `.cfg` gives)
+  =/  mono  (rap 3 ~[single-mod '\0a---- CONFIG other ----\0a' mc-cfg '===='])
+  =/  f  (mk-fs ~[[/src/spec/tla mono]])
+  =/  ir  (run-inline (inline-req 'spec' ~[['spec' single-mod]] '') 256)
+  (expect-eq !>(result.ir) !>((clay-result f (clay-req 'spec' `/src/spec/tla ~[/src]))))
+::
+++  test-monolith-config-edges
+  ::  the first block wins; an unterminated block runs to end of file;
+  ::  the header is whole-line with at least four dashes each side;
+  ::  the body is trimmed (MonolithSpecExtractor.config)
+  ;:  weld
+    %+  expect-eq  !>('A\0aB')
+    !>((monolith-config:mod '---- CONFIG x ----\0aA\0aB\0a====\0a---- CONFIG x ----\0aC' %x))
+    %+  expect-eq  !>('A')
+    !>((monolith-config:mod '-----  CONFIG \09 X  -------\0d\0a  A  \0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '--- CONFIG x ----\0aA\0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '---- CONFIG x ---- y\0aA\0a' %x))
+    %+  expect-eq  !>('')
+    !>((monolith-config:mod '---- CONFIG x ----\0a====\0aA\0a' %x))
+  ==
 ::
 ++  test-clay-bad-module-name-rejected
   %+  expect-eq

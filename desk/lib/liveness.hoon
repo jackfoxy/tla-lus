@@ -21,13 +21,21 @@
   ::  operator's call — carries the formals of the expansion it came from, and
   ::  they must win over the run env, being locals. tlc2 keeps the same thing
   ::  as the `Context` it hands to `tool.eval`
+  ::  R4.2n: `%act` and `%enabled` leaves carry bindings too (a bounded
+  ::  quantifier's variables, an INSTANCE's substitutions, expanded formals)
   |=  [x=live-expr:tp env=eenv:ne]
   ^-  eenv:ne
-  ?>  ?=(%state -.x)
-  ?:  &(=(~ ctx.x) =(~ nsub.x))  env
+  =/  b=[ctx=(map @t value:vl) nsub=(map @t sem:sm) pout=(map @t clo:ne)]
+    ?+  -.x  [~ ~ ~]
+      %state    ?>(?=(%state -.x) [ctx.x nsub.x pout.x])
+      %act      ?>(?=(%act -.x) [ctx.x nsub.x pout.x])
+      %enabled  ?>(?=(%enabled -.x) [ctx.x nsub.x pout.x])
+    ==
+  ?:  &(=(~ ctx.b) =(~ nsub.b))  env
   %=  env
-    vals  (~(uni by vals.env) ctx.x)
-    psub  (~(uni by psub.env) nsub.x)
+    vals  (~(uni by vals.env) ctx.b)
+    psub  (~(uni by psub.env) nsub.b)
+    pout  (~(uni by pout.env) pout.b)
   ==
 ::
 ++  st-pred-bool
@@ -66,7 +74,7 @@
   ::  ENABLED is `LNStateEnabled extends LNState`, so its level is VARIABLE and
   ::  `+state-preds-of` keeps it -- tlc2 evaluates it here through
   ::  `LNStateEnabled.eval` -> `tool.enabled`, and so must the port (R1.2.7)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::
   ::  the rest are above state level -- `%act` and `%next` are ActionLevel,
   ::  `%all`/`%even` TemporalLevel -- so `+state-preds-of`'s `le-level <= 1`
@@ -83,6 +91,10 @@
   ::  TBGraphNode.isConsistent: every state predicate of the node holds
   |=  [nd=tb-node:tb s0=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.P7: memoized (`~+`), as are +succ-fps, +cs-bits and +ca-bits: every
+  ::  OOS and every tableau node pairing with a state re-asked these pure
+  ::  questions of it; tlc2's LiveCheck answers them once per state/edge
+  ~+
   =/  ps  state-preds.nd
   |-  ^-  ?
   ?~  ps  &
@@ -106,15 +118,30 @@
   ::  per occurrence -- again invisible to a node-count projection (R1.6.3).
   |=  [s0=state:ne nsb=sem:sm env=eenv:ne order=(list @t) states=(map @t state:ne)]
   ^-  (list [fp=@t st=state:ne])
+  ~+
   =/  r  (next-states:ne s0 nsb env)
   ?:  ?=(%| -.r)  ~
   =|  seen=(set @t)
   |-  ^-  (list [fp=@t st=state:ne])
   ?~  p.r  ~
-  =/  fp  `@t`(state-fp:fpl order i.p.r)
+  =/  fp  (live-key order i.p.r env)
   ?.  (~(has by states) fp)  $(p.r t.p.r)
   ?:  (~(has in seen) fp)  $(p.r t.p.r)
   [[fp i.p.r] $(p.r t.p.r, seen (~(put in seen) fp))]
+::
+++  live-key
+  ::  R4.2e: a state's key in the liveness graph, computed as the graph build
+  ::  computed it (`+register-in:check` with FP64): the symmetry
+  ::  representative, then the FP64 of the VIEW's value on it, or of the
+  ::  representative itself. Plain `state-fp` here missed every successor a
+  ::  VIEW or SYMMETRY had re-keyed, dropping its product edge
+  |=  [order=(list @t) st=state:ne env=eenv:ne]
+  ^-  @t
+  =/  cst  (canonicalize:fpl perms.idk.env order st)
+  ?~  view.idk.env  `@t`(state-fp:fpl order cst)
+  =/  vr  (eval:ne u.view.idk.env env(s0 cst, s1 cst, primed |))
+  ?:  ?=(%| -.vr)  `@t`(state-fp:fpl order cst)
+  `@t`(view-fp:fpl p.vr)
 ::
 ++  build-product
   ::  the product node count and initial-node count for one OrderOfSolution.
@@ -203,6 +230,22 @@
       node-par=(list par:tb)     ::  per-node tableau particle (for promises)
       edge-ca=(list (list ?))    ::  per-edge checkAction results
   ==
+::
+++  bit-mask
+  ::  R4.Q8b: a result vector as an atom, bit i for element i
+  |=  v=(list ?)
+  ^-  @
+  =|  m=@
+  =/  i  0
+  |-  ^-  @
+  ?~  v  m
+  $(v t.v, i +(i), m ?:(i.v (con m (bex i)) m))
+::
+++  bit-mask-of
+  ::  R4.Q8b: the mask with bits `is` set
+  |=  is=(list @ud)
+  ^-  @
+  (roll is |=([i=@ud m=@] (con m (bex i))))
 ::
 ++  bit-at
   ::  the i-th boolean of a result vector (missing reads false)
@@ -302,7 +345,7 @@
   ::
   ::  ENABLED is state-level (`LNStateEnabled extends LNState`), so it can be a
   ::  checkState entry and tlc2 evaluates it (R1.2.7)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::
   ::  the rest are above state level, and a checkState entry is level <= 1 by
   ::  construction (`+classify` bins `[]<>S` with `le-level <= 1` here and
@@ -335,8 +378,8 @@
     ::  reported, never answered
     ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
-    %act      (act-eval box.x sub.x a.x s0 s1 env)
-    %enabled  (enabled-eval box.x sub.x p.x s0 env)
+    %act      (act-eval box.x sub.x a.x s0 s1 (leaf-env x env))
+    %enabled  (enabled-eval box.x sub.x p.x s0 (leaf-env x env))
   ::  `LNNext.eval(tool, s1, s2)` is `body.eval(tool, s2, Empty)` -- the body at
   ::  the SUCCESSOR state. `()P` is ActionLevel, so it can be a checkAction
   ::  entry and must be evaluated rather than refused (R1.2.7)
@@ -382,13 +425,13 @@
     ~|([%tlc-live-state-leaf-unevaluable msg.p.r] !!)
   ::
   ::  `LNStateEnabled extends LNState`, so it evaluates at `sts[pos]` too
-    %enabled  (enabled-eval box.x sub.x p.x (snag pos sts) env)
+    %enabled  (enabled-eval box.x sub.x p.x (snag pos sts) (leaf-env x env))
   ::
       %act
     ::  `LNAction.eval(s1, s2)` with s2 the successor -- `sts[cyc]` at the end
     =/  s0  (snag pos sts)
     =/  s1  (snag ?:((lth +(pos) len) +(pos) cyc) sts)
-    (act-eval box.x sub.x a.x s0 s1 env)
+    (act-eval box.x sub.x a.x s0 s1 (leaf-env x env))
   ::
   ::  `astToLive` rewrites `()` away, so tlc2 asserts here; the body is ported
   ::  as written so a shape that does reach it behaves rather than bails
@@ -427,6 +470,9 @@
   ::  stutter makes [A]_e true and <A>_e false without evaluating A)
   |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne s1=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.Q8: memoized per leaf and transition -- the same fairness leaf
+  ::  stands in every OrderOfSolution of a run
+  ~+
   =/  stut
     ?~  sub  |
     =/  v0  (sub-val u.sub s0 env)
@@ -442,17 +488,24 @@
   ::  changes the subscript e; ENABLED [A]_e is always true
   |=  [box=? sub=(unit sem:sm) a=sem:sm s0=state:ne env=eenv:ne]
   ^-  ?
+  ::  R4.Q8: memoized per leaf and STATE: it depends on `s0` alone, and was
+  ::  solved again for every edge out of it and for every OrderOfSolution
+  ~+
   ?:  &(box ?=(^ sub))  &
   ::  R2.7.4.1: an ENABLED test discards the run carrier, like +eval-enabled
   =/  r=sres:ne  -:(solve:ne a %next s0 ~ env(enabled &) empty-rst:ne)
   ?:  ?=(%| -.r)  |
-  ?~  sub
-    (lien p.r |=(st=state:ne (complete:ne st vars.env)))
+  ::  R4.2s: NO completeness requirement. tlc2's `Tool.enabled` answers as
+  ::  soon as the action's items are exhausted -- a variable the action does
+  ::  not mention is unconstrained, not "unassigned". Requiring a complete
+  ::  successor read `ENABLED Move_Cat` (which assigns `cat_box` only) as
+  ::  FALSE, so `WF_cat_box(Move_Cat)` was vacuous and Moving_Cat_Puzzle
+  ::  reported a stuttering counter-example tlc2 does not
+  ?~  sub  ?=(^ p.r)
   =/  v0  (sub-val u.sub s0 env)
   ?~  v0  |
   %+  lien  p.r
   |=  st=state:ne
-  ?.  (complete:ne st vars.env)  |
   =/  v1  (sub-val u.sub st env)
   ?&(?=(^ v1) !(equal:vl u.v0 u.v1))
 ::
@@ -474,11 +527,33 @@
 ::  each step from the kont, so the persisted cursor stays small.
 +$  pcursor
   $:  tabg=tb-graph:tb
+      ::  the worklist as a FIFO: `q` the front, `qb` the back REVERSED.
+      ::  `edges` is REVERSED until the build completes. R4.P7: both were
+      ::  welded per step, O(n) each, so the build was quadratic
       q=(list pg-key)
+      qb=(list pg-key)
       seen=(set pg-key)
       nodes=(map pg-key pnode)
       edges=(list pedge)
       inits=(list pg-key)
+      ::  R4.P7: per-STATE results, shared by every tableau node the state
+      ::  pairs with: its successor fingerprints and its checkState bits.
+      ::  tlc2's LiveCheck records both once, while the BFS runs
+      sc=(map @t (list @t))
+      cb=(map @t (list ?))
+      ::  R4.Q8b: per-EDGE checkAction bits by `[fp0 fp1]`, shared by every
+      ::  tableau node pair over the edge, and carried to the next
+      ::  OrderOfSolution when its checkAction list is the same (`+seed`).
+      ::  Their `~+` entries -- a dozen fairness leaves on every edge -- did
+      ::  not survive the bounded cache, so each OOS evaluated them again
+      ab=(map [@t @t] (list ?))
+      ::  R4.Q8b: once the product is built, the PEMs still to search for a
+      ::  lasso, a slice's worth at a time (`+lasso-step`); ~ while building
+      lp=(unit (list pem:tp))
+      ::  R4.Q8b: the built product's out-edges per vertex with their masks
+      ::  (`+out-arcs`), kept for every lasso slice: rebuilding them per
+      ::  slice cost ReadersWriters (≈80k edges) seconds a slice
+      oa=(map pg-key (list [m=@ e=pedge]))
   ==
 ::  the bounded/resumable Tarjan SCC cursor (unit 8.8.2b): the roots still to
 ::  start, the index/lowlink/on-stack/SCC-stack state, an EXPLICIT DFS frame
@@ -504,43 +579,124 @@
           env=eenv:ne
       ==
   ^-  pcursor
-  ?~  tf.o  [*tb-graph:tb ~ ~ ~ ~ ~]
+  ::  R4.Q8b: a no-tableau OOS walks every state once (`+flat-step`), in the
+  ::  map order `+labeled-product` uses
+  ?~  tf.o
+    :*  *tb-graph:tb
+        (turn ~(tap by states) |=([fp=@t *] `pg-key`[fp 0]))
+        ~  ~  ~  ~
+        (turn inits |=(fp=@t `pg-key`[fp 0]))
+        ~  ~  ~  ~  ~
+    ==
   =/  tabg  (build-tableau:tb u.tf.o)
   =/  ik    (init-keys states inits tabg env)
-  [tabg ik (silt ik) ~ ~ ik]
+  [tabg ik ~ (silt ik) ~ ~ ik ~ ~ ~ ~ ~]
+::
+::  R4.Q8b: the checkState and checkAction bits a finished OrderOfSolution
+::  computed, under the lists they were computed for
++$  lcache
+  $:  cs=(list live-expr)
+      ca=(list live-expr)
+      cb=(map @t (list ?))
+      ab=(map [@t @t] (list ?))
+  ==
+::
+++  seed
+  ::  R4.Q8b: a fresh cursor given the bits an earlier OrderOfSolution
+  ::  computed under the same lists (the same fairness leaves stand in every
+  ::  OOS of a run)
+  |=  [pc=pcursor o=oos:tp lc=lcache]
+  ^-  pcursor
+  =?  cb.pc  =(cs.lc check-state.o)  cb.lc
+  =?  ab.pc  =(ca.lc check-action.o)  ab.lc
+  pc
 ::
 ++  product-step
   ::  advance a product-build cursor by at most `budget` worklist keys; `done`
   ::  is true when the worklist is empty (the product is complete). Mirrors the
   ::  tableau branch of +labeled-product exactly, one slice at a time.
+  ::  R4.Q8: `sm` is the graph build's recorded successors (`succ` of the
+  ::  BFS cursor); when present they are the edges, else they are solved
   |=  $:  o=oos:tp  states=(map @t state:ne)  nsb=sem:sm  env=eenv:ne
-          order=(list @t)  pc=pcursor  budget=@ud
+          order=(list @t)  pc=pcursor  budget=@ud  sm=(map @t (list @t))
       ==
   ^-  [done=? cur=pcursor]
+  ?~  tf.o  (flat-step o states nsb env order pc budget sm)
   =/  spent  0
   |-  ^-  [done=? cur=pcursor]
-  ?~  q.pc  [& pc]
+  =?  pc  &(?=(~ q.pc) ?=(^ qb.pc))  pc(q (flop qb.pc), qb ~)
+  ?~  q.pc  [& pc(edges (flop edges.pc))]
   ?:  =(spent budget)  [| pc]
   =/  k   i.q.pc
   =/  s0  (~(got by states) fp.k)
   =/  t0  (snag-node:tb tidx.k nodes.tabg.pc)
-  =.  nodes.pc  (~(put by nodes.pc) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  succs  (succ-fps s0 nsb env order states)
-  =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env)
+  =/  bits=(list ?)
+    =/  c  (~(get by cb.pc) fp.k)
+    ?^  c  u.c
+    (cs-bits check-state.o s0 env)
+  =.  cb.pc     (~(put by cb.pc) fp.k bits)
+  =.  nodes.pc  (~(put by nodes.pc) k [bits par.t0])
+  =/  succs=(list [fp=@t st=state:ne])
+    =/  c  (~(get by sc.pc) fp.k)
+    ?^  c  (turn u.c |=(f=@t [f (~(got by states) f)]))
+    ?.  =(~ sm)
+      %+  turn  (flop (~(gut by sm) fp.k ~))
+      |=(f=@t [f (~(got by states) f)])
+    (succ-fps s0 nsb env order states)
+  =.  sc.pc  (~(put by sc.pc) fp.k (turn succs |=([f=@t *] f)))
+  =/  out  (node-edges k s0 t0 tabg.pc check-action.o succs env ab.pc)
+  =.  ab.pc  ab.out
   =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen.pc) x)))
   =.  seen.pc  (~(gas in seen.pc) fresh)
-  =.  edges.pc  (weld edges.pc es.out)
-  $(q.pc (weld t.q.pc fresh), spent +(spent))
+  =.  edges.pc  (weld (flop es.out) edges.pc)
+  $(q.pc t.q.pc, qb.pc (weld (flop fresh) qb.pc), spent +(spent))
+::
+++  flat-step
+  ::  R4.Q8b: `+labeled-product`'s no-tableau product a budget of states at a
+  ::  time. It used to be built and searched in ONE slice (ReadersWriters:
+  ::  the whole liveness phase, over 13 minutes, in one Gall event) and
+  ::  re-solved every state's successors; the graph build recorded them.
+  ::  The same nodes, and the same edges in the same order: per state its
+  ::  stutter self-edge, then its successors
+  |=  $:  o=oos:tp  states=(map @t state:ne)  nsb=sem:sm  env=eenv:ne
+          order=(list @t)  pc=pcursor  budget=@ud  sm=(map @t (list @t))
+      ==
+  ^-  [done=? cur=pcursor]
+  =/  spent  0
+  |-  ^-  [done=? cur=pcursor]
+  ?~  q.pc  [& pc(edges (flop edges.pc))]
+  ?:  =(spent budget)  [| pc]
+  =/  fp  fp.i.q.pc
+  =/  s0  (~(got by states) fp)
+  =/  bits=(list ?)
+    =/  c  (~(get by cb.pc) fp)
+    ?^  c  u.c
+    (cs-bits check-state.o s0 env)
+  =.  cb.pc     (~(put by cb.pc) fp bits)
+  =.  nodes.pc  (~(put by nodes.pc) [fp 0] [bits ~])
+  =/  succs=(list [fp=@t st=state:ne])
+    ?.  =(~ sm)
+      %+  turn  (flop (~(gut by sm) fp ~))
+      |=(f=@t [f (~(got by states) f)])
+    (succ-fps s0 nsb env order states)
+  =^  sb  ab.pc  (edge-bits check-action.o s0 s0 fp fp env ab.pc)
+  =.  edges.pc  [[[fp 0] [fp 0] sb &] edges.pc]
+  |-  ^-  [done=? cur=pcursor]
+  ?~  succs  ^$(q.pc t.q.pc, spent +(spent))
+  =^  b  ab.pc  (edge-bits check-action.o s0 st.i.succs fp fp.i.succs env ab.pc)
+  $(succs t.succs, edges.pc [[[fp 0] [fp.i.succs 0] b |] edges.pc])
 ::
 ++  cs-bits
   |=  [xs=(list live-expr) s0=state:ne env=eenv:ne]
   ^-  (list ?)
+  ~+
   ?~  xs  ~
   [(cs-eval i.xs s0 env) $(xs t.xs)]
 ::
 ++  ca-bits
   |=  [xs=(list live-expr) s0=state:ne s1=state:ne env=eenv:ne]
   ^-  (list ?)
+  ~+
   ?~  xs  ~
   [(ca-eval i.xs s0 s1 env) $(xs t.xs)]
 ::
@@ -580,7 +736,7 @@
   ::  drain the bounded product-build cursor in one unbounded pass (the job
   ::  kernel steps the same cursor a slice at a time — unit 8.8.2a)
   =/  pc  (product-init o states inits env)
-  =/  r   (product-step o states nsb env order pc (bex 62))
+  =/  r   (product-step o states nsb env order pc (bex 62) ~)
   [nodes.cur.r edges.cur.r inits.cur.r]
 ::
 ++  bit-tape
@@ -662,31 +818,44 @@
   ::  (see `+$ pedge`); on the TRACE product it is what tlc2 does too
   ::  (`LiveCheck.checkTrace`: `successors.put(tlcState)`, "Add state itself to
   ::  allow stuttering").
+  ::  R4.Q8b: `ab` caches each edge's checkAction bits (`+edge-bits`); the
+  ::  edges come out in the same order as before
   |=  $:  k=pg-key  s0=state:ne  t0=tb-node:tb  tabg=tb-graph:tb
           ca=(list live-expr)  succs=(list [fp=@t st=state:ne])  env=eenv:ne
+          ab=(map [@t @t] (list ?))
       ==
-  ^-  [es=(list pedge) keys=(list pg-key)]
+  ^-  [es=(list pedge) keys=(list pg-key) ab=(map [@t @t] (list ?))]
   ::  the stutter edge is a pure SELF-loop on (fp,tidx): it must not cross with
   ::  the tableau successors, or stuttering would DISCOVER product nodes tlc2
   ::  never has -- measured on the `~>` fixtures, where crossing added a
   ::  (state, tidx 2) node that neither tlc2 nor the port's own `+build-product`
   ::  count path has (R1.6.3).
-  =/  stut-edge=pedge  [k k (ca-bits ca s0 s0 env) &]
+  =^  sbits  ab  (edge-bits ca s0 s0 fp.k fp.k env ab)
+  =/  stut-edge=pedge  [k k sbits &]
+  =|  es=(list pedge)
+  =|  keys=(list pg-key)
   =/  ss  succs
-  |-  ^-  [es=(list pedge) keys=(list pg-key)]
-  ?~  ss  [~[stut-edge] ~]
-  =/  rest  $(ss t.ss)
-  =/  here
-    =/  bits  (ca-bits ca s0 st.i.ss env)
-    =/  ns  nexts.t0
-    |-  ^-  [es=(list pedge) keys=(list pg-key)]
-    ?~  ns  [~ ~]
-    =/  t1  (snag-node:tb i.ns nodes.tabg)
-    =/  more  $(ns t.ns)
-    ?.  (consistent-at t1 st.i.ss env)  more
-    =/  nk=pg-key  [fp.i.ss i.ns]
-    [[[k nk bits |] es.more] [nk keys.more]]
-  [(weld es.here es.rest) (weld keys.here keys.rest)]
+  |-  ^-  [es=(list pedge) keys=(list pg-key) ab=(map [@t @t] (list ?))]
+  ?~  ss  [(flop [stut-edge es]) (flop keys) ab]
+  =^  bits  ab  (edge-bits ca s0 st.i.ss fp.k fp.i.ss env ab)
+  =/  ns  nexts.t0
+  |-  ^-  [es=(list pedge) keys=(list pg-key) ab=(map [@t @t] (list ?))]
+  ?~  ns  ^$(ss t.ss)
+  =/  t1  (snag-node:tb i.ns nodes.tabg)
+  ?.  (consistent-at t1 st.i.ss env)  $(ns t.ns)
+  =/  nk=pg-key  [fp.i.ss i.ns]
+  $(ns t.ns, es [[k nk bits |] es], keys [nk keys])
+::
+++  edge-bits
+  ::  R4.Q8b: an edge's checkAction bits, from `ab` when already known
+  |=  $:  ca=(list live-expr)  s0=state:ne  s1=state:ne  f0=@t  f1=@t
+          env=eenv:ne  ab=(map [@t @t] (list ?))
+      ==
+  ^-  [(list ?) (map [@t @t] (list ?))]
+  =/  c  (~(get by ab) [f0 f1])
+  ?^  c  [u.c ab]
+  =/  b  (ca-bits ca s0 s1 env)
+  [b (~(put by ab) [f0 f1] b)]
 ::
 ::  +|  Liveness over a simulation trace (Work Unit 9.3a)
 ::
@@ -696,10 +865,10 @@
   ::  that follow its occurrences — accumulated by fingerprint, matching
   ::  addNextState). The product build adds the stutter self-loop. This is the
   ::  graph tlc2 LiveCheck.checkTrace feeds the liveness checker per behavior.
-  |=  [trace=(list state:ne) order=(list @t)]
+  |=  [trace=(list state:ne) order=(list @t) env=eenv:ne]
   ^-  [states=(map @t state:ne) init=@t succ=(jar @t [fp=@t st=state:ne])]
   ?~  trace  [~ *@t ~]
-  =/  ini  `@t`(state-fp:fpl order i.trace)
+  =/  ini  (live-key order i.trace env)
   =|  states=(map @t state:ne)
   =|  succ=(jar @t [fp=@t st=state:ne])
   =.  states  (~(put by states) ini i.trace)
@@ -707,7 +876,7 @@
   =/  rest  t.trace
   |-  ^-  [states=(map @t state:ne) init=@t succ=_succ]
   ?~  rest  [states ini succ]
-  =/  fp1  `@t`(state-fp:fpl order i.rest)
+  =/  fp1  (live-key order i.rest env)
   =.  states  (~(put by states) fp1 i.rest)
   =.  succ    (~(add ja succ) fp.prev [fp1 i.rest])
   $(rest t.rest, prev [fp1 i.rest])
@@ -718,7 +887,7 @@
   ::  next-states search, so it needs no reachable-graph exploration.
   |=  [o=oos:tp trace=(list state:ne) env=eenv:ne order=(list @t)]
   ^-  [nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
-  =/  g  (trace-graph trace order)
+  =/  g  (trace-graph trace order env)
   ?~  tf.o
     =/  ik=(list pg-key)  ~[[init.g 0]]
     =/  nm=(map pg-key pnode)
@@ -751,7 +920,7 @@
   =/  s0  (~(got by states.g) fp.k)
   =/  t0  (snag-node:tb tidx.k nodes.tabg)
   =.  nodes  (~(put by nodes) k [(cs-bits check-state.o s0 env) par.t0])
-  =/  out  (node-edges k s0 t0 tabg check-action.o (~(get ja succ.g) fp.k) env)
+  =/  out  (node-edges k s0 t0 tabg check-action.o (~(get ja succ.g) fp.k) env ~)
   =/  fresh  (skim keys.out |=(x=pg-key !(~(has in seen) x)))
   =.  seen   (~(gas in seen) fresh)
   =.  edges  (weld edges es.out)
@@ -786,6 +955,13 @@
   ::  frame. Byte-identical to the former recursive +strong.
   |=  [verts=(list pg-key) adj=(jar pg-key pg-key)]
   ^-  (list (list pg-key))
+  (tarjan-g verts |=(v=pg-key (~(get ja adj) v)))
+::
+++  tarjan-g
+  ::  R4.Q8b: `+tarjan` with the successors from a gate, so a caller can
+  ::  filter them on the fly instead of building an adjacency map
+  |=  [verts=(list pg-key) nxt=$-(pg-key (list pg-key))]
+  ^-  (list (list pg-key))
   =/  sc=scursor  [verts 0 ~ ~ ~ ~ ~ ~]
   |-  ^-  (list (list pg-key))
   ::  bind the frame stack to a LOCAL and narrow that, so the sc.work / sc.verts
@@ -806,7 +982,7 @@
     =.  idx.sc    +(idx.sc)
     =.  stk.sc    [v0 stk.sc]
     =.  onstk.sc  (~(put in onstk.sc) v0)
-    =.  work.sc   ~[[v0 (~(get ja adj) v0)]]
+    =.  work.sc   ~[[v0 (nxt v0)]]
     $(sc sc)
   =/  fr     i.wk
   =/  wrest  t.wk
@@ -847,7 +1023,7 @@
   =.  idx.sc    +(idx.sc)
   =.  stk.sc    [w stk.sc]
   =.  onstk.sc  (~(put in onstk.sc) w)
-  =.  work.sc   [[w (~(get ja adj) w)] wk2]
+  =.  work.sc   [[w (nxt w)] wk2]
   $(sc sc)
 ::
 ++  scc-accepting
@@ -866,11 +1042,63 @@
         (~(has in members) to.e)
         (levy eaa |=(i=@ud (bit-at i ca.e)))
     ==
+  (scc-accepting-in scc pm promises nodes internal)
+::
+++  scc-accepting-in
+  ::  +scc-accepting given the component's INTERNAL edges, as +scc-internal
+  ::  computes them for every component in one pass
+  |=  $:  scc=(list pg-key)  pm=pem:tp  promises=(list live-expr)
+          nodes=(map pg-key pnode)  internal=(list pedge)
+      ==
+  ^-  ?
   ?.  ?|((gth (lent scc) 1) (lien internal |=(e=pedge =(from.e to.e))))  |
-  =/  node-cs   (turn scc |=(k=pg-key cs:(~(got by nodes) k)))
-  =/  node-par  (turn scc |=(k=pg-key par:(~(got by nodes) k)))
-  =/  edge-ca   (turn internal |=(e=pedge ca.e))
-  (pem-accepting pm promises [node-cs node-par edge-ca])
+  ::  R4.Q8b: `+pem-accepting` on bit masks -- AEState/AEAction each hold
+  ::  somewhere iff the OR of the members' bits covers them, EAAction holds
+  ::  on every edge iff each edge's bits cover it. The same predicate; the
+  ::  list-indexed tests cost ElevatorLivenessMedium ~0.27 s per PEM
+  =/  ea  (bit-mask-of ea-action.pm)
+  ?.  (levy internal |=(e=pedge =(ea (dis (bit-mask ca.e) ea))))  |
+  =/  sm  (bit-mask-of ae-state.pm)
+  =/  cm  (roll scc |=([k=pg-key m=@] (con m (bit-mask cs:(~(got by nodes) k)))))
+  ?.  =(sm (dis cm sm))  |
+  =/  am  (bit-mask-of ae-action.pm)
+  =/  xm  (roll internal |=([e=pedge m=@] (con m (bit-mask ca.e))))
+  ?.  =(am (dis xm am))  |
+  (all-promises promises (turn scc |=(k=pg-key par:(~(got by nodes) k))))
+::
+++  scc-internal
+  ::  each component's internal EAAction-holding edges, in edge order, aligned
+  ::  with `sccs`. R4.P7: +scc-accepting filtered the WHOLE edge list once per
+  ::  component, O(components x edges); this is one pass
+  |=  [sccs=(list (list pg-key)) edges=(list pedge) eaa=(list @ud)]
+  ^-  (list (list pedge))
+  =/  cid=(map pg-key @ud)
+    =|  m=(map pg-key @ud)
+    =/  i  0
+    =/  cs  sccs
+    |-  ^-  (map pg-key @ud)
+    ?~  cs  m
+    =/  ks  i.cs
+    =.  m
+      |-  ^-  (map pg-key @ud)
+      ?~  ks  m
+      $(ks t.ks, m (~(put by m) i.ks i))
+    $(cs t.cs, i +(i))
+  =/  bk=(map @ud (list pedge))
+    =|  b=(map @ud (list pedge))
+    =/  es  edges
+    |-  ^-  (map @ud (list pedge))
+    ?~  es  b
+    =/  f  (~(get by cid) from.i.es)
+    ?~  f  $(es t.es)
+    ?.  =(f (~(get by cid) to.i.es))  $(es t.es)
+    ?.  (levy eaa |=(j=@ud (bit-at j ca.i.es)))  $(es t.es)
+    $(es t.es, b (~(put by b) u.f [i.es (~(gut by b) u.f ~)]))
+  =/  n  (lent sccs)
+  =|  out=(list (list pedge))
+  |-  ^-  (list (list pedge))
+  ?:  =(0 n)  out
+  $(n (dec n), out [(flop (~(gut by bk) (dec n) ~)) out])
 ::
 ++  oos-violated
   ::  whether any pem of an OrderOfSolution has an accepting SCC in the product
@@ -885,11 +1113,13 @@
   ?~  pms  |
   =/  adj   (adj-of edges.lp ea-action.i.pms)
   =/  sccs  (tarjan verts adj)
+  =/  ins   (scc-internal sccs edges.lp ea-action.i.pms)
   =/  hit
     |-  ^-  ?
     ?~  sccs  |
-    ?:  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)  &
-    $(sccs t.sccs)
+    ?~  ins  |
+    ?:  (scc-accepting-in i.sccs i.pms promises.o nodes.lp i.ins)  &
+    $(sccs t.sccs, ins t.ins)
   ?:(hit & $(pms t.pms))
 ::
 ++  live-verdict
@@ -988,6 +1218,21 @@
   |=  m=pem:tp
   &(=(~ ea-action.m) =(~ ae-state.m) =(~ ae-action.m))
 ::
+++  lasso-step
+  ::  R4.Q8b: `+lasso-of-product` over the next `n` of a built product's
+  ::  remaining PEMs. The PEMs are searched in order and the first lasso
+  ::  wins, so contiguous chunks answer as the whole list does; the search
+  ::  used to be one slice per OOS (≈200 s for ElevatorLivenessMedium's 256)
+  |=  [o=oos:tp pc=pcursor n=@ud]
+  ^-  [done=? lasso=(unit lasso) cur=pcursor]
+  =/  rest  ?~(lp.pc pems.o u.lp.pc)
+  =/  now   (scag (max 1 n) rest)
+  =/  l     (lasso-of-arcs o(pems now) [nodes.pc edges.pc inits.pc] oa.pc)
+  ?^  l  [& l pc]
+  =/  left  (slag (max 1 n) rest)
+  ?~  left  [& ~ pc]
+  [| ~ pc(lp `left)]
+::
 ++  lasso-of-product
   ::  the lasso (if any) for one OrderOfSolution over an ALREADY-BUILT product
   ::  (unit 8.8.2a): the bounded SCC/acceptance/lasso post-step the job kernel
@@ -997,6 +1242,24 @@
           lp=[nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
       ==
   ^-  (unit lasso)
+  (lasso-of-arcs o lp (out-arcs edges.lp))
+::
+++  out-arcs
+  ::  R4.Q8b: each vertex's out-edges with their checkAction bits as one mask,
+  ::  in `+adj-of`'s order (a jar prepends)
+  |=  edges=(list pedge)
+  ^-  (map pg-key (list [m=@ e=pedge]))
+  %+  roll  edges
+  |=  [e=pedge acc=(map pg-key (list [m=@ e=pedge]))]
+  (~(put by acc) from.e [[(bit-mask ca.e) e] (~(gut by acc) from.e ~)])
+::
+++  lasso-of-arcs
+  ::  R4.Q8b: `+lasso-of-product` given the product's `+out-arcs`
+  |=  $:  o=oos:tp
+          lp=[nodes=(map pg-key pnode) edges=(list pedge) inits=(list pg-key)]
+          oa=(map pg-key (list [m=@ e=pedge]))
+      ==
+  ^-  (unit lasso)
   =/  init-set  (silt inits.lp)
   =/  verts     (turn ~(tap by nodes.lp) |=([k=pg-key *] k))
   =/  pms       pems.o
@@ -1004,10 +1267,38 @@
   ::  witness the OrderOfSolution needs, and `+box-free-tf` is exactly that
   ::  question -- does a FINITE PREFIX discharge everything?
   =/  finite    (box-free-tf ~[o])
+  ::  R4.Q8b: a PEM filters `oa` (`+out-arcs`) on the fly with one `dis` per
+  ::  edge -- the adjacency, vertex set and internal-edge lists were rebuilt
+  ::  per PEM from the whole edge list, and ElevatorLivenessMedium has 256
+  ::  PEMs per OOS, each with its own EAAction list (448 s per OOS in one
+  ::  slice, now ≈200 s)
   |-  ^-  (unit lasso)
   ?~  pms  ~
-  =/  adj   (adj-of edges.lp ea-action.i.pms)
-  =/  sccs  (tarjan verts adj)
+  =/  si=[sccs=(list (list pg-key)) ins=(list (list pedge))]
+    =/  ea  (bit-mask-of ea-action.i.pms)
+    =/  ok  |=(m=@ =(ea (dis m ea)))
+    =/  outs
+      |=  v=pg-key
+      ^-  (list pedge)
+      (murn (~(gut by oa) v ~) |=([m=@ e=pedge] ?.((ok m) ~ `e)))
+    ::  only vertices with an EAAction out-edge: any other is its own
+    ::  component with no internal edge, never accepting, and leaving it out
+    ::  changes neither the other components nor their order (a DFS from it
+    ::  reaches nothing, and entering it moves no lowlink)
+    =/  vs  (skim verts |=(k=pg-key (lien (~(gut by oa) k ~) |=([m=@ *] (ok m)))))
+    =/  sccs  (tarjan-g vs |=(v=pg-key (turn (outs v) |=(e=pedge to.e))))
+    :-  sccs
+    ::  each component's internal EAAction edges (only `+scc-accepting-in`
+    ::  reads them, and it is order-blind)
+    %+  turn  sccs
+    |=  c=(list pg-key)
+    ^-  (list pedge)
+    =/  mem  (silt c)
+    %-  zing
+    %+  turn  c
+    |=(v=pg-key (skim (outs v) |=(e=pedge (~(has in mem) to.e))))
+  =/  sccs  sccs.si
+  =/  ins   ins.si
   ::  a stuttering counterexample is preferred over a back-to-state one, so
   ::  collect every accepting stutter lasso and pick among them, falling back
   ::  to the first back-to-state cycle. Which one is picked is keyed on
@@ -1048,12 +1339,13 @@
       =/  b  (lent prefix.best)
       =?  best  ?:(finite (lth a b) (gth a b))  i.more
       $(more t.more)
-    ?.  (scc-accepting i.sccs i.pms promises.o nodes.lp edges.lp ea-action.i.pms)
-      $(sccs t.sccs)
+    ?~  ins  $(sccs ~)
+    ?.  (scc-accepting-in i.sccs i.pms promises.o nodes.lp i.ins)
+      $(sccs t.sccs, ins t.ins)
     =/  st  (stutter-lasso i.sccs i.pms promises.o nodes.lp edges.lp init-set ea-action.i.pms)
     =?  stutters  ?=(^ st)  [u.st stutters]
     =?  bt  &(?=(~ bt) ?=(~ st))  (bts-lasso i.sccs edges.lp init-set ea-action.i.pms)
-    $(sccs t.sccs)
+    $(sccs t.sccs, ins t.ins)
   ?^(here here $(pms t.pms))
 ::
 ++  stutter-lasso

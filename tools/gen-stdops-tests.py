@@ -104,6 +104,17 @@ CLASSIFY = {
     ("Randomization", "RandomSubset"): ("required", "R2.7.4.5: `EnumerableValue.getRandomSubset(k)` -- the SubsetEnumerator LCG over the normalized element list, seeded `nextInt(n)` and incremented by a `nextPrime` draw, both from the carrier's enumeration generator. k > |S| is not an error; it yields the whole set"),
     ("Randomization", "RandomSetOfSubsets"): ("required", "R2.7.4.5: `SubsetValue.getRandomSetOfSubsets(k, n/|S|)`, the CoinTossingSubsetEnumerator -- k picks, one IEEE-754 `nextDouble() < probability` per element per pick, collected into a set so duplicates collapse. This is the (int, double) overload; the (int, int) one is the only path to util.Combinatorics and has no caller"),
     ("Randomization", "TestRandomSetOfSubsets"): ("required", "R2.7.4.5: no Java method at the pin -- Randomization.tla defines it as `[i \\in 1..5 |-> Cardinality(RandomSetOfSubsets(k, n, S))]`, whose five draws sit inside a function constructor and under Cardinality, both below the R2.7.4.1b carrier boundary. Evaluating that body would make ONE draw sequence and report it five times, so the port implements it natively -- the same decision TLCGetAndSet got in R2.7.4.3"),
+    #  R4.2f (user decision 2026-10-13): tla2tools' Json module. The three
+    #  encoders are pure registry rows; the two writers are node-ops whose
+    #  file becomes a job artifact through the carrier. The two readers wait
+    #  for the read half (Clay)
+    ("Json", "ToJson"):          ("required", "R4.2f: Json.getNode, Gson compact text"),
+    ("Json", "ToJsonArray"):     ("required", "R4.2f: Json.getArrayNode"),
+    ("Json", "ToJsonObject"):    ("required", "R4.2f: Json.getObjectNode (a tuple keyed by 0-based position)"),
+    ("Json", "JsonSerialize"):   ("required", "R4.2f: writes ToJson(v) of a sequence or record; the file is a job artifact (carrier `files`); TRUE"),
+    ("Json", "ndJsonSerialize"): ("required", "R4.2f: one ToJson line per element of a sequence; the file is a job artifact; TRUE"),
+    ("Json", "JsonDeserialize"):   ("required", "R4.2f: a typed refusal by name (approved difference, user decision 2026-10-13): it reads a file by a working-directory path, and a run reads only the sources its request names"),
+    ("Json", "ndJsonDeserialize"): ("required", "R4.2f: a typed refusal by name, as JsonDeserialize"),
     ("Sequences", "Seq"):    ("required", "non-enumerable descriptor: membership yes, enumeration typed failure (C1.3)"),
     # TLCExt's non-debugger operators (R2.6.3). The module-level default calls
     # every TLCExt surface `excluded`; these five are not, and `class` has to
@@ -214,7 +225,7 @@ def hoon_contracts() -> dict:
             r"\[\['([^']+)' '((?:[^'\\]|\\.)+)' (\d+)\]\s*\[([|&]) (\d+)", table):
         key = (m.group(1), m.group(2).replace("\\\\", "\\"), int(m.group(3)))
         out[key] = (m.group(4) == "&", int(m.group(5)))
-    nodes = text.split("++  node-op")[1].split("++  op-meta")[0]
+    nodes = text.split("++  node-op\n")[1].split("++  op-meta")[0]
     for m in re.finditer(
             r"=\(k \['([^']+)' '([^']+)' (\d+)\]\)\s*`\[%[\w-]+ ([|&]) (\d+)\]", nodes):
         out[(m.group(1), m.group(2), int(m.group(3)))] = (
@@ -264,6 +275,42 @@ def hoon_registry() -> tuple:
     return reg, bodies
 
 
+# R4.2c: CommunityModules operators the port overrides. Their modules are not
+# tla2tools StandardModules (the pin's inventory never lists them); each is
+# checked against the CommunityModules release jar's Java override instead
+# (IOUtils.java `@TLAPlusOperator(identifier = "IOEnv", module = "IOUtils")`).
+COMMUNITY_OVERRIDES = {
+    ("IOUtils", "IOEnv", 0): "R4.2c: the request's `env` as a record",
+    # R4.2h: refused by name (no process; no file outside the request)
+    ("IOUtils", "IOExec", 1): "R4.2h refusal", ("IOUtils", "IOEnvExec", 2): "R4.2h refusal",
+    ("IOUtils", "IOExecTemplate", 2): "R4.2h refusal", ("IOUtils", "IOEnvExecTemplate", 3): "R4.2h refusal",
+    ("IOUtils", "IOSerialize", 3): "R4.2h refusal", ("IOUtils", "IODeserialize", 2): "R4.2h refusal",
+    ("IOUtils", "Serialize", 3): "R4.2h refusal", ("IOUtils", "Deserialize", 2): "R4.2h refusal",
+    ("CSV", "CSVWrite", 3): "R4.2h refusal", ("CSV", "CSVWriteRecord", 4): "R4.2h refusal",
+    ("CSV", "CSVRead", 3): "R4.2h refusal", ("CSV", "CSVRecords", 1): "R4.2h refusal",
+    # R4.2b: ported from the pinned deps jar's overrides (tools/gen-cm-tests.py
+    # measures each against the pin), or refused by name
+    ("SequencesExt", "SetToSeq", 1): "R4.2b", ("SequencesExt", "SetToSeqs", 1): "R4.2b",
+    ("SequencesExt", "Contains", 2): "R4.2b", ("SequencesExt", "IsPrefix", 2): "R4.2b",
+    ("SequencesExt", "LongestCommonPrefix", 1): "R4.2b", ("SequencesExt", "Suffixes", 1): "R4.2b",
+    ("SequencesExt", "AllSubSeqs", 1): "R4.2b", ("SequencesExt", "RemoveFirst", 2): "R4.2b",
+    ("Functions", "IsInjective", 1): "R4.2b", ("Functions", "AntiFunction", 1): "R4.2b",
+    ("FiniteSetsExt", "kSubset", 2): "R4.2b", ("IOUtils", "atoi", 1): "R4.2b",
+    ("SVG", "SVGElemToString", 1): "R4.2b", ("SVG", "PointOnLine", 3): "R4.2b",
+    ("SVG", "NodeOfRingNetwork", 5): "R4.2b refusal", ("SVG", "NodesOfDirectedMultiGraph", 3): "R4.2b refusal",
+    ("Statistics", "ChiSquare", 3): "R4.2b refusal",
+    # R4.2b node-ops (an operator argument): lib/node-eval +eval-cm-op
+    ("SequencesExt", "FoldLeft", 3): "R4.2b", ("SequencesExt", "FoldLeftDomain", 3): "R4.2b",
+    ("SequencesExt", "FoldRight", 3): "R4.2b", ("SequencesExt", "FoldRightDomain", 3): "R4.2b",
+    ("SequencesExt", "FoldSeq", 3): "R4.2b", ("SequencesExt", "RemoveFirstMatch", 2): "R4.2b",
+    ("SequencesExt", "SelectInSeq", 2): "R4.2b", ("SequencesExt", "SelectLastInSeq", 2): "R4.2b",
+    ("SequencesExt", "SelectInSubSeq", 4): "R4.2b", ("SequencesExt", "SelectLastInSubSeq", 4): "R4.2b",
+    ("Functions", "FoldFunction", 3): "R4.2b", ("Functions", "FoldFunctionOnSet", 4): "R4.2b",
+    ("FiniteSetsExt", "FoldSet", 3): "R4.2b", ("FiniteSetsExt", "Quantify", 2): "R4.2b",
+    ("BagsExt", "FoldBag", 3): "R4.2b", ("VectorClocks", "CausalOrder", 4): "R4.2b refusal",
+}
+
+
 def check_registry(rows: list) -> list:
     """The C1.0 inventory binds the C1.1 implementation: every override row
     must be an operator the pin really declares and classifies `required`,
@@ -275,6 +322,8 @@ def check_registry(rows: list) -> list:
     problems = []
     for k in sorted(reg):
         cls = known.get(k)
+        if cls is None and k in COMMUNITY_OVERRIDES:
+            continue
         if cls is None:
             # defensive fallback: accept the same module+name at another
             # arity. No registry key needs it today — unary minus was keyed

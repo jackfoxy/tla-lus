@@ -1,0 +1,11 @@
+SANY exit 0
+*** Warnings: 3
+line 37, col 1 to line 37, col 23 of module APReadersWriters
+Multiple declarations or definitions for symbol ToSet.
+This duplicates the one at line 30, col 1 to line 30, col 37 of module APReadersWriters.
+line 37, col 1 to line 37, col 23 of module APReadersWriters
+Multiple declarations or definitions for symbol read.
+This duplicates the one at line 33, col 1 to line 33, col 24 of module APReadersWriters.
+line 37, col 1 to line 37, col 23 of module APReadersWriters
+Multiple declarations or definitions for symbol write.
+This duplicates the one at line 35, col 1 to line 35, col 26 of module APReadersWriters.

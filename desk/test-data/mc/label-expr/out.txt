@@ -1,0 +1,12 @@
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+x = 0
+State 2: <Next line 7, col 9 to line 8, col 29 of module spec>
+x = 1
+State 3: <Next line 7, col 9 to line 8, col 29 of module spec>
+x = 2
+State 4: <Next line 7, col 9 to line 8, col 29 of module spec>
+x = 3
+4 states generated, 4 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 4.

@@ -4,13 +4,12 @@
 # class: sany | check | excluded  (check = SANY + TLC, ported ops only)
 #
 # histogram:
-#   check                        247
-#   excluded:feature             37
-#   excluded:module              155
-#   excluded:pluscal             86
-#   excluded:proof               57
-#   sany                         246
-#   sany:check-excluded          187
+#   check                        388
+#   excluded:module              153
+#   excluded:pluscal             121
+#   sany                         276
+#   sany:check-excluded          37
+#   sany:symbolic                40
 #
 # total: 1015 modules
 
@@ -34,16 +33,16 @@ test-model	CalculatorSC.tla	excluded	module:IOUtils
 test-model	CallGotoUnlabeledTest.tla	sany	
 test-model	CaseOtherXml.tla	sany	
 test-model	CodePlexBug08/AgentRing.tla	sany	
-test-model	CodePlexBug08/AgentRingMC.tla	sany	check-excluded:AgentRing,TLCExt
+test-model	CodePlexBug08/AgentRingMC.tla	sany	check-excluded:TLCExt
 test-model	CodePlexBug08/CodeplexBug8.tla	sany	
 test-model	CodePlexBug08/EWD840.tla	sany	
-test-model	CodePlexBug08/EWD840MC1.tla	sany	check-excluded:EWD840,TLCExt
-test-model	CodePlexBug08/EWD840MC2.tla	sany	check-excluded:EWD840
-test-model	CodePlexBug08/EWD840MC3.tla	sany	check-excluded:EWD840
-test-model	CodePlexBug08/EWD840MC4.tla	sany	check-excluded:EWD840
-test-model	CodePlexBug08/InlineMC.tla	sany	check-excluded:EWD840
-test-model	CodePlexBug08/MC.tla	sany	check-excluded:CodeplexBug8
-test-model	CodePlexBug08/MCa.tla	sany	check-excluded:CodeplexBug8,TLCExt
+test-model	CodePlexBug08/EWD840MC1.tla	sany	check-excluded:TLCExt
+test-model	CodePlexBug08/EWD840MC2.tla	check	
+test-model	CodePlexBug08/EWD840MC3.tla	check	
+test-model	CodePlexBug08/EWD840MC4.tla	check	
+test-model	CodePlexBug08/InlineMC.tla	check	
+test-model	CodePlexBug08/MC.tla	check	
+test-model	CodePlexBug08/MCa.tla	sany	check-excluded:TLCExt
 test-model	CodePlexBug21.tla	check	
 test-model	ConstLevelInvariant.tla	sany	
 test-model	ConstantContextTLCCache.tla	sany	check-excluded:TLCExt
@@ -52,8 +51,8 @@ test-model	ConstantRank1TLCEval.tla	sany
 test-model	ConstantRank2AssertError.tla	sany	
 test-model	Continue.tla	check	
 test-model	CyclicRedefine.tla	sany	
-test-model	CyclicRedefineInstance.tla	sany	check-excluded:Base
-test-model	CyclicRedefineVars.tla	sany	check-excluded:Base
+test-model	CyclicRedefineInstance.tla	check	
+test-model	CyclicRedefineVars.tla	check	
 test-model	Decimal.tla	sany	
 test-model	DepthFirstErrorTrace.tla	check	
 test-model	DepthFirstTerminate.tla	excluded	pluscal
@@ -71,17 +70,17 @@ test-model	DoInitFunctor/DoInitFunctorProperty.tla	check
 test-model	EWD840/EWD840.tla	sany	
 test-model	EWD840/Error02.tla	sany	
 test-model	EWD840/Error03.tla	sany	
-test-model	EWD840/MC.tla	sany	check-excluded:EWD840
-test-model	EWD840/MC02.tla	sany	check-excluded:EWD840
+test-model	EWD840/MC.tla	check	
+test-model	EWD840/MC02.tla	check	
 test-model	EWD840/MC02Sim.tla	sany	
-test-model	EWD840/MC03Sim.tla	sany	check-excluded:EWD840
-test-model	EWD840/MC06.tla	sany	check-excluded:EWD840
-test-model	EWD998/EWD998.tla	sany	check-excluded:TLCExt,Utils
-test-model	EWD998/EWD998Chan.tla	sany	check-excluded:EWD998,Utils
-test-model	EWD998/EWD998_TTrace.tla	excluded	module:EWD998_TE,TTraceTraceDef
+test-model	EWD840/MC03Sim.tla	check	
+test-model	EWD840/MC06.tla	check	
+test-model	EWD998/EWD998.tla	sany	check-excluded:TLCExt
+test-model	EWD998/EWD998Chan.tla	sany	check-excluded:TLCExt
+test-model	EWD998/EWD998_TTrace.tla	sany	
 test-model	EWD998/Utils.tla	sany	
 test-model	Echo/Echo.tla	excluded	pluscal
-test-model	Echo/MCEcho.tla	sany	check-excluded:Echo
+test-model	Echo/MCEcho.tla	check	
 test-model	Echo/Relation.tla	sany	
 test-model	Empty.tla	check	
 test-model	EmptyExistentialQuantifier.tla	sany	
@@ -101,7 +100,7 @@ test-model	Github1109a.tla	sany
 test-model	Github1145.tla	check	
 test-model	Github1145b.tla	check	
 test-model	Github1147.tla	sany	check-excluded:TLCExt
-test-model	Github1161.tla	excluded	module:Github1161Abstract,SubstInNode
+test-model	Github1161.tla	check	
 test-model	Github1191.tla	sany	
 test-model	Github1191a.tla	sany	
 test-model	Github1198.tla	sany	
@@ -129,7 +128,7 @@ test-model	Github362.tla	sany
 test-model	Github362B.tla	sany	
 test-model	Github391.tla	check	
 test-model	Github407.tla	check	
-test-model	Github429.tla	excluded	module:Alpha
+test-model	Github429.tla	sany	
 test-model	Github432.tla	check	
 test-model	Github461.tla	check	
 test-model	Github525.tla	check	
@@ -142,34 +141,34 @@ test-model	Github680a.tla	sany
 test-model	Github680b.tla	sany	
 test-model	Github680c.tla	sany	
 test-model	Github687.tla	sany	
-test-model	Github687fifo.tla	excluded	module:FIFO
-test-model	Github687spec.tla	excluded	module:Ring
+test-model	Github687fifo.tla	sany	
+test-model	Github687spec.tla	sany	
 test-model	Github696.tla	sany	check-excluded:TLCExt
 test-model	Github696b.tla	sany	check-excluded:TLCExt
-test-model	Github702.tla	excluded	module:x_unchanged
+test-model	Github702.tla	check	
 test-model	Github710a.tla	sany	
 test-model	Github710b.tla	sany	check-excluded:TLCExt
 test-model	Github710d.tla	check	
 test-model	Github710e.tla	check	
 test-model	Github715.tla	check	
-test-model	Github725.tla	excluded	module:Inner
-test-model	Github725b.tla	excluded	module:Inner725b
-test-model	Github725c.tla	excluded	module:Inner725c
+test-model	Github725.tla	check	
+test-model	Github725b.tla	check	
+test-model	Github725c.tla	check	
 test-model	Github725d.tla	check	
-test-model	Github725e.tla	excluded	module:Inner725e,access
-test-model	Github725f.tla	excluded	module:Inner725f
-test-model	Github725g.tla	excluded	module:Inner725g
+test-model	Github725e.tla	check	
+test-model	Github725f.tla	check	
+test-model	Github725g.tla	check	
 test-model	Github726.tla	check	
 test-model	Github742.tla	check	
 test-model	Github743.tla	check	
 test-model	Github746.tla	check	
 test-model	Github757.tla	sany	
 test-model	Github766.tla	sany	
-test-model	Github790.tla	sany	check-excluded:Github790,TLAPS
+test-model	Github790.tla	excluded	module:TLAPS
 test-model	Github798I.tla	sany	
 test-model	Github798N.tla	sany	
 test-model	Github807.tla	sany	
-test-model	Github817.tla	excluded	module:Abstract,Abstract2
+test-model	Github817.tla	sany	
 test-model	Github819.tla	sany	
 test-model	Github849.tla	sany	
 test-model	Github866.tla	sany	
@@ -191,13 +190,13 @@ test-model	MinimumDiameter.tla	check
 test-model	MissingBodyInWhile.tla	excluded	pluscal
 test-model	MissingBodyInWith.tla	excluded	pluscal
 test-model	ModuleOverwrites/ModuleOverwrites.tla	check	
-test-model	MonolithSpec.tla	excluded	module:Mod4711,Mod4712
+test-model	MonolithSpec.tla	sany	
 test-model	NoFairnessButLiveProp.tla	sany	
 test-model	PlusCalOptions.tla	sany	check-excluded:Toolbox
 test-model	PossibleFail.tla	sany	
 test-model	PossibleTest.tla	check	
 test-model	PostConditionsTest.tla	check	
-test-model	PrintTraceRace/MC.tla	sany	check-excluded:PrintTraceRace
+test-model	PrintTraceRace/MC.tla	check	
 test-model	PrintTraceRace/PrintTraceRace.tla	sany	
 test-model	RandomElement.tla	check	
 test-model	RandomElementXandY.tla	check	
@@ -225,7 +224,7 @@ test-model	TLCGetNonDeterminism.tla	check
 test-model	TLCSet.tla	check	
 test-model	TLCSetInit.tla	check	
 test-model	TLCSetSim.tla	sany	
-test-model	TSnapShot/MC.tla	sany	check-excluded:TSnapShot
+test-model	TSnapShot/MC.tla	check	
 test-model	TSnapShot/TSnapShot.tla	sany	
 test-model	Test2.tla	check	
 test-model	Test2a.tla	check	
@@ -239,11 +238,11 @@ test-model	UserModuleOverrideBase.tla	excluded	module:UserModuleOverrideFromJar
 test-model	ViewMap.tla	excluded	pluscal
 test-model	VoteProof/Consensus.tla	sany	
 test-model	VoteProof/FiniteSets.tla	sany	
-test-model	VoteProof/MC.tla	sany	check-excluded:VoteProof
+test-model	VoteProof/MC.tla	check	
 test-model	VoteProof/TLAPS.tla	sany	
 test-model	VoteProof/VoteProof.tla	excluded	pluscal
 test-model	cdot/ActionComposition.tla	sany	
-test-model	cdot/ActionCompositionDistributive.tla	excluded	module:HL
+test-model	cdot/ActionCompositionDistributive.tla	sany	
 test-model	cdot/CdotWithContextA.tla	check	
 test-model	cdot/CdotWithContextB.tla	check	
 test-model	cdot/CdotWithContextC.tla	check	
@@ -258,7 +257,7 @@ test-model	coverage/D.tla	check
 test-model	coverage/E.tla	check	
 test-model	coverage/F.tla	check	
 test-model	coverage/G.tla	check	
-test-model	coverage/Github314.tla	sany	check-excluded:Base
+test-model	coverage/Github314.tla	check	
 test-model	coverage/Github377.tla	check	
 test-model	coverage/Github649.tla	check	
 test-model	coverage/H.tla	check	
@@ -269,73 +268,73 @@ test-model	coverage/L.tla	check
 test-model	coverage/M.tla	check	
 test-model	debug/Debug02.tla	sany	
 test-model	debug/Debug03.tla	sany	
-test-model	debug/Debug04.tla	excluded	module:Naturals \* Needed for debugger watch expressions.
+test-model	debug/Debug04.tla	sany	
 test-model	debug/Debug05.tla	sany	
 test-model	debug/ExpressionBreakpointTest.tla	sany	
 test-model	dekker.tla	sany	
 test-model	examples/BlockingQueue/BlockingQueuePoisonApple.tla	sany	check-excluded:TLCExt
 test-model	examples/CoffeeCan/CoffeeCan100Beans.tla	check	
 test-model	examples/FiniteMonotonic/DistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt
-test-model	examples/FiniteMonotonic/MCDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt
+test-model	examples/FiniteMonotonic/MCDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt
 test-model	examples/Huang/Huang.tla	excluded	module:DyadicRationals,Functions,SequencesExt
 test-model	examples/Prisoners/Prisoners.tla	sany	check-excluded:TLCExt
-test-model	examples/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.tla	sany	check-excluded:SPA_Attack_New
+test-model	examples/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.tla	excluded	module:Bitwise,Functions
 test-model	examples/SDP_Verification/SDP_Attack_New_Solution_Spec/SPA_Attack_New.tla	excluded	module:Bitwise,Functions
-test-model	examples/SDP_Verification/SDP_Attack_Spec/MC.tla	sany	check-excluded:SPA_Attack
+test-model	examples/SDP_Verification/SDP_Attack_Spec/MC.tla	excluded	module:Bitwise,Functions
 test-model	examples/SDP_Verification/SDP_Attack_Spec/SPA_Attack.tla	excluded	module:Bitwise,Functions
-test-model	examples/SingleLaneBridge/MC.tla	sany	check-excluded:SingleLaneBridge
+test-model	examples/SingleLaneBridge/MC.tla	check	
 test-model	examples/SingleLaneBridge/SingleLaneBridge.tla	sany	
 test-model	examples/SpanningTree/SpanTree.tla	check	
 test-model	examples/SpanningTree/SpanTreeRandom.tla	check	
 test-model	examples/SpanningTree/SpanTreeTest.tla	sany	
 test-model	examples/SpecifyingSystems/CachingMemory/InternalMemory.tla	sany	
-test-model	examples/SpecifyingSystems/CachingMemory/MCWriteThroughCache.tla	sany	check-excluded:WriteThroughCacheInstanced
+test-model	examples/SpecifyingSystems/CachingMemory/MCWriteThroughCache.tla	check	
 test-model	examples/SpecifyingSystems/CachingMemory/Memory.tla	sany	
 test-model	examples/SpecifyingSystems/CachingMemory/MemoryInterface.tla	sany	
 test-model	examples/SpecifyingSystems/CachingMemory/WriteThroughCache.tla	sany	
-test-model	examples/SpecifyingSystems/CachingMemory/WriteThroughCacheInstanced.tla	excluded	module:statement
+test-model	examples/SpecifyingSystems/CachingMemory/WriteThroughCacheInstanced.tla	sany	
 test-model	examples/SpecifyingSystems/Liveness/HourClock.tla	sany	
 test-model	examples/SpecifyingSystems/Liveness/InternalMemory.tla	sany	
-test-model	examples/SpecifyingSystems/Liveness/LiveHourClock.tla	sany	check-excluded:HourClock,TLCExt
+test-model	examples/SpecifyingSystems/Liveness/LiveHourClock.tla	sany	check-excluded:TLCExt
 test-model	examples/SpecifyingSystems/Liveness/LiveInternalMemory.tla	sany	
 test-model	examples/SpecifyingSystems/Liveness/LiveWriteThroughCache.tla	sany	
-test-model	examples/SpecifyingSystems/Liveness/MCLiveInternalMemory.tla	sany	check-excluded:LiveInternalMemory,TLCExt
-test-model	examples/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.tla	excluded	module:LiveMemory
+test-model	examples/SpecifyingSystems/Liveness/MCLiveInternalMemory.tla	sany	check-excluded:TLCExt
+test-model	examples/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.tla	sany	check-excluded:TLCExt
 test-model	examples/SpecifyingSystems/Liveness/Memory.tla	sany	
 test-model	examples/SpecifyingSystems/Liveness/MemoryInterface.tla	sany	
-test-model	examples/SpecifyingSystems/Liveness/WriteThroughCacheInstanced.tla	excluded	module:statement
+test-model	examples/SpecifyingSystems/Liveness/WriteThroughCacheInstanced.tla	sany	
 test-model	examples/SpecifyingSystems/TLC/ABCorrectness.tla	check	
 test-model	examples/SpecifyingSystems/TLC/AlternatingBit.tla	sany	
-test-model	examples/SpecifyingSystems/TLC/MCAlternatingBit.tla	sany	check-excluded:ABCorrectness,AlternatingBit,TLCExt
-test-model	examples/YoYo/MCYoYoNoPruning.tla	sany	check-excluded:TLCExt,YoYoNoPruning
+test-model	examples/SpecifyingSystems/TLC/MCAlternatingBit.tla	sany	check-excluded:TLCExt
+test-model	examples/YoYo/MCYoYoNoPruning.tla	excluded	module:UndirectedGraphs
 test-model	examples/YoYo/YoYoNoPruning.tla	excluded	module:UndirectedGraphs
 test-model	examples/YoYo/YoYoPruning.tla	excluded	module:UndirectedGraphs
-test-model	examples/aba-asyn-byz/aba_asyn_byz.tla	excluded	module:FiniteSets *),Naturals (*
+test-model	examples/aba-asyn-byz/aba_asyn_byz.tla	sany	check-excluded:TLCExt
 test-model	examples/acp/ACP_NB.tla	sany	
-test-model	examples/acp/ACP_NB_TLC.tla	sany	check-excluded:ACP_NB,TLCExt
-test-model	examples/acp/ACP_NB_WRONG_TLC.tla	sany	check-excluded:ACP_SB
+test-model	examples/acp/ACP_NB_TLC.tla	sany	check-excluded:TLCExt
+test-model	examples/acp/ACP_NB_WRONG_TLC.tla	check	
 test-model	examples/acp/ACP_SB.tla	sany	
-test-model	examples/acp/ACP_SB_TLC.tla	sany	check-excluded:ACP_SB
+test-model	examples/acp/ACP_SB_TLC.tla	check	
 test-model	examples/allocator/SchedulingAllocator.tla	sany	check-excluded:TLCExt
 test-model	examples/allocator/SimpleAllocator.tla	sany	check-excluded:TLCExt
-test-model	examples/bcastByz/bcastByz.tla	check	
-test-model	examples/bcastFolklore/bcastFolklore.tla	excluded	module:FiniteSets *),Naturals (*
-test-model	examples/braf/BufferedRandomAccessFile.tla	excluded	module:Common,RandomAccessFile
+test-model	examples/bcastByz/bcastByz.tla	excluded	module:Functions
+test-model	examples/bcastFolklore/bcastFolklore.tla	check	
+test-model	examples/braf/BufferedRandomAccessFile.tla	sany	check-excluded:TLCExt
 test-model	examples/cf1s-folklore/cf1s_folklore.tla	check	
 test-model	examples/detector_chan96/Age_Channel.tla	sany	
 test-model	examples/detector_chan96/EPFailureDetector.tla	sany	
-test-model	examples/detector_chan96/EnvironmentController.tla	sany	check-excluded:Age_Channel,EPFailureDetector
+test-model	examples/detector_chan96/EnvironmentController.tla	check	
 test-model	examples/ewd687a/EWD687a.tla	excluded	module:Graphs
-test-model	examples/ewd687a/MCEWD687a.tla	sany	check-excluded:EWD687a,TLCExt
-test-model	examples/ewd840/EWD840.tla	sany	check-excluded:SyncTerminationDetection,TLCExt
+test-model	examples/ewd687a/MCEWD687a.tla	excluded	module:Graphs
+test-model	examples/ewd840/EWD840.tla	sany	check-excluded:TLCExt
 test-model	examples/ewd840/SyncTerminationDetection.tla	check	
 test-model	examples/ewd998/AsyncTerminationDetection.tla	sany	check-excluded:TLCExt
 test-model	examples/ewd998/EWD998.tla	excluded	module:Functions
-test-model	examples/ewd998/EWD998Chan.tla	sany	check-excluded:EWD998,Utils
-test-model	examples/ewd998/EWD998ChanID.tla	sany	check-excluded:EWD998Chan,TLCExt,Utils
+test-model	examples/ewd998/EWD998Chan.tla	excluded	module:Functions,SequencesExt
+test-model	examples/ewd998/EWD998ChanID.tla	excluded	module:Functions,SequencesExt
 test-model	examples/ewd998/Utils.tla	excluded	module:Functions,SequencesExt
 test-model	examples/locks_auxiliary_vars/Lock.tla	excluded	pluscal
-test-model	examples/locks_auxiliary_vars/LockHS.tla	sany	check-excluded:Lock,Peterson,Stuttering
+test-model	examples/locks_auxiliary_vars/LockHS.tla	check	
 test-model	examples/locks_auxiliary_vars/Peterson.tla	excluded	pluscal
 test-model	examples/locks_auxiliary_vars/Stuttering.tla	sany	
 test-model	examples/nbacg_guer01/nbacg_guer01.tla	check	
@@ -378,7 +377,7 @@ test-model	pcal/FastMutex3.tla	excluded	pluscal
 test-model	pcal/FastMutexWithGoto.tla	excluded	pluscal
 test-model	pcal/FastMutexWithGoto2.tla	excluded	pluscal
 test-model	pcal/Fischer.tla	excluded	pluscal
-test-model	pcal/Github136.tla	sany	check-excluded:Github136Inner
+test-model	pcal/Github136.tla	check	
 test-model	pcal/Github136Inner.tla	sany	
 test-model	pcal/Github776.tla	check	
 test-model	pcal/InnerLabeledIf.tla	excluded	pluscal
@@ -431,13 +430,13 @@ test-model	pcal/bug_05_12_16b.tla	excluded	pluscal
 test-model	pcal/bug_05_12_31.tla	excluded	pluscal
 test-model	pcal/bug_06_01_25.tla	excluded	pluscal
 test-model	qlearning/Counter.tla	excluded	module:CSV
-test-model	sany/Github723.tla	excluded	module:Inner
+test-model	sany/Github723.tla	sany	
 test-model	sany/RecursiveDefDeclMismatch.tla	sany	
 test-model	simulation/BasicMultiTrace/BasicMultiTrace.tla	sany	
 test-model	simulation/BenchmarkSpec/BenchmarkSpec.tla	sany	
 test-model	simulation/Example1.tla	sany	check-excluded:TLCExt
 test-model	simulation/Example2.tla	sany	check-excluded:TLCExt
-test-model	simulation/NQSpec/MC.tla	sany	check-excluded:NQSpecImpliesQSpec
+test-model	simulation/NQSpec/MC.tla	check	
 test-model	simulation/NQSpec/NQSpec.tla	sany	
 test-model	simulation/NQSpec/NQSpecImpliesQSpec.tla	sany	
 test-model	simulation/NQSpec/QSpec.tla	sany	
@@ -471,37 +470,37 @@ test-model	suite/test18.tla	check
 test-model	suite/test19.tla	check	
 test-model	suite/test2.tla	check	
 test-model	suite/test20.tla	check	
-test-model	suite/test201.tla	sany	check-excluded:test201a
+test-model	suite/test201.tla	check	
 test-model	suite/test201a.tla	check	
 test-model	suite/test202.tla	check	
-test-model	suite/test203.tla	sany	check-excluded:test203a
+test-model	suite/test203.tla	check	
 test-model	suite/test203a.tla	check	
 test-model	suite/test204.tla	check	
-test-model	suite/test205.tla	sany	check-excluded:test204
-test-model	suite/test206.tla	sany	check-excluded:test206a
+test-model	suite/test205.tla	check	
+test-model	suite/test206.tla	check	
 test-model	suite/test206a.tla	check	
 test-model	suite/test207.tla	check	
-test-model	suite/test208.tla	excluded	module:Test1
-test-model	suite/test209.tla	excluded	module:Test1
+test-model	suite/test208.tla	excluded	module:M,Test1
+test-model	suite/test209.tla	excluded	module:M,Test1
 test-model	suite/test21.tla	check	
-test-model	suite/test210.tla	excluded	module:Test1
+test-model	suite/test210.tla	excluded	module:M,Test1
 test-model	suite/test211.tla	sany	
-test-model	suite/test212.tla	sany	check-excluded:test212a,test212b
+test-model	suite/test212.tla	check	
 test-model	suite/test212a.tla	sany	
 test-model	suite/test212b.tla	sany	
-test-model	suite/test213.tla	sany	check-excluded:test213b
+test-model	suite/test213.tla	check	
 test-model	suite/test213b.tla	sany	
 test-model	suite/test214.tla	check	
 test-model	suite/test215.tla	check	
-test-model	suite/test216.tla	sany	check-excluded:test216a,test216c
+test-model	suite/test216.tla	check	
 test-model	suite/test216a.tla	sany	
 test-model	suite/test216b.tla	sany	
 test-model	suite/test216c.tla	sany	
-test-model	suite/test217.tla	sany	check-excluded:test217a
+test-model	suite/test217.tla	check	
 test-model	suite/test217a.tla	sany	
 test-model	suite/test218.tla	excluded	module:Test218a
-test-model	suite/test219.tla	sany	check-excluded:test219a
-test-model	suite/test219a.tla	sany	check-excluded:test206a
+test-model	suite/test219.tla	check	
+test-model	suite/test219a.tla	check	
 test-model	suite/test22.tla	check	
 test-model	suite/test220.tla	check	
 test-model	suite/test23.tla	check	
@@ -522,7 +521,7 @@ test-model	suite/test34.tla	check
 test-model	suite/test35.tla	check	
 test-model	suite/test36.tla	check	
 test-model	suite/test37.tla	check	
-test-model	suite/test38.tla	sany	check-excluded:test38a
+test-model	suite/test38.tla	check	
 test-model	suite/test38a.tla	sany	
 test-model	suite/test39.tla	check	
 test-model	suite/test4.tla	check	
@@ -533,7 +532,7 @@ test-model	suite/test43.tla	check
 test-model	suite/test44.tla	check	
 test-model	suite/test45.tla	check	
 test-model	suite/test46.tla	check	
-test-model	suite/test47.tla	sany	check-excluded:test47a
+test-model	suite/test47.tla	check	
 test-model	suite/test47a.tla	sany	
 test-model	suite/test48.tla	check	
 test-model	suite/test49.tla	check	
@@ -542,309 +541,309 @@ test-model	suite/test49b.tla	check
 test-model	suite/test49c.tla	check	
 test-model	suite/test5.tla	check	
 test-model	suite/test50.tla	check	
-test-model	suite/test51.tla	sany	check-excluded:test51a,test51b
+test-model	suite/test51.tla	check	
 test-model	suite/test51a.tla	sany	
 test-model	suite/test51b.tla	sany	
 test-model	suite/test52.tla	check	
 test-model	suite/test53.tla	check	
 test-model	suite/test54.tla	check	
-test-model	suite/test55.tla	excluded	module:semantics
+test-model	suite/test55.tla	check	
 test-model	suite/test55a.tla	sany	
-test-model	suite/test56.tla	excluded	module:semantics
-test-model	suite/test56a.tla	excluded	module:semantics
-test-model	suite/test57.tla	excluded	module:semantics
-test-model	suite/test57a.tla	excluded	module:semantics
+test-model	suite/test56.tla	check	
+test-model	suite/test56a.tla	sany	
+test-model	suite/test57.tla	check	
+test-model	suite/test57a.tla	sany	
 test-model	suite/test58.tla	check	
-test-model	suite/test59.tla	excluded	module:inside
-test-model	suite/test59a.tla	excluded	module:inside
+test-model	suite/test59.tla	check	
+test-model	suite/test59a.tla	sany	
 test-model	suite/test6.tla	check	
 test-model	suite/test60.tla	check	
-test-model	suite/test61.tla	sany	check-excluded:test61a
+test-model	suite/test61.tla	check	
 test-model	suite/test61a.tla	sany	
 test-model	suite/test62.tla	check	
-test-model	suite/test63.tla	sany	check-excluded:test63a
+test-model	suite/test63.tla	check	
 test-model	suite/test63a.tla	check	
-test-model	suite/test64.tla	sany	check-excluded:test64a
+test-model	suite/test64.tla	check	
 test-model	suite/test64a.tla	check	
-test-model	suite/test65.tla	sany	check-excluded:test65a
+test-model	suite/test65.tla	check	
 test-model	suite/test65a.tla	check	
 test-model	suite/test7.tla	check	
 test-model	suite/test8.tla	check	
 test-model	suite/test9.tla	check	
 test-model	suite/test99.tla	check	
 test-model	suite/test999.tla	check	
-test-model	suite/testa.tla	sany	check-excluded:test
+test-model	suite/testa.tla	check	
 test-model	suite/testfoo.tla	check	
 test-model	suite/testt37.tla	sany	
 test-model	symmetry/April20a.tla	sany	
-test-model	symmetry/April20aMC.tla	sany	check-excluded:April20a
+test-model	symmetry/April20aMC.tla	check	
 test-model	symmetry/April20b.tla	sany	
-test-model	symmetry/April20bMC.tla	sany	check-excluded:April20b
+test-model	symmetry/April20bMC.tla	check	
 test-model	symmetry/April21.tla	sany	
-test-model	symmetry/April21MC.tla	sany	check-excluded:April21
+test-model	symmetry/April21MC.tla	check	
 test-model	symmetry/April22.tla	sany	
-test-model	symmetry/April22MC.tla	sany	check-excluded:April22
+test-model	symmetry/April22MC.tla	check	
 test-model	symmetry/April25.tla	sany	
-test-model	symmetry/April25MC.tla	sany	check-excluded:April25
+test-model	symmetry/April25MC.tla	check	
 test-model	symmetry/April29.tla	sany	
-test-model	symmetry/April29MC.tla	sany	check-excluded:April29
-test-model	symmetry/April29dMC.tla	sany	check-excluded:April29
+test-model	symmetry/April29MC.tla	check	
+test-model	symmetry/April29dMC.tla	check	
 test-model	symmetry/ChooseTableauSymmetry.tla	sany	
-test-model	symmetry/ChooseTableauSymmetryMC.tla	sany	check-excluded:ChooseTableauSymmetry
-test-model	symmetry/ChooseTableauSymmetryMCa.tla	sany	check-excluded:ChooseTableauSymmetry
+test-model	symmetry/ChooseTableauSymmetryMC.tla	check	
+test-model	symmetry/ChooseTableauSymmetryMCa.tla	check	
 test-model	symmetry/ErrorTraceConstruction.tla	sany	
-test-model	symmetry/ErrorTraceConstructionMC.tla	sany	check-excluded:ErrorTraceConstruction
-test-model	symmetry/LongMC.tla	sany	check-excluded:SymmetryLivenessLong
-test-model	symmetry/LongMCa.tla	sany	check-excluded:SymmetryLivenessLong
-test-model	symmetry/MC.tla	sany	check-excluded:SymmetryLiveness3
-test-model	symmetry/MCa.tla	sany	check-excluded:SymmetryLiveness3
+test-model	symmetry/ErrorTraceConstructionMC.tla	check	
+test-model	symmetry/LongMC.tla	check	
+test-model	symmetry/LongMCa.tla	check	
+test-model	symmetry/MC.tla	check	
+test-model	symmetry/MCa.tla	check	
 test-model	symmetry/May09.tla	sany	
-test-model	symmetry/May09MC.tla	sany	check-excluded:May09
-test-model	symmetry/May09dMC.tla	sany	check-excluded:May09
-test-model	symmetry/NQ/MC.tla	sany	check-excluded:NQSpec
-test-model	symmetry/NQ/MCa.tla	sany	check-excluded:NQSpec
+test-model	symmetry/May09MC.tla	check	
+test-model	symmetry/May09dMC.tla	check	
+test-model	symmetry/NQ/MC.tla	check	
+test-model	symmetry/NQ/MCa.tla	check	
 test-model	symmetry/NQ/NQSpec.tla	sany	
-test-model	symmetry/NoSymmetryLivenessTableauMC.tla	sany	check-excluded:SymmetryLivenessTableau
+test-model	symmetry/NoSymmetryLivenessTableauMC.tla	check	
 test-model	symmetry/OneBitMutex/OneBitMutex.tla	excluded	pluscal
-test-model	symmetry/OneBitMutex/OneBitMutexMC.tla	sany	check-excluded:OneBitMutex
-test-model	symmetry/OneBitMutex/OneBitMutexNoSymmetryMC.tla	sany	check-excluded:OneBitMutex,TLCExt
+test-model	symmetry/OneBitMutex/OneBitMutexMC.tla	check	
+test-model	symmetry/OneBitMutex/OneBitMutexNoSymmetryMC.tla	sany	check-excluded:TLCExt
 test-model	symmetry/SymmetryLiveness3.tla	sany	
 test-model	symmetry/SymmetryLivenessLong.tla	sany	
 test-model	symmetry/SymmetryLivenessTableau.tla	sany	
-test-model	symmetry/SymmetryLivenessTableauMC.tla	sany	check-excluded:SymmetryLivenessTableau
+test-model	symmetry/SymmetryLivenessTableauMC.tla	check	
 test-model	symmetry/TableauSymmetry.tla	sany	
-test-model	symmetry/TableauSymmetryMC.tla	sany	check-excluded:TableauSymmetry
+test-model	symmetry/TableauSymmetryMC.tla	check	
 test-model	symmetry/TwoPhaseCommit/DistributedCommit.tla	sany	
-test-model	symmetry/TwoPhaseCommit/MC.tla	sany	check-excluded:TwoPhaseCommit
+test-model	symmetry/TwoPhaseCommit/MC.tla	check	
 test-model	symmetry/TwoPhaseCommit/TwoPhaseCommit.tla	sany	
 test-model	symmetry/Unsymmetric.tla	sany	
-test-model	symmetry/UnsymmetricMCA.tla	sany	check-excluded:Unsymmetric
-test-model	symmetry/UnsymmetricMCB.tla	sany	check-excluded:Unsymmetric
+test-model	symmetry/UnsymmetricMCA.tla	check	
+test-model	symmetry/UnsymmetricMCB.tla	check	
 test-model	testinvalidinvariant.tla	check	
-examples	specifications/Bakery-Boulangerie/Bakery.tla	excluded	feature:pluscal
-examples	specifications/Bakery-Boulangerie/Boulanger.tla	excluded	feature:pluscal
-examples	specifications/Bakery-Boulangerie/MCBakery.tla	sany	check-excluded:Bakery
-examples	specifications/Bakery-Boulangerie/MCBoulanger.tla	sany	check-excluded:Boulanger
+examples	specifications/Bakery-Boulangerie/Bakery.tla	excluded	pluscal
+examples	specifications/Bakery-Boulangerie/Boulanger.tla	excluded	pluscal
+examples	specifications/Bakery-Boulangerie/MCBakery.tla	excluded	module:TLAPS
+examples	specifications/Bakery-Boulangerie/MCBoulanger.tla	excluded	module:TLAPS
 examples	specifications/CarTalkPuzzle/CarTalkPuzzle.tla	sany	
 examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/CarTalkPuzzle.tla	sany	
-examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.tla	sany	check-excluded:CarTalkPuzzle
+examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.tla	check	
 examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/CarTalkPuzzle.tla	sany	
-examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/MC.tla	sany	check-excluded:CarTalkPuzzle
+examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_2/MC.tla	check	
 examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_3/CarTalkPuzzle.tla	sany	
-examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_3/MC.tla	sany	check-excluded:CarTalkPuzzle
-examples	specifications/Chameneos/APChameneos.tla	excluded	module:so
+examples	specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_3/MC.tla	check	
+examples	specifications/Chameneos/APChameneos.tla	sany	
 examples	specifications/Chameneos/Chameneos.tla	check	
 examples	specifications/CheckpointCoordination/CheckpointCoordination.tla	sany	
-examples	specifications/CheckpointCoordination/MCCheckpointCoordination.tla	sany	check-excluded:CheckpointCoordination
-examples	specifications/CigaretteSmokers/APCigaretteSmokers.tla	excluded	module:so
+examples	specifications/CheckpointCoordination/MCCheckpointCoordination.tla	check	
+examples	specifications/CigaretteSmokers/APCigaretteSmokers.tla	sany	symbolic
 examples	specifications/CigaretteSmokers/CigaretteSmokers.tla	check	
-examples	specifications/CigaretteSmokers/CigaretteSmokers_proof.tla	excluded	proof
-examples	specifications/CoffeeCan/APCoffeeCan.tla	excluded	module:so
+examples	specifications/CigaretteSmokers/CigaretteSmokers_proof.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/CoffeeCan/APCoffeeCan.tla	sany	symbolic
 examples	specifications/CoffeeCan/CoffeeCan.tla	check	
-examples	specifications/CoffeeCan/CoffeeCan_proof.tla	excluded	proof
-examples	specifications/DieHard/APADieHardest.tla	sany	
-examples	specifications/DieHard/APDieHarder.tla	excluded	module:so
+examples	specifications/CoffeeCan/CoffeeCan_proof.tla	excluded	module:TLAPS
+examples	specifications/DieHard/APADieHardest.tla	excluded	module:FiniteSetsExt,Functions
+examples	specifications/DieHard/APDieHarder.tla	sany	symbolic
 examples	specifications/DieHard/DieHard.tla	check	
-examples	specifications/DieHard/DieHard_proof.tla	excluded	proof
+examples	specifications/DieHard/DieHard_proof.tla	excluded	module:TLAPS
 examples	specifications/DieHard/DieHarder.tla	sany	
 examples	specifications/DieHard/DieHardest.tla	excluded	module:FiniteSetsExt,Functions
-examples	specifications/DieHard/MCDieHarder.tla	sany	check-excluded:DieHarder
-examples	specifications/DieHard/MCDieHardest.tla	sany	check-excluded:DieHardest
-examples	specifications/DiningPhilosophers/APDiningPhilosophers.tla	excluded	module:so
-examples	specifications/DiningPhilosophers/DiningPhilosophers.tla	excluded	feature:pluscal
-examples	specifications/Disruptor/APDisruptor_MPMC.tla	excluded	module:so
-examples	specifications/Disruptor/APDisruptor_SPMC.tla	excluded	module:so
-examples	specifications/Disruptor/APRingBuffer.tla	excluded	module:so
-examples	specifications/Disruptor/Disruptor_MPMC.tla	sany	check-excluded:RingBuffer
-examples	specifications/Disruptor/Disruptor_SPMC.tla	sany	check-excluded:RingBuffer
+examples	specifications/DieHard/MCDieHarder.tla	check	
+examples	specifications/DieHard/MCDieHardest.tla	excluded	module:FiniteSetsExt,Functions
+examples	specifications/DiningPhilosophers/APDiningPhilosophers.tla	sany	symbolic
+examples	specifications/DiningPhilosophers/DiningPhilosophers.tla	excluded	pluscal
+examples	specifications/Disruptor/APDisruptor_MPMC.tla	sany	symbolic
+examples	specifications/Disruptor/APDisruptor_SPMC.tla	sany	symbolic
+examples	specifications/Disruptor/APRingBuffer.tla	sany	
+examples	specifications/Disruptor/Disruptor_MPMC.tla	check	
+examples	specifications/Disruptor/Disruptor_SPMC.tla	check	
 examples	specifications/Disruptor/RingBuffer.tla	sany	
 examples	specifications/EinsteinRiddle/Einstein.tla	excluded	module:Apalache
-examples	specifications/FiniteMonotonic/APCRDT.tla	excluded	module:so
-examples	specifications/FiniteMonotonic/APDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt,so
-examples	specifications/FiniteMonotonic/APReplicatedLog.tla	excluded	module:so
+examples	specifications/FiniteMonotonic/APCRDT.tla	sany	symbolic
+examples	specifications/FiniteMonotonic/APDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt
+examples	specifications/FiniteMonotonic/APReplicatedLog.tla	sany	symbolic
 examples	specifications/FiniteMonotonic/CRDT.tla	sany	
-examples	specifications/FiniteMonotonic/CRDT_proof.tla	excluded	proof
+examples	specifications/FiniteMonotonic/CRDT_proof.tla	excluded	module:FunctionTheorems,Functions,NaturalsInduction,TLAPS
 examples	specifications/FiniteMonotonic/DistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt
-examples	specifications/FiniteMonotonic/MCCRDT.tla	excluded	feature:action composition
-examples	specifications/FiniteMonotonic/MCDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt
-examples	specifications/FiniteMonotonic/MCReplicatedLog.tla	excluded	feature:action composition
+examples	specifications/FiniteMonotonic/MCCRDT.tla	excluded	module:FiniteSetsExt
+examples	specifications/FiniteMonotonic/MCDistributedReplicatedLog.tla	excluded	module:FiniteSetsExt,SequencesExt
+examples	specifications/FiniteMonotonic/MCReplicatedLog.tla	excluded	module:FiniteSetsExt
 examples	specifications/FiniteMonotonic/ReplicatedLog.tla	sany	
 examples	specifications/GameOfLife/GameOfLife.tla	check	
 examples	specifications/Huang/Huang.tla	excluded	module:DyadicRationals,Functions,SequencesExt
-examples	specifications/KeyValueStore/APKeyValueStore.tla	excluded	module:so
-examples	specifications/KeyValueStore/ClientCentric.tla	sany	
-examples	specifications/KeyValueStore/KVsnap.tla	excluded	feature:pluscal
+examples	specifications/KeyValueStore/APKeyValueStore.tla	sany	
+examples	specifications/KeyValueStore/ClientCentric.tla	excluded	module:Functions
+examples	specifications/KeyValueStore/KVsnap.tla	excluded	pluscal
 examples	specifications/KeyValueStore/KeyValueStore.tla	sany	
-examples	specifications/KeyValueStore/KeyValueStore_proof.tla	excluded	proof
-examples	specifications/KeyValueStore/MCKVS.tla	sany	check-excluded:KeyValueStore
-examples	specifications/KeyValueStore/MCKVsnap.tla	sany	check-excluded:KVsnap
+examples	specifications/KeyValueStore/KeyValueStore_proof.tla	excluded	module:TLAPS
+examples	specifications/KeyValueStore/MCKVS.tla	check	
+examples	specifications/KeyValueStore/MCKVsnap.tla	excluded	module:Functions
 examples	specifications/KeyValueStore/Util.tla	excluded	module:Functions
 examples	specifications/KnuthYao/KnuthYao.tla	excluded	module:DyadicRationals
 examples	specifications/KnuthYao/Prob.tla	sany	
-examples	specifications/KnuthYao/SimKnuthYao.tla	excluded	module:CSV,Functions,IOUtils,Statistics
-examples	specifications/LearnProofs/AddTwo.tla	excluded	feature:pluscal
-examples	specifications/LearnProofs/FindHighest.tla	excluded	feature:pluscal
-examples	specifications/LearnProofs/MCFindHighest.tla	sany	check-excluded:FindHighest
-examples	specifications/LeastCircularSubstring/LeastCircularSubstring.tla	excluded	feature:pluscal
-examples	specifications/LeastCircularSubstring/MCLeastCircularSubstring.tla	sany	check-excluded:LeastCircularSubstring
+examples	specifications/KnuthYao/SimKnuthYao.tla	excluded	module:CSV,DyadicRationals,Functions,IOUtils,Statistics
+examples	specifications/LearnProofs/AddTwo.tla	excluded	pluscal
+examples	specifications/LearnProofs/FindHighest.tla	excluded	pluscal
+examples	specifications/LearnProofs/MCFindHighest.tla	excluded	module:TLAPS
+examples	specifications/LeastCircularSubstring/LeastCircularSubstring.tla	excluded	pluscal
+examples	specifications/LeastCircularSubstring/MCLeastCircularSubstring.tla	check	
 examples	specifications/LeastCircularSubstring/ZSequences.tla	sany	
-examples	specifications/LevelChecking/LevelSpec.tla	excluded	module:M,node,occurs,parameter,parameters,statement,statements
-examples	specifications/LoopInvariance/BinarySearch.tla	excluded	feature:pluscal
-examples	specifications/LoopInvariance/MCBinarySearch.tla	sany	check-excluded:BinarySearch
-examples	specifications/LoopInvariance/MCQuicksort.tla	sany	check-excluded:Quicksort
-examples	specifications/LoopInvariance/Quicksort.tla	excluded	feature:pluscal
-examples	specifications/LoopInvariance/SumSequence.tla	excluded	feature:pluscal
-examples	specifications/Majority/APMajority.tla	excluded	module:so
-examples	specifications/Majority/MCMajority.tla	sany	check-excluded:Majority
+examples	specifications/LevelChecking/LevelSpec.tla	sany	
+examples	specifications/LoopInvariance/BinarySearch.tla	excluded	pluscal
+examples	specifications/LoopInvariance/MCBinarySearch.tla	excluded	module:TLAPS
+examples	specifications/LoopInvariance/MCQuicksort.tla	excluded	module:FiniteSetTheorems,SequenceTheorems,TLAPS
+examples	specifications/LoopInvariance/Quicksort.tla	excluded	pluscal
+examples	specifications/LoopInvariance/SumSequence.tla	excluded	pluscal
+examples	specifications/Majority/APMajority.tla	sany	
+examples	specifications/Majority/MCMajority.tla	check	
 examples	specifications/Majority/Majority.tla	sany	
-examples	specifications/Majority/MajorityProof.tla	excluded	proof
-examples	specifications/MisraReachability/APParReach.tla	excluded	module:so
-examples	specifications/MisraReachability/APReachable.tla	excluded	module:so
-examples	specifications/MisraReachability/MCParReach.tla	sany	check-excluded:ParReach
-examples	specifications/MisraReachability/MCReachabilityTest.tla	sany	check-excluded:ReachabilityTest
-examples	specifications/MisraReachability/MCReachable.tla	sany	check-excluded:Reachable
-examples	specifications/MisraReachability/ParReach.tla	excluded	feature:pluscal
-examples	specifications/MisraReachability/ParReachProofs.tla	excluded	proof
+examples	specifications/Majority/MajorityProof.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/MisraReachability/APParReach.tla	sany	symbolic
+examples	specifications/MisraReachability/APReachable.tla	sany	
+examples	specifications/MisraReachability/MCParReach.tla	check	
+examples	specifications/MisraReachability/MCReachabilityTest.tla	excluded	module:NaturalsInduction,TLAPS
+examples	specifications/MisraReachability/MCReachable.tla	check	
+examples	specifications/MisraReachability/ParReach.tla	excluded	pluscal
+examples	specifications/MisraReachability/ParReachProofs.tla	excluded	module:TLAPS
 examples	specifications/MisraReachability/Reachability.tla	sany	
-examples	specifications/MisraReachability/ReachabilityProofs.tla	excluded	proof
-examples	specifications/MisraReachability/ReachabilityTest.tla	excluded	module:TLAPS
-examples	specifications/MisraReachability/Reachable.tla	excluded	feature:pluscal
-examples	specifications/MisraReachability/ReachableProofs.tla	excluded	proof
-examples	specifications/MissionariesAndCannibals/APMissionariesAndCannibals.tla	excluded	module:so
+examples	specifications/MisraReachability/ReachabilityProofs.tla	excluded	module:NaturalsInduction,TLAPS
+examples	specifications/MisraReachability/ReachabilityTest.tla	excluded	module:NaturalsInduction,TLAPS
+examples	specifications/MisraReachability/Reachable.tla	excluded	pluscal
+examples	specifications/MisraReachability/ReachableProofs.tla	excluded	module:NaturalsInduction,TLAPS
+examples	specifications/MissionariesAndCannibals/APMissionariesAndCannibals.tla	sany	symbolic
 examples	specifications/MissionariesAndCannibals/MissionariesAndCannibals.tla	check	
-examples	specifications/MissionariesAndCannibals/MissionariesAndCannibals_proof.tla	excluded	proof
-examples	specifications/Moving_Cat_Puzzle/APCat.tla	excluded	module:so
+examples	specifications/MissionariesAndCannibals/MissionariesAndCannibals_proof.tla	excluded	module:TLAPS
+examples	specifications/Moving_Cat_Puzzle/APCat.tla	sany	symbolic
 examples	specifications/Moving_Cat_Puzzle/Cat.tla	check	
 examples	specifications/MultiCarElevator/Elevator.tla	check	
-examples	specifications/MultiCarElevator/Elevator_proof.tla	excluded	proof
-examples	specifications/MultiPaxos-SMR/MultiPaxos.tla	excluded	feature:pluscal
-examples	specifications/MultiPaxos-SMR/MultiPaxos_MC.tla	sany	check-excluded:MultiPaxos
+examples	specifications/MultiCarElevator/Elevator_proof.tla	excluded	module:TLAPS
+examples	specifications/MultiPaxos-SMR/MultiPaxos.tla	excluded	pluscal
+examples	specifications/MultiPaxos-SMR/MultiPaxos_MC.tla	check	
 examples	specifications/N-Queens/Queens.tla	sany	
-examples	specifications/N-Queens/Queens.toolbox/FourQueens/MC.tla	sany	check-excluded:Queens
+examples	specifications/N-Queens/Queens.toolbox/FourQueens/MC.tla	check	
 examples	specifications/N-Queens/Queens.toolbox/FourQueens/Queens.tla	sany	
-examples	specifications/N-Queens/QueensPluscal.tla	excluded	feature:pluscal
-examples	specifications/N-Queens/QueensPluscal.toolbox/FourQueens/MC.tla	sany	check-excluded:QueensPluscal
-examples	specifications/N-Queens/QueensPluscal.toolbox/FourQueens/QueensPluscal.tla	excluded	feature:pluscal
-examples	specifications/NanoBlockchain/MCNano.tla	sany	check-excluded:Nano
+examples	specifications/N-Queens/QueensPluscal.tla	excluded	pluscal
+examples	specifications/N-Queens/QueensPluscal.toolbox/FourQueens/MC.tla	check	
+examples	specifications/N-Queens/QueensPluscal.toolbox/FourQueens/QueensPluscal.tla	excluded	pluscal
+examples	specifications/NanoBlockchain/MCNano.tla	check	
 examples	specifications/NanoBlockchain/Nano.tla	sany	
-examples	specifications/Paxos/Consensus.tla	excluded	proof
-examples	specifications/Paxos/MCConsensus.tla	sany	check-excluded:Consensus
-examples	specifications/Paxos/MCPaxos.tla	sany	check-excluded:Paxos
-examples	specifications/Paxos/MCVoting.tla	sany	check-excluded:Voting
-examples	specifications/Paxos/Paxos.tla	sany	
-examples	specifications/Paxos/Voting.tla	excluded	proof
-examples	specifications/PaxosHowToWinATuringAward/Consensus.tla	excluded	proof
-examples	specifications/PaxosHowToWinATuringAward/MCConsensus.tla	sany	check-excluded:Consensus
-examples	specifications/PaxosHowToWinATuringAward/MCPaxos.tla	sany	check-excluded:Paxos
-examples	specifications/PaxosHowToWinATuringAward/MCVoting.tla	sany	check-excluded:Voting
-examples	specifications/PaxosHowToWinATuringAward/Paxos.tla	excluded	module:statement
-examples	specifications/PaxosHowToWinATuringAward/Voting.tla	excluded	proof
-examples	specifications/PaxosHowToWinATuringAward/Voting_proof.tla	excluded	proof
-examples	specifications/Prisoners/APPrisoners.tla	excluded	module:so
+examples	specifications/Paxos/Consensus.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Paxos/MCConsensus.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Paxos/MCPaxos.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Paxos/MCVoting.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Paxos/Paxos.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Paxos/Voting.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/Consensus.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/MCConsensus.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/MCPaxos.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/MCVoting.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/Paxos.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/Voting.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/PaxosHowToWinATuringAward/Voting_proof.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/Prisoners/APPrisoners.tla	sany	
 examples	specifications/Prisoners/MCPrisoners.tla	sany	
 examples	specifications/Prisoners/Prisoners.tla	check	
-examples	specifications/Prisoners_Single_Switch/APPrisoner.tla	excluded	module:so
+examples	specifications/Prisoners_Single_Switch/APPrisoner.tla	sany	
 examples	specifications/Prisoners_Single_Switch/Prisoner.tla	check	
-examples	specifications/ReadersWriters/APReadersWriters.tla	excluded	module:so
-examples	specifications/ReadersWriters/MC.tla	sany	check-excluded:ReadersWriters
+examples	specifications/ReadersWriters/APReadersWriters.tla	sany	symbolic
+examples	specifications/ReadersWriters/MC.tla	check	
 examples	specifications/ReadersWriters/ReadersWriters.tla	sany	
-examples	specifications/ReadersWriters/ReadersWriters_proof.tla	excluded	proof
-examples	specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.tla	sany	check-excluded:SPA_Attack_New
+examples	specifications/ReadersWriters/ReadersWriters_proof.tla	excluded	module:FiniteSetTheorems,TLAPS
+examples	specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/MC.tla	excluded	module:Bitwise,Functions
 examples	specifications/SDP_Verification/SDP_Attack_New_Solution_Spec/SPA_Attack_New.tla	excluded	module:Bitwise,Functions
-examples	specifications/SDP_Verification/SDP_Attack_Spec/MC.tla	sany	check-excluded:SPA_Attack
+examples	specifications/SDP_Verification/SDP_Attack_Spec/MC.tla	excluded	module:Bitwise,Functions
 examples	specifications/SDP_Verification/SDP_Attack_Spec/SPA_Attack.tla	excluded	module:Bitwise,Functions
-examples	specifications/SimplifiedFastPaxos/FastPaxos.tla	sany	check-excluded:Paxos
+examples	specifications/SimplifiedFastPaxos/FastPaxos.tla	check	
 examples	specifications/SimplifiedFastPaxos/Paxos.tla	check	
-examples	specifications/SingleLaneBridge/APSingleLaneBridge.tla	excluded	module:so
-examples	specifications/SingleLaneBridge/MC.tla	sany	check-excluded:SingleLaneBridge
+examples	specifications/SingleLaneBridge/APSingleLaneBridge.tla	sany	
+examples	specifications/SingleLaneBridge/MC.tla	check	
 examples	specifications/SingleLaneBridge/SingleLaneBridge.tla	sany	
 examples	specifications/SlidingPuzzles/SlidingPuzzles.tla	check	
 examples	specifications/SlidingPuzzles/SlidingPuzzles_anim.tla	excluded	module:SVG,SequencesExt
-examples	specifications/SlushProtocol/Slush.tla	excluded	feature:pluscal
-examples	specifications/SpanningTree/APSpanTree.tla	excluded	module:so
+examples	specifications/SlushProtocol/Slush.tla	excluded	pluscal
+examples	specifications/SpanningTree/APSpanTree.tla	sany	symbolic
 examples	specifications/SpanningTree/SpanTree.tla	check	
 examples	specifications/SpanningTree/SpanTreeRandom.tla	check	
 examples	specifications/SpanningTree/SpanTreeTest.tla	sany	check-excluded:Randomization
-examples	specifications/SpanningTree/SpanTree_proof.tla	excluded	proof
+examples	specifications/SpanningTree/SpanTree_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/AdvancedExamples/BNFGrammars.tla	sany	
 examples	specifications/SpecifyingSystems/AdvancedExamples/DifferentialEquations.tla	sany	
 examples	specifications/SpecifyingSystems/AdvancedExamples/Graphs.tla	sany	
 examples	specifications/SpecifyingSystems/AdvancedExamples/InnerSequential.tla	sany	
 examples	specifications/SpecifyingSystems/AdvancedExamples/InnerSerial.tla	sany	
-examples	specifications/SpecifyingSystems/AdvancedExamples/MCInnerSequential.tla	sany	check-excluded:InnerSequential
-examples	specifications/SpecifyingSystems/AdvancedExamples/MCInnerSerial.tla	excluded	module:InnerSerial \*
+examples	specifications/SpecifyingSystems/AdvancedExamples/MCInnerSequential.tla	check	
+examples	specifications/SpecifyingSystems/AdvancedExamples/MCInnerSerial.tla	check	
 examples	specifications/SpecifyingSystems/AdvancedExamples/RegisterInterface.tla	sany	
 examples	specifications/SpecifyingSystems/AdvancedExamples/SerialMemory.tla	sany	
-examples	specifications/SpecifyingSystems/AsynchronousInterface/APAsynchInterface.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/AsynchronousInterface/APChannel.tla	excluded	module:so
+examples	specifications/SpecifyingSystems/AsynchronousInterface/APAsynchInterface.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/AsynchronousInterface/APChannel.tla	sany	symbolic
 examples	specifications/SpecifyingSystems/AsynchronousInterface/AsynchInterface.tla	check	
-examples	specifications/SpecifyingSystems/AsynchronousInterface/AsynchInterface_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/AsynchronousInterface/AsynchInterface_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/AsynchronousInterface/Channel.tla	check	
-examples	specifications/SpecifyingSystems/AsynchronousInterface/Channel_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/AsynchronousInterface/Channel_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/AsynchronousInterface/PrintValues.tla	check	
 examples	specifications/SpecifyingSystems/CachingMemory/InternalMemory.tla	sany	
-examples	specifications/SpecifyingSystems/CachingMemory/InternalMemory_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/CachingMemory/MCInternalMemory.tla	sany	check-excluded:InternalMemory
-examples	specifications/SpecifyingSystems/CachingMemory/MCWriteThroughCache.tla	sany	check-excluded:WriteThroughCacheInstanced
+examples	specifications/SpecifyingSystems/CachingMemory/InternalMemory_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/CachingMemory/MCInternalMemory.tla	check	
+examples	specifications/SpecifyingSystems/CachingMemory/MCWriteThroughCache.tla	check	
 examples	specifications/SpecifyingSystems/CachingMemory/Memory.tla	sany	
 examples	specifications/SpecifyingSystems/CachingMemory/MemoryInterface.tla	sany	
 examples	specifications/SpecifyingSystems/CachingMemory/WriteThroughCache.tla	sany	
-examples	specifications/SpecifyingSystems/CachingMemory/WriteThroughCacheInstanced.tla	excluded	module:statement
-examples	specifications/SpecifyingSystems/Composing/APChannel.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/Composing/APHourClock.tla	excluded	module:so
+examples	specifications/SpecifyingSystems/CachingMemory/WriteThroughCacheInstanced.tla	sany	
+examples	specifications/SpecifyingSystems/Composing/APChannel.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/Composing/APHourClock.tla	sany	symbolic
 examples	specifications/SpecifyingSystems/Composing/BinaryHourClock.tla	sany	
 examples	specifications/SpecifyingSystems/Composing/Channel.tla	sany	
-examples	specifications/SpecifyingSystems/Composing/ChannelRefinement.tla	excluded	module:Inner
-examples	specifications/SpecifyingSystems/Composing/Channel_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/Composing/CompositeFIFO.tla	excluded	module:InnerBuf
+examples	specifications/SpecifyingSystems/Composing/ChannelRefinement.tla	sany	
+examples	specifications/SpecifyingSystems/Composing/Channel_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/Composing/CompositeFIFO.tla	sany	
 examples	specifications/SpecifyingSystems/Composing/HourClock.tla	sany	
-examples	specifications/SpecifyingSystems/Composing/HourClock_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/Composing/HourClock_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/Composing/InternalMemory.tla	sany	
-examples	specifications/SpecifyingSystems/Composing/InternalMemory_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/Composing/JointActionMemory.tla	excluded	module:InnerEnvironmentComponent,InnerMemoryComponent
+examples	specifications/SpecifyingSystems/Composing/InternalMemory_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/Composing/JointActionMemory.tla	sany	
 examples	specifications/SpecifyingSystems/Composing/MemoryInterface.tla	sany	
-examples	specifications/SpecifyingSystems/FIFO/APChannel.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/FIFO/APInnerFIFO.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/FIFO/APInnerFIFOInstanced.tla	excluded	module:so,statement
-examples	specifications/SpecifyingSystems/FIFO/APMCInnerFIFO.tla	excluded	module:so
+examples	specifications/SpecifyingSystems/FIFO/APChannel.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/FIFO/APInnerFIFO.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/FIFO/APInnerFIFOInstanced.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/FIFO/APMCInnerFIFO.tla	sany	symbolic
 examples	specifications/SpecifyingSystems/FIFO/Channel.tla	sany	
-examples	specifications/SpecifyingSystems/FIFO/Channel_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/FIFO/Channel_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/FIFO/FIFO.tla	sany	
 examples	specifications/SpecifyingSystems/FIFO/InnerFIFO.tla	sany	
-examples	specifications/SpecifyingSystems/FIFO/InnerFIFOInstanced.tla	excluded	module:statement,statements
-examples	specifications/SpecifyingSystems/FIFO/InnerFIFO_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/FIFO/MCInnerFIFO.tla	sany	check-excluded:InnerFIFOInstanced
-examples	specifications/SpecifyingSystems/HourClock/APHourClock.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/HourClock/APHourClock2.tla	excluded	module:so
+examples	specifications/SpecifyingSystems/FIFO/InnerFIFOInstanced.tla	sany	
+examples	specifications/SpecifyingSystems/FIFO/InnerFIFO_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/FIFO/MCInnerFIFO.tla	check	
+examples	specifications/SpecifyingSystems/HourClock/APHourClock.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/HourClock/APHourClock2.tla	sany	symbolic
 examples	specifications/SpecifyingSystems/HourClock/HourClock.tla	check	
-examples	specifications/SpecifyingSystems/HourClock/HourClock2.tla	sany	check-excluded:HourClock
-examples	specifications/SpecifyingSystems/HourClock/HourClock_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/Liveness/APHourClock.tla	excluded	module:so
-examples	specifications/SpecifyingSystems/Liveness/APLiveHourClock.tla	excluded	module:so
+examples	specifications/SpecifyingSystems/HourClock/HourClock2.tla	check	
+examples	specifications/SpecifyingSystems/HourClock/HourClock_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/Liveness/APHourClock.tla	sany	symbolic
+examples	specifications/SpecifyingSystems/Liveness/APLiveHourClock.tla	sany	symbolic
 examples	specifications/SpecifyingSystems/Liveness/HourClock.tla	sany	
-examples	specifications/SpecifyingSystems/Liveness/HourClock_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/Liveness/HourClock_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/Liveness/InternalMemory.tla	sany	
-examples	specifications/SpecifyingSystems/Liveness/InternalMemory_proof.tla	excluded	proof
-examples	specifications/SpecifyingSystems/Liveness/LiveHourClock.tla	sany	check-excluded:HourClock
+examples	specifications/SpecifyingSystems/Liveness/InternalMemory_proof.tla	excluded	module:TLAPS
+examples	specifications/SpecifyingSystems/Liveness/LiveHourClock.tla	check	
 examples	specifications/SpecifyingSystems/Liveness/LiveInternalMemory.tla	sany	
 examples	specifications/SpecifyingSystems/Liveness/LiveWriteThroughCache.tla	sany	
 examples	specifications/SpecifyingSystems/Liveness/MCInternalMemory.tla	sany	
-examples	specifications/SpecifyingSystems/Liveness/MCLiveInternalMemory.tla	sany	check-excluded:LiveInternalMemory
-examples	specifications/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.tla	excluded	module:LiveMemory
+examples	specifications/SpecifyingSystems/Liveness/MCLiveInternalMemory.tla	check	
+examples	specifications/SpecifyingSystems/Liveness/MCLiveWriteThroughCache.tla	check	
 examples	specifications/SpecifyingSystems/Liveness/Memory.tla	sany	
 examples	specifications/SpecifyingSystems/Liveness/MemoryInterface.tla	sany	
-examples	specifications/SpecifyingSystems/Liveness/WriteThroughCacheInstanced.tla	excluded	module:statement
+examples	specifications/SpecifyingSystems/Liveness/WriteThroughCacheInstanced.tla	sany	
 examples	specifications/SpecifyingSystems/RealTime/HourClock.tla	sany	
-examples	specifications/SpecifyingSystems/RealTime/HourClock_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/RealTime/HourClock_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/RealTime/InternalMemory.tla	sany	
-examples	specifications/SpecifyingSystems/RealTime/InternalMemory_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/RealTime/InternalMemory_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/RealTime/MCRealTime.tla	sany	
-examples	specifications/SpecifyingSystems/RealTime/MCRealTimeHourClock.tla	sany	check-excluded:HourClock
+examples	specifications/SpecifyingSystems/RealTime/MCRealTimeHourClock.tla	check	
 examples	specifications/SpecifyingSystems/RealTime/Memory.tla	sany	
 examples	specifications/SpecifyingSystems/RealTime/MemoryInterface.tla	sany	
-examples	specifications/SpecifyingSystems/RealTime/RTMemory.tla	excluded	module:Inner
+examples	specifications/SpecifyingSystems/RealTime/RTMemory.tla	sany	
 examples	specifications/SpecifyingSystems/RealTime/RTWriteThroughCache.tla	sany	
-examples	specifications/SpecifyingSystems/RealTime/RealTimeHourClock.tla	excluded	module:Inner
+examples	specifications/SpecifyingSystems/RealTime/RealTimeHourClock.tla	sany	
 examples	specifications/SpecifyingSystems/RealTime/RealTime_SS.tla	sany	
 examples	specifications/SpecifyingSystems/RealTime/WriteThroughCache.tla	sany	
 examples	specifications/SpecifyingSystems/SimpleMath/SimpleMath.tla	check	
@@ -860,172 +859,172 @@ examples	specifications/SpecifyingSystems/Syntax/BNFGrammars.tla	sany
 examples	specifications/SpecifyingSystems/Syntax/TLAPlusGrammar.tla	sany	
 examples	specifications/SpecifyingSystems/TLC/ABCorrectness.tla	check	
 examples	specifications/SpecifyingSystems/TLC/AlternatingBit.tla	sany	
-examples	specifications/SpecifyingSystems/TLC/AlternatingBit_proof.tla	excluded	proof
+examples	specifications/SpecifyingSystems/TLC/AlternatingBit_proof.tla	excluded	module:TLAPS
 examples	specifications/SpecifyingSystems/TLC/BNFGrammars.tla	sany	
 examples	specifications/SpecifyingSystems/TLC/ConfigFileGrammar.tla	sany	
-examples	specifications/SpecifyingSystems/TLC/MCAlternatingBit.tla	sany	check-excluded:ABCorrectness,AlternatingBit
+examples	specifications/SpecifyingSystems/TLC/MCAlternatingBit.tla	check	
 examples	specifications/Stones/Stones.tla	check	
 examples	specifications/TLC/MCReachability.tla	sany	
 examples	specifications/TLC/StateGraphs.tla	excluded	module:IOUtils
-examples	specifications/TLC/TLCMC.tla	excluded	feature:pluscal
-examples	specifications/TLC/TestGraphs.tla	sany	check-excluded:StateGraphs,TLCMC
-examples	specifications/TLC/TestMCReachability.tla	sany	check-excluded:MCReachability,StateGraphs
-examples	specifications/TeachingConcurrency/Simple.tla	excluded	feature:pluscal
-examples	specifications/TeachingConcurrency/SimpleRegular.tla	excluded	feature:pluscal
-examples	specifications/TeachingConcurrency/SimpleRegular_proof.tla	excluded	proof
-examples	specifications/TeachingConcurrency/Simple_proof.tla	excluded	proof
+examples	specifications/TLC/TLCMC.tla	excluded	pluscal
+examples	specifications/TLC/TestGraphs.tla	excluded	module:IOUtils
+examples	specifications/TLC/TestMCReachability.tla	excluded	module:IOUtils
+examples	specifications/TeachingConcurrency/Simple.tla	excluded	pluscal
+examples	specifications/TeachingConcurrency/SimpleRegular.tla	excluded	pluscal
+examples	specifications/TeachingConcurrency/SimpleRegular_proof.tla	excluded	module:TLAPS
+examples	specifications/TeachingConcurrency/Simple_proof.tla	excluded	module:TLAPS
 examples	specifications/TransitiveClosure/TransitiveClosure.tla	check	
 examples	specifications/TwoPhase/Alternate.tla	sany	
-examples	specifications/TwoPhase/MCTwoPhase.tla	sany	check-excluded:TwoPhase
-examples	specifications/TwoPhase/TwoPhase.tla	excluded	proof
-examples	specifications/TwoPhase/TwoPhase_proof.tla	excluded	proof
-examples	specifications/YoYo/MCYoYoNoPruning.tla	sany	check-excluded:YoYoNoPruning
-examples	specifications/YoYo/MCYoYoPruning.tla	sany	check-excluded:YoYoPruning
+examples	specifications/TwoPhase/MCTwoPhase.tla	excluded	module:TLAPS
+examples	specifications/TwoPhase/TwoPhase.tla	excluded	module:TLAPS
+examples	specifications/TwoPhase/TwoPhase_proof.tla	excluded	module:TLAPS
+examples	specifications/YoYo/MCYoYoNoPruning.tla	excluded	module:UndirectedGraphs
+examples	specifications/YoYo/MCYoYoPruning.tla	excluded	module:UndirectedGraphs
 examples	specifications/YoYo/YoYoAllGraphs.tla	excluded	module:UndirectedGraphs
 examples	specifications/YoYo/YoYoNoPruning.tla	excluded	module:UndirectedGraphs
 examples	specifications/YoYo/YoYoPruning.tla	excluded	module:UndirectedGraphs
-examples	specifications/aba-asyn-byz/aba_asyn_byz.tla	excluded	module:FiniteSets *),Naturals (*
+examples	specifications/aba-asyn-byz/aba_asyn_byz.tla	check	
 examples	specifications/acp/ACP_NB.tla	sany	
-examples	specifications/acp/ACP_NB_TLC.tla	sany	check-excluded:ACP_NB
-examples	specifications/acp/ACP_NB_WRONG_TLC.tla	sany	check-excluded:ACP_SB
+examples	specifications/acp/ACP_NB_TLC.tla	check	
+examples	specifications/acp/ACP_NB_WRONG_TLC.tla	check	
 examples	specifications/acp/ACP_SB.tla	sany	
-examples	specifications/acp/ACP_SB_TLC.tla	sany	check-excluded:ACP_SB
-examples	specifications/acp/APACP_SB.tla	excluded	module:so
-examples	specifications/allocator/AllocatorImplementation.tla	sany	check-excluded:SchedulingAllocator
-examples	specifications/allocator/AllocatorImplementation_proof.tla	excluded	proof
-examples	specifications/allocator/AllocatorRefinement.tla	sany	check-excluded:SchedulingAllocator,SimpleAllocator
+examples	specifications/acp/ACP_SB_TLC.tla	check	
+examples	specifications/acp/APACP_SB.tla	sany	symbolic
+examples	specifications/allocator/AllocatorImplementation.tla	check	
+examples	specifications/allocator/AllocatorImplementation_proof.tla	excluded	module:FiniteSetTheorems,SequenceTheorems,TLAPS,WellFoundedInduction
+examples	specifications/allocator/AllocatorRefinement.tla	check	
 examples	specifications/allocator/SchedulingAllocator.tla	check	
-examples	specifications/allocator/SchedulingAllocator_proof.tla	excluded	proof
+examples	specifications/allocator/SchedulingAllocator_proof.tla	excluded	module:FiniteSetTheorems,SequenceTheorems,TLAPS,WellFoundedInduction
 examples	specifications/allocator/SimpleAllocator.tla	check	
-examples	specifications/allocator/SimpleAllocator_proof.tla	excluded	proof
-examples	specifications/barriers/APBarrier.tla	excluded	module:so
+examples	specifications/allocator/SimpleAllocator_proof.tla	excluded	module:TLAPS
+examples	specifications/barriers/APBarrier.tla	sany	symbolic
 examples	specifications/barriers/Barrier.tla	check	
-examples	specifications/barriers/Barriers.tla	excluded	feature:pluscal
-examples	specifications/bcastByz/bcastByz.tla	excluded	proof
-examples	specifications/bcastFolklore/APbcastFolklore.tla	excluded	module:so
-examples	specifications/bcastFolklore/bcastFolklore.tla	excluded	module:FiniteSets *),Naturals (*
-examples	specifications/bosco/APbosco.tla	excluded	module:so
+examples	specifications/barriers/Barriers.tla	excluded	pluscal
+examples	specifications/bcastByz/bcastByz.tla	excluded	module:FiniteSetTheorems,FunctionTheorems,Functions,NaturalsInduction,SequenceTheorems,TLAPS
+examples	specifications/bcastFolklore/APbcastFolklore.tla	sany	symbolic
+examples	specifications/bcastFolklore/bcastFolklore.tla	check	
+examples	specifications/bosco/APbosco.tla	sany	symbolic
 examples	specifications/bosco/bosco.tla	check	
-examples	specifications/braf/BufferedRandomAccessFile.tla	excluded	module:Common,RandomAccessFile
-examples	specifications/btree/btree.tla	sany	check-excluded:kvstore
+examples	specifications/braf/BufferedRandomAccessFile.tla	check	
+examples	specifications/btree/btree.tla	check	
 examples	specifications/btree/kvstore.tla	check	
-examples	specifications/byihive/VoucherCancel.tla	sany	check-excluded:VoucherLifeCycle
-examples	specifications/byihive/VoucherIssue.tla	sany	check-excluded:VoucherLifeCycle
+examples	specifications/byihive/VoucherCancel.tla	check	
+examples	specifications/byihive/VoucherIssue.tla	check	
 examples	specifications/byihive/VoucherLifeCycle.tla	check	
-examples	specifications/byihive/VoucherLifeCycle_proof.tla	excluded	proof
-examples	specifications/byihive/VoucherRedeem.tla	sany	check-excluded:VoucherLifeCycle
-examples	specifications/byihive/VoucherTransfer.tla	sany	check-excluded:VoucherLifeCycle
-examples	specifications/byzpaxos/BPConProof.tla	excluded	feature:pluscal
-examples	specifications/byzpaxos/Consensus.tla	excluded	feature:pluscal
-examples	specifications/byzpaxos/PConProof.tla	excluded	feature:pluscal
-examples	specifications/byzpaxos/VoteProof.tla	excluded	feature:pluscal
-examples	specifications/c1cs/APc1cs.tla	excluded	module:so
+examples	specifications/byihive/VoucherLifeCycle_proof.tla	excluded	module:TLAPS
+examples	specifications/byihive/VoucherRedeem.tla	check	
+examples	specifications/byihive/VoucherTransfer.tla	check	
+examples	specifications/byzpaxos/BPConProof.tla	excluded	pluscal
+examples	specifications/byzpaxos/Consensus.tla	excluded	pluscal
+examples	specifications/byzpaxos/PConProof.tla	excluded	pluscal
+examples	specifications/byzpaxos/VoteProof.tla	excluded	pluscal
+examples	specifications/c1cs/APc1cs.tla	sany	symbolic
 examples	specifications/c1cs/c1cs.tla	check	
 examples	specifications/cbc_max/cbc_max.tla	sany	
-examples	specifications/cf1s-folklore/APcf1s_folklore.tla	excluded	module:so
+examples	specifications/cf1s-folklore/APcf1s_folklore.tla	sany	
 examples	specifications/cf1s-folklore/cf1s_folklore.tla	check	
-examples	specifications/chang_roberts/APChangRoberts.tla	excluded	module:so
-examples	specifications/chang_roberts/ChangRoberts.tla	excluded	feature:pluscal
-examples	specifications/chang_roberts/MCChangRoberts.tla	sany	check-excluded:ChangRoberts
+examples	specifications/chang_roberts/APChangRoberts.tla	sany	symbolic
+examples	specifications/chang_roberts/ChangRoberts.tla	excluded	pluscal
+examples	specifications/chang_roberts/MCChangRoberts.tla	check	
 examples	specifications/dag-consensus/BlockDag.tla	sany	
-examples	specifications/dag-consensus/BlockDagTest.tla	sany	check-excluded:BlockDag
+examples	specifications/dag-consensus/BlockDagTest.tla	check	
 examples	specifications/dag-consensus/Digraph.tla	sany	
-examples	specifications/dag-consensus/Sailfish.tla	excluded	feature:pluscal
-examples	specifications/dag-consensus/TLCSailfish1.tla	sany	check-excluded:Sailfish
-examples	specifications/dag-consensus/TLCSailfish2.tla	sany	check-excluded:Sailfish
+examples	specifications/dag-consensus/Sailfish.tla	excluded	pluscal
+examples	specifications/dag-consensus/TLCSailfish1.tla	check	
+examples	specifications/dag-consensus/TLCSailfish2.tla	check	
 examples	specifications/dag-consensus/Utils.tla	sany	
 examples	specifications/detector_chan96/Age_Channel.tla	sany	
 examples	specifications/detector_chan96/EPFailureDetector.tla	sany	
-examples	specifications/detector_chan96/EnvironmentController.tla	sany	check-excluded:Age_Channel,EPFailureDetector
-examples	specifications/dijkstra-mutex/DijkstraMutex.tla	excluded	feature:pluscal
-examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/DijkstraMutex.tla	excluded	feature:pluscal
-examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/MC.tla	sany	check-excluded:DijkstraMutex
-examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/DijkstraMutex.tla	excluded	feature:pluscal
-examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/MC.tla	sany	check-excluded:DijkstraMutex
+examples	specifications/detector_chan96/EnvironmentController.tla	check	
+examples	specifications/dijkstra-mutex/DijkstraMutex.tla	excluded	pluscal
+examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/DijkstraMutex.tla	excluded	pluscal
+examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/LSpec-model/MC.tla	check	
+examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/DijkstraMutex.tla	excluded	pluscal
+examples	specifications/dijkstra-mutex/DijkstraMutex.toolbox/Safety-4-processors/MC.tla	check	
 examples	specifications/diskpaxos/DiskSynod.tla	sany	
 examples	specifications/diskpaxos/HDiskSynod.tla	sany	
-examples	specifications/diskpaxos/MC_HDiskSynod.tla	sany	check-excluded:HDiskSynod
-examples	specifications/diskpaxos/Synod.tla	excluded	module:Inner
-examples	specifications/echo/Echo.tla	excluded	feature:pluscal
-examples	specifications/echo/MCEcho.tla	sany	check-excluded:Echo
+examples	specifications/diskpaxos/MC_HDiskSynod.tla	check	
+examples	specifications/diskpaxos/Synod.tla	sany	
+examples	specifications/echo/Echo.tla	excluded	pluscal
+examples	specifications/echo/MCEcho.tla	check	
 examples	specifications/echo/Relation.tla	sany	
-examples	specifications/ewd426/APTokenRing.tla	excluded	module:so
+examples	specifications/ewd426/APTokenRing.tla	sany	symbolic
 examples	specifications/ewd426/SimTokenRing.tla	excluded	module:CSV,IOUtils
 examples	specifications/ewd426/TokenRing.tla	check	
 examples	specifications/ewd687a/EWD687a.tla	excluded	module:Graphs
-examples	specifications/ewd687a/EWD687aPlusCal.tla	excluded	feature:pluscal
-examples	specifications/ewd687a/EWD687a_anim.tla	excluded	module:IOUtils,SVG
-examples	specifications/ewd687a/EWD687a_proof.tla	excluded	proof
-examples	specifications/ewd687a/MCEWD687a.tla	sany	check-excluded:EWD687a
-examples	specifications/ewd840/APEWD840.tla	excluded	module:so
-examples	specifications/ewd840/APSyncTerminationDetection.tla	excluded	module:so
-examples	specifications/ewd840/EWD840.tla	sany	check-excluded:SyncTerminationDetection
-examples	specifications/ewd840/EWD840_anim.tla	excluded	module:Integers \* Grab SVG from https://github.com/tlaplus/CommunityModules/,SVG
-examples	specifications/ewd840/EWD840_json.tla	sany	check-excluded:EWD840
-examples	specifications/ewd840/EWD840_proof.tla	excluded	proof
+examples	specifications/ewd687a/EWD687aPlusCal.tla	excluded	pluscal
+examples	specifications/ewd687a/EWD687a_anim.tla	excluded	module:Graphs,IOUtils,SVG
+examples	specifications/ewd687a/EWD687a_proof.tla	excluded	module:FiniteSetTheorems,Graphs,NaturalsInduction,TLAPS
+examples	specifications/ewd687a/MCEWD687a.tla	excluded	module:Graphs
+examples	specifications/ewd840/APEWD840.tla	sany	symbolic
+examples	specifications/ewd840/APSyncTerminationDetection.tla	sany	symbolic
+examples	specifications/ewd840/EWD840.tla	check	
+examples	specifications/ewd840/EWD840_anim.tla	excluded	module:SVG
+examples	specifications/ewd840/EWD840_json.tla	sany	check-excluded:Json,TLCExt
+examples	specifications/ewd840/EWD840_proof.tla	excluded	module:NaturalsInduction,TLAPS
 examples	specifications/ewd840/SyncTerminationDetection.tla	check	
-examples	specifications/ewd840/SyncTerminationDetection_proof.tla	excluded	proof
+examples	specifications/ewd840/SyncTerminationDetection_proof.tla	excluded	module:TLAPS
 examples	specifications/ewd998/AsyncTerminationDetection.tla	check	
-examples	specifications/ewd998/AsyncTerminationDetection_proof.tla	excluded	proof
-examples	specifications/ewd998/EWD998.tla	sany	check-excluded:AsyncTerminationDetection,Functions
+examples	specifications/ewd998/AsyncTerminationDetection_proof.tla	excluded	module:TLAPS
+examples	specifications/ewd998/EWD998.tla	check	
 examples	specifications/ewd998/EWD998Chan.tla	excluded	module:SequencesExt
 examples	specifications/ewd998/EWD998ChanID.tla	excluded	module:SequencesExt
-examples	specifications/ewd998/EWD998ChanID_export.tla	excluded	module:IOUtils
-examples	specifications/ewd998/EWD998ChanID_shiviz.tla	sany	check-excluded:EWD998ChanID,Json,TLCExt
-examples	specifications/ewd998/EWD998ChanTrace.tla	excluded	module:IOUtils,VectorClocks
-examples	specifications/ewd998/EWD998Chan_opts.tla	excluded	module:CSV,IOUtils
-examples	specifications/ewd998/EWD998PCal.tla	excluded	feature:pluscal
-examples	specifications/ewd998/EWD998PCal_proof.tla	excluded	proof
+examples	specifications/ewd998/EWD998ChanID_export.tla	excluded	module:IOUtils,SequencesExt
+examples	specifications/ewd998/EWD998ChanID_shiviz.tla	excluded	module:SequencesExt
+examples	specifications/ewd998/EWD998ChanTrace.tla	excluded	module:IOUtils,SequencesExt,VectorClocks
+examples	specifications/ewd998/EWD998Chan_opts.tla	excluded	module:CSV,IOUtils,SequencesExt
+examples	specifications/ewd998/EWD998PCal.tla	excluded	pluscal
+examples	specifications/ewd998/EWD998PCal_proof.tla	excluded	module:BagsExt,TLAPS
 examples	specifications/ewd998/EWD998_anim.tla	excluded	module:SVG,SequencesExt
 examples	specifications/ewd998/EWD998_opts.tla	excluded	module:CSV,IOUtils
 examples	specifications/ewd998/EWD998_optsSC.tla	excluded	module:CSV,IOUtils
-examples	specifications/ewd998/EWD998_proof.tla	excluded	proof
+examples	specifications/ewd998/EWD998_proof.tla	excluded	module:FiniteSetTheorems,TLAPS
 examples	specifications/ewd998/Folds.tla	sany	
 examples	specifications/ewd998/Functions.tla	sany	
 examples	specifications/ewd998/SmokeEWD998.tla	excluded	module:CSV,IOUtils
 examples	specifications/ewd998/SmokeEWD998_SC.tla	excluded	module:CSV,IOUtils
 examples	specifications/ewd998/Utils.tla	sany	
-examples	specifications/glowingRaccoon/APclean.tla	excluded	module:so
-examples	specifications/glowingRaccoon/APstages.tla	excluded	module:so
-examples	specifications/glowingRaccoon/clean.tla	excluded	module:Naturals \* an import - copies module in there
-examples	specifications/glowingRaccoon/clean_proof.tla	excluded	proof
-examples	specifications/glowingRaccoon/product.tla	excluded	module:Sequences \* imports
-examples	specifications/glowingRaccoon/stages.tla	excluded	module:Naturals \* an import
-examples	specifications/glowingRaccoon/stages_proof.tla	excluded	proof
-examples	specifications/lamport_mutex/APLamportMutex.tla	excluded	module:so
+examples	specifications/glowingRaccoon/APclean.tla	sany	symbolic
+examples	specifications/glowingRaccoon/APstages.tla	sany	symbolic
+examples	specifications/glowingRaccoon/clean.tla	check	
+examples	specifications/glowingRaccoon/clean_proof.tla	excluded	module:TLAPS
+examples	specifications/glowingRaccoon/product.tla	check	
+examples	specifications/glowingRaccoon/stages.tla	check	
+examples	specifications/glowingRaccoon/stages_proof.tla	excluded	module:TLAPS
+examples	specifications/lamport_mutex/APLamportMutex.tla	sany	symbolic
 examples	specifications/lamport_mutex/LamportMutex.tla	sany	
-examples	specifications/lamport_mutex/LamportMutex_proofs.tla	excluded	proof
-examples	specifications/lamport_mutex/MCLamportMutex.tla	sany	check-excluded:LamportMutex
-examples	specifications/locks_auxiliary_vars/Lock.tla	excluded	feature:pluscal
-examples	specifications/locks_auxiliary_vars/LockHS.tla	excluded	proof
-examples	specifications/locks_auxiliary_vars/Peterson.tla	excluded	feature:pluscal
+examples	specifications/lamport_mutex/LamportMutex_proofs.tla	excluded	module:SequenceTheorems,TLAPS
+examples	specifications/lamport_mutex/MCLamportMutex.tla	check	
+examples	specifications/locks_auxiliary_vars/Lock.tla	excluded	pluscal
+examples	specifications/locks_auxiliary_vars/LockHS.tla	excluded	module:NaturalsInduction,TLAPS
+examples	specifications/locks_auxiliary_vars/Peterson.tla	excluded	pluscal
 examples	specifications/locks_auxiliary_vars/Stuttering.tla	sany	
 examples	specifications/nbacc_ray97/nbacc_ray97.tla	check	
-examples	specifications/nbacg_guer01/APnbacg_guer01.tla	excluded	module:so
+examples	specifications/nbacg_guer01/APnbacg_guer01.tla	sany	symbolic
 examples	specifications/nbacg_guer01/nbacg_guer01.tla	check	
-examples	specifications/spanning/APspanning.tla	excluded	module:so
-examples	specifications/spanning/MC_spanning.tla	sany	check-excluded:spanning
+examples	specifications/spanning/APspanning.tla	sany	symbolic
+examples	specifications/spanning/MC_spanning.tla	check	
 examples	specifications/spanning/spanning.tla	sany	
-examples	specifications/spanning/spanning_proof.tla	excluded	proof
-examples	specifications/sums_even/MC_sums_even.tla	sany	check-excluded:sums_even
-examples	specifications/sums_even/sums_even.tla	excluded	proof
-examples	specifications/tcp/APtcp.tla	excluded	module:SequencesExt,so
-examples	specifications/tcp/IndInv_apa.tla	excluded	module:Apalache
-examples	specifications/tcp/MCtcp.tla	sany	check-excluded:tcp
+examples	specifications/spanning/spanning_proof.tla	excluded	module:TLAPS
+examples	specifications/sums_even/MC_sums_even.tla	excluded	module:TLAPS
+examples	specifications/sums_even/sums_even.tla	excluded	module:TLAPS
+examples	specifications/tcp/APtcp.tla	excluded	module:SequencesExt
+examples	specifications/tcp/IndInv_apa.tla	excluded	module:Apalache,SequencesExt
+examples	specifications/tcp/MCtcp.tla	excluded	module:SequencesExt
 examples	specifications/tcp/tcp.tla	excluded	module:SequencesExt
-examples	specifications/tcp/tcp_proof.tla	excluded	proof
+examples	specifications/tcp/tcp_proof.tla	excluded	module:FiniteSetTheorems,SequenceTheorems,SequencesExt,SequencesExtTheorems,TLAPS
 examples	specifications/tower_of_hanoi/Bits.tla	sany	
 examples	specifications/tower_of_hanoi/Hanoi.tla	sany	
 examples	specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/Bits.tla	sany	
 examples	specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/Hanoi.tla	sany	
-examples	specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/MC.tla	sany	check-excluded:Hanoi
+examples	specifications/tower_of_hanoi/Hanoi.toolbox/Model_1/MC.tla	check	
 examples	specifications/tower_of_hanoi/HanoiSeq.tla	sany	
 examples	specifications/tower_of_hanoi/Hanoi_anim.tla	excluded	module:SVG
-examples	specifications/transaction_commit/2PCwithBTM.tla	excluded	feature:pluscal
-examples	specifications/transaction_commit/APTCommit.tla	excluded	module:so
-examples	specifications/transaction_commit/PaxosCommit.tla	sany	check-excluded:TCommit
-examples	specifications/transaction_commit/PaxosCommit_proof.tla	excluded	proof
+examples	specifications/transaction_commit/2PCwithBTM.tla	excluded	pluscal
+examples	specifications/transaction_commit/APTCommit.tla	sany	symbolic
+examples	specifications/transaction_commit/PaxosCommit.tla	check	
+examples	specifications/transaction_commit/PaxosCommit_proof.tla	excluded	module:FiniteSetTheorems,TLAPS,WellFoundedInduction
 examples	specifications/transaction_commit/TCommit.tla	check	
-examples	specifications/transaction_commit/TCommit_proof.tla	excluded	proof
-examples	specifications/transaction_commit/TwoPhase.tla	sany	check-excluded:TCommit
-examples	specifications/transaction_commit/TwoPhase_proof.tla	excluded	proof
+examples	specifications/transaction_commit/TCommit_proof.tla	excluded	module:TLAPS
+examples	specifications/transaction_commit/TwoPhase.tla	check	
+examples	specifications/transaction_commit/TwoPhase_proof.tla	excluded	module:TLAPS

@@ -1,0 +1,4 @@
+RESULT success
+Model checking completed. No error has been found.
+28585 states generated, 2641 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 9.

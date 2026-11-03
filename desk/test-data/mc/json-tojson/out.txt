@@ -1,0 +1,2 @@
+Error: Invariant Inv is violated by the initial state:
+x = <<"{\"a\":1,\"b\":\"s\\\"q\"}", "[1,[],[2,3]]", "[true,true]", "{\"1\":\"x\",\"3\":\"y\"}", "[\"p\",\"q\"]", "{\"0\":10,\"1\":20}", TRUE>>

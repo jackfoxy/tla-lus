@@ -22,7 +22,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DESK="$REPO/desk"
 TLA_REPO="${TLA_REPO:-/mnt/mars/gitrepos/tlaplus}"
 PIN="4ba7d8811289fb8e95dac4d5e554c05216ba3100"
-DESK_STATE="%0"           # agent state version (app/tla-lus.hoon)
+DESK_STATE="%0"           # the agent state tag (app/tla-lus.hoon)
 FAIL=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }
@@ -56,32 +56,33 @@ grep -qiE 'MIT' "$DESK/lib/stdmods.hoon" && pass "StandardModules carry MIT prov
   || fail "stdmods.hoon missing MIT provenance header"
 grep -qiE 'MIT' "$DESK/doc/compatibility.md" "$DESK/../README.md" 2>/dev/null \
   && pass "license noted in docs" || fail "license not noted in docs"
+#  R5.1: the upstream licenses beyond the tlaplus tools' MIT -- tlapm
+#  (BSD-2-Clause), tlauc (MIT), CommunityModules (MIT), Apalache (Apache-2.0
+#  with NOTICE), the Examples (MIT) -- are carried verbatim from their pinned
+#  commits under licenses/, and every tlapm- or tlauc-derived file in the
+#  repo has a license.txt beside it (tools/gen-licenses.py --check)
+python3 "$REPO/tools/gen-licenses.py" --check >/dev/null 2>&1 \
+  && pass "upstream licenses match their pins; tlapm/tlauc-derived files covered" \
+  || fail "upstream licenses: run tools/gen-licenses.py --check"
 
 echo "== gate 5: kelvin compatibility =="
 [ -f "$DESK/sys.kelvin" ] && pass "sys.kelvin present: $(head -1 "$DESK/sys.kelvin")" \
   || fail "no sys.kelvin"
 
-echo "== gate 6: state migration =="
-# R1.8.8: this gate used to require the literal chain jobs-0-to-1 / 1-to-2 /
-# 2-to-3 in lib/migrate. R1.5.12b DELETED that chain on purpose — nothing has
-# been released, so the pre-%3 versions were collapsed rather than carried —
-# and the gate was not updated with it, so it had been failing silently since
-# 2026-08-17. What the design actually guarantees is the MECHANISM, so that is
-# what is checked: a version-tagged state union, an on-load that coerces the
-# stored noun (`;;`) instead of requiring it to nest, a `?-` dispatch on the
-# version tag, and a state tag matching DESK_STATE.
+echo "== gate 6: state loading =="
+# ONE state shape and no migrations (the project is in development): on-load
+# COERCES the stored noun (`;;`) to that shape instead of requiring it to nest,
+# and resets to empty if it does not fit. No version union, no conversion arms
 MIGOK=1
 MIGWHY=""
-grep -q '+\$  versioned-state' "$DESK/app/tla-lus.hoon" \
-  || { MIGOK=0; MIGWHY="no versioned-state union"; }
-grep -q ';;(versioned-state' "$DESK/app/tla-lus.hoon" \
-  || { MIGOK=0; MIGWHY="on-load does not coerce the stored noun"; }
-grep -q '?-  -.old' "$DESK/app/tla-lus.hoon" \
-  || { MIGOK=0; MIGWHY="on-load has no version dispatch"; }
-grep -q "^+\$  state-${DESK_STATE#%}  \[${DESK_STATE} " "$DESK/app/tla-lus.hoon" \
-  || { MIGOK=0; MIGWHY="state mold is not ${DESK_STATE}"; }
-[ "$MIGOK" -eq 1 ] && pass "on-load coerces + dispatches a version-tagged state ($DESK_STATE)" \
-  || fail "state migration mechanism: $MIGWHY"
+grep -q ';;(state-0 q.old-vase)' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="on-load does not coerce the stored noun to state-0"; }
+grep -q '=|  state-0' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="the agent does not run state-0"; }
+! grep -qE 'versioned-state|state-[1-9]' "$DESK/app/tla-lus.hoon" \
+  || { MIGOK=0; MIGWHY="a migration (versioned state) is present"; }
+[ "$MIGOK" -eq 1 ] && pass "on-load coerces the one state shape; no migrations" \
+  || fail "state loading: $MIGWHY"
 
 echo "== gate 7: no synchronous Clay read in a stage =="
 # the pure pipeline may not touch Clay: every external read is a
@@ -122,6 +123,31 @@ if python3 "$REPO/tools/check-parity.py" --check >/tmp/tla-parity.log 2>&1; then
   echo "        $OWED (scaffold gate; release-gate.sh requires 0)"
 else
   fail "parity ledger malformed — see /tmp/tla-parity.log"; tail -6 /tmp/tla-parity.log
+fi
+
+echo "== gate 12: every desk file has a mark =="
+# Clay validates EVERY file of a commit through the mark its extension names;
+# one file with no mark (`%no-cast-between %mime %py` / `%jsonl`) fails the
+# whole |commit. The desk is deployed by copying desk/ wholesale (R4.0e), so
+# every file under it must name a mark in desk/mar, or one `|new-desk`
+# supplies (hoon, noun).
+MARKS=$( { ls "$DESK/mar" | sed -n 's/\.hoon$//p'; echo hoon; echo noun; } | sort -u)
+UNMARKED=$(find "$DESK" -type f | while read -r f; do
+  b=$(basename "$f")
+  case "$b" in *.*) e="${b##*.}" ;; *) e="" ;; esac
+  printf '%s\n' "$MARKS" | grep -qx -- "$e" || echo "$f"
+done)
+[ -z "$UNMARKED" ] && pass "every file under desk/ names a mark" \
+  || { fail "$(printf '%s\n' "$UNMARKED" | wc -l) file(s) with no mark:"; \
+       printf '%s\n' "$UNMARKED" | sed "s|$DESK/|    |" | head -20; }
+
+echo "== gate 13: Examples runner logic =="
+# R4.0d/e: the stop that works (max-time = wall), the census classes, the
+# timed-out skip list. Offline -- no ship
+if python3 "$REPO/tools/test-examples.py" >/tmp/tla-examples.log 2>&1; then
+  pass "$(tail -1 /tmp/tla-examples.log)"
+else
+  fail "runner checks failed — see /tmp/tla-examples.log"; grep FAIL /tmp/tla-examples.log | head
 fi
 
 echo

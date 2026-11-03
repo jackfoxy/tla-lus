@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 38, col 1 to line 38, col 13 of module APc1cs
+Multiple declarations or definitions for symbol vars.
+This duplicates the one at line 36, col 1 to line 36, col 43 of module APc1cs.

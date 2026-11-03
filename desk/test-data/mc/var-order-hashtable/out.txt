@@ -1,0 +1,7 @@
+Error: Invariant Inv is violated by the initial state:
+/\ Qux = 3
+/\ zeta = 0
+/\ alpha = 1
+/\ beta2 = 4
+/\ beta10 = 5
+/\ mid = 2

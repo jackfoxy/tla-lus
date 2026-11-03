@@ -1,0 +1,163 @@
+BINDINGS
+Bags!BagCardinality/1|override:MethodValue
+Bags!BagIn/2|override:MethodValue
+Bags!BagOfAll/2|override:MethodValue
+Bags!BagToSet/1|override:MethodValue
+Bags!BagUnion/1|override:MethodValue
+Bags!CopiesIn/2|override:MethodValue
+Bags!EmptyBag/0|override:MethodValue
+Bags!IsABag/1|override:MethodValue
+Bags!SetToBag/1|override:MethodValue
+Bags!SubBag/1|body
+Bags!\ominus/2|override:MethodValue
+Bags!\oplus/2|override:MethodValue
+Bags!\sqsubseteq/2|override:MethodValue
+FiniteSets!Cardinality/1|override:MethodValue
+FiniteSets!IsFiniteSet/1|override:MethodValue
+FiniteSetsExt!Choices/1|body
+FiniteSetsExt!ChooseUnique/2|body
+FiniteSetsExt!FlattenSet/1|body
+FiniteSetsExt!FoldSet/3|override:MethodValue
+FiniteSetsExt!MapThenSumSet/2|body
+FiniteSetsExt!Max/1|body
+FiniteSetsExt!Min/1|body
+FiniteSetsExt!ProductSet/1|body
+FiniteSetsExt!Quantify/2|override:MethodValue
+FiniteSetsExt!ReduceSet/3|body
+FiniteSetsExt!SumSet/1|body
+FiniteSetsExt!SymDiff/2|body
+FiniteSetsExt!kSubset/2|override:MethodValue
+Folds!MapThenFoldSet/5|body
+Functions!AntiFunction/1|override:MethodValue
+Functions!Bijection/2|body
+Functions!ExistsBijection/2|body
+Functions!ExistsInjection/2|body
+Functions!ExistsSurjection/2|body
+Functions!FoldFunction/3|override:MethodValue
+Functions!FoldFunctionOnSet/4|override:MethodValue
+Functions!Injection/2|body
+Functions!Inverse/3|body
+Functions!IsInjective/1|override:MethodValue
+Functions!IsRestriction/2|body
+Functions!Pointwise/3|body
+Functions!Range/1|body
+Functions!Restrict/2|body
+Functions!RestrictDomain/2|body
+Functions!RestrictValues/2|body
+Functions!SumFunction/1|body
+Functions!SumFunctionOnSet/2|body
+Functions!Surjection/2|body
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+SequencesExt!AllSubSeqs/1|override:MethodValue
+SequencesExt!BoundedSeq/2|body
+SequencesExt!CommonPrefixes/1|body
+SequencesExt!Cons/2|body
+SequencesExt!Contains/2|override:MethodValue
+SequencesExt!FlattenSeq/1|body
+SequencesExt!FoldLeft/3|override:MethodValue
+SequencesExt!FoldLeftDomain/3|override:MethodValue
+SequencesExt!FoldRight/3|override:MethodValue
+SequencesExt!FoldRightDomain/3|override:MethodValue
+SequencesExt!FoldSeq/3|override:MethodValue
+SequencesExt!Front/1|body
+SequencesExt!IndexFirstSubSeq/2|body
+SequencesExt!InsertAt/3|body
+SequencesExt!Interleave/2|body
+SequencesExt!IsPrefix/2|override:MethodValue
+SequencesExt!IsStrictPrefix/2|body
+SequencesExt!IsStrictSuffix/2|body
+SequencesExt!IsSuffix/2|body
+SequencesExt!Last/1|body
+SequencesExt!LongestCommonPrefix/1|override:MethodValue
+SequencesExt!Prefixes/1|body
+SequencesExt!Remove/2|body
+SequencesExt!RemoveAt/2|body
+SequencesExt!RemoveFirst/2|override:MethodValue
+SequencesExt!RemoveFirstMatch/2|override:MethodValue
+SequencesExt!ReplaceAll/3|body
+SequencesExt!ReplaceAllSubSeqs/3|override:EvaluatingValue
+SequencesExt!ReplaceAt/3|body
+SequencesExt!ReplaceFirstSubSeq/3|override:EvaluatingValue
+SequencesExt!ReplaceSubSeqAt/4|body
+SequencesExt!Reverse/1|body
+SequencesExt!SelectInSeq/2|override:MethodValue
+SequencesExt!SelectInSubSeq/4|override:MethodValue
+SequencesExt!SelectLastInSeq/2|override:MethodValue
+SequencesExt!SelectLastInSubSeq/4|override:MethodValue
+SequencesExt!SeqMod/2|body
+SequencesExt!SeqOf/2|body
+SequencesExt!SetToAllKPermutations/1|body
+SequencesExt!SetToSeq/1|override:MethodValue
+SequencesExt!SetToSeqs/1|override:MethodValue
+SequencesExt!SetToSortSeq/2|body
+SequencesExt!Snoc/2|body
+SequencesExt!SubSeqs/1|body
+SequencesExt!Suffixes/1|override:MethodValue
+SequencesExt!ToBag/1|body
+SequencesExt!ToSet/1|body
+SequencesExt!TupleOf/2|body
+SequencesExt!Zip/2|body
+TLC!:>/2|override:MethodValue
+TLC!@@/2|override:MethodValue
+TLC!Any/0|override:MethodValue
+TLC!Assert/2|override:MethodValue
+TLC!JavaTime/0|override:MethodValue
+TLC!Permutations/1|override:MethodValue
+TLC!Print/2|override:MethodValue
+TLC!PrintT/1|override:MethodValue
+TLC!RandomElement/1|override:MethodValue
+TLC!SortSeq/2|override:MethodValue
+TLC!TLCEval/1|override:EvaluatingValue
+TLC!TLCGet/1|override:EvaluatingValue
+TLC!TLCSet/2|override:MethodValue
+TLC!ToString/1|override:MethodValue
+EVAL
+ASS SetEnumValue {<<>>, <<1>>, <<2>>, <<3>>, <<1, 2>>, <<1, 3>>, <<2, 3>>, <<1, 2, 3>>}
+Cont BoolValue TRUE
+ContNo BoolValue FALSE
+FL IntValue 4
+FLD TupleValue <<1, 2, 3>>
+FLS TupleValue <<1, 2, 3>>
+FR IntValue -8
+FRD TupleValue <<1, 2, 3>>
+FRS TupleValue <<1, 2, 3>>
+FS IntValue 123
+LCP TupleValue <<1, 2>>
+LCPOne TupleValue <<5, 6>>
+Pre BoolValue TRUE
+PreEq BoolValue TRUE
+PreNo BoolValue FALSE
+RF TupleValue <<2, 1>>
+RFM TupleValue <<1, 3>>
+RFNo TupleValue <<1, 2>>
+SIS IntValue 2
+SISNo IntValue 0
+SISS IntValue 4
+SLIS IntValue 4
+SLISNo IntValue 0
+SLISS IntValue 1
+STS TupleValue <<1, 2, 3>>
+STSE TupleValue <<>>
+STSS SetEnumValue {<<1, 2>>, <<2, 1>>}
+Suf SetEnumValue {<<>>, <<3>>, <<2, 3>>, <<1, 2, 3>>}

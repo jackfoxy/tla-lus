@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lc={b<=2,op<=2} alc={(op,0)>=0,(op,1)>=0} alp={(op,0,b),(op,1,b)}
+lvl F L0 ml=[3,3] w=[1,1] mml=[0,0;] olc=[FFTT;]
+lvl L L0 lp={b,op} lc={b<=2,op<=2} alc={(op,0)>=0,(op,1)>=0} alp={(op,0,b),(op,1,b)}

@@ -1,0 +1,6 @@
+CONSTANTS
+  Nat <- NatOverride
+  Limit <- MCLimit
+INIT Init
+NEXT Next
+INVARIANT TypeOK

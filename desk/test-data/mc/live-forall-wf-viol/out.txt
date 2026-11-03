@@ -1,0 +1,4 @@
+Error: Temporal property Done was violated.
+Error: The following behavior constitutes a counter-example:
+22 states generated, 9 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 5.

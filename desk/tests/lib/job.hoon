@@ -24,24 +24,24 @@
 ++  check-req
   |=  [spec=@t cfg=@t]
   ^-  request
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  sim-req
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%simulate seed num depth |]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  dfid-req
   ::  `tlc2.TLC -workers 1 -dfid <depth>` (R2.5)
   |=  [spec=@t cfg=@t depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%dfid depth &]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  gen-req
   ::  the same run under `-generate` (R2.4.6): probabilistic successor picking
   |=  [spec=@t cfg=@t seed=@ud num=@ud depth=@ud]
   ^-  request
-  [[%check [| | | | ~ | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~]
+  [[%check [| | | | ~ | ~ [%simulate seed num depth &]]] (bundle spec `cfg) lim ~ ~ ~ ~]
 ::
 ++  clay-req
   ::  a %clay %check request over ~zod/%spec at a pinned revision
@@ -49,21 +49,21 @@
   ^-  request
   :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
       [%clay ~zod %spec ud+1 root cfg roots]
-      lim  ~  ~
+      lim  ~  ~  ~  ~
   ==
 ::
 ++  analyze-req
   |=  mods=(list [module-name @t])
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~]
+  [[%analyze [& | | |]] [%inline root (malt mods) ~] lim ~ ~ ~ ~]
 ::
 ++  analyze-req-f
   ::  an %analyze request with explicit flags [syntax semantic level lint]
   |=  [mods=(list [module-name @t]) flags=analyze-flags]
   ^-  request
   =/  root  ?~(mods 'spec' -.i.mods)
-  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~]
+  [[%analyze flags] [%inline root (malt mods) ~] lim ~ ~ ~ ~]
 ::
 ++  cyc-spec
   ^~
@@ -159,9 +159,9 @@
   '''
 ++  multi-spec
   ::  the root EXTENDS a user helper module (a two-module bundle); the checked
-  ::  predicates are root-local — evaluating an operator imported from another
-  ::  *user* module is a documented unit-6 residue (only own + INSTANCE defs are
-  ::  in the evaluation defmap)
+  ::  predicates are root-local here. Imported definitions are in the
+  ::  evaluation defmap since unit 6C.1, and since R4.2l the kernel's config
+  ::  targets and VARIABLEs follow EXTENDS too (`test-extends-*`)
   ^~
   '''
   ---- MODULE spec ----
@@ -311,7 +311,7 @@
         [%clay ~zod %base ud+1 'spec' `/spec-cfg/txt ~[/]]
         lim
         `[%base /spec]
-        ~
+        ~  ~  ~
     ==
   %+  expect-eq
     !>  `'write target /spec overlaps a module-search root; a run may not write over its own sources'
@@ -324,7 +324,7 @@
         [%clay ~zod %base ud+1 'spec' `/src/spec-cfg/txt ~[/src]]
         lim
         `[%base /out]
-        ~
+        ~  ~  ~
     ==
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
@@ -332,12 +332,12 @@
   ::  an %inline bundle declares no search roots, so nothing of its own can
   ::  be written over
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%base /out] ~ ~ ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-write-bad-desk-rejected
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim `[%'Bad Desk' /out] ~ ~ ~]
   %+  expect-eq
     !>(`'invalid desk name \'Bad Desk\'')
   !>((validate:job-lib req))
@@ -357,7 +357,7 @@
 ::
 ++  test-validate-translate-rejected
   =/  req=request
-    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~]
+    [[%translate [%none | &]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: PlusCal translation is not ported yet (unit 8)')
   !>((validate:job-lib req))
@@ -366,33 +366,33 @@
   ::  the semantic/level/lint flags are wired (unit 4.8); a well-formed
   ::  bundle validates
   =/  req=request
-    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~]
+    [[%analyze [& & & &]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   (expect-eq !>(~) !>((validate:job-lib req)))
 ::
 ++  test-validate-translate-before-check-rejected
   =/  req=request
-    [[%check [& | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~]
+    [[%check [& | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec `mc-cfg) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: translate-before-check is not ported yet (unit 8)')
   !>((validate:job-lib req))
 ::
 ++  test-validate-check-needs-config
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle cyc-spec ~) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'a %check request requires a config')
   !>((validate:job-lib req))
 ::
 ++  test-validate-empty-bundle
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive & 0]]] [%inline 'spec' ~ `mc-cfg] lim ~ ~ ~ ~]
   (expect-eq !>(`'empty source bundle') !>((validate:job-lib req)))
 ::
 ++  test-validate-missing-root
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'Nope' (malt ~[['spec' cyc-spec]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   (expect-eq !>(`'root module not in bundle') !>((validate:job-lib req)))
 ::
@@ -405,7 +405,7 @@
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'A' (malt ~[['A' cyc-spec] ['B' cyc-spec]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   =.  max-modules.limits.req  1
   (expect-eq !>(`'too many modules') !>((validate:job-lib req)))
@@ -510,7 +510,7 @@
   ::  the lint-warning analyze request, with `codes` promoted to errors
   |=  codes=(set diag-code)
   ^-  request
-  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes]
+  [[%analyze [& & & &]] [%inline 'spec' (malt ~[['spec' lint-spec]]) ~] lim ~ codes ~ ~]
 ::
 ++  test-promote-warning-fails-the-run
   =/  req  (promote-req (silt ~[`diag-code`[%sany 4.802]]))
@@ -588,6 +588,686 @@
     (expect-eq !>(~) !>(cont.j))
   ==
 ::
+++  print-spec
+  ::  R4.2a: every print site tlc2 has -- a constant definition, an ASSUME
+  ::  (with a `\E` that prints per witness tried), Init, Next and an invariant
+  ^-  @t
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'K == IF PrintT("const K") THEN 7 ELSE 0'
+      'VARIABLE x'
+      'Init == x = 0 /\\ PrintT(<<"init", x>>)'
+      'Next == x < 2 /\\ x\' = x + 1 /\\ PrintT(<<"next", x, x\'>>)'
+      'Inv == PrintT(<<"inv", x>>)'
+      'ASSUME Print("assume", K = K)'
+      'ASSUME \\E i \\in 1..3 : PrintT(<<"ex", i>>) /\\ i = 2'
+      '===='
+  ==
+::
+++  print-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-print-output-artifact
+  ::  R4.2a: the `%output` artifact holds the pin's console lines, in the
+  ::  pin's order (measured with tla2tools.jar on this spec), whatever the
+  ::  slicing
+  =/  want=@t
+    %-  of-wain:format
+    :~  '"const K"'  '"assume"  TRUE'  '<<"ex", 1>>'  '<<"ex", 2>>'
+        '<<"init", 0>>'  '<<"inv", 0>>'  '<<"next", 0, 1>>'  '<<"inv", 1>>'
+        '<<"next", 1, 2>>'  '<<"inv", 2>>'
+    ==
+  =/  j0  (init:job-lib (check-req print-spec print-cfg) t0)
+  =/  a  (run-all j0 256)
+  =/  b  (run-all j0 1)
+  ;:  weld
+    (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.+.a))
+    (expect-eq !>(`[%text want]) !>((~(get by artifacts.+.a) %output)))
+    (expect-eq !>((~(get by artifacts.+.a) %output)) !>((~(get by artifacts.+.b) %output)))
+  ==
+::
+++  test-json-file-artifacts
+  ::  R4.2f: `JsonSerialize` / `ndJsonSerialize` are TRUE and their files are
+  ::  artifacts named for the path (`+file-art`); the text is what
+  ::  tla2tools.jar writes for the same calls (measured)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, Json'
+        'VARIABLE x'
+        'Init == x = 0 /\\ JsonSerialize("out/Trace.json", <<[a |-> 1]>>)'
+        '             /\\ ndJsonSerialize("log.ndjson", <<1, "two">>)'
+        'Next == UNCHANGED x'
+        '===='
+    ==
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec 'INIT Init\0aNEXT Next\0a') t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.j))
+    %+  expect-eq  !>(`[%text '[{"a":1}]'])
+    !>((~(get by artifacts.j) ~.file-out-trace.json))
+    %+  expect-eq  !>(`[%text '1\0a"two"\0a'])
+    !>((~(get by artifacts.j) ~.file-log.ndjson))
+  ==
+::
+++  env-req
+  ::  R4.2c/g: a check request carrying an environment and Java properties
+  |=  [spec=@t cfg=@t env=(map @t @t) props=(map @t @t)]
+  ^-  request
+  =/  r  (check-req spec cfg)
+  r(env env, props props)
+::
+++  ioutils-mini
+  ::  the one IOUtils operator under test, as a module of that name (the
+  ::  override is keyed [IOUtils IOEnv 0], as tlc2 binds it)
+  '---- MODULE IOUtils ----\0aIOEnv == CHOOSE r : TRUE\0a====\0a'
+::
+++  test-ioenv-from-request
+  ::  R4.2c: `IOEnv` is the request's environment as a record; an absent
+  ::  variable is not in its DOMAIN (the corpus's guarded reads)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, IOUtils'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME IOEnv.K = "7" /\\ "J" \\notin DOMAIN IOEnv'
+        '===='
+    ==
+  =/  b  [%inline 'spec' (malt ~[['spec' spec] ['IOUtils' ioutils-mini]]) `'INIT Init\0aNEXT Next\0a']
+  =/  r0  (check-req spec '')
+  =/  r1  r0(src b, env (malt ~[['K' '7']]))
+  =/  r2  r0(src b)
+  =/  a  (run-all (init:job-lib r1 t0) 256)
+  =/  z  (run-all (init:job-lib r2 t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.+.a))
+    ::  no K: the record has no such field, so the ASSUME fails to evaluate
+    (expect !>(?=([~ %failed *] result.+.z)))
+  ==
+::
+++  cdot-spec
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'VARIABLE x'
+      'Init == x = 1'
+      'Inc == x\' = x + 1'
+      'Dbl == x\' = x * 2'
+      'Next == x < 20 /\\ (Inc \\cdot Dbl \\/ Inc)'
+      'ASSUME TLCGet("-Dfoo") = "-Dfoo"'
+      '===='
+  ==
+::
+++  test-cdot-with-property
+  ::  R4.2g: with `tlc2.tool.impl.Tool.cdot=true` the composition runs; the
+  ::  pin (`java -Dtlc2.tool.impl.Tool.cdot=true`) reports 58 generated
+  ::  (the intermediate states of `Inc \cdot Dbl` included), 30 distinct,
+  ::  depth 7. An unset `-D` key reads back as itself
+  =/  props  (malt ~[['tlc2.tool.impl.Tool.cdot' 'true']])
+  =/  a  (run-all (init:job-lib (env-req cdot-spec 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' ~ props) t0) 256)
+  =/  st  ?.(?=([~ %ok *] result.+.a) *run-stats stats.u.result.+.a)
+  (expect-eq !>([58 30 7]) !>([generated.st distinct.st depth.st]))
+::
+++  test-cdot-refused-without-property
+  ::  R4.2g: without the property, the pin's own refusal
+  =/  a  (run-all (init:job-lib (env-req cdot-spec 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' ~ ~) t0) 256)
+  %+  expect-eq
+    !>(`[%failed 'The current version of TLC does not support action composition.  An incomplete implementation can be enabled via the tlc2.tool.impl.Tool.cdot=true java property.'])
+  !>(?.(?=([~ %failed *] result.+.a) ~ `[%failed reason.u.result.+.a]))
+::
+++  test-tlcget-d-property
+  ::  R4.2g: `TLCGet("-D<key>")` reads the request's property
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, TLC'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME TLCGet("-Dfoo") = "bar"'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (env-req spec 'INIT Init\0aNEXT Next\0a' ~ (malt ~[['foo' 'bar']])) t0) 256)
+  (expect-eq !>(`[%ok [2 1 0 1 [0 0 0 0]]]) !>(result.+.a))
+::
+++  test-json-deserialize-refused
+  ::  R4.2f: the JSON readers are refused by name (approved difference)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, Json'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME ndJsonDeserialize("trace.ndjson") = <<>>'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (check-req spec 'INIT Init\0aNEXT Next\0a') t0) 256)
+  =/  why=@t  ?.(?=([~ %failed *] result.+.a) '' reason.u.result.+.a)
+  %-  expect
+  !>  ?=(^ (find "Json!ndJsonDeserialize; it reads a file" (trip why)))
+::
+++  config-spec
+  |=  want=@t
+  ^-  @t
+  %-  of-wain:format
+  :~  '---- MODULE spec ----'
+      'EXTENDS Naturals, TLC'
+      'VARIABLE x'
+      'Init == x = 0'
+      'Next == x < 1 /\\ x\' = x + 1'
+      (cat 3 'ASSUME ' want)
+      '===='
+  ==
+::
+++  test-tlcget-config-bfs
+  ::  R4.2w: the exhaustive run's record, as tla2tools.jar prints it
+  ::  (`mode |-> "bfs", worker |-> 1, seed |-> "0", fingerprint |->
+  ::  "-7992595565342442794", deadlock |-> FALSE`); install names this engine
+  =/  sp  %-  config-spec
+    %+  rap  3
+    :~  'LET c == TLCGet("config") IN c.mode = "bfs" /\\ c.worker = 1 /\\ '
+        'c.seed = "0" /\\ c.fingerprint = "-7992595565342442794" /\\ '
+        'c.deadlock = FALSE /\\ DOMAIN c = {"mode", "deadlock", "worker", '
+        '"seed", "fingerprint", "install"}'
+    ==
+  =/  a  (run-all (init:job-lib (check-req sp 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a') t0) 256)
+  (expect !>(?=([~ %ok *] result.+.a)))
+::
+++  test-tlcget-config-generate
+  ::  R4.2w: a `-generate` run's record (SimTokenRing, EWD998_opts assume
+  ::  `mode = "generate"`); traces and depth are the request's
+  =/  sp  %-  config-spec
+    %+  rap  3
+    :~  'LET c == TLCGet("config") IN c.mode = "generate" /\\ c.traces = 3 /\\ '
+        'c.depth = 4 /\\ c.aril = "0" /\\ c.sched = "random"'
+    ==
+  =/  r  (sim-req sp 'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a' 0 3 4)
+  =/  r2  r(op [%check [| | | | ~ | ~ [%simulate 0 3 4 &]]])
+  =/  a  (run-all (init:job-lib r2 t0) 256)
+  (expect !>(?=([~ %ok *] result.+.a)))
+::
+++  test-ioexec-refused
+  ::  R4.2h: a CommunityModules process operator is refused by name
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, IOUtils'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == UNCHANGED x'
+        'ASSUME IOExec(<<"ls">>).exitValue = 0'
+        '===='
+    ==
+  =/  iou  '---- MODULE IOUtils ----\0aIOExec(c) == CHOOSE r : TRUE\0a====\0a'
+  =/  b  [%inline 'spec' (malt ~[['spec' spec] ['IOUtils' iou]]) `'INIT Init\0aNEXT Next\0a']
+  =/  r0  (check-req spec '')
+  =/  a  (run-all (init:job-lib r0(src b) t0) 256)
+  =/  why=@t  ?.(?=([~ %failed *] result.+.a) '' reason.u.result.+.a)
+  %-  expect
+  !>  ?=(^ (find "IOUtils!IOExec; it runs a process" (trip why)))
+::
+++  ec2213-why
+  ::  the failure reason of a two-module PROPERTY run (R4.2ad)
+  |=  [mods=(list [@t @t]) cfg=@t]
+  ^-  tape
+  =/  b  [%inline 'r' (malt mods) `cfg]
+  =/  r0  (check-req '' '')
+  =/  a  (run-all (init:job-lib r0(src b) t0) 256)
+  ?.  ?=([~ %failed *] result.+.a)  ""
+  (trip reason.u.result.+.a)
+::
+++  ec2213-a
+  %-  of-wain:format
+  :~  '---- MODULE A ----'
+      'EXTENDS Naturals'
+      'VARIABLE x'
+      'Init == x = 0'
+      'Next == x\' = (x + 1) % 3'
+      'Bad == \\A i \\in {x} : <>(x = i)'
+      '===='
+  ==
+::
+++  test-ec2213-module-extends
+  ::  R4.2ad: EC 2213's location names the module the formula is IN (pin:
+  ::  `... line 6, col 8 to line 6, col 31 of module A:`), not the root
+  =/  r
+    '---- MODULE r ----\0aEXTENDS A\0aSpec == Init /\\ [][Next]_x\0a====\0a'
+  =/  why  (ec2213-why ~[['r' r] ['A' ec2213-a]] 'SPECIFICATION Spec\0aPROPERTY Bad\0a')
+  %+  expect-eq
+    !>("TLC cannot handle the temporal formula line 6, col 8 to line 6, col 31 of module A")
+  !>((scag 82 why))
+::
+++  test-ec2213-module-instance
+  ::  through an INSTANCE: the instanced module's text (pin: `of module A`)
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE r ----'
+        'EXTENDS Naturals'
+        'VARIABLE y'
+        'I == INSTANCE A WITH x <- y'
+        'Spec == y = 0 /\\ [][(y\' = (y + 1) % 3)]_y'
+        'Prop == I!Bad'
+        '===='
+    ==
+  =/  why  (ec2213-why ~[['r' r] ['A' ec2213-a]] 'SPECIFICATION Spec\0aPROPERTY Prop\0a')
+  %+  expect-eq
+    !>("TLC cannot handle the temporal formula line 6, col 8 to line 6, col 31 of module A")
+  !>((scag 82 why))
+::
+++  bundle-stats
+  ::  [generated distinct depth] of an inline multi-module %check, or the
+  ::  failure reason (R4.2 census fixes)
+  |=  [root=@t mods=(list [@t @t]) cfg=@t]
+  ^-  (each [@ud @ud @ud] @t)
+  =/  bun  [%inline root (malt mods) `cfg]
+  =/  r0  (check-req '' '')
+  =/  a  (run-all (init:job-lib r0(src bun) t0) 256)
+  =/  res  result.+.a
+  ?~  res  [%| 'no result']
+  ?.  ?=(%ok -.u.res)
+    [%| ?:(?=(%failed -.u.res) reason.u.res 'not ok')]
+  [%& [generated distinct depth]:stats.u.res]
+::
+++  test-instance-extends-chain
+  ::  an unnamed INSTANCE imports what the instanced module itself imports
+  ::  through ITS unnamed INSTANCE and EXTENDS (Sailfish: `INSTANCE Sailfish`
+  ::  -> `INSTANCE BlockDag` -> `EXTENDS Utils` gives `Max`). Pin: 2/1/1
+  =/  u  '---- MODULE U ----\0aEXTENDS Integers\0aMax(S) == CHOOSE x \\in S : \\A y \\in S : y <= x\0a====\0a'
+  =/  b  '---- MODULE B ----\0aEXTENDS Integers, U\0aTop == Max({1, 5, 3})\0a====\0a'
+  =/  sm
+    '---- MODULE S ----\0aEXTENDS Integers\0aINSTANCE B\0aVARIABLE x\0aInit == x = Top\0aNext == UNCHANGED x\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Integers\0aVARIABLE x\0aINSTANCE S\0aInv == x = Max({2, 5})\0a====\0a'
+  %+  expect-eq  !>([%& [2 1 1]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['S' sm] ['B' b] ['U' u]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-mod-override-through-instance
+  ::  `B <-[V] MB` overrides V's `B` under every instance qualification
+  ::  (MCPaxos: `Ballot <-[Voting] MCBallot` with `V == INSTANCE Voting`);
+  ::  else `\E b \in Nat` is enumerated. Pin: 4/3/2
+  =/  v
+    '---- MODULE V ----\0aEXTENDS Naturals\0aB == Nat\0aVARIABLE y\0aVI == y = 0\0aVN == \\E b \\in B : b > y /\\ y\' = b\0a====\0a'
+  =/  p
+    '---- MODULE P ----\0aEXTENDS Naturals\0aVARIABLE y\0aMB == 0..2\0aW == INSTANCE V\0aInit == W!VI\0aNext == W!VN\0a====\0a'
+  %+  expect-eq  !>([%& [4 3 2]])
+  !>  %^  bundle-stats  'P'
+        ~[['P' p] ['V' v]]
+      'CONSTANT B <-[V] MB\0aINIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-mod-override-inherited
+  ::  `Nat <- [M]MNat` where M INHERITS Nat (LeastCircularSubstring:
+  ::  `Nat <- [ZSequences]ZSeqNat`): tlc2 overrides Nat's one shared
+  ::  definition. Pin: 6/3/1
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aSmall == {n \\in Nat : n < 3}\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Naturals, M\0aMNat == 0..5\0aVARIABLE x\0aInit == x \\in Small\0aNext == x\' = (x + 1) % 3\0a====\0a'
+  %+  expect-eq  !>([%& [6 3 1]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'CONSTANT Nat <- [M]MNat\0aINIT Init\0aNEXT Next\0a'
+::
+++  test-subst-names-own-var
+  ::  `I == INSTANCE A WITH x <- Lx`, where the ROOT's `Lx == x + 1` names
+  ::  the root's own `x`: the substitution expression is read outside the
+  ::  inner binding of `x` (braf: `file_content <- LogicalFileContent`
+  ::  looped). Pin: 5/5/5
+  =/  a  '---- MODULE A ----\0aEXTENDS Naturals\0aVARIABLE x\0aAN == x\' = x + 1\0aASpec == x = 1 /\\ [][AN]_x\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Lx == x + 1'
+        'I == INSTANCE A WITH x <- Lx'
+        'Init == x = 0'
+        'Next == x < 4 /\\ x\' = x + 1'
+        'Prop == I!ASpec'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [5 5 5]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['A' a]]
+      'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-live-instance-self-subst
+  ::  an unnamed INSTANCE substitutes `d <- d`; a bare `d` in the instanced
+  ::  module's temporal PROPERTY must translate as the variable, not chase
+  ::  that binding forever (TestMCReachability's `Termination`: one slice
+  ::  exhausted the loom). Pin: 3/3/3
+  =/  i
+    %-  of-wain:format
+    :~  '---- MODULE I ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, d'
+        'Init == x = 0 /\\ d = FALSE'
+        'Next == x < 2 /\\ x\' = x + 1 /\\ d\' = (x + 1 = 2)'
+        'Spec == Init /\\ [][Next]_<<x, d>> /\\ WF_<<x, d>>(Next)'
+        'Done == <>(d \\/ x = 5)'
+        '===='
+    ==
+  =/  r  '---- MODULE R ----\0aEXTENDS Naturals\0aVARIABLES x, d\0aINSTANCE I\0a====\0a'
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['I' i]]
+      'SPECIFICATION Spec\0aPROPERTY Done\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-reads-instancer-scope
+  ::  `b <- a` names the INSTANTIATING module's `a`, although the instance
+  ::  also substitutes its own `a <- x`: a call-by-name substitution is read
+  ::  in the scope it was written in (TestGraphs' `Refinement`: `T <- ... \cup
+  ::  {.. : succ \in successors}` captured the sibling `successors`, a wrong
+  ::  implied-action failure). Pin: 3/3/3
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLES a, b\0aStep == b\' = b /\\ a\' = a + 1\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, a'
+        'I == INSTANCE M WITH a <- x, b <- a'
+        'Init == x = 0 /\\ a = 10'
+        'Next == x < 2 /\\ x\' = x + 1 /\\ a\' = a'
+        'Prop == [][I!Step]_<<x, a>>'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT Next\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-state-expr-lazy
+  ::  a state-reading `WITH` expression carries level 0 in the graph; it is
+  ::  bound by name all the same, so `x'` through the instance reads the
+  ::  successor (it read the current-state value: a wrong implied-action
+  ::  failure). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLE x\0aInc == x\' = x + 2\0aNext == Inc\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'I == INSTANCE M WITH x <- x * 2'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Inc]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-state-op-lazy
+  ::  as above through an operator, `y <- Dbl(x)` ("primed variable is
+  ::  unassigned in the successor state: y"). Pin: 4/4/4
+  =/  n  '---- MODULE N ----\0aEXTENDS Naturals\0aVARIABLE y\0aInc == y\' = y + 2\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Dbl(v) == v * 2'
+        'I == INSTANCE N WITH y <- Dbl(x)'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Inc]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['N' n]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subst-sibling-member
+  ::  `I!Next` calls its sibling `Inc`, whose `WITH` wrapper binds `x <-
+  ::  Dbl(x)` again from inside the instance: the binding in force is kept,
+  ::  so `Dbl` is applied once (EWD998ChanID's `active <- Node2Nat(active)`
+  ::  was applied twice). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aVARIABLE x\0aInc == x\' = x + 2\0aNext == Inc\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Dbl(v) == v * 2'
+        'I == INSTANCE M WITH x <- Dbl(x)'
+        'Init == x = 0'
+        'RNext == x < 3 /\\ x\' = x + 1'
+        'Prop == [][I!Next]_x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT RNext\0aPROPERTY Prop\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-memo-key-keeps-free-names
+  ::  an operator application is memoized with its environment cut to the
+  ::  names FREE in its reach: `F` reads the constant `N` freely, and `N` is
+  ::  only BOUND in `L`'s `Lib(N)` -- a cut by every name bound anywhere in
+  ::  the reach dropped it ("undefined identifier: N", EWD998Chan). Pin: 3/3/3
+  =/  l  '---- MODULE L ----\0aEXTENDS Naturals\0aLib(N) == N + 1\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals, L'
+        'CONSTANT N'
+        'F(x) == x + N + Lib(0)'
+        'VARIABLE v'
+        'Init == v = F(1)'
+        'Next == v < 9 /\\ v\' = v + 1'
+        'Inv == v >= 7'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['L' l]]
+      'CONSTANT N = 5\0aINIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-memo-const-def-reads-state
+  ::  `F` is constant-level in its module, but `c <- x` makes it read the
+  ::  state, here through its sibling `G`: the memo keys it with the variables its reach names, never by
+  ::  the graph's level (cleared states read "unassigned", TLCSailfish2's
+  ::  BlockDag over `vs`). Pin: 4/4/4
+  =/  m  '---- MODULE M ----\0aEXTENDS Naturals\0aCONSTANT c\0aF == c + 1\0aG == F * 2\0a====\0a'
+  =/  r
+    %-  of-wain:format
+    :~  '---- MODULE R ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'I == INSTANCE M WITH c <- x'
+        'Init == x = 0'
+        'Next == x < 3 /\\ x\' = x + 1'
+        'Inv == I!G = 2 * (x + 1)'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['M' m]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subset-assign-supersets
+  ::  R4.Q5: `x' \in SUBSET T /\ x \subseteq x'` produces only the
+  ::  supersets of x (`+subset-sup`); the counts are the full path's. Pin:
+  ::  10/4/2
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = {1}'
+        'Next == /\\ x\' \\in SUBSET {1, 2, 3, 4}'
+        '        /\\ x \\subseteq x\''
+        '        /\\ 3 \\notin x\''
+        '===='
+    ==
+  %+  expect-eq  !>([%& [10 4 2]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-subset-assign-outside
+  ::  R4.Q5: A not within T leaves no candidate. Pin: 1/1/1
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = {5}'
+        'Next == /\\ x\' \\in SUBSET {1, 2, 3, 4}'
+        '        /\\ x \\subseteq x\''
+        '===='
+    ==
+  %+  expect-eq  !>([%& [1 1 1]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-cdefs-in-dependency-order
+  ::  R4.Q7: constant definitions are evaluated dependencies first, each
+  ::  with the values already found (`+cdef-order:ne`) -- the walk is over
+  ::  the definition MAP, whose order is not the source order; a failing
+  ::  one stays lazy and so does its dependent. x = C = (A * 2) + 1 = 7:
+  ::  one state and its stuttering step. Pin: 2/1/1
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'A == 3'
+        'B == A * 2'
+        'C == B + 1'
+        'Bad == CHOOSE y \\in {} : TRUE'
+        'Dep == Bad + 1'
+        'Init == x = C'
+        'Next == UNCHANGED x'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [2 1 1]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0a'
+::
+++  test-memo-keyed-on-dependency-values
+  ::  R4.QW: `D` reads the state only through `O`, so its memo is keyed on
+  ::  `O`'s value (`+dep-vals:ne`). A wrong key would serve x = 0's `D` at
+  ::  x = 1: `Inv` would fail and `Bad` hold. Pins: 5/4/4; `Bad` violated
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, FiniteSets'
+        'VARIABLE x'
+        'O == x % 2'
+        'D == {y \\in SUBSET {1, 2, 3} : Cardinality(y) <= O}'
+        'Init == x = 0'
+        'Next == x\' = (x + 1) % 4'
+        'Inv == Cardinality(D) = IF x % 2 = 0 THEN 1 ELSE 4'
+        'Bad == Cardinality(D) = 1'
+        '===='
+    ==
+  ;:  weld
+    %+  expect-eq  !>([%& [5 4 4]])
+    !>((bundle-stats 'spec' ~[['spec' sp]] 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'))
+    %+  expect-eq  !>([%| 'not ok'])
+    !>((bundle-stats 'spec' ~[['spec' sp]] 'INIT Init\0aNEXT Next\0aINVARIANT Bad\0a'))
+  ==
+::
+++  test-action-argument-solved
+  ::  an ACTION passed as an operator argument is bound by name and solved
+  ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`
+  ::  was evaluated eagerly: "primed variable is unassigned"). Pin: 4/4/4
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLES x, s'
+        'Keep(A) == A /\\ UNCHANGED s'
+        'Wrap(A) == s = 0 /\\ A'
+        'Init == x = 0 /\\ s = 0'
+        'Next == Wrap(Keep(x < 3 /\\ x\' = x + 1))'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [4 4 4]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-oparg-sibling-through-instance
+  ::  an operator ARGUMENT naming a sibling inside a named instance resolves
+  ::  to the instance's copy (MCKVsnap: `satisfyIsolationLevel(s, t, CT_SI)`
+  ::  in `CC == INSTANCE ClientCentric`). Pin: 3/3/3
+  =/  c
+    '---- MODULE C ----\0aEXTENDS Naturals\0aTwice(f(_), a) == f(f(a))\0aInc(a) == a + 1\0aT(a) == Twice(Inc, a)\0a====\0a'
+  =/  r
+    '---- MODULE R ----\0aEXTENDS Naturals\0aCC == INSTANCE C\0aVARIABLE x\0aInit == x = CC!T(0)\0aNext == x < 6 /\\ x\' = CC!T(x)\0a====\0a'
+  %+  expect-eq  !>([%& [3 3 3]])
+  !>  %^  bundle-stats  'R'
+        ~[['R' r] ['C' c]]
+      'INIT Init\0aNEXT Next\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-memb-through-substin
+  ::  membership in an instanced definition is decided on the structure
+  ::  under its `$SubstIn` wrapper (MCNano's `N!Ledger`): `[D -> SUBSET
+  ::  (1..12)]` has 4096^3 elements and must not be built. Pin: 385/64/7
+  =/  m
+    %-  of-wain:format
+    :~  '---- MODULE M ----'
+        'EXTENDS Naturals'
+        'CONSTANT D'
+        'VARIABLE l'
+        'Big == [D -> SUBSET (1..12)]'
+        'TypeOk == l \\in [{1, 2} -> Big]'
+        'MI == l = [i \\in {1, 2} |-> [d \\in D |-> {}]]'
+        'MN == \\E i \\in {1, 2}, d \\in D : l\' = [l EXCEPT ![i][d] = {1}]'
+        '===='
+    ==
+  =/  q
+    %-  of-wain:format
+    :~  '---- MODULE Q ----'
+        'EXTENDS Naturals'
+        'VARIABLE l'
+        'N == INSTANCE M WITH D <- {1, 2, 3}'
+        'Init == N!MI'
+        'Next == N!MN'
+        'Inv == N!TypeOk'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [385 64 7]])
+  !>  %^  bundle-stats  'Q'
+        ~[['Q' q] ['M' m]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a'
+::
+++  test-sim-alias
+  ::  R4.2i: a simulated behavior renders through the ALIAS, each state
+  ::  paired with its successor and the last with itself (pin, -simulate:
+  ::  `x = 3` / `nx = 3` last)
+  =/  spec=@t
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals'
+        'VARIABLE x'
+        'Init == x = 0'
+        'Next == x\' = x + 1'
+        'Inv == x < 3'
+        'Alias == [x |-> x, nx |-> x\']'
+        '===='
+    ==
+  =/  a  (run-all (init:job-lib (sim-req spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a' 7 1 10) t0) 256)
+  =/  rep  (~(get by artifacts.+.a) %report)
+  =/  txt=tape  ?.(?=([~ %text *] rep) "" (trip +.u.rep))
+  ;:  weld
+    (expect !>(?=(^ (find "/\\ x = 2\0a/\\ nx = 3" txt))))
+    (expect !>(?=(^ (find "/\\ x = 3\0a/\\ nx = 3" txt))))
+    ::  R4.2as: the simulator's labels (pin: `<Init line 4, col 9 to line 4,
+    ::  col 13 of module S1>`, then the generating action)
+    (expect !>(?=(^ (find "State 1: <Init line 4, col 9 to line 4, col 13 of module spec>" txt))))
+    (expect !>(?=(^ (find "State 2: <Next line 5, col 9 to line 5, col 18 of module spec>" txt))))
+  ==
+::
 ++  test-check-budget-independent
   ::  the final job is identical whatever the per-event budget
   =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
@@ -630,7 +1310,7 @@
 ::
 ++  test-check-deadlock-disabled
   =/  req=request
-    [[%check [| | | | ~ | ~ [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~]
+    [[%check [| | | | ~ | ~ [%exhaustive | 0]]] (bundle dead-spec `mc-cfg) lim ~ ~ ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [3 3 0 3 [0 1 1 1]]]) !>(result.j))
 ::
@@ -649,10 +1329,120 @@
   =/  req=request
     :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
         [%inline 'spec' (malt ~[['spec' multi-spec] ['helper' helper-mod]]) `mc-cfg]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   (expect-eq !>(`[%ok [5 4 0 4 [0 1 1 1]]]) !>(result.j))
+::
+::  R4.2l: an MC-style root that only EXTENDS the module holding the
+::  variable, Init, Next and the invariant. The job kernel used to look the
+::  config targets up in the ROOT syntax tree and refused it (`no definition
+::  for INIT Init`), the cause of about 29 R4.0e census refusals. Expected
+::  values: tlc2 at the pin (`-workers 1`), 2026-10-09
+++  ext-spec
+  ^~
+  '''
+  ---- MODULE Spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x' = x + 1
+  Inv == x < 2
+  ====
+  '''
+++  ext-mc
+  ^~
+  '''
+  ---- MODULE MC ----
+  EXTENDS Spec
+  ====
+  '''
+++  ext-req
+  |=  cfg=@t
+  ^-  request
+  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
+      [%inline 'MC' (malt ~[['MC' ext-mc] ['Spec' ext-spec]]) `cfg]
+      lim  ~  ~  ~  ~
+  ==
+++  ext-cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
+++  test-extends-config-targets
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ext-req ext-cfg) t0) 256)
+  %+  expect-eq
+    !>  `*`[[%invariant 'Inv' %.n] 3 3 0 3]
+  !>  ^-  *
+      ?.  ?=([~ %violated *] result.j)  result.j
+      =*  r  u.result.j
+      :*  violation.r
+          generated.stats.r  distinct.stats.r  queued.stats.r  depth.stats.r
+      ==
+::
+::  the action label names the module that DEFINES the imported Next, as
+::  tlc2 prints it, not the root
+++  test-extends-next-label
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib (ext-req ext-cfg) t0) 256)
+  =/  ra  (~(get by artifacts.j) %report)
+  =/  lines=wain
+    ?.  ?&(?=(^ ra) ?=(%text -.u.ra))  ~
+    (to-wain:format text.u.ra)
+  %+  expect-eq
+    !>  ^-  wain
+    :~  'State 1: <Initial predicate>'
+        'State 2: <Next line 5, col 9 to line 5, col 18 of module Spec>'
+        'State 3: <Next line 5, col 9 to line 5, col 18 of module Spec>'
+    ==
+  !>((skim lines |=(l=@t =('State ' (end [3 6] l)))))
+::
+::  a name NO module defines is still refused, by the config validator and
+::  with tlc2's own text, before the kernel's guard: so that guard only ever
+::  fired on names an EXTENDed module defines, which is the R4.2l bug
+++  test-extends-undefined-invariant
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (ext-req 'INIT Init\0aNEXT Next\0aINVARIANT Nope\0a') t0) 256)
+  %+  expect-eq
+    !>  `[%failed 'The invariant Nope specified in the configuration file\0ais not defined in the specification.']
+  !>(result.j)
+::
+::  R4.2y: a crash inside a slice seals the job %failed. Before, Gall rolled
+::  the event back with the behn wake that drove it, and the job sat
+::  `running` until the runner's wall cap (three R4.0e2 census models)
+++  test-crash-seals-job
+  ::  a stage `+run` has no arm for crashes it (`%tla-lus-unplanned-stage`)
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  r   (step:job-lib j0(pending ~[%lint], cont ~) 256 t0)
+  =/  res  ?:(?=(%stop -.r) result.job.r ~)
+  %+  expect-eq
+    !>  [%stop %.y 'internal: crashed in %lint']
+  !>  :+  -.r
+        ?=([~ %failed *] res)
+      ?.  ?=([~ %failed *] res)  ''
+      (end [3 26] reason.u.res)
+::
+::  the crash that ports tlc2's `Assert.fail(TLC_LIVE_WRONG_FORMULA_FORMAT)`
+::  (`Liveness.classifyExpr`) is that typed error, with tlc2's text and code.
+::  Expected: tlc2 at the pin (`-workers 1`), 2026-10-09 -- exit 255,
+::  `Error: Temporal formulas containing actions must be of forms <>[]A or []<>A.`
+++  wff-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLES i
+  Init == i = 0
+  Next == i < 5 /\ i' = i + 1
+  Spec == Init /\ [][Next]_i
+  Live == (<><<Next>>_i) ~> (i = 5)
+  ====
+  '''
+++  test-wrong-formula-format-typed
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req wff-spec 'SPECIFICATION Spec\0aPROPERTY Live\0a') t0) 256)
+  %+  expect-eq
+    !>  :-  `[%failed 'Temporal formulas containing actions must be of forms <>[]A or []<>A.']
+        `[%tlc 2.214]
+  !>  :-  result.j
+      =/  ds  (skim diags.j |=(d=diagnostic =(%error severity.d)))
+      ?~(ds ~ `code.i.ds)
 ::
 ::  a search whose persisted cursor is under the noun-size bound completes
 ::  normally (the limit is a defense-in-depth ceiling above max-states)
@@ -681,6 +1471,41 @@
   %+  expect-eq
     !>(`%depth)
   !>(?:(?&(?=(^ result.j) ?=(%limited -.u.result.j)) `kind.u.result.j ~))
+::
+::  R4.3: the state bound is checked before each INITIAL state is
+::  registered (it was checked only after all of them: LeastCircularSubstring-
+::  Medium's 6,400 ran out of time first), so it stops at bound + 1
+++  test-limited-states-in-inits
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in 0..50\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  10
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%states 11])
+  !>  ?.  ?&(?=(^ result.j) ?=(%limited -.u.result.j))  ~
+      `[kind distinct.stats]:u.result.j
+::
+::  R4.3: under a bound an init `x \in {y \in S : P}` takes bound + 1
+::  elements, not the whole filter (CoffeeCan3000Beans' ~4.5 million)
+++  test-init-filter-bounded
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {y \\in 0..50 : y % 2 = 0}\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  5
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%states 6 6])
+  !>  ?.  ?&(?=(^ result.j) ?=(%limited -.u.result.j))  ~
+      `[kind generated.stats distinct.stats]:u.result.j
+::
+::  R4.3: a bounded init that a later conjunct thins below the bound is
+::  solved again unbounded, so a truncated init set is never explored:
+::  the 5 states x > 40 complete (the bounded pass alone found none)
+++  test-init-filter-bound-resolved
+  =/  sp  '---- MODULE spec ----\0aEXTENDS Naturals\0aVARIABLE x\0aInit == x \\in {y \\in 0..50 : y % 2 = 0} /\\ x > 40\0aNext == UNCHANGED x\0a====\0a'
+  =/  req  (check-req sp 'INIT Init\0aNEXT Next\0a')
+  =.  max-states.limits.req  5
+  =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
+  %+  expect-eq  !>(`[%ok 5])
+  !>  ?.  ?&(?=(^ result.j) ?=(%ok -.u.result.j))  ~
+      `[%ok distinct.stats.u.result.j]
 ::
 ++  test-limited-time
   ::  max-time is checked on entry to every slice
@@ -812,6 +1637,32 @@
   %+  expect-eq
     !>(`[%violated [%property 'Lead' %.n] [5 4 0 4 [0 1 1 1]]])
   !>(result.j)
+::
+::  R4.P7: an end of the search other than an invariant violation pre-empts
+::  the temporal check on the kernel path too. tlc2 reports `Deadlock
+::  reached` (3 generated, 3 distinct, depth 3) and never runs the liveness
+::  check; the kernel reported `internal: unexpected graph outcome`
+++  live-deadlock-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  Next == x < 2 /\ x' = x + 1
+  Lead == (x = 0) ~> (x = 1)
+  ====
+  '''
+::
+++  test-live-deadlock-preempts
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req live-deadlock-spec lead-cfg) t0) 256)
+  ?>  ?=([~ %violated *] result.j)
+  =/  r  u.result.j
+  =/  s  stats.r
+  %+  expect-eq
+    !>([[%deadlock ~] 3 3 0 3])
+  !>([violation.r generated.s distinct.s queued.s depth.s])
 ::
 ++  test-pause-resume-every-boundary-liveness
   (every-boundary (check-req live-spec live-bad-cfg) 1)
@@ -1035,14 +1886,14 @@
   %+  expect-eq
     !>  `'unsupported: -continue with -dfid (the DFID engine records one violation; use exhaustive mode)'
   !>  %-  validate:job-lib
-  [[%check [| | | & ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+  [[%check [| | | & ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-dfid-refuses-difftrace
   ::  measured at the pin, `-difftrace` changes nothing outside `-simulate`
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>  %-  validate:job-lib
-  [[%check [| | & | ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~]
+  [[%check [| | & | ~ | ~ [%dfid 10 &]]] (bundle cyc-spec `bare-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-dfid-kernel-report-matches-console
   ::  the kernel's `%report` artifact is the CONSOLE renderer's output, so the
@@ -1341,6 +2192,38 @@
     (expect-eq !>(%.n) !>((noun-over:job-lib small 1.000)))
     (expect-eq !>(%.y) !>((noun-over:job-lib small 1)))
   ==
+::
+++  test-noun-due-checkpoints
+  ::  R4.P8: every change below 32; above it, 16 checkpoints per doubling
+  ::  (a crossing measures, a slice inside one bucket does not); no growth
+  ::  never measures
+  ;:  weld
+    (expect-eq !>(%.y) !>((noun-due:job-lib 3 4)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 7 7)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 1.024 1.055)))
+    (expect-eq !>(%.y) !>((noun-due:job-lib 1.024 1.088)))
+    (expect-eq !>(%.y) !>((noun-due:job-lib 1.000 2.000)))
+    (expect-eq !>(%.n) !>((noun-due:job-lib 90.000 90.100)))
+  ==
+
+::
+::  R4.P2 (H3): a continuation is stored as itself, tagged with its type's
+::  hash, so a slice no longer jams, cues and clams the whole search state
+++  test-kont-round-trip
+  =/  k=kont:job-lib  [%parse ~['a'] ~]
+  =/  c  (save-kont:job-lib k)
+  ?>  ?=(^ c)
+  (expect-eq !>(k) !>((load-kont:job-lib u.c)))
+::
+::  a continuation written by another build (its tag differs) fails the JOB
+::  with the restart notice, never the event
+++  test-kont-foreign-tag-restarts
+  =/  j0  (init:job-lib (check-req cyc-spec mc-cfg) t0)
+  =/  j   j0(stage %parse, cont `[%1 [0v0 [%parse ~['a'] ~]]])
+  =/  r   (step:job-lib j 256 t0)
+  %+  expect-eq
+    !>  `[%failed 'restarted: the in-flight state is from an incompatible engine version; resubmit']
+  !>(?:(?=(%stop -.r) result.job.r ~))
 
 ::
 ::  +|  Kernel Report == Console Report (R1.8.3)
@@ -1374,6 +2257,45 @@
   %+  expect-eq
     !>((console-report spec cfg))
   !>((kernel-report spec cfg))
+::
+++  kernel-report-at
+  ::  `+kernel-report` at a given slice budget
+  |=  [spec=@t cfg=@t budget=@ud]
+  ^-  @t
+  =/  [evs=(list event) j=jb]
+    (run-all (init:job-lib (check-req spec cfg) t0) budget)
+  =/  a  (~(get by artifacts.j) %report)
+  ?~  a  ''
+  ?.  ?=(%text -.u.a)  ''
+  text.u.a
+::
+::  R4.Q8b: the lasso search is sliced by PEMs once the product is built
+::  (`+lasso-step`), a budget/16 of them per slice (one at budget 1). Two
+::  fairness conjuncts give the OOS several PEMs; at budget 1 every PEM is its
+::  own slice, and the reports must be the console path's, held or violated
+++  pem-spec
+  ^~
+  '''
+  ---- MODULE spec ----
+  EXTENDS Naturals
+  VARIABLE x
+  Init == x = 0
+  A == x' = (x + 1) % 3
+  B == x' = x
+  Next == A \/ B
+  Spec == Init /\ [][Next]_x /\ WF_x(A) /\ WF_x(B)
+  Holds == []<>(x = 2)
+  Fails == []<>(x = 5)
+  ====
+  '''
+++  test-kernel-report-pem-slices
+  =/  hc  'SPECIFICATION Spec\0aPROPERTY Holds\0a'
+  =/  fc  'SPECIFICATION Spec\0aPROPERTY Fails\0a'
+  ;:  weld
+    (expect-eq !>((console-report pem-spec hc)) !>((kernel-report-at pem-spec hc 1)))
+    (expect-eq !>((console-report pem-spec fc)) !>((kernel-report-at pem-spec fc 1)))
+    (expect-eq !>((console-report pem-spec fc)) !>((kernel-report-at pem-spec fc 256)))
+  ==
 ::
 ::  a STUTTERING counterexample under INIT/NEXT: the console path appends the
 ::  EC 2257 hint, and the kernel used to drop it
@@ -1495,27 +2417,6 @@
     (expect-eq !>(~[['v' '2'] ['doubled' '4'] ['moved' 'FALSE']]) !>(bindings:(snag 2 sts)))
   ==
 ::
-++  test-alias-refused-with-property
-  ::  the lasso trace is rendered by the %liveness stage, which takes no alias,
-  ::  and tlc2 does alias it. Narrowed refusal, not a silent wrong trace
-  =/  cfg  'SPECIFICATION Spec\0aPROPERTY Lead\0aALIAS Alias\0a'
-  =/  [evs=(list event) j=jb]
-    (run-all (init:job-lib (check-req alias-spec cfg) t0) 256)
-  %+  expect-eq
-    !>(`[%failed 'unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)'])
-  !>(result.j)
-::
-++  test-alias-refused-in-simulation
-  ::  same shape one mode over: the simulated trace is not aliased either
-  =/  cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aALIAS Alias\0a'
-  =/  [evs=(list event) j=jb]
-    (run-all (init:job-lib (sim-req alias-spec cfg 1 4 4) t0) 256)
-  %+  expect-eq
-    !>(`[%failed 'unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)'])
-  !>(result.j)
-::
-::  the same spec WITHOUT the VIEW line still runs: the refusal is keyed on the
-::  option, not on the definition being present in the module
 ++  test-view-definition-alone-is-fine
   =/  [evs=(list event) j=jb]
     (run-all (init:job-lib (check-req view-spec 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a') t0) 256)
@@ -1556,7 +2457,7 @@
 ++  ovr-req
   |=  nm=(unit source-name)
   ^-  request
-  [[%check [| | | | nm | ~ [%exhaustive & 0]]] ovr-bundle lim ~ ~]
+  [[%check [| | | | nm | ~ [%exhaustive & 0]]] ovr-bundle lim ~ ~ ~ ~]
 ::
 ++  test-cfg-override-absent-uses-bundle-cfg
   ::  no override: the bundle's own cfg runs, Loose holds, the run completes
@@ -1585,7 +2486,7 @@
   =/  req=request
     :*  [%check [| | | | `'some-cfg' | ~ [%exhaustive & 0]]]
         [%clay ~zod %spec ud+1 'spec' `/spec-cfg/txt ~[/lib]]
-        lim  ~  ~
+        lim  ~  ~  ~  ~
     ==
   %+  expect-eq
     !>(`'unsupported: cfg source override on a %clay bundle; select the config with src.cfg (a path)')
@@ -1695,7 +2596,7 @@
   ^-  request
   =/  l  lim
   =.  max-set-size.l  n
-  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~]
+  [[%check [| | | | ~ | ~ [%exhaustive & 0]]] (bundle bigset-spec `mc-cfg) l ~ ~ ~ ~]
 ::
 ++  test-max-set-size-default-runs
   ::  the matched half: the same spec under the default bound completes
@@ -1734,7 +2635,7 @@
 ++  cont-req
   |=  c=?
   ^-  request
-  [[%check [| | | c ~ | ~ [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~]
+  [[%check [| | | c ~ | ~ [%exhaustive & 0]]] (bundle cont-spec `mc-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-continue-off-stops-at-first
   ::  the matched half: without the flag the run STOPS at the first violation
@@ -1787,7 +2688,7 @@
 ++  vw-req
   |=  v=?
   ^-  request
-  [[%check [| v | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~]
+  [[%check [| v | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `vw-cfg) lim ~ ~ ~ ~]
 ::
 ++  test-view-render-off-shows-bindings
   ::  the matched half: without the flag the trace prints the BINDINGS
@@ -1812,7 +2713,7 @@
 ++  test-view-render-without-view-refused
   ::  the flag with no VIEW in the config has nothing to render
   =/  req=request
-    [[%check [| & | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| & | | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~ ~ ~]
   =/  [evs=(list event) j=jb]  (run-all (init:job-lib req t0) 256)
   %+  expect-eq
     !>(`[%failed 'unsupported: -view without a VIEW in the config (nothing to render)'])
@@ -1822,8 +2723,33 @@
   ::  measured: an exhaustive run is byte-identical with and without the flag,
   ::  so accepting it there would be accepting an option that does nothing
   =/  req=request
-    [[%check [| | & | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~]
+    [[%check [| | & | ~ | ~ [%exhaustive & 0]]] (bundle vw-spec `mc-cfg) lim ~ ~ ~ ~]
   %+  expect-eq
     !>(`'unsupported: -difftrace outside simulation (tlc2 honours it only in -simulate)')
   !>((validate:job-lib req))
+::
+::  R4.2k: a module of ASSUMEs with NO behaviour spec (SimpleMath's shape)
+::  completes over zero initial states through the kernel, as the console
+::  path has since R3.0a; a false ASSUME is still the assumption verdict
+++  asm-only
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE spec ----\0a"  "EXTENDS Naturals\0a"
+    "ASSUME 1 + 1 = 2\0a"  "====\0a"
+  ==
+++  asm-false
+  ^-  @t
+  %-  crip
+  ;:  weld
+    "---- MODULE spec ----\0a"  "EXTENDS Naturals\0a"
+    "ASSUME 1 + 1 = 3\0a"  "====\0a"
+  ==
+++  test-no-behaviour-spec
+  =/  ok  +:(run-all (init:job-lib (check-req asm-only '') t0) 256)
+  =/  bad  +:(run-all (init:job-lib (check-req asm-false '') t0) 256)
+  ;:  weld
+    (expect-eq !>(`[%ok [0 0 0 0 [0 0 0 0]]]) !>(result.ok))
+    (expect-eq !>(%.y) !>(?=([~ %violated [%assumption *] *] result.bad)))
+  ==
 --

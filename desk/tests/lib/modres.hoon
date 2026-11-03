@@ -320,6 +320,101 @@
       '---- MODULE A ----\0aEXTENDS Nope1, Nope2\0a====\0a'
   ==
 ::
+++  test-modres-monolith
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        ''
+        '****** SANY2 Version 2.2 created 08 July 2020'
+        ''
+        'Parsing file A.tla'
+        'Parsing file B.tla'
+        'Parsing file Naturals.tla'
+        'Parsing file C.tla'
+    ==
+  !>
+  %-  trim-blanks
+  %+  dump-modres:modules  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aI == INSTANCE C WITH k <- 1\0aFoo == Bar + I!Baz\0a====\0a\0a---- MODULE B ----\0aEXTENDS Naturals\0aBar == 1\0a====\0a\0a---- MODULE C ----\0aCONSTANT k\0aBaz == k\0a====\0a'
+  ==
+::
+++  test-modres-monolith-chain
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        ''
+        '****** SANY2 Version 2.2 created 08 July 2020'
+        ''
+        'Parsing file A.tla'
+        'Parsing file B.tla'
+        'Parsing file C.tla'
+    ==
+  !>
+  %-  trim-blanks
+  %+  dump-modres:modules  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aFoo == Bar\0a====\0a---- MODULE B ----\0aEXTENDS C\0aBar == Qux\0a====\0a---- MODULE C ----\0aQux == 2\0a====\0a'
+  ==
+::
+++  test-modres-monolith-notwhole
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        ''
+        '****** SANY2 Version 2.2 created 08 July 2020'
+        ''
+        'Parsing file A.tla'
+        ''
+        'Fatal errors while parsing TLA+ spec in file A.tla'
+        ''
+        'In module A'
+        ''
+        'Cannot find source file for module B imported in module A.'
+        '*** Errors: 1'
+        ''
+        'In module A'
+        ''
+        'Cannot find source file for module B imported in module A.'
+    ==
+  !>
+  %-  trim-blanks
+  %+  dump-modres:modules  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aFoo == Bar\0a====\0a\0a---- MODULE B ---- \\* not a whole-line header\0aBar == 1\0a====\0a'
+  ==
+::
+++  test-modres-monolith-shadow
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        ''
+        '****** SANY2 Version 2.2 created 08 July 2020'
+        ''
+        'Parsing file A.tla'
+        'Parsing file B.tla'
+    ==
+  !>
+  %-  trim-blanks
+  %+  dump-modres:modules  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aFoo == Bar\0a====\0a\0a---- MODULE B ----\0aBar == 1\0aTrailing == 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aBar == 2\0a====\0a'
+  ==
+::
 ++  test-modres-nested
   %+  expect-eq
     !>  ^-  wain
@@ -337,6 +432,32 @@
   :~
       :-  'A'
       '---- MODULE A ----\0a---- MODULE Inner ----\0ai == 1\0a====\0aI == INSTANCE Inner\0a====\0a'
+  ==
+::
+++  test-modres-order-ext-first
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        ''
+        '****** SANY2 Version 2.2 created 08 July 2020'
+        ''
+        'Parsing file A.tla'
+        'Parsing file B.tla'
+        'Parsing file Naturals.tla'
+        'Parsing file C.tla'
+    ==
+  !>
+  %-  trim-blanks
+  %+  dump-modres:modules  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aI == INSTANCE C WITH k <- 1\0aFoo == Bar + I!Baz\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aEXTENDS Naturals\0aBar == 1\0a====\0a'
+      :-  'C'
+      '---- MODULE C ----\0aCONSTANT k\0aBaz == k\0a====\0a'
   ==
 ::
 ++  test-modres-shadow

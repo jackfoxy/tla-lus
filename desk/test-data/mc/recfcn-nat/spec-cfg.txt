@@ -1,0 +1,4 @@
+CONSTANT S = {1, 2, 3}
+INIT Init
+NEXT Next
+INVARIANT Inv

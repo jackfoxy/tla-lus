@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 23, col 1 to line 23, col 33 of module APDistributedReplicatedLog
+Multiple declarations or definitions for symbol vars.
+This duplicates the one at line 21, col 1 to line 21, col 14 of module APDistributedReplicatedLog.

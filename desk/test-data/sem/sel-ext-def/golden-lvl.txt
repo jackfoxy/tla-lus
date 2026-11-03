@@ -1,0 +1,4 @@
+LEVELS
+lvl MODULE A L-1 lp={Q} lc={Q<=3,n<=2,q<=3}
+lvl X L0
+lvl Y L0 lp={Q} lc={Q<=3,q<=3}

@@ -15,6 +15,13 @@
     "Keep == UNCHANGED y\0a"
     "Both == (x' = x + 1) /\\ (UNCHANGED y)\0a"
     "Sum == x' + y\0a"
+    "K == 2\0a"
+    "G == x + K\0a"
+    "F == G + K\0a"
+    "FAt == \\A p \\in \{5} : F = p\0a"
+    "FPr == F' = F + 1\0a"
+    "Sq[i \\in 1..2] == i + x\0a"
+    "SqAt == \\A i \\in \{7} : Sq[1] = 1 + x /\\ i = 7\0a"
     "====\0a"
   ==
 ::
@@ -47,4 +54,15 @@
 ::  composite action predicate
 ++  test-both-true   (bp 'Both' ~[['x' 1] ['y' 3]] ~[['x' 2] ['y' 3]] &)
 ++  test-both-false  (bp 'Both' ~[['x' 1] ['y' 3]] ~[['x' 2] ['y' 9]] |)
+::  R4.P11: a state-level arity-0 definition is memoized per state; its
+::  value follows the state, reaches constants through other definitions,
+::  ignores the call site's locals, and a primed reference reads s1
+++  test-sdef-memo
+  ;:  weld
+    (bp 'FAt' ~[['x' 1] ['y' 0]] ~ &)
+    (bp 'FAt' ~[['x' 2] ['y' 0]] ~ |)
+    (bp 'FPr' ~[['x' 1] ['y' 0]] ~[['x' 2] ['y' 0]] &)
+    (bp 'FPr' ~[['x' 1] ['y' 0]] ~[['x' 3] ['y' 0]] |)
+    (bp 'SqAt' ~[['x' 4] ['y' 0]] ~ &)
+  ==
 --

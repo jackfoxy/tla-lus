@@ -9,10 +9,10 @@ directory of the files a `%clay` `source-bundle` would name:
                        module name (`helper.tla`); the declared-name check in
                        lib/modules +resolve still validates the case-sensitive
                        requested name
-<case>/cfg.txt         the .cfg body, as `.txt` — the desk has no %cfg mark
-                       (a *.cfg through Clay aborts |commit), so cfg is served
-                       under a marked extension; the ModelConfig parser reads
-                       any non-.tla extension identically
+<case>/cfg.txt         the .cfg body, as `.txt`. Written before the desk had
+                       a `%cfg` mark (`mar/cfg.hoon`, R4.0e); `.cfg` now works
+                       too, and the ModelConfig parser reads any non-.tla
+                       extension identically
 <case>/expect.txt      the differential expectation, keyed to the frozen
                        inline golden it must equal
 ```

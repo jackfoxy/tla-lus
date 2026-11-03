@@ -41,7 +41,7 @@
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
       default-limits:job-lib
-      ~  ~
+      ~  ~  ~  ~
   ==
 ::  the same request, but persisting its artifacts to Clay (R2.2)
 ++  demo-req-write
@@ -58,7 +58,7 @@
       :*  %inline  'spec'  (malt ~[['spec' cyc-spec]])
           `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
       ==
-      default-limits:job-lib  ~  ~
+      default-limits:job-lib  ~  ~  ~  ~
   ==
 ::
 ++  live-src
@@ -81,7 +81,7 @@
       :*  %inline  'spec'  (malt ~[['spec' live-src]])
           `'INIT Init\0aNEXT Next\0aPROPERTY Live\0a'
       ==
-      default-limits:job-lib  ~  ~
+      default-limits:job-lib  ~  ~  ~  ~
   ==
 ::
 ++  do-poke
@@ -90,9 +90,21 @@
   (~(on-poke ag bol) %tla-lus-action !>(`action`act))
 ::
 ++  do-arvo
+  ::  the job's CURRENT step wake (its number read from the agent's state)
   |=  [ag=agent:gall id=@ta]
   ^-  [(list card) agent:gall]
-  (~(on-arvo ag bol) [%job id %step ~] [%behn %wake ~])
+  (do-wake ag id (cur-arm ag id))
+::
+++  cur-arm
+  |=  [ag=agent:gall id=@ta]
+  ^-  @ud
+  (~(gut by arms:;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag bol))) id 0)
+::
+++  do-wake
+  ::  a NUMBERED step wake (R4.P2)
+  |=  [ag=agent:gall id=@ta seq=@ud]
+  ^-  [(list card) agent:gall]
+  (~(on-arvo ag bol) [%job id %step (scot %ud seq) ~] [%behn %wake ~])
 ::
 ++  do-writ
   ::  a Clay answer arriving on a job's load wire
@@ -157,11 +169,15 @@
   (expect-eq !>(~) !>(-.res))
 ::
 ++  test-save-load-roundtrip
+  ::  the jobs round-trip exactly; the wake numbers advance by design, since
+  ::  loading re-arms every running job (R4.P2, `test-on-load-keeps-current`)
   =/  ag  `agent:gall`agent
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
   =/  saved  ~(on-save ag bol)
   =/  ag2  `agent:gall`+:(~(on-load agent bol) saved)
-  (expect-eq !>(q:~(on-save ag bol)) !>(q:~(on-save ag2 bol)))
+  %+  expect-eq
+    !>(-:+:;;([%0 * *] q:~(on-save ag bol)))
+  !>(-:+:;;([%0 * *] q:~(on-save ag2 bol)))
 ::
 ++  test-inflight-resume-across-reload
   ::  unit 9.4: a mid-run job's checkpointed cursor (the jammed %bfs/%sim/%live
@@ -198,10 +214,13 @@
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
   =/  j  (need (scry-job ag ~.j1))
   ;:  weld
-    (expect-eq !>(2) !>((lent caz)))
+    ::  ack, the first step's wake (number 1), and the sweep timer (R4.P2)
+    (expect-eq !>(3) !>((lent caz)))
     (expect-eq !>([%ack ~.j1]) !>((fact-update (snag 0 caz))))
     %-  expect
-    !>(?=([%pass [%job @ %step ~] %arvo %b %wait *] (snag 1 caz)))
+    !>(?=([%pass [%job %j1 %step %'1' ~] %arvo %b %wait *] (snag 1 caz)))
+    %-  expect
+    !>(?=([%pass [%sweep @ ~] %arvo %b %wait *] (snag 2 caz)))
     (expect-eq !>(%starting) !>(stage.j))
     (expect-eq !>([0 total]) !>(progress.j))
     (expect-eq !>(~) !>(result.j))
@@ -261,7 +280,7 @@
       !>([%job ~.j1 [%progress 1 total]])
     !>((fact-update (snag 1 caz)))
     %-  expect
-    !>(?=([%pass [%job @ %step ~] %arvo %b %wait *] (snag 2 caz)))
+    !>(?=([%pass [%job @ %step @ ~] %arvo %b %wait *] (snag 2 caz)))
   ==
 ::
 ++  test-run-to-done
@@ -590,11 +609,18 @@
   !>  (lent !<((list [req-id stage]) q:(need (need (~(on-peek ag2 bol) /x/jobs)))))
 ::
 ++  test-on-load-keeps-current
-  ::  a current state loads unchanged
+  ::  a current state loads with its jobs unchanged; only the wake numbers
+  ::  advance, because loading re-arms every running job (R4.P2)
   =/  ag   `agent:gall`agent
   =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
   =/  ag2  `agent:gall`+:(~(on-load agent bol) ~(on-save ag bol))
-  (expect-eq !>(q:~(on-save ag bol)) !>(q:~(on-save ag2 bol)))
+  =/  s1  ;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag bol))
+  =/  s2  ;;([%0 jobs=* arms=(map @ta @ud) *] q:~(on-save ag2 bol))
+  ;:  weld
+    (expect-eq !>(jobs.s1) !>(jobs.s2))
+    (expect-eq !>(`1) !>((~(get by arms.s1) ~.j1)))
+    (expect-eq !>(`2) !>((~(get by arms.s2) ~.j1)))
+  ==
 
 ::
 ::  +|  Clay write-back (R2.2)
@@ -630,4 +656,72 @@
   =^  c1   ag  (do-poke ag [%submit ~.jr demo-req])
   =^  caz  ag  (wake-n ag ~.jr total)
   (expect-eq !>(0) !>((lent (write-cards-of caz))))
+::
+::  +|  Wake Numbering And The Sweep (R4.P2)
+::
+::  a wake whose number is not the job's current one is stale: it does not
+::  step the job, so re-arming can never fork a second step chain
+++  test-stale-wake-ignored
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =^  caz   ag  (do-wake ag ~.j1 7)
+  =/  stg   stage:(need (scry-job ag ~.j1))
+  =^  caz2  ag  (do-wake ag ~.j1 1)
+  ;:  weld
+    (expect-eq !>(~) !>(caz))
+    (expect-eq !>(%starting) !>(stg))
+    (expect-eq !>(3) !>((lent caz2)))
+    %-  expect
+    !>(?=([%pass [%job %j1 %step %'2' ~] %arvo %b %wait *] (snag 2 caz2)))
+  ==
+::
+::  loading re-arms a running job and starts the sweep, so a job whose wake
+::  was lost resumes
+++  test-on-load-rearms
+  =/  ag   `agent:gall`agent
+  =^  caz  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  [caz2=(list card) ag2=agent:gall]
+    (~(on-load agent bol) ~(on-save ag bol))
+  ;:  weld
+    (expect-eq !>(2) !>((lent caz2)))
+    %-  expect
+    !>(?=([%pass [%job %j1 %step %'2' ~] %arvo %b %wait *] (snag 0 caz2)))
+    %-  expect
+    !>(?=([%pass [%sweep @ ~] %arvo %b %wait *] (snag 1 caz2)))
+    (expect-eq !>(%starting) !>(stage:(need (scry-job ag2 ~.j1))))
+  ==
+::
+::  the sweep re-arms a running job and reschedules itself; a superseded sweep
+::  timer does nothing
+++  test-sweep-rearms
+  =/  ag  `agent:gall`agent
+  =^  caz0  ag  (do-poke ag [%submit ~.j1 demo-req])
+  =/  sw=card  (snag 2 caz0)
+  ?>  ?=([%pass [%sweep @ ~] *] sw)
+  =/  [caz=(list card) ag2=agent:gall]
+    (~(on-arvo ag bol) p.sw [%behn %wake ~])
+  =/  [cz3=(list card) ag3=agent:gall]
+    (~(on-arvo ag bol) [%sweep (scot %da ~2000.1.1) ~] [%behn %wake ~])
+  ;:  weld
+    (expect-eq !>(2) !>((lent caz)))
+    %-  expect
+    !>(?=([%pass [%job %j1 %step %'2' ~] %arvo %b %wait *] (snag 0 caz)))
+    %-  expect
+    !>(?=([%pass [%sweep @ ~] %arvo %b %wait *] (snag 1 caz)))
+    (expect-eq !>(~) !>(cz3))
+  ==
+::
+++  test-pace-budget
+  ::  R4.QS: a new job starts small, a short slice doubles the budget, a
+  ::  long one scales it toward the goal, never below 1 nor above the
+  ::  default
+  =/  t0  ~2026.7.12
+  ;:  weld
+    (expect-eq !>(16) !>((pace-budget:job-lib ~ t0)))
+    (expect-eq !>(32) !>((pace-budget:job-lib `[t0 16] (add t0 ~s1))))
+    (expect-eq !>(256) !>((pace-budget:job-lib `[t0 256] (add t0 ~s1))))
+    (expect-eq !>(64) !>((pace-budget:job-lib `[t0 256] (add t0 ~s40))))
+    (expect-eq !>(1) !>((pace-budget:job-lib `[t0 4] (add t0 ~m10))))
+    (expect-eq !>(100) !>((pace-budget:job-lib `[t0 100] (add t0 ~s15))))
+  ==
 --

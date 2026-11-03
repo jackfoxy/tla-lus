@@ -30,7 +30,13 @@
 ::
 ::  a false assumption stops the run before search (EC 2104)
 ++  test-assume-false
-  (expect-eq !>(~['Error: An assumption is false.']) !>((check:check (spec "ASSUME 1 = 2") cfg)))
+  ::  tlc2's text, measured (R4.2j): the location is EC 2104's `%1%`
+  =/  want=@t
+    %+  rap  3
+    :~  'Error: Assumption line 4, col 8 to line 4, col 12 '
+        'of module A is false.'
+    ==
+  (expect-eq !>(~[want]) !>((check:check (spec "ASSUME 1 = 2") cfg)))
 ::  a satisfied assumption lets the run complete (%ok)
 ++  test-assume-ok
   (expect-eq !>(%ok) !>((verdict "ASSUME 1 + 1 = 2")))
@@ -41,7 +47,10 @@
 ++  test-assume-nonbool
   =/  out  (check:check (spec "ASSUME 1 + 1") cfg)
   =/  ln   ?~(out "" (trip i.out))
-  (expect-eq !>(%.y) !>((gulf-match ln "Error: Evaluating an assumption failed:")))
+  =/  want
+    %+  weld  "Error: Evaluating assumption line 4, col 8 to line 4, "
+    "col 12 of module A failed."
+  (expect-eq !>(%.y) !>((gulf-match ln want)))
 ::  a conjunction of assumptions: all must hold
 ++  test-assume-false-still-fails
   (expect-eq !>(%failed) !>((verdict "ASSUME 2 = 3")))

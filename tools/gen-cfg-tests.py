@@ -8,8 +8,8 @@ ConfigFileException message). This captures each case's golden.txt and
 emits desk/tests/lib/cfg.hoon comparing (dump-cfg:config 'in-text')
 against each golden. Never edit generated files.
 
-Input files use the .txt extension (not .cfg): the desk has no %cfg Clay
-mark, so a .cfg file aborts |commit; ModelConfig parses either identically.
+Input files use the .txt extension, written before the desk had a `%cfg`
+mark (R4.0e); ModelConfig parses either identically.
 """
 import subprocess
 from pathlib import Path

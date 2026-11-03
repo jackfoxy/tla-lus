@@ -1,0 +1,45 @@
+RESULT safety failure
+Error: Invariant NotSolved is violated.
+80 states generated, 25 distinct states found, 6 states left on queue.
+The depth of the complete state graph search is 8.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<7, 0, 0>>
+State 2: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<6, 0, 1>>
+State 3: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<4, 2, 1>>
+State 4: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<4, 3, 0>>
+State 5: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<0, 3, 4>>
+State 6: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<1, 2, 4>>
+State 7: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<1, 0, 6>>
+State 8: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+  stderr |-> "" ]
+  stdout |-> "Finish writing to the file with success!",
+/\ _anim = [ exitValue |-> 0,
+/\ towers = <<0, 0, 7>>

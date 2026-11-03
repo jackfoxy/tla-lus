@@ -1,0 +1,5 @@
+SANY exit 0
+*** Warnings: 1
+line 20, col 1 to line 20, col 18 of module APTokenRing
+Multiple declarations or definitions for symbol vars.
+This duplicates the one at line 18, col 1 to line 18, col 15 of module APTokenRing.

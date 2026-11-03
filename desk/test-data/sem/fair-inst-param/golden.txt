@@ -1,0 +1,19 @@
+ACCEPT
+MODULE A 1.1-5.4
+  var x L1 2.10-2.10
+  def I!vars arity=1 local=n L1 3.1-3.30
+    param z arity=0 L0 3.3-3.3
+    substin subs=1 L1 3.1-3.30
+      sub y <-
+        apply z opkind=FormalParamKind L0 3.30-3.30
+      in
+        apply y opkind=VariableDeclKind L1 3.9-3.9
+  def F arity=0 local=n L3 4.1-4.25
+    apply $WF opkind=BuiltInKind L3 4.6-4.25
+      apply I!vars opkind=UserDefinedOpKind L1 4.9-4.17
+        apply x opkind=VariableDeclKind L1 4.11-4.11
+      apply = opkind=BuiltInKind L2 4.19-4.24
+        apply ' opkind=BuiltInKind L2 4.19-4.20
+          apply x opkind=VariableDeclKind L1 4.19-4.19
+        apply x opkind=VariableDeclKind L1 4.24-4.24
+  instance name=I module=B local=n L0 3.1-3.30

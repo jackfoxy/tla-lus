@@ -1,0 +1,17 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def F arity=1 local=n L-1 2.1-2.9
+    param y arity=0 L-1 2.3-2.3
+    apply y opkind=FormalParamKind L-1 2.9-2.9
+  def I!D arity=1 local=n L-1 3.1-3.30
+    param x arity=0 L0 3.3-3.3
+    substin subs=1 L-1 3.1-3.30
+      sub C <-
+        oparg nullOpArg arity=-2 L-1 0.0-0.0
+      in
+        apply C opkind=ConstantDeclKind L0 3.9-3.12
+          apply x opkind=FormalParamKind L0 3.11-3.11
+  instance name=I module=B local=n L0 3.1-3.30
+DIAGS
+D 4004 ERROR 3.27-3.30 Arity 1 operator (not an expression) is expected
+D 4243 ERROR 0.0-0.0 An operator must be substituted for symbol 'C', and it must have arity 1.

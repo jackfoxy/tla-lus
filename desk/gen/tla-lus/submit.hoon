@@ -13,10 +13,13 @@
   ?-  kind
     %translate  [%translate [%none | &]]
     %analyze    [%analyze [& & & &]]
-    %check      [%check [& | | | ~ | ~ [%exhaustive & 0]]]
+    ::  check-opts is [translate view difftrace continue cfg coverage
+    ::  postconditions mode]; translate=& is a typed rejection at submit
+    %check      [%check [| | | | ~ | ~ [%exhaustive & 0]]]
   ==
 =/  demo-text  '---- MODULE Demo ----\0a====\0a'
 :^    %submit
     id
   op
-[[%inline 'Demo' (malt ~[['Demo' demo-text]]) ~] default-limits:job-lib |]
+::  request tail is [src limits write promote env props]
+[[%inline 'Demo' (malt ~[['Demo' demo-text]]) ~] default-limits:job-lib ~ ~ ~ ~]

@@ -1,0 +1,7 @@
+SANY exit 0
+line 100, col 12 to line 100, col 15 of module nbacc_ray97
+The field name "Proc" in the record constructor is identical to the existing definition or declaration
+named Proc, located at line 27, col 1 to line 27, col 12 of module nbacc_ray97.
+The field in the record will not take the value of the Proc definition or declaration.
+In TLA+, field names in records are strings, regardless of any similarly named declarations or definitions.
+Therefore, DOMAIN [Proc |-> ...] = {"Proc"} holds true.

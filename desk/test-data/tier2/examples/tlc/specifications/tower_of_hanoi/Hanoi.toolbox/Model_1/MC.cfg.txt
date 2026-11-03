@@ -1,0 +1,69 @@
+RESULT safety failure
+Error: Invariant NotSolved is violated.
+768 states generated, 233 distinct states found, 26 states left on queue.
+The depth of the complete state graph search is 32.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+towers = <<31, 0, 0>>
+State 2: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<30, 0, 1>>
+State 3: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<28, 2, 1>>
+State 4: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<28, 3, 0>>
+State 5: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<24, 3, 4>>
+State 6: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<25, 2, 4>>
+State 7: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<25, 0, 6>>
+State 8: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<24, 0, 7>>
+State 9: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<16, 8, 7>>
+State 10: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<16, 9, 6>>
+State 11: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<18, 9, 4>>
+State 12: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<19, 8, 4>>
+State 13: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<19, 12, 0>>
+State 14: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<18, 12, 1>>
+State 15: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<16, 14, 1>>
+State 16: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<16, 15, 0>>
+State 17: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<0, 15, 16>>
+State 18: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<1, 14, 16>>
+State 19: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<1, 12, 18>>
+State 20: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<0, 12, 19>>
+State 21: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<4, 8, 19>>
+State 22: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<4, 9, 18>>
+State 23: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<6, 9, 16>>
+State 24: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<7, 8, 16>>
+State 25: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<7, 0, 24>>
+State 26: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<6, 0, 25>>
+State 27: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<4, 2, 25>>
+State 28: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<4, 3, 24>>
+State 29: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<0, 3, 28>>
+State 30: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<1, 2, 28>>
+State 31: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<1, 0, 30>>
+State 32: <Next line 89, col 38 to line 91, col 34 of module Hanoi>
+towers = <<0, 0, 31>>

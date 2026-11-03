@@ -1,0 +1,68 @@
+BINDINGS
+FiniteSets!Cardinality/1|override:MethodValue
+FiniteSets!IsFiniteSet/1|override:MethodValue
+FiniteSetsExt!Choices/1|body
+FiniteSetsExt!ChooseUnique/2|body
+FiniteSetsExt!FlattenSet/1|body
+FiniteSetsExt!FoldSet/3|override:MethodValue
+FiniteSetsExt!MapThenSumSet/2|body
+FiniteSetsExt!Max/1|body
+FiniteSetsExt!Min/1|body
+FiniteSetsExt!ProductSet/1|body
+FiniteSetsExt!Quantify/2|override:MethodValue
+FiniteSetsExt!ReduceSet/3|body
+FiniteSetsExt!SumSet/1|body
+FiniteSetsExt!SymDiff/2|body
+FiniteSetsExt!kSubset/2|override:MethodValue
+Folds!MapThenFoldSet/5|body
+Functions!AntiFunction/1|override:MethodValue
+Functions!Bijection/2|body
+Functions!ExistsBijection/2|body
+Functions!ExistsInjection/2|body
+Functions!ExistsSurjection/2|body
+Functions!FoldFunction/3|override:MethodValue
+Functions!FoldFunctionOnSet/4|override:MethodValue
+Functions!Injection/2|body
+Functions!Inverse/3|body
+Functions!IsInjective/1|override:MethodValue
+Functions!IsRestriction/2|body
+Functions!Pointwise/3|body
+Functions!Range/1|body
+Functions!Restrict/2|body
+Functions!RestrictDomain/2|body
+Functions!RestrictValues/2|body
+Functions!SumFunction/1|body
+Functions!SumFunctionOnSet/2|body
+Functions!Surjection/2|body
+Integers!-./1|override:MethodValue
+Integers!Int/0|override:MethodValue
+Naturals!%/2|override:MethodValue
+Naturals!*/2|override:MethodValue
+Naturals!+/2|override:MethodValue
+Naturals!-/2|override:MethodValue
+Naturals!../2|override:MethodValue
+Naturals!</2|override:MethodValue
+Naturals!>/2|override:MethodValue
+Naturals!Nat/0|override:MethodValue
+Naturals!\div/2|override:MethodValue
+Naturals!\geq/2|override:MethodValue
+Naturals!\leq/2|override:MethodValue
+Naturals!^/2|override:MethodValue
+Sequences!Append/2|override:MethodValue
+Sequences!Head/1|override:MethodValue
+Sequences!Len/1|override:MethodValue
+Sequences!SelectSeq/2|override:MethodValue
+Sequences!Seq/1|override:MethodValue
+Sequences!SubSeq/3|override:MethodValue
+Sequences!Tail/1|override:MethodValue
+Sequences!\o/2|override:MethodValue
+EVAL
+FS IntValue 6
+FSE IntValue 7
+FSSeq TupleValue <<1, 2, 3>>
+FSStr TupleValue <<"a", "b", "c">>
+KS KSubsetValue {{1, 2}, {1, 3}, {2, 3}}
+KS0 SubsetValue {{}}
+KSBig SetEnumValue {}
+Q IntValue 2
+QE IntValue 0

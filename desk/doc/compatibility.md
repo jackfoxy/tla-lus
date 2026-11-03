@@ -11,12 +11,14 @@ here is a deliberate, documented divergence rather than a latent bug.
 |---|---|
 | Oracle pin (SANY/PlusCal/TLC) | `tlaplus@4ba7d8811` (MIT) |
 | Example/fixture pins | `tlaplus-Examples@47b0e2cc`, `vscode-tlaplus@acc095d6` (MIT) |
-| Agent state version | `%0` — `versioned-state` in `app/tla-lus`. Nothing has been released, so exactly one version exists: the one that ships. Pre-release reshapes are not versions and the desk carries no record of them |
+| R4 module-path pins | `CommunityModules@a20cc8eb2` (release `202604221529`, MIT), `tlapm@fd3988fc4` library (BSD-2-Clause), `apalache@a9d9f8267` (`v0.57.1`, Apache-2.0), `tlauc@a4f21b9fc` (`1.1.0`, MIT); `tools/r4-deps.sh` verifies them |
+| Agent state | `state-0` in `app/tla-lus`, the ONE state shape. The project is in development, so there are no migrations: shapes change in place, and `on-load` coerces the stored noun or resets to empty |
 | Public API version | `api-version` 1 (`sur/tla-lus`, reported at `/x/version` with the state version, `[1 0]`). **Unchanged by R2.7.1's wire split**, per §10.6: pre-release reshapes are not versions. **R3 does not move it either** — nothing has shipped and no ship holds state worth preserving, so there is no migration anywhere in this project. It moves at release |
 | Kelvin | `sys.kelvin` = `[%zuse 411 410 409 408]` |
-| Scaffold gate | `tools/scaffold-gate.sh` (11 gates) — proves scaffold hygiene, not parity; passes whatever the ledger owes |
+| Scaffold gate | `tools/scaffold-gate.sh` (13 gates) — proves scaffold hygiene, not parity; passes whatever the ledger owes |
 | **Release gate** | `tools/release-gate.sh` (R1.9.3) — the scaffold gate **plus** ledger closure, tier 2, no stubs in port code, refusals documented both ways, upgrade/restart, reproducible artifacts; then `-test /=tla-lus=/tests ~` on the ship |
-| Parity ledger | `desk/doc/parity-manifest.md`, checked by `tools/check-parity.py` — **134 rows, 0 still owed — CLOSED 2026-09-05 by R3.0d**, and asserted: `release-gate.sh` PASSES every clause and `r3-acceptance.py --suite-log` prints **R3 ACCEPTED** on 5/5 (2179 suite arms, 0 failed). R1 closed it at 125/0; **R2.0 re-opened it deliberately** and the release gate fails for the whole of R2 (see the ledger's own header). The count went UP at R2.7.7.0, which is not drift: three rows were CREATED for `.cfg` keywords no row had ever covered (`cfg-postcondition`, `cfg-possible`, `cfg-internal-kw`), the same way R2.0 created `cfg-view` and `cfg-alias` for VIEW and ALIAS. **It reached 134/0 at R2.7.16, R2.8.2b re-opened three rows on measurement and R3.0 closed all three**: `tlc-eval-node` (a LAMBDA operator-valued argument), `tlc-eval-action` (a multi-binder existential in action position) and `cfg-runspec` (a config with no behaviour spec) — all three found by the FIRST `tlaplus-Examples` specs ever run through the Hoon checker, none reachable from any spec the corpus already ran. **One row is owed in their place**: closing the EXHAUSTIVE multi-binder path left `check-mode-generate` refusing the same construct in PROBABILISTIC mode, an asymmetry R3.0c made visible rather than created, and **R3.0d took that measurement and closed it**: `SubsetEnumerator.reset()` rewinds without reseeding, so every draw happens at construction in group order and an inner group replays its permutation — the port draws once per group and walks a fixed odometer, proven by 30 seeded exact-trace cases. **R3.2 then demoted `tlc-value-composite` on a WRONG ANSWER**: a RECORD does not compare equal to a FUNCTION (`+fcn-like` omits `%rec`), which is TRUE at the pin — found by adding `BagsTest` to the batch, where exactly the 6 assumptions with a record-literal expectation fail. That row's evidence compares RENDERINGS, and a rendering differential cannot see an equality. **R3.2a closed it the same day**: `+fcn-like` now admits `%rec`, which is what `+to-fcn-pairs` four lines below it had always done — and the state-identity risk did not exist, because `+fp-enc` already encoded both representations to the same bytes. It also fixed a second, latent divergence: record form in rendering is tlc2's `isName`, not "the domain is all strings" |
+| Parity ledger | `desk/doc/parity-manifest.md`, checked by `tools/check-parity.py` — **138 rows, 0 still owed (2026-10-17: R4.2b added `tlc-module-community`; 2026-10-14: R4.2j(a) returned `op-wire-failure` to `parity`, R4.2ab `tlc-monolith`; 2026-10-11: R4.1c returned `semantic-graph` to `parity`; `tlc-monolith` approved-difference, its CONFIG half refused) — RE-OPENED 2026-10-08 by R4.0b and R4.0f**: `op-wire-failure` (created by R4.0f: the typed wire's projection of a failing run -- no EC for a runtime evaluation error, a false ASSUME as `%failed`, generic module-resolution text; R4.2j), `tlc-monolith` (a root file carrying trailing modules after its `====`, which the pin resolves through `MonolithSpecExtractor` and the port does not) and `semantic-graph` (INSTANCE inside LET; a wrong accept on an operator-constant substitution's arity), both R4.1c. It had been **CLOSED 2026-09-05 by R3.0d**, and asserted: `release-gate.sh` PASSES every clause and `r3-acceptance.py --suite-log` prints **R3 ACCEPTED** on 5/5 (2179 suite arms, 0 failed). R1 closed it at 125/0; **R2.0 re-opened it deliberately** and the release gate fails for the whole of R2 (see the ledger's own header). The count went UP at R2.7.7.0, which is not drift: three rows were CREATED for `.cfg` keywords no row had ever covered (`cfg-postcondition`, `cfg-possible`, `cfg-internal-kw`), the same way R2.0 created `cfg-view` and `cfg-alias` for VIEW and ALIAS. **It reached 134/0 at R2.7.16, R2.8.2b re-opened three rows on measurement and R3.0 closed all three**: `tlc-eval-node` (a LAMBDA operator-valued argument), `tlc-eval-action` (a multi-binder existential in action position) and `cfg-runspec` (a config with no behaviour spec) — all three found by the FIRST `tlaplus-Examples` specs ever run through the Hoon checker, none reachable from any spec the corpus already ran. **One row is owed in their place**: closing the EXHAUSTIVE multi-binder path left `check-mode-generate` refusing the same construct in PROBABILISTIC mode, an asymmetry R3.0c made visible rather than created, and **R3.0d took that measurement and closed it**: `SubsetEnumerator.reset()` rewinds without reseeding, so every draw happens at construction in group order and an inner group replays its permutation — the port draws once per group and walks a fixed odometer, proven by 30 seeded exact-trace cases. **R3.2 then demoted `tlc-value-composite` on a WRONG ANSWER**: a RECORD does not compare equal to a FUNCTION (`+fcn-like` omits `%rec`), which is TRUE at the pin — found by adding `BagsTest` to the batch, where exactly the 6 assumptions with a record-literal expectation fail. That row's evidence compares RENDERINGS, and a rendering differential cannot see an equality. **R3.2a closed it the same day**: `+fcn-like` now admits `%rec`, which is what `+to-fcn-pairs` four lines below it had always done — and the state-identity risk did not exist, because `+fp-enc` already encoded both representations to the same bytes. It also fixed a second, latent divergence: record form in rendering is tlc2's `isName`, not "the domain is all strings" |
+| `tlaplus-Examples` coverage | **Not established.** Leaving out PlusCal, the pin has 373 modules and 167 TLC models. Only **6** modules have been compared against Java SANY and only **5** models against tlc2, and all of those agree. Nothing else has been run. The tier-2 inventory under-reported what is checkable (36 `check` modules where there are 98); R4.0b repaired the classifier and it now reports 98. CommunityModules, the TLAPS library and `Apalache.tla` were pinned by R4.0a (row above). Measured 2026-10-08: `testing.md` §*Examples coverage, measured after R3*; plan: `R4-examples-work-breakdown-r4.md` |
 | Ledger ↔ port-map coherence | `tools/check-portmap.py` (scaffold gate 10) |
 | Evidence counts | `desk/doc/evidence-counts.md` (generated by `validate.py`; docs cite it, never hand-written) |
 | Differential integrity | `tools/validate.py --check` (tier 1) and `tools/tier2.py --check` (tier 2) — all goldens reproduce byte-identically from the pins |
@@ -37,17 +39,24 @@ about what each artifact does and does not claim:
 - a `parity` row means a differential comparator agrees with the pin on that
   row's projection, not that every conceivable behaviour was compared;
 - an **`approved-difference`** row means the port deliberately differs and the
-  difference is stated and tested. **Six remain**; R2 withdrew approval from the
-  other seven and they are now owed work (see the matrix note below). Every
-  surviving one is enumerated below — this document has no prose-only claim of a
+  difference is stated and tested. **Ten remain** as of the ledger's close
+  (2026-09-05): `tlc-driver`, `tlc-dfid`, `tlc-eval-cst`, `tlc-value-model`,
+  `cfg-internal-kw`, `tlc-value-order`, `tlc-module-tlc`, `tlc-live-product`,
+  `tlc-coverage`, `tlc-uniquestring`. R2 withdrew approval from seven others
+  and R2/R3 closed every one of them — their rows below are marked ✅ CLOSED or
+  ⟶ **R2** and are kept as the **record of what the difference was**, not as a
+  claim that it still exists. Every surviving one is enumerated below — this document has no prose-only claim of a
   difference that the matrix omits, and `tools/check-portmap.py` fails if a new
   one is added to the ledger without appearing here.
 
 ## Support matrix — every approved difference
 
-**Ten** ledger rows are `approved-difference`. Each is a deliberate deviation
+**Thirteen** ledger rows are `approved-difference`. Each is a deliberate deviation
 that a differential test pins, not a latent bug and not a residue. The section
 named in the last column carries the full argument.
+
+> **R4.2ab (2026-10-14) closed `tlc-monolith`'s** (the CONFIG half, now
+> ported); its row below is kept, marked closed.
 
 > **R2 withdrew approval from seven more**, which became `partial` and owed:
 > `tlc-safety-invariant` (**closed by R2.7.1**), `tlc-enum` and
@@ -65,20 +74,24 @@ named in the last column carries the full argument.
 |---|---|---|---|
 | `tlc-safety-invariant` ✅ **CLOSED R2.7.1** | *(historical)* the wire's `violation` collapsed TLC's EC 2107 (violated by the *initial state*) and EC 2110 (violated by a *behavior*) into one `[%invariant name]` | it was a design choice on a pre-release wire, not a constraint, and the rendered console report always kept both TLC forms verbatim — **R2.7.1 converted it**: `violation` now carries `initial=?` on `%invariant` and `%property`, and the row is `parity`. Kept here as the record of what the difference was | `gen-safety-tests` (pass, multi-inv, inv-behavior, inv-initial) + `tests/lib/inv-constraints` + two `tests/lib/job` arms (`test-invariant-violated-by-{behavior,initial-state}`) |
 | `tlc-eval-cst` | `lib/eval` remains a narrower constant-expression evaluator with its own `tlc2.REPL` oracle, no longer backing state generation | not superseded code left lying around: it owns the canonical `value` mold and `vfield`/`vpair` that `lib/value` and `lib/config` depend on. `approved-difference`, deliberately not `replaced` | `gen-eval-tests` (37) |
-| `tlc-eval-node` ⟶ **R2** (re-opened R2.7.13) | *(historical)* a filter or function built over a **lazy base set** kept tlc2's lazy class where the port forced it — a projection artifact in the printed class name, not in the enumeration | the enumeration always stayed lazy (`ecur`); what was missing was a lazy-set *representation* class — **R2.7.2 added one** (`cls` on `%set`); **R2.7.13 RE-OPENED the row after measuring what was left.** tlc2's rule is one line of `Tool.java`: a function is a `FcnRcdValue` iff every domain value is `instanceof Reducible`, and `Reducible` has exactly TWO implementors — `IntervalValue` and `SetEnumValue`. The same predicate governs the binary set operators, so `\cup`/`\cap`/`\`/`UNION` are eager only when BOTH operands are Reducible (R2.7.2 mapped them to `SetEnumValue` unconditionally, true of every golden it had), and `[D -> R]`/`[a: S]` are `SetOfFcnsValue`/`SetOfRcdsValue`. Every VALUE agrees; only the class column differs | `tests/lib/node-eval` (37) + `neval-probe` (14) + `core-eval` (121 compared, 13 frozen: `ev-tupbind/FcnT` + `ev-lazyclass` x12) |
+| `tlc-eval-node` ✅ **CLOSED R3.0** (re-opened R2.7.13) | *(historical)* a filter or function built over a **lazy base set** kept tlc2's lazy class where the port forced it — a projection artifact in the printed class name, not in the enumeration | the enumeration always stayed lazy (`ecur`); what was missing was a lazy-set *representation* class — **R2.7.2 added one** (`cls` on `%set`); **R2.7.13 RE-OPENED the row after measuring what was left.** tlc2's rule is one line of `Tool.java`: a function is a `FcnRcdValue` iff every domain value is `instanceof Reducible`, and `Reducible` has exactly TWO implementors — `IntervalValue` and `SetEnumValue`. The same predicate governs the binary set operators, so `\cup`/`\cap`/`\`/`UNION` are eager only when BOTH operands are Reducible (R2.7.2 mapped them to `SetEnumValue` unconditionally, true of every golden it had), and `[D -> R]`/`[a: S]` are `SetOfFcnsValue`/`SetOfRcdsValue`. Every VALUE agrees; only the class column differs | `tests/lib/node-eval` (37) + `neval-probe` (14) + `core-eval` (121 compared, 13 frozen: `ev-tupbind/FcnT` + `ev-lazyclass` x12) |
 | `tlc-value-model` | model values order **lexicographically** inside a set, and their fingerprint folds the *name* where tlc2 folds the `UniqueString` tok | both follow from family 5: tlc2's order is intern order, which depends on the whole run's path through the Java tools. The fingerprint is injective, just not byte-identical | `gen-core-eval-tests` (ev-model) + `gen-stdops-tests` (st-string-order) + `tests/lib/strorder` |
 | `tlc-enum` ✅ **CLOSED R2.7.2** | *(historical)* a fully-forced top-level `SUBSET {1, 2}` printed as `SetEnumValue` | a projection artifact, not a behavioural one — the enumeration always stayed lazy (`ecur`, `sexp-subseteq`) — **R2.7.2 gave the port the representation class it lacked** and the row is `parity` | `gen-core-eval-tests` (ev-sets, compared) + tier-2 `tlc-batch` (SubsetEq) |
 | `tlc-eval-error` ✅ **CLOSED R2.7.3** | *(historical)* the decimal-literal rejection fired at **evaluation** where tlc2 fires it at spec **load** | the difference was recorded as one of timing; **measured, it was one of VERDICT** — tlc2 fails in `processConstantDefns`, so a spec with an UNUSED decimal aborts there and used to run here. R2.7.3 moved the check to spec processing on both paths (EC 2244) and the row is `parity` | `gen-core-eval-tests` (ev-errors, ev-domerr) + `gen-mc-tests` (decimal-unused) |
-| `tlc-value-order` | strings order lexicographically, not by intern position | measured at C1.7 with `tools/oracle/InternDump.java`: for a 10-line fixture SANY interns 399 strings — syntax-tree kind names, internal operator names — before the module's own lexemes. That order is an artifact of the Java toolchain's path, not of TLA+ | `gen-stdops-tests` (intern-order evidence, st-string-order) + `tests/lib/strorder` (12) |
+| `tlc-value-order` | strings order lexicographically, not by intern position | measured at C1.7 with `tools/oracle/InternDump.java`: for a 10-line fixture SANY interns 399 strings — syntax-tree kind names, internal operator names — before the module's own lexemes. That order is an artifact of the Java toolchain's path, not of TLA+ **Measured consequence (R4.2as, 2026-10-17):** a SEEDED SIMULATION draws its initial state by index into the init-state list, so over a string-valued set (`Color == {"white", "black"}`) the same seed starts from a different state (EWD840_anim: the first behavior's `color` values come out inverted) and the behaviors that follow differ; verdicts can arrive by a different behavior or a different first violation (EWD687a_anim). | `gen-stdops-tests` (intern-order evidence, st-string-order) + `tests/lib/strorder` (12) |
+| `tlc-var-order` (R4.2t) | a state's variables print (and fold into FP64) in DECLARATION order, where tlc2 uses the java.util.Hashtable enumeration of the module's SANY Context | the order depends on `String.hashCode`, the table's capacity history and the insertion order of every symbol in the context -- a layout artifact of SANY's symbol table, as string order is of its intern table; verdicts and counts are unaffected, traces differ in binding order (tier 2 already sorts bindings), and FP64's byte order reaches the RNG reseed, the liveness lasso choice and symmetry tie-breaks | `gen-mc-tests` (`var-order-hashtable`, golden = pin, assertion = port) |
 | `tlc-uniquestring` | no intern table exists; strings are atoms | the mechanism behind `tlc-value-order`, listed separately because it is the *cause* and could otherwise look unaccounted for | `gen-stdops-tests` (intern-order evidence) |
 | `tlc-module-tlc` | argument-error text for some `TLC` operators is normalized where the pin fails inside a `MethodValue` cast naming a Java signature; and `TLCSet("exit"/"pause", …)` is refused by name | the pinned text names Java types a Hoon port has no analogue for; the EC and the failure are reproduced. **R2.7.4.3** shipped the REGISTER STORE (`TLCSet`, `TLCGet(int)`, `TLCExt!TLCGetOrDefault`, `TLCExt!TLCGetAndSet`) — measured at the pin and pinned by corpus cases whose STATE COUNT depends on it, so a dropped write cannot pass. What stays refused is the pair of string keys that are not registers at all: `"exit"` stops the checker mid-run and `"pause"` blocks the search on stdin, and neither is a channel this engine has. Both are real tlc2 capabilities, so they are named as unsupported rather than misreported as bad arguments | `gen-stdops-tests` (st-tlc, st-tlc-errors) + `gen-core-eval-tests` (ev-tlc) + `tests/lib/tlcmod` (register store) + `gen-mc-tests` (tlcset-graph, tlcset-same-eval, tlcext-getordefault, tlcext-getandset) |
 | `tlc-module-tlc` (RNG seed default) | an UNSEEDED exhaustive run draws its seed from `new Random().nextLong()` and never prints it; here the default seed is 0 | R2.7.4.4 and R2.7.4.5 implement `TLC!RandomElement` and the three `Randomization` operators byte-exactly against the pin FOR A GIVEN SEED — `-seed N` and `+check-seed` agree on the state graph, and `RandomSubset(3, 1..10)` is `{1, 6, 9}` at 12345 and `{2, 9, 10}` at 987654321. What differs is only what happens when no seed is given: tlc2's choice is unrecoverable after the fact, so a spec that draws is not reproducible by anyone, including its author. A fixed default makes the port's runs reproducible by construction; pass a seed to compare against the pin. Note the per-predecessor reseed is `fingerPrint ^ seed`, so a comparison is also pinned to `-fp 0`. All four operators draw from the same `RandomEnumerableValues` generator, so one row covers them | `gen-mc-tests` (rnd-one-draw, rnd-two-draws, rnd-two-draws-alt, rnd-exists, rnd-init-draw, rnd-init-draw-alt, rsub-graph, rsub-graph-alt, rsub-init, rsub-init-two, rsub-two-draws, rsos-graph, rsos-init, rsos-test-init) + `tests/lib/tlcmod` |
+| `tlc-module-community` (R4.2b) | four CommunityModules overrides are refused by name: `SVG!NodeOfRingNetwork`, `SVG!NodesOfDirectedMultiGraph`, `Statistics!ChiSquare`, `VectorClocks!CausalOrder` | their answers are java.lang.Math doubles truncated to int (an ulp decides a pixel), a jungrapht graph layout, Apache Commons Math's chi-square distribution, and java.util.HashMap iteration order -- none reproducible bit-for-bit, and their TLA+ bodies are dummies (`[x \|-> 0, y \|-> 0]`, `TRUE`) that would answer wrongly. The 14 pure and 16 operator-argument overrides the Examples reach are ported and measured against the pin with the deps jar bound | `tests/lib/cmops` (gen-cm-tests) + `tests/lib/stdops` `test-cm-refusals` |
 | `tlc-live-normalize` ✅ **CLOSED R2.7.14b** | *(the row's original claim — "`astToLive` expands RECURSIVE operators with temporal bodies and the port does not" — was measured **STALE** by R2.7.6.0: `+user-op` and `+ite-of` shipped it in R1.6.1, and the three terminating `Github1389*` fixtures are byte-exact.)* **What actually differs is the BOUND.** When the expansion reaches no base case, tlc2 has none: it inlines until the JVM stack overflows and reports **EC 1005**. The port stops at `+expand-cap` — 1.000 nested expansions — and rejects, naming the bound. Measured, the two upstream fixtures reach that outcome differently: `Github1389Loops` genuinely runs away and hits the cap, while `Github1389StateGuard`'s recursion is guarded by a STATE variable, so its expansion fails on the first attempt and never recurses (byte-identical with the cap lowered to 3) and it is refused with the pin's own EC 2213 text | a Hoon runaway is an uncatchable hang, not a throwable — there is nothing to catch and convert into an error — the same trade `live-graph-cap` already makes for the graph build. **Neither side produces a verdict**, so the outcome is the same and only the code and text differ. R2.7.6.1 made the cap rejection NAME the bound rather than reuse EC 2213, because a caller has to be able to tell "the port stopped" from "tlc2 cannot handle this formula either" (`Github525`, `Github742`, refused at the pin). **R2.7.14b CLOSED the second clause**: `Github1389Counting` and `Github1389ViolatedC` needed `POSTCONDITION` + `TLCExt!CounterExample` (R2.7.6.2), which was never liveness work — both now run WITH their upstream POSTCONDITION and pass, so the row is `parity`. What remains here is the EXPANSION BOUND above, which stays an approved difference | `gen-mc-tests`: `gh1389-loops` and `gh1389-guard` are APPROVED-DIFFERENCE arms — the golden holds the pin's EC 1005 and the arm asserts the port's own text, so a regression on either side fails — plus `gh1389-ok`/`-viol`/`-violb` byte-exact; `gen-liveness-tests` (struct.txt) + `tests/lib/temporal` (22) + `temporal-struct` (16) + tier-2 `tlc-liveness-batch` (9, **zero divergences**) |
 | `cfg-internal-kw` (`_PERIODIC`) | tlc2 evaluates `_PERIODIC` on a WALL-CLOCK timer and ends the run when it is false; the port refuses the keyword by name | Measured both directions, same jar and config: on a 4-state spec an always-FALSE `_PERIODIC` has **no effect at all** (the timer never fires, the run completes), and on a ~4M-state spec it stops the run wherever the timer landed — **1 677 194** states one run, **1 740 872** the next. `doPeriodicWork` belongs to the thread that prints progress and takes checkpoints, not to the search. **`tlc-dfid`'s argument in its strongest form**: tlc2's own answer is not reproducible, so no port can match it and no oracle can say what matching means. Ignoring the keyword would match a fast run by accident; evaluating it at an invented point would match nothing. The refusal is reproducible and says what is missing. `_RL_REWARD`'s capability is out of scope on the `tlc-distributed` argument (its only consumer is `RLSimulationWorker`, behind a JVM system property), while its NAME VALIDATION is at parity | `gen-mc-tests` (`periodic-fast`, an approved-difference arm: golden = the pin's completion, assertion = the port's refusal) + `cfg-periodic-undef` / `cfg-periodic-arg` / `cfg-rlreward-undef` byte-exact |
 | `tlc-driver` (`-terse`, `-simulate stats`) | `-terse` does not suppress lazy-set expansion here — a printed state always shows the enumerated form; and `-simulate stats=basic/full` writes no `<root>_actions.dot` | **`-terse` is per-Value-class, not a global switch** — measured, `SUBSET (1..3)` and `(1..4) \X (1..2)` stay unexpanded at the pin while a set FILTER is expanded anyway — and reproducing it needs each lazy class to keep its SOURCE DESCRIPTOR, which tlc2's `SubsetValue` has and this port's materialized `[%set cls p]` does not. R2.7.2's class tag was necessary and not sufficient. It changes RENDERING only: verdict, counts and trace shape are unaffected. `-simulate stats=full` writes a Graphviz action-flow file and leaves the console **byte-identical** (13 states generated either way) — an unrequested side artifact, the class `Json` is already excluded for. Neither is accepted-and-ignored: the request carries no such field | `gen-mc-tests` (`terse-subset`, an approved-difference arm: golden = the pin under `-terse`, assertion = the port's expanded rendering) |
 | `tlc-live-product` | the product graph is built in memory over `(state-fp, tableau-node-index)` pairs, not through tlc2's disk-backed node layout | the disk layout is performance-only; the semantics compared are the product's nodes and edges | `gen-liveness-tests` (product.txt) + `tests/lib/liveness-product` (15) |
-| `tlc-live-diagnostics` ⟶ **R2** | after a **deadlock**, tlc2 still reports a violated temporal property and its counter-example in a second block; the port's R1.6.6 precedence emits the deadlock report alone | same verdict, one missing block; censused as tier-2 divergence `Github710d` so it cannot pass unnoticed | `tests/lib/liveness-message` (9) + `gen-liveness-tests` (symmetry-live, diamond-stutter) |
+| `tlc-live-diagnostics` ✅ **CLOSED R2.7.12** | *(historical)* after a **deadlock**, tlc2 still reports a violated temporal property and its counter-example in a second block; the port's R1.6.6 precedence emitted the deadlock report alone. **R2.7.12 closed the row** by porting tlc2's post-hoc property attribution (`+eval-on-lasso`), including the plural `TLC_TEMPORAL_PROPERTY_VIOLATED` forms | same verdict, one missing block; censused as tier-2 divergence `Github710d` so it cannot pass unnoticed | `tests/lib/liveness-message` (9) + `gen-liveness-tests` (symmetry-live, diamond-stutter) |
 | `tlc-dfid` | a DFID run's **counterexample trace** is not compared against the pin — the port descends into the first eligible successor where tlc2 descends into a RANDOM one | not a port limitation: `DFIDWorker.getInit`/`getNext` draw from a generator seeded off the clock (`new RandomGenerator()` takes `java.util.Random()`'s no-arg seed, then reseeds from `nextLong()`), and **`-seed` does not reach it**. Measured at the pin, six runs of the same jar on one unchanged spec reported **three different counterexamples**. A stronger case than `tlc-coverage`'s: there, two runs of the SAME engine on the SAME input disagree, so no port could match it and no oracle could define what matching means. Everything order-INDEPENDENT is byte-exact and compared: the verdict, every EC 2205 level line, and both EC 2204/2208 counts — including on violating runs, where matching the counts required reproducing the fact that a violation does not stop the walk | `tests/lib/dfid` (22 cases). The generator MEASURES the claim rather than assuming it: it runs the jar 5× per case and drops the trace only where the counterexample actually varied. **2 of 22 varied; the other 20 compare their trace byte-for-byte**, including both whitespace forms (`State N: ` for an invariant violation, `State N:` for a deadlock) |
+| `tlc-monolith` (CONFIG half) ✅ **CLOSED R4.2ab** | *(historical)* a `.tla` given as the config is refused at submit (`config path … is a .tla module …`); tlc2 (`-config Spec.tla`) reads the lines between `---- CONFIG Spec ----` and the next `====` as the config (`MonolithSpecExtractor.config`) | a CLI convenience of the Java harness, not a TLA+ semantic: the same text works as a `.cfg` (`%clay` `cfg` path or `%inline` `cfg`). 58 test-model specs carry a CONFIG block (the tlaplus test harness's own single-file fixtures); 3 Examples modules carry one (`ewd998/EWD998_opts`, `EWD998Chan_opts`, `EWD998_optsSC`), but every manifest model is a `.cfg`, so none is read. Approved by the user at the R4.1 close, 2026-10-11 **R4.2ab (2026-10-14) PORTED it**: a `%clay` `cfg` path whose mark is `tla` yields its first whole-line `-----* CONFIG <name> -----*` block up to the next `====` line, markers excluded, trimmed (`+monolith-config`); no block is an empty config (pin: EC 2231, as an empty `.cfg`). `<name>` is the CONFIG file's name, not the root module's (pin: `-config M1.tla M2` reads `CONFIG M1`); a Clay segment is the lowercased name, so the header matches it case-folded — the one analogue | `tests/lib/clay-load` (monolith-config, -other-file, -missing-block, monolith-config-edges) |
+| `tlc-fp-identity` (R4.P5c) | two states whose FP64 fingerprints collide are merged by tlc2 and kept apart here, in the safety search of a spec that never draws and in DFID, which key the visited set on a 128-bit hash of the canonical equality key instead of FP64 | FP64 costs about 9× the key per state (R4.P5b), and is observable nowhere on those paths: not in the trace, the counts or the order of exploration. tlc2 itself warns that a collision is possible and estimates its probability; the difference appears only on such a collision. FP64 stays the key for specs that draw (the reseed reads it), temporal graph builds and the graph export | `tests/lib/neval-fp` (key equality = FP64 equality across representations), `tests/lib/neval-mc` (`+draws`), the unchanged mc/dfid/symmetry/safety goldens |
 | `tlc-coverage` | the coverage block reports **five line kinds minus two**: the per-VARIABLE line and the indented per-node sub-expression lines are absent, and a run that **prints a counterexample** reports no block at all | R2.7.4.0 measured the row's premise wrong: the INIT/NEXT/CONSTRAINT numbers are NOT `getEvalCount()` in the sense that phrase suggested — every one is a count of **states at a checker boundary** (`Worker.addElement`, `Tool.getInitStates`, `Tool.isInModel`), so they ARE properties of the spec and they are now reproduced (R2.7.4.2b). What is not: (a) the per-VARIABLE `TLC_COVERAGE_VAR` count, a `CountDistinct.SyncedHyperLogLog(10)` **estimate** over `v.fingerPrint(FP64.New())` — an estimator, not a fact, and reproducing it would also pin every run to `-fp 0`; (b) the `TLC_COVERAGE_VALUE`/`_COST` sub-expression lines, which are per-NODE evaluation counts on an `OpApplNodeWrapper` — the one coverage quantity a structurally different evaluator cannot mean the same thing by; (c) a violating run's counters, because tlc2 re-invokes the initial predicate and the actions to reconstruct the trace with coverage still recording (measured: `<Init …>: 1:1` / `<A …>: 2:2` becomes `3:3` / `2:6` when the deadlock trace is printed, unchanged under `-noGenerateSpecTE`). All three are **absences declared by name**, never a different number under the same label. `-coverage` is also refused by name outside exhaustive mode, alongside a temporal PROPERTY, under a SPECIFICATION-form config, and as an INTERVAL — `TLCGlobals.coverageInterval` gates only *periodic* reporting and is a wall-clock behaviour (the rule R2.6.1 applied to `TLCGet("duration")`) | `gen-coverage-tests` (`tests/lib/coverage`, 5 cases, whole block line-for-line) + `gen-safety-tests` (coverage, coverage-constraint, coverage-disj, coverage-exists, coverage-init-reject) + `tests/lib/trace` (action set, counterexample refusal) |
 
 Two further deliberate normalizations live in the **differential harness**
@@ -1137,42 +1150,19 @@ the counters were reset to the shipping value and the intermediate names
 retired — `state-0`/`%0` is the state, `jobstate` and `step-out` are the
 kernel's own molds, and `api-version` is 1.
 
-**What survives is the mechanism, which is the point.** The agent's saved
-state is a version-tagged union with one arm today:
+**No migrations during development (2026-10-09, the user's rule).** The
+agent has ONE state shape, `state-0`, and `on-load` **coerces** the stored
+noun to it inside `mule`, resetting to empty if it no longer fits:
 
 ```hoon
-+$  versioned-state  $%(state-0)
-+$  state-0  [%0 jobs=(map req-id jobstate:job-lib)]
+=/  res  (mule |.(;;(state-0 q.old-vase)))
 ```
 
-and `on-load` **coerces** the stored noun rather than requiring it to nest:
-
-```hoon
-=/  old  ;;(versioned-state q.old-vase)
-?-  -.old
-  %0  old
-==
-```
-
-Two properties of that shape were learned by running the old chain, and both
-are why it is written this way:
-
-- **A frozen mold must be a frozen COPY, never a reference to a live
-  `/sur` type.** The pre-release chain once defined a historical state as
-  `(map req-id job)` using the *current* `$job`; when the `%clay` bundle was
-  reshaped, every "frozen" mold silently changed with it and no longer
-  described what had actually been stored. A future `state-1` must copy the
-  molds it freezes.
-- **`!<` is the wrong tool for `on-load`.** It type-checks the vase as
-  stored, so *any* change to a mold reachable from the state fails the whole
-  load — and the fallback wipes every job, including completed results a
-  caller never collected. `;;` inside `mule` loads a merely restyled state
-  and still falls back on a genuinely unreadable one.
-
-`tools/scaffold-gate.sh` gate 6 and `tools/release-gate.sh` R5 both assert
-this mechanism — the union, the coercion, the dispatch, and a state tag
-matching the gate's own `DESK_STATE` — so the next version bump has to touch
-the gate, and the gate will say so.
+`;;` rather than `!<`, because `!<` type-checks the vase as stored, so any
+change to a mold reachable from the state would fail the load even when the
+noun still fits. There is no version union, no conversion arm, and no
+legacy-format decoding (wire or continuation); scaffold gate 6 checks
+exactly that. The release will decide what the first frozen shape is.
 
 ### 10.8 Clay write-back — at parity for the mechanism (R2.2)
 
@@ -1281,9 +1271,10 @@ operator; the `TLC` module's pure operators (`:>`, `@@`, `Assert`,
 descriptors `Nat`, `Int`, and `Seq(S)`. SYMMETRY evaluates its definition
 through the same registry, so `Permutations` has one implementation.
 
-`Print`, `PrintT`, `TLCGet`, and `TLCSet` are **typed rejections that name
-what is missing**, never silent no-ops: the first two write to TLC's console
-and this engine has no output channel on the evaluation path; the last two
+`Print`, `PrintT`, `TLCGet`, and `TLCSet` were **typed rejections that name
+what is missing**, never silent no-ops (all four are implemented since:
+`Print`/`PrintT` in R4.2a, the other two in R2.6.1/R2.7.4.3): the first two write to TLC's console
+and this engine had no output channel on the evaluation path; the last two
 read and mutate engine state the evaluator does not own. `TLCGet` still
 reproduces the pin's EC 2145 for a key TLC itself does not define.
 
@@ -1365,7 +1356,7 @@ appear silently. The complete list of deliberate skips:
 | any `SelectSeq`/`SortSeq`/`BagOfAll` with a `LAMBDA` argument | the LAMBDA is now in the semantic graph (R1.3.1: `$OpArg`-encoded anonymous OpDefNode, level via `l-def`); *evaluating* a LAMBDA-parameterized StandardModule operator during model-checking remains deferred (`resolve-oparg`) |
 | `1 + "a"` | the pin's message names the Java method signature; normalized here |
 | `Bags!SubBag` applied | its vendored body needs recursive functions and multi-binder set constructors (unit-6.5 residue) |
-| `Print`, `PrintT`, `Any` | typed rejections here (no output channel; `Any` excluded) |
+| `Any` | excluded (`Print`/`PrintT` are implemented since R4.2a) |
 | the whole `st-string-order` case | family 5, measured and approved (above) |
 | the whole `st-big-literal` case | the pin fails the entire load on a numeral above 2^31-1; here the expression containing it fails |
 
@@ -1374,7 +1365,7 @@ Differences that remain in this area, all failures rather than wrong values:
 | case | TLC | here |
 |---|---|---|
 | `Nat`/`Int` in a value position (`Expr == Nat`, `Cardinality(Nat)`) | a `UserValue` rendering `Nat`; `Cardinality(Nat)` is EC 2181 | typed rejection `unsupported StandardModule operator: Naturals!Nat/0` — there is no UserValue kind |
-| `S \cap Nat`, `S \cup Int`, `Seq(Nat)` | evaluated lazily | rejected: set algebra and a descriptor's range take value operands, and the infinite sets are descriptors |
+| `S \cap Nat`, `S \cup Int`, `Seq(Nat)` as a VALUE (enumerated, `Cardinality`, a function's range) | evaluated lazily | rejected: set algebra and a descriptor's range take value operands, and the infinite sets are descriptors. **Membership is lazy since R4.2m**: `\in`, `\notin` and `\subseteq` decide `N \in Nat \ {0}`, `f \in [P -> [P -> Nat]]`, `r \in [a : Int]` and `s \in Seq(Nat)` on the set's structure (`+memb-node`), as tlc2's lazy values do |
 | quantifying over `Nat` | a long non-enumerable-quantifier-bound message naming the bound | `Attempted to enumerate the non-enumerable set Nat.` |
 | a non-integer argument to `+ - * ^ \div %` | fails inside the Java `MethodValue` cast, naming the method signature | the same EC (2154) with a normalized message: `The second argument of + should be an integer, but instead it is:` |
 
@@ -1475,7 +1466,148 @@ function …`) and a definition's `F[9]` (`Attempted to apply function: …`), w
 because tlc2 keeps the former a lazy `FcnLambdaValue` and normalizes the latter to a
 `FcnRcdValue`.
 
+## R4.2 close — three approved output differences (2026-10-17)
+
+Approved by the user at the R4.2 close; none moves a verdict or a count.
+
+- **Print interleaving (R4.2ao).** When one action yields several
+  successors, tlc2 checks each successor as it is generated, so the
+  invariants' `Print` lines interleave with the action's; here every
+  successor of the action is generated first, then each is checked, so the
+  action's lines come first (measured on `x' = x + d` over `d \in {1, 2}`).
+- **SANY warnings (R4.2ae).** tlc2 prints SANY's `*** Warnings: N` block in
+  its parse phase (between `Semantic processing of module ...` and
+  `Linting ...`), a phase the console report here does not render at all
+  (no `Parsing file` / `Semantic processing` lines either). The warnings
+  are produced by the semantic pass and reach `%analyze` as typed
+  diagnostics.
+- **SemDump-only projections (R4.2an).** SemDump lists the theorems a module
+  INHERITS in the extender's dump; an ASSUME over an inherited CONSTANT gets
+  a level annotation here where SemDump has none; a parameter's maxLevel
+  through a LAMBDA operator argument in `WITH` is 2 at the pin and 3 here
+  (sem `inst-lambda` withheld). The dump is a diagnostic projection; no
+  verdict depends on it.
+
+## Release R4.2af — PROPERTY decomposition (2026-10-17)
+
+A PROPERTY `\A i \in S : P(i)` over a constant S is binned on `P`'s shape as
+`processConfigProps` bins each unrolled element (an invariant, implied init
+or implied action named by `P`'s location; temporal otherwise), and a
+non-recursive operator applied to constant arguments (`SM(42)!Spec`) is
+decomposed through its body. One residue: an operator applied to a
+STATE-level argument (`Check(x, 2)`) stays one part, because its body's
+levels were computed with constant formals; tlc2 decomposes it, so its
+box-state conjuncts are checked by the liveness engine here (same verdict,
+a temporal rather than an invariant report). A temporal violation now names
+the configured PROPERTY, as tlc2 does (it named the definition or the
+conjunct's location since R4.2n). Evidence: mc `forall-unroll-*`,
+`param-inline-*`, `temporal-name-*`.
+
+## Release R4.2 — census residue (2026-10-14..16)
+
+Semantics brought to the pin while clearing the Examples census's error rows
+(`tools/notes/plan2-R4.2-census-residue-notes.md`): a LET definition shadows
+an outer bound name; `CASE` and `[A]_e` in action position are solved, not
+filtered; a module-scoped override (`lhs <-[M] rhs`) reaches every instance
+qualification and an `lhs` that `M` inherits; membership and set domains stay
+lazy through `UNION {...}`, `$SubstIn` wrappers and zero-arity definitions; a
+nested instance brings its EXTENDS closure; a built-in passed as an operator
+argument (`ReduceSet(\intersect, ...)`) evaluates; a call-by-name argument
+binds the variable it denotes; a substitution's expression is read outside
+its own name. `r.f` on a record without `f` takes tlc2's wording, without the
+location line tlc2 appends.
+
+## Release R4.2ab — a `.tla` given as the config
+
+A `%clay` `cfg` path ending `/tla` is read the way `-config Spec.tla` is: its
+first whole-line `-----* CONFIG <name> -----*` block up to the next `====`
+line, markers excluded and trimmed (`MonolithSpecExtractor.config`). No block
+is an empty config (EC 2231, as an empty `.cfg`). `<name>` is the config
+file's own name, not the root module's. **One analogue:** Clay segments are
+lowercase, so the header's name is compared case-folded with the file segment,
+where tlc2 compares it case-sensitively with the file name. Evidence:
+clay-load `test-clay-monolith-config*`, `test-monolith-config-edges`.
+
+## Release R4.2ad — EC 2213's module
+
+`TLC cannot handle the temporal formula <location>` names the module whose
+text holds the formula: the defining module through EXTENDS, the instanced
+module through INSTANCE (both measured). Evidence: job
+`test-ec2213-module-extends`, `test-ec2213-module-instance`. The cause text
+after the colon is the port's evaluation error, not tlc2's (`tlc-eval-error`).
+
+## Release R4.2 — a recursive function over `Nat`
+
+`f[n \in Nat] == ...` applied at a point (Relation.tla's `TransitiveClosure`,
+reached by MCEcho) is the value tlc2's lazy `FcnLambdaValue` gives: the
+port solves the points between 0 and the argument once each. The function
+as a whole still cannot be enumerated (tlc2 cannot either). Evidence: mc
+`recfcn-nat`.
+
+## Release R4.2h — wall clock and process
+
+A reproducible run may not observe the wall clock or start a process (R2.6.1's
+rule), so these are refused BY NAME, never answered: `TLCGet("duration")`,
+`TLCSet("exit"/"pause", ..)`, `TLC!JavaTime`, and (new in R4.2h)
+CommunityModules' `IOUtils!IOExec`, `IOEnvExec`, `IOExecTemplate`,
+`IOEnvExecTemplate`, `IOSerialize`, `IODeserialize`, `Serialize`,
+`Deserialize` and `CSV!CSVWrite`, `CSVWriteRecord`, `CSVRead`, `CSVRecords`
+(`unsupported CommunityModules operator: IOUtils!IOExec; it runs a process,
+...`). Before R4.2h those fell through to their dummy TLA+ bodies. Evidence:
+job `test-ioexec-refused`.
+
+## Release R4.2w — `TLCGet("config")`
+
+The run's configuration record, built from the request's run mode exactly as
+the pin's checker or simulator builds it (fields measured per mode:
+`plan2-R4.2w-tlcget-config-notes.md`). **One field differs, an approved
+difference under `tlc-module-tlc`:** `install` is the tlc2 jar's file path at
+the pin, a fact about the machine running it; here it is `"%tla-lus"`.
+DFID's `seed` is the port's default 0 where tlc2's is an unprinted random
+seed (the standing seed-default difference). The console path has no record
+and refuses the key by name. Evidence: job `test-tlcget-config-bfs`,
+`test-tlcget-config-generate`.
+
+## Release R4.2f — the `Json` module
+
+tla2tools' `Json` module (CI's module search puts it ahead of
+CommunityModules' copy) is ported for its encoders and writers and REFUSED
+for its readers, by decision (2026-10-13):
+
+- `ToJson`, `ToJsonArray`, `ToJsonObject`: Json.java's rules, Gson's compact
+  text (parity; mc `json-tojson`).
+- `JsonSerialize`, `ndJsonSerialize`: TRUE, and the file they write is a job
+  artifact `file-<path>` (job `test-json-file-artifacts`). The console path
+  writes nothing.
+- **`JsonDeserialize`, `ndJsonDeserialize`: approved difference, a typed
+  refusal by name.** They read a file by a path relative to tlc2's working
+  directory; a run here reads only the sources its request names, and the
+  corpus's one reader (EWD998ChanTrace) also needs `TLCGet("config")`.
+  Message: `unsupported StandardModule operator: Json!ndJsonDeserialize; it
+  reads a file, and a run reads only the sources its request names` (job
+  `test-json-deserialize-refused`).
+
 ## Release R1.4 — `TLC!Print` and `TLC!PrintT`
+
+**R4.2a (2026-10-13) REVERSES this decision: `Print`/`PrintT` are ported.**
+The accumulator R1.4.6 costed exists now -- the R2.7.4.1 carrier `rst`, which
+already threads `TLCSet` registers and the RNG -- and gains `out`, the printed
+lines. `Print(v1, v2)` writes `ppr(v1)  ppr(v2)` and is `v2`; `PrintT(v)`
+writes `ppr(v)` and is TRUE. The console path prints the lines inline, in the
+pin's order (constant definitions, then ASSUMEs, then the initial states, then
+the search; a run whose ASSUME fails prints what came before it); the job
+stores them in its `%output` text artifact, capped at 1 MB with a marker
+line. Binders whose body prints (`\E p \in S : ... PrintT(p) ...`, Stones)
+are evaluated on the carrier and stop where tlc2 stops. Two residues, both
+output-only: `ppr`'s line wrapping of a long value is not reproduced (the line
+is the one-line rendering), and when ONE action yields several successors the
+port prints all of their `Next` lines before their invariant lines, where tlc2
+checks each successor as it is generated (R4.2ao). Verdicts, counts and values
+are unaffected by either. Evidence: `gen-mc-tests` (`print-order`,
+`print-exists`), `gen-core-eval-tests` (`ev-tlc` `Pr`/`PrT`/`PrNest`, no longer
+skipped), `tests/lib/job` (`test-print-output-artifact`), `tests/lib/tlcmod`.
+
+The original decision, kept as the record:
 
 **Decided in R1.4.6: approved difference, a typed rejection.** In tlc2 `Print(out, val)`
 returns `val` and writes `out` to the console, and `PrintT(out)` returns `TRUE`. The
@@ -1873,7 +2005,7 @@ ignored):
 | malformed / invalid config | the real TLC `CFG_*` (5001-5006) or `TLC_CONFIG_*` (2222-2281) diagnostic at `%config`, byte-matching ModelConfig/SpecProcessor (unit 5) |
 | a temporal property the normalizer cannot decompose | **the pin's own message**, `TLC cannot handle the temporal formula …` — R1.8.1's full normalizer removed the port-specific *temporal property form* rejection this table used to list. `<>P`, `[]<>P`, `[]P`, `~>`, `-+->`, `WF_`/`SF_` and `<>[]` all run |
 | `VIEW` **with a temporal `PROPERTY`** | `unsupported: VIEW with a temporal PROPERTY (the liveness graph is not view-keyed; unit 8)` (at `%config`). **R2.3.1**: VIEW itself is live; only the combination is refused, because the liveness module recomputes plain state fingerprints (`+succ-fps`, `+trace-graph`) that a view-keyed graph would not match — the same latent mismatch symmetry+liveness is refused for |
-| `ALIAS` **with a temporal `PROPERTY`**, or in **simulation** mode | `unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)` / `unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)`. **R2.3.2**: ALIAS is live on every SAFETY path — plain invariants, deadlock, implied init/action and `[]P` box-state — and refused only where the trace renderer takes no alias. Still not name-resolved at config time: `getAliasSpec` runs only when a trace prints, so tlc2 accepts an undefined ALIAS |
+| *(retired R4.2i)* `ALIAS` **with a temporal `PROPERTY`**, or in **simulation** mode | **R4.2i (2026-10-16): no longer refused** — the lasso prefix and the simulated behavior render through the ALIAS (pin-measured pairing: the lasso's last state with the state the cycle returns to, or itself when stuttering; the simulated last state with itself). Was: `unsupported: ALIAS with a temporal PROPERTY (the lasso trace is not aliased; unit 8)` / `unsupported: ALIAS in simulation mode (the simulated trace is not aliased; unit 9)`. **R2.3.2**: ALIAS is live on every SAFETY path — plain invariants, deadlock, implied init/action and `[]P` box-state — and refused only where the trace renderer takes no alias. Still not name-resolved at config time: `getAliasSpec` runs only when a trace prints, so tlc2 accepts an undefined ALIAS |
 | `write` = `` `[desk pax] `` overlapping a search root | `write target <pax> overlaps a module-search root; a run may not write over its own sources` (at submit). **R2.2**: writing is supported; writing over the run's own inputs is not |
 | `_PERIODIC` in the config | `unsupported: _PERIODIC ` + the definition name + *"; tlc2 evaluates it inside the search loop and ENDS the run when it is false, which no completed run here could report"* (at `%config`). **R2.7.7.5** measured why it cannot be ported: `doPeriodicWork` runs on tlc2's WALL-CLOCK periodic thread, so where it fires varies run to run (1 677 194 states one run, 1 740 872 the next). The row `cfg-internal-kw` carries the argument |
 | `_RL_REWARD` in the config | `unsupported: _RL_REWARD ` + the definition name + *"; its only consumer is the reinforcement-learning simulation worker, which this engine does not have"* (at `%config`). **R2.7.7.x**; `cfg-internal-kw` |
