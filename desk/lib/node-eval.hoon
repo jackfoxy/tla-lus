@@ -1467,6 +1467,8 @@
     [[%| 0 'CHOOSE expects one bounded variable.'] rs]
   =/  ds  (bound-domains bs e)
   ?:  ?=(%| -.ds)  [ds rs]
+  ::  R4.2au: CHOOSE over its NORMALIZED domain, as `+choose-over:v`
+  =?  ds  ?=(%choose k)  [%& (turn p.ds norm-set:v)]
   =/  body  (snag 0 args.n)
   =/  rows  (bind-rows p.ds)
   =|  keep=(list value:v)

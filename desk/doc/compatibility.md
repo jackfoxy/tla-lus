@@ -363,6 +363,17 @@ which element `CHOOSE` picks from a string or model-value set, the two tools
 may report different witnesses — as two TLC drivers already do — and neither
 answer is more correct: TLA+ leaves it unspecified.
 
+**What is not part of the difference (R4.2au, 2026-11-03).** Within its
+order, `CHOOSE` takes the FIRST element of its domain in NORMALIZED order,
+as tlc2 does: `Tool` OPCODE_bc calls `inVal.normalize()` and enumerates
+with `Ordering.NORMALIZED`, however the domain was built. Before R4.2au the
+port streamed a `\cup` domain operand by operand, so
+`CHOOSE y \in {3} \cup {1} : TRUE` was 3, where the pin gives 1.
+MultiCarElevator's `DispatchElevator` broke a distance tie on
+`stationary \cup approaching` that way and grew 26 transitions the pin does
+not have. ElevatorSafetySmall's counts still matched while its depth was
+32 against the pin's 36.
+
 ## Unit P2-3 — Typed semantic graph (increment 3a)
 
 The semantic dump now covers `$Except`/`$Pair`/`$Seq`/`$Tuple` with SANY's
