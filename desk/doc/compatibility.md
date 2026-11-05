@@ -273,6 +273,28 @@ origin module is a deferred refinement, like the parser's typed-at
 spans), and a request-carried `lint-options` set is a future sur
 extension (the pipeline applies empty options today).
 
+**Bound-symbol identity (R4.4, 2026-11-04).** SANY keys its constraint
+sets by SymbolNode, so two same-named binders are two entries. The port
+keys a binder by its module and position: the module whose text it is in,
+which is the module being checked, the instanced module inside a
+`$SubstIn` body (its WITH expressions stay the instancing module's), and
+the defining module for a subexpression selected from another module's
+definition (`QNonEmpty!:`; recorded as `$Nop:<module>` and rendered
+`$Nop`). Until R4.4 the key was the position alone, so KeyValueStore's
+ClientCentric (`CHOOSE i` at 48:21, the same position as an `i` in
+`Sequences`) printed one `i<=3` fewer than SemDump. Only the LEVELS
+projection showed it; no corpus verdict moved. Found by clause 8, because
+tlauc moves ClientCentric's columns and the converted text did not collide.
+Sem cases `binder-pos-ext`, `binder-pos-inst` and `sel-ext-def` cover it.
+
+**Unicode spellings (R4.4, clause 8).** A module converted by the pinned
+`tlauc --skip numsets` gets the same verdict as SANY gives it, and the same
+semantic graph as its ASCII original, with only columns moved: all 373
+corpus modules (`desk/test-data/blackbox/parse-census-unicode.txt`,
+`unicode-identity-census.txt`) and the `tests/lib/unicode` fixture, whose
+SemDump goldens the port matches byte for byte, Unicode columns included
+(the port counts a column per code point, as Java does for BMP input).
+
 Remaining unit-4 residue:
 
 - **BY/QED proof-step level rules** ride in when the proof-step nodes
@@ -362,6 +384,17 @@ elements in its own run-dependent order. Where a spec's *outcome* depends on
 which element `CHOOSE` picks from a string or model-value set, the two tools
 may report different witnesses — as two TLC drivers already do — and neither
 answer is more correct: TLA+ leaves it unspecified.
+
+**What is not part of the difference (R4.2au, 2026-11-03).** Within its
+order, `CHOOSE` takes the FIRST element of its domain in NORMALIZED order,
+as tlc2 does: `Tool` OPCODE_bc calls `inVal.normalize()` and enumerates
+with `Ordering.NORMALIZED`, however the domain was built. Before R4.2au the
+port streamed a `\cup` domain operand by operand, so
+`CHOOSE y \in {3} \cup {1} : TRUE` was 3, where the pin gives 1.
+MultiCarElevator's `DispatchElevator` broke a distance tie on
+`stationary \cup approaching` that way and grew 26 transitions the pin does
+not have. ElevatorSafetySmall's counts still matched while its depth was
+32 against the pin's 36.
 
 ## Unit P2-3 — Typed semantic graph (increment 3a)
 

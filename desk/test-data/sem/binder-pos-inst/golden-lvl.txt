@@ -1,0 +1,5 @@
+LEVELS
+lvl MODULE A L-1 lc={i<=3,i<=3}
+lvl Id L0 ml=[3] w=[1]
+lvl I!G L0 lc={i<=3}
+lvl F L0 lc={i<=3}

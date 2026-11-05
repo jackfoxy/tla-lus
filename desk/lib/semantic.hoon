@@ -1444,7 +1444,9 @@
   ==
 ::  a subexpression selector's base lookup: the operator's body and its
 ::  own formal parameters (for the LAMBDA arity count) — R1.3.5.3.4
-+$  defentry  [body=(unit sem) params=(list spar)]
+::  R4.4: `mod` is the module whose text the body is, '' for the module
+::  doing the selecting; a selection from another module keeps it (+nop-mod)
++$  defentry  [body=(unit sem) params=(list spar) mod=@t]
 +$  sem-module
   $:  name=@t
       at=sspan
@@ -3543,18 +3545,20 @@
 ++  bodymap
   ::  name -> definition/theorem body, over a module's own defs + thmdefs;
   ::  the base of a subexpression selector is looked up here (it carries
-  ::  the body, unlike ctx's sym)
-  |=  m=sem-module
+  ::  the body, unlike ctx's sym); `mod` as in +defentry
+  |=  [m=sem-module mod=@t]
   ^-  (map @t defentry)
   =|  r=(map @t defentry)
   =.  r
     |-  ^-  (map @t defentry)
     ?~  defs.m  r
-    $(defs.m t.defs.m, r (~(put by r) name.i.defs.m [body.i.defs.m params.i.defs.m]))
+    =/  de=defentry  [body.i.defs.m params.i.defs.m mod]
+    $(defs.m t.defs.m, r (~(put by r) name.i.defs.m de))
   |-  ^-  (map @t defentry)
   ?~  thmdefs.m  r
   =/  nm  name.i.thmdefs.m
-  $(thmdefs.m t.thmdefs.m, r ?~(nm r (~(put by r) u.nm [body.i.thmdefs.m ~])))
+  =/  de=defentry  [body.i.thmdefs.m ~ mod]
+  $(thmdefs.m t.thmdefs.m, r ?~(nm r (~(put by r) u.nm de)))
 ::
 ++  find-label
   ::  the first $Label node named `nm` within a sem tree (hand-rolled; a
@@ -3738,7 +3742,10 @@
     =/  wrapped=sem
       ?~  sp  cur.nav
       (rewrap-substin mod.u.sp names.u.sp exprs.u.sp cur.nav lvl.u.sp at.u.sp)
-    [%apply ['$Nop' %builtin] (sem-lvl wrapped) at.s ~ ~ [wrapped ~]]
+    ::  R4.4: another module's text says which (`$Nop:B`), so the level
+    ::  check keys its binders as that module's (+bound-key)
+    =/  nop=@t  ?:(=('' mod.u.be) '$Nop' (cat 3 '$Nop:' mod.u.be))
+    [%apply [nop %builtin] (sem-lvl wrapped) at.s ~ ~ [wrapped ~]]
   ::  parametric label (.3.3) -> apply LAMBDA to the collected args
   =/  lv
     =/  al=(list sem)  args.s
@@ -3793,7 +3800,7 @@
   ::  own shadow them
   |=  [m=sem-module ext=(map @t defentry)]
   ^-  sem-module
-  =/  reg  (~(uni by ext) (bodymap m))
+  =/  reg  (~(uni by ext) (bodymap m ''))
   =/  ndefs=(list sem-def)
     |-  ^-  (list sem-def)
     ?~  defs.m  ~
@@ -3830,7 +3837,7 @@
   =/  ld  (~(get by mods) i.ex)
   ?~  ld  $(ex t.ex)
   =/  gm  (gen-module tree.u.ld (full-ctx tree.u.ld ctxs) ctxs mods)
-  =/  sub  (~(uni by (ext-bodies tree.u.ld ctxs mods)) (bodymap gm))
+  =/  sub  (~(uni by (ext-bodies tree.u.ld ctxs mods)) (bodymap gm i.ex))
   $(ex t.ex, acc (~(uni by sub) acc))
 ::
 ++  gen-module
@@ -4059,6 +4066,8 @@
       pfx=@t
       c=ctx
       mlevs=(map @t mlev)
+      ::  the module whose text is being checked (+bound-key)
+      mod=@t
   ==
 ::  the instanced-module data INSTANCE checking needs (constancy plus
 ::  the module node's constraint collections)
@@ -4195,12 +4204,15 @@
   ::  a bound identifier's key. SANY keys constraint sets by SymbolNode
   ::  identity, so two same-named binders carry distinct entries (both
   ::  render, e.g. lc={n<=2,n<=3}); the binder span stands in for the
-  ::  node identity
-  |=  b=sbind
+  ::  node identity. R4.4: with the module whose text it is in -- a span
+  ::  names no module, and ClientCentric's `CHOOSE i` at 48.21 merged with
+  ::  Sequences' `i` at 48.21 (one `i<=3` short of SemDump)
+  |=  [b=sbind e=lenv]
   ^-  lkey
   =/  own=@t
     ?~  at.b  'b'
-    (crip "b{(a-co line.from.u.at.b)}.{(a-co col.from.u.at.b)}")
+    %-  crip
+    "b{(trip mod.e)}:{(a-co line.from.u.at.b)}.{(a-co col.from.u.at.b)}"
   [own name.b %formal-param]
 ::
 ++  substin-mod
@@ -4211,6 +4223,15 @@
   =/  t  (trip nm)
   ?.  =("$SubstIn:" (scag 9 t))  ~
   `(crip (slag 9 t))
+::
+++  nop-mod
+  ::  the defining module a selection from another module's text carries
+  ::  (`$Nop:B`, +resolve-one); ~ for any other op name
+  |=  nm=@t
+  ^-  (unit @t)
+  =/  t  (trip nm)
+  ?.  =("$Nop:" (scag 5 t))  ~
+  `(crip (slag 5 t))
 ::
 ++  apsubstin-mod
   ::  the $APSubstIn (instanced theorem/assumption) variant
@@ -4376,6 +4397,12 @@
       [s(lvl lvl.ar, args aout) ar ads]
     ?:  ?=(^ (anysubstin-mod name.op.s))
       (l-substin s e)
+    =/  nop  (nop-mod name.op.s)
+    ?^  nop
+      ::  a $Nop over another module's text: that module's binders
+      =/  g  (l-x s(name.op '$Nop') e(mod u.nop))
+      ?>  ?=(%apply -.s.g)
+      [s.g(name.op name.op.s) r.g ds.g]
     ?:  ?=(?(%constant %variable %formal-param %new-constant) kind.op.s)
       ::  application of a declared symbol or formal parameter
       =/  key  (scope-key name.op.s kind.op.s e)
@@ -4467,7 +4494,9 @@
   =/  bl  (slag nsubs args.s)
   ?~  bl
     [s rs.gsub ds.gsub]
-  =/  gb  (l-x i.bl e)
+  ::  the body is the instanced module's text; the WITH expressions above
+  ::  are this one's
+  =/  gb  (l-x i.bl e(mod (fall (anysubstin-mod name.op.s) mod.e)))
   ::  which substituted parameter (by index) a body key matches
   =/  sub-idx
     |=  k=lkey
@@ -4655,13 +4684,13 @@
   =/  bkeys=(list [nm=@t key=lkey])
     %+  weld
       ^-  (list [nm=@t key=lkey])
-      (turn ubound.s |=(b=sbind [name.b (bound-key b)]))
+      (turn ubound.s |=(b=sbind [name.b (bound-key b e)]))
     ^-  (list [nm=@t key=lkey])
     %-  zing
     %+  turn  bound.s
     |=  g=sem-bound
     ^-  (list [nm=@t key=lkey])
-    (turn vars.g |=(b=sbind [name.b (bound-key b)]))
+    (turn vars.g |=(b=sbind [name.b (bound-key b e)]))
   =/  bset
     =/  acc  *(set lkey)
     =/  bl  bkeys
@@ -5162,14 +5191,14 @@
     $(al t.al, acc (~(uni in acc) all.i.al))
   =/  ubound2
     %+  turn  ubound.s
-    |=(b=sbind b(used (~(has in argall) (bound-key b))))
+    |=(b=sbind b(used (~(has in argall) (bound-key b e))))
   =/  bound2
     %+  turn  gout.granges
     |=  g=sem-bound
     %_  g
         vars
       %+  turn  vars.g
-      |=(b=sbind b(used (~(has in argall) (bound-key b))))
+      |=(b=sbind b(used (~(has in argall) (bound-key b e))))
     ==
   =/  dsall  :(weld ds0 dsarg dsrng dstmp dsquant)
   =/  rngok
@@ -5870,6 +5899,7 @@
         ''
         c
         mlevs.dv
+        name.m
     ==
   ::  a named THEOREM/ASSUMPTION whose level constraints a later definition
   ::  inherits (`THEOREM Foo == c=0` / `Bar == Foo`) must be in scope when
@@ -6638,7 +6668,8 @@
         ?~(body ~ (render-sem i.body (add d 2) |))
       ==
     :-  %+  line  d
-        "apply {(trip name.op.s)} opkind={(trip (kind-tag kind.op.s))} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
+        =/  opn  ?^((nop-mod name.op.s) "$Nop" (trip name.op.s))
+        "apply {opn} opkind={(trip (kind-tag kind.op.s))} {(rlvl mask lvl.s)} {(sspan-tape at.s)}"
     ;:  weld
       ^-  wain
       %+  turn  ubound.s

@@ -237,4 +237,20 @@
   !>  %-  crip
       %-  eval-text:ne
       'LET f[n \\in 0..2, v \\in {1, 2}] == IF n = 0 THEN v ELSE f[n - 1, v] * 2 IN f[2, 1]'
+::
+::  R4.2au: CHOOSE takes the first element in NORMALIZED order, whatever the
+::  domain is built from (tlc2 normalizes it, OPCODE_bc). A `\cup` used to
+::  stream its operands in turn. Pin: <<1, 2, 6, 3, 1>>
+++  test-choose-normalizes-cup
+  %+  expect-eq
+    !>  '<<1, 2, 6, 3, 1>>'
+  !>  %-  crip
+      %-  eval-text:ne
+      %+  rap  3
+      :~  '<<CHOOSE y \\in {3} \\cup {1} : TRUE, '
+          'CHOOSE y \\in UNION {{5, 4}, {2}} : TRUE, '
+          'CHOOSE y \\in ({7} \\cup {6}) \\ {} : TRUE, '
+          'CHOOSE y \\in {3, 9} \\cup {1, 8} : y > 2, '
+          'CHOOSE y \\in (2..3) \\cup {1} : TRUE>>'
+      ==
 --

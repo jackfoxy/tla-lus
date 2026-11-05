@@ -66,9 +66,11 @@ every library it stages onto `%tla-ex` (`tlapm/`, `community/`, `apalache/`,
 `specifications/`, each as `license.txt`). The scaffold gate's provenance
 clause runs `gen-licenses.py --check`: the files must equal what the pins
 give, and any tlapm library module stored in the repo, or tlauc output under
-`desk/test-data/unicode/` (R4.4), must have a `license.txt` beside it. As of
-R5.1 the repo stores no tlapm module text and no tlauc output; both reach
-only the `%tla-ex` staging (tlapm) or will in R4.4 (tlauc).
+`desk/test-data/unicode/` (R4.4), must have a `license.txt` beside it. The
+repo stores no tlapm module text. Its only tlauc output is the R4.4
+fixture's `unicode/` copy (`tools/gen-unicode-tests.py`), with tlauc's
+license beside it; the converted corpus reaches only the `%tla-ex` staging
+(`unicode/`, with `unicode/license.txt`).
 
 ## 2. Java Oracle Build And Invocation Forms
 
