@@ -15,7 +15,7 @@
 #   R4  refusals are documented BOTH ways: every `unsupported:` message in the
 #                               desk is in compatibility.md's table, and every
 #                               message that table lists exists in the desk
-#   R5  upgrade / restart       a version-tagged state, a coercing on-load, and
+#   R5  upgrade / restart       one tagged state shape, a coercing on-load, and
 #                               a test that resumes an in-flight job across a
 #                               Gall reload
 #   R6  reproducible artifacts  the oracle baseline regenerates byte-identically
@@ -115,12 +115,15 @@ else
 fi
 
 echo "== R5: upgrade and restart =="
+#  R4 (the user's no-migrations rule, 2026-10): ONE tagged state shape,
+#  which on-load coerces (`;;`) and resets to empty when it no longer fits;
+#  no version union, no conversion arms (scaffold gate 6 forbids them)
 R5=1; WHY=""
-grep -q '+\$  versioned-state' "$DESK/app/tla-lus.hoon" || { R5=0; WHY="no versioned-state"; }
-grep -q ';;(versioned-state'   "$DESK/app/tla-lus.hoon" || { R5=0; WHY="on-load does not coerce"; }
+grep -q '+\$  state-0' "$DESK/app/tla-lus.hoon" || { R5=0; WHY="no tagged state-0"; }
+grep -q ';;(state-0'    "$DESK/app/tla-lus.hoon" || { R5=0; WHY="on-load does not coerce"; }
 grep -q 'test-inflight-resume-across-reload' "$DESK/tests/app/tla-lus.hoon" \
   || { R5=0; WHY="no in-flight resume-across-reload test"; }
-[ "$R5" -eq 1 ] && pass "version-tagged state, coercing on-load, resume-across-reload test" \
+[ "$R5" -eq 1 ] && pass "one tagged state shape, coercing on-load, resume-across-reload test" \
   || fail "upgrade/restart: $WHY"
 
 echo "== R6: reproducible artifacts =="
@@ -147,9 +150,9 @@ if [ "$TIER3" -eq 1 ]; then
   fi
 else
   echo "  REPORT  not run (pass --tier3; it needs a running ship)."
-  echo "          Report-only by R2.8.1a: median workload spread 15.6% on a"
-  echo "          fresh boot, over its own +/-15% bar. Do not promote this to"
-  echo "          a clause without re-measuring."
+  echo "          Report-only. R2.8.1a measured 15.6% on a fresh boot (over"
+  echo "          its +/-15% bar); R4.5.1 re-measured 4.5% warm, 3.0% fresh"
+  echo "          boot, 3.4% across a rebuild. Promoting it is a decision."
 fi
 
 echo

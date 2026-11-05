@@ -1,0 +1,124 @@
+{
+ "decision": "plan r16 decision 2 (A), approved by the user 2026-11-03: clause 2's time-bound rows are R4's recorded fallback; MCChangRoberts stays excluded (a known runaway). The list and each row's class and gap: tools/notes/plan2-R4.Q9-notes.md",
+ "time_bound": [
+  {
+   "model": "specifications/Bakery-Boulangerie/MCBakery.cfg",
+   "class": "startup"
+  },
+  {
+   "model": "specifications/CarTalkPuzzle/CarTalkPuzzle.toolbox/Model_1/MC.cfg",
+   "class": "startup"
+  },
+  {
+   "model": "specifications/TransitiveClosure/TransitiveClosure.cfg",
+   "class": "startup"
+  },
+  {
+   "model": "specifications/LoopInvariance/MCBinarySearch.cfg",
+   "class": "startup"
+  },
+  {
+   "model": "specifications/YoYo/YoYoAllGraphs.cfg",
+   "class": "startup"
+  },
+  {
+   "model": "specifications/bcastByz/bcastByz.cfg",
+   "class": "explored, out of time"
+  },
+  {
+   "model": "specifications/allocator/AllocatorImplementation.cfg",
+   "class": "explored, out of time"
+  },
+  {
+   "model": "specifications/CoffeeCan/CoffeeCan1000Beans.cfg",
+   "class": "explored, out of time"
+  },
+  {
+   "model": "specifications/GameOfLife/GameOfLife.cfg",
+   "class": "explored, out of time"
+  },
+  {
+   "model": "specifications/LoopInvariance/MCQuicksort.cfg",
+   "class": "2-10x"
+  },
+  {
+   "model": "specifications/FiniteMonotonic/MCCRDT.cfg",
+   "class": "2-10x"
+  },
+  {
+   "model": "specifications/Disruptor/Disruptor_MPMC.cfg",
+   "class": "2-10x"
+  },
+  {
+   "model": "specifications/braf/BufferedRandomAccessFile.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/lamport_mutex/MCLamportMutex.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/SimplifiedFastPaxos/FastPaxos.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/NanoBlockchain/MCNanoMedium.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/btree/btree.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/MultiPaxos-SMR/MultiPaxos_MC_small.cfg",
+   "class": "10-100x"
+  },
+  {
+   "model": "specifications/dag-consensus/TLCSailfish1.cfg",
+   "class": "over 100x"
+  },
+  {
+   "model": "specifications/CheckpointCoordination/MCCheckpointCoordinationFailure.cfg",
+   "class": "no manifest count"
+  },
+  {
+   "model": "specifications/SlidingPuzzles/SlidingPuzzles.cfg",
+   "class": "no manifest count"
+  },
+  {
+   "model": "specifications/SlidingPuzzles/SlidingPuzzles_anim.cfg",
+   "class": "no manifest count"
+  },
+  {
+   "model": "specifications/SpanningTree/SpanTreeRandom.cfg",
+   "class": "no manifest count"
+  }
+ ],
+ "not_run": [
+  {
+   "model": "specifications/chang_roberts/MCChangRoberts.cfg",
+   "why": "a known runaway (R4.0e2): excluded from the runner, listed under the fallback"
+  }
+ ],
+ "approved_refusals": [
+  {
+   "model": "specifications/ewd998/SmokeEWD998.cfg",
+   "reason": "unsupported StandardModule operator: TLC!TLCGet; the key duration",
+   "ledger": "tlc-module-tlc",
+   "where": "compatibility.md Release R4.2h"
+  },
+  {
+   "model": "specifications/ewd998/EWD998ChanTrace.cfg",
+   "reason": "unsupported StandardModule operator: Json!ndJsonDeserialize",
+   "ledger": "tlc-module-excluded",
+   "where": "compatibility.md Release R4.2f"
+  }
+ ],
+ "order_dependent": [
+  {
+   "model": "specifications/acp/ACP_NB_WRONG_TLC.cfg",
+   "ledger": "tlc-value-model",
+   "why": "a violation's distinct/queued counts depend on BFS order within a level, and the port orders model values lexicographically where tlc2 uses intern order: 12,645/970 vs the pin's 11,852/1,248 at depth 13. Measured 2026-11-05 (R4.5.2): with the eight model values renamed m1..m8 in config order (intern order = lexicographic order), the port gives 11,852 distinct, 1,248 queued, depth 13 = the pin. Verdict and depth must match"
+  }
+ ]
+}
