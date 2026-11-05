@@ -67,7 +67,7 @@ The parity ledger was **closed at R3 — 134 rows, none owed (2026-09-05)**, whe
 `tools/release-gate.sh` passed every clause and `tools/r3-acceptance.py
 --suite-log` reported **R3 ACCEPTED** on 5/5. **R4** (the tlaplus-Examples
 corpus, PlusCal excluded) re-opened three rows on measurement and closed
-them again; the ledger stands at **140 rows, none owed**, and R4's clauses
+them again; the ledger stands at **141 rows, none owed**, and R4's clauses
 are measured clause by clause in
 [testing.md](desk/doc/testing.md) (§*Examples coverage at R4*), pending the
 acceptance run (R4.5.2–R4.5.3). See

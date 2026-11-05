@@ -265,7 +265,7 @@ the clauses (`R4-examples-work-breakdown-r16.md`), and
 | 1 parse: `%analyze` verdict = pinned SANY, 373 modules | **373/373** agree (2,862 s in all, median 5.6 s, R4.5.1 engine) | `tla-zod-tools/logs/parse-census-r451.txt`; R4.1b's `desk/test-data/blackbox/parse-census.txt` |
 | 2 small models (127) | **101** report the pin's outcome (93 at a 900 s wall, ElevatorSafetySmall after R4.2au, 7 at 3,600 s); **2** approved refusals (SmokeEWD998 `TLCGet("duration")`, EWD998ChanTrace `ndJsonDeserialize`); **24** are R4's recorded fallback: 23 time-bound at an hour, plus MCChangRoberts, not run (a known runaway) | `tools/notes/plan2-R4.Q9-notes.md` (the list, by class); `logs/census-q9-small.txt`, `logs/census-qb.txt` |
 | 3 large models (31), smoke budget 1,000 states | **31/31**, MCInnerSerial at its per-model wall (≈63 min; plan r3 decision 1 A) | `logs/census-q9-large.txt` |
-| 4 ledger | **140 rows, 0 owed** (15 approved differences) | `tools/check-parity.py` |
+| 4 ledger | **141 rows, 0 owed** (16 approved differences) | `tools/check-parity.py` |
 | 5 throughput | reported, no gate: tier 3 against the R2 baseline, every workload 17–73% faster | `logs/tier3-q9.json` |
 | 6 gates | release gate and the user's full suite and Examples runner: R4.5.3 | — |
 | 7 black box through the wire | the clause 2–3 censuses are this wire, against the manifest | as clauses 2–3 |

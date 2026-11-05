@@ -1,7 +1,8 @@
-::  The semantic graph's approved differences (R4.5.1), asserted on the
-::  port's side; each names its ledger row. The pin's own output for the
-::  first is captured in test-data/sem/inst-noparam/golden.txt, whose
-::  generated arm gen-sem-tests.py withholds.
+::  The semantic graph's approved differences (R4.5.1, R4.5.2), asserted on
+::  the port's side; each names its ledger row. The pin's own output is
+::  captured in test-data/sem/<case>/golden.txt (inst-noparam,
+::  mdef-inner-ext), whose generated arms gen-sem-tests.py withholds or cuts
+::  to the DIAGS.
 /+  *test
 /=  semantic  /lib/semantic
 |%
@@ -29,6 +30,38 @@
   ^-  (list [@t @t])
   :~  ['A' '---- MODULE A ----\0aI == INSTANCE B\0a====\0a']
       ['B' '---- MODULE B ----\0aF == 1\0a====\0a']
+  ==
+::
+++  test-inner-module-section-not-rendered
+  ::  `sem-inner-module-dump`: SemDump nests an inner module's own section
+  ::  (`MODULE Inner`, its declarations and definitions, its LEVELS rows) in
+  ::  the parent's dump; the port's dump is the parent's alone. The pin's is
+  ::  test-data/sem/mdef-inner-ext/golden.txt
+  %+  expect-eq
+    !>  ^-  wain
+    :~  'ACCEPT'
+        'MODULE A 1.1-7.4'
+        '  def P arity=0 local=n L0 6.1-6.24'
+        '    apply $BoundedExists opkind=BuiltInKind L0 6.6-6.24'
+        '      bound m L-1 6.9-6.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 6.15-6.17'
+        '          num 1 L0 6.16-6.16'
+        '      apply TRUE opkind=BuiltInKind L0 6.21-6.24'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~  :-  'A'
+      %-  crip
+      ;:  weld
+        "---- MODULE A ----\0a---- MODULE Inner ----\0aEXTENDS B\0a"
+        "Q == m\0a====\0aP == \\E m \\in \{1} : TRUE\0a====\0a"
+      ==
+      ['B' '---- MODULE B ----\0aVARIABLE m\0a====\0a']
   ==
 ::
 ++  test-multiply-defined-first-line

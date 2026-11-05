@@ -152,7 +152,8 @@ else
   echo "  REPORT  not run (pass --tier3; it needs a running ship)."
   echo "          Report-only. R2.8.1a measured 15.6% on a fresh boot (over"
   echo "          its +/-15% bar); R4.5.1 re-measured 4.5% warm, 3.0% fresh"
-  echo "          boot, 3.4% across a rebuild. Promoting it is a decision."
+  echo "          boot, 3.4% across a rebuild; the user kept it report-only"
+  echo "          for R4 (2026-11-05)."
 fi
 
 echo

@@ -19,8 +19,8 @@ excluded. Every clause is computed from a file; none is asserted by hand.
                 (`%limited %states` at the budget, or success, whose
                 counts then meet clause 2's check)
   4 ledger      every ledger row terminal, none owed
-  5 throughput  tier 3 REPORTED (whether it becomes a gate is the user's
-                decision; until then it is read, not asserted)
+  5 throughput  tier 3 REPORTED: report-only for R4 by the user's decision
+                (2026-11-05), though the noise criterion now passes
   6 gates       release-gate.sh passes; the user-run full suite is ok=%.y
                 and covers every test arm; the user-run Examples runner
                 census covers every model -- both logs are required inputs
@@ -250,9 +250,10 @@ def c_ledger() -> None:
 def r_tier3(log: Path | None) -> None:
     if log is None or not log.exists():
         report("5 throughput (tier 3)",
-               "no --tier3-log; R2.8.1a's noise criterion passes on all three "
-               "legs since R4.5.1 (warm 4.5%, fresh boot 3.0%, rebuild 3.4%); "
-               "making it a gate is the user's decision. Read, never asserted")
+               "no --tier3-log. REPORT-ONLY for R4 by the user's decision "
+               "(2026-11-05), although R2.8.1a's noise criterion now passes on "
+               "all three legs (warm 4.5%, fresh boot 3.0%, rebuild 3.4%; "
+               "`live` alone spread 20.7%). Read, never asserted")
         return
     lines = [l for l in log.read_text(errors="replace").splitlines() if l.strip()]
     report("5 throughput (tier 3)", f"{log.name}: " + (lines[-1][:160] if lines else "empty"))

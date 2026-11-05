@@ -100,8 +100,9 @@ DIAGS_ONLY = {
     "mdef-inner": "R4.2ar: SemDump nests an inner module's own section "
                   "(MODULE Inner, its definitions and LEVELS rows) in the "
                   "parent's dump; the port's dump has never rendered inner "
-                  "modules. The diagnostic, found inside the inner module, "
-                  "is the point of the case",
+                  "modules (ledger `sem-inner-module-dump`, approved). The "
+                  "diagnostic, found inside the inner module, is the point "
+                  "of the case",
     "mdef-inner-ext": "R4.2ar: as mdef-inner (the inner module's own "
                       "section); the point is that NO diagnostic appears -- "
                       "the inner module's EXTENDS B does not put B's "

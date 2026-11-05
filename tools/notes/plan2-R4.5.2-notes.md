@@ -84,3 +84,17 @@ current tree (small at 900 s; the timed-out small rows but MCChangRoberts;
 the 11 rows at 3,600 s; the large smoke; MCInnerSerial at 3,800 s), then
 `r4-acceptance.py` reads them in that order, later rows overriding earlier.
 Every `timed-out.json` row is covered by a pass or by `r4-fallback.json`.
+
+## Decisions (the user, 2026-11-05: "do your recommendations")
+
+1. **Tier 3 stays report-only for R4**, although R2.8.1a's criterion now
+   passes on all three legs (`live` alone spread 20.7% from one slow run).
+   Clause 5 and `release-gate.sh` say so.
+2. **The inner-module dump section is an approved difference**, ledger
+   `sem-inner-module-dump` (now 141 rows, 0 owed, 16 approved
+   differences): SemDump nests an inner module's section in its parent's
+   dump, the port's dump is the parent's alone; the inner module's
+   diagnostics are the parent's (R4.2ar), so no verdict depends on it.
+   Arm `tests/lib/sem-approved` `test-inner-module-section-not-rendered`
+   (port side; the pin's is `sem/mdef-inner-ext/golden.txt`).
+   `check-portmap.py`'s number words stopped at fifteen; extended.
