@@ -273,6 +273,28 @@ origin module is a deferred refinement, like the parser's typed-at
 spans), and a request-carried `lint-options` set is a future sur
 extension (the pipeline applies empty options today).
 
+**Bound-symbol identity (R4.4, 2026-11-04).** SANY keys its constraint
+sets by SymbolNode, so two same-named binders are two entries. The port
+keys a binder by its module and position: the module whose text it is in,
+which is the module being checked, the instanced module inside a
+`$SubstIn` body (its WITH expressions stay the instancing module's), and
+the defining module for a subexpression selected from another module's
+definition (`QNonEmpty!:`; recorded as `$Nop:<module>` and rendered
+`$Nop`). Until R4.4 the key was the position alone, so KeyValueStore's
+ClientCentric (`CHOOSE i` at 48:21, the same position as an `i` in
+`Sequences`) printed one `i<=3` fewer than SemDump. Only the LEVELS
+projection showed it; no corpus verdict moved. Found by clause 8, because
+tlauc moves ClientCentric's columns and the converted text did not collide.
+Sem cases `binder-pos-ext`, `binder-pos-inst` and `sel-ext-def` cover it.
+
+**Unicode spellings (R4.4, clause 8).** A module converted by the pinned
+`tlauc --skip numsets` gets the same verdict as SANY gives it, and the same
+semantic graph as its ASCII original, with only columns moved: all 373
+corpus modules (`desk/test-data/blackbox/parse-census-unicode.txt`,
+`unicode-identity-census.txt`) and the `tests/lib/unicode` fixture, whose
+SemDump goldens the port matches byte for byte, Unicode columns included
+(the port counts a column per code point, as Java does for BMP input).
+
 Remaining unit-4 residue:
 
 - **BY/QED proof-step level rules** ride in when the proof-step nodes

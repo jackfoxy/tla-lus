@@ -638,7 +638,7 @@
   ?:  &(=(nm '$Label') ?=(^ as))  (eval-rs i.as e rs)
   ::  R4.2am: a selected subexpression (`Thm!:`) is wrapped in `$Nop`, which
   ::  tlc2 evaluates as its argument (OPCODE_nop)
-  ?:  &(=(nm '$Nop') ?=(^ as))  (eval-rs i.as e rs)
+  ?:  &(=('$Nop' (end [3 4] nm)) ?=(^ as))  (eval-rs i.as e rs)
   ::  arity-0 constants
   ?:  =(nm 'TRUE')     [[%& [%bool &]] rs]
   ?:  =(nm 'FALSE')    [[%& [%bool |]] rs]
@@ -3645,7 +3645,8 @@
   =/  nm  name.op.n
   ::  R4.2m: a labeled action `P :: A` is solved as `A`; R4.2am: so is a
   ::  selected one (`$Nop`)
-  ?:  &(|(=(nm '$Label') =(nm '$Nop')) ?=(^ args.n))  $(n i.args.n)
+  ?:  &(|(=(nm '$Label') =('$Nop' (end [3 4] nm))) ?=(^ args.n))
+    $(n i.args.n)
   ?:  |(=(nm '$ConjList') =(nm '\\land'))
     (solve-conj args.n mode cur part e s)
   ?:  |(=(nm '$DisjList') =(nm '\\lor'))
@@ -4647,7 +4648,8 @@
     ?~  body.n  [[%err 0 'LET with no body in an action.'] p]
     (psolve u.body.n cur part (with-lets lets.n e) acts p fil)
   =/  nm  name.op.n
-  ?:  &(|(=(nm '$Label') =(nm '$Nop')) ?=(^ args.n))  $(n i.args.n)
+  ?:  &(|(=(nm '$Label') =('$Nop' (end [3 4] nm))) ?=(^ args.n))
+    $(n i.args.n)
   ?:  |(=(nm '$ConjList') =(nm '\\land'))
     ?~  args.n  (pnext cur part acts p fil)
     (psolve i.args.n cur part e (weld (pitems t.args.n e) acts) p fil)

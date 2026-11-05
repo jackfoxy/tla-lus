@@ -113,6 +113,85 @@
       '---- MODULE A ----\0aF(y) == y\0aG == F\0a====\0a'
   ==
 ::
+++  test-sem-binder-pos-ext
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def F arity=0 local=n L0 4.1-4.29'
+        '    apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '      bound i L0 4.9-4.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '          num 1 L0 4.16-4.16'
+        '      apply = opkind=BuiltInKind L0 4.21-4.29'
+        '        apply Id opkind=UserDefinedOpKind L0 4.21-4.25'
+        '          apply i opkind=FormalParamKind L0 4.24-4.24'
+        '        num 1 L0 4.29-4.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={i<=3,i<=3}'
+        'lvl F L0 lc={i<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0a\0aF == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aId(x) == x\0a\0aG == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+  ==
+::
+++  test-sem-binder-pos-inst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Id arity=1 local=n L0 2.1-2.10'
+        '    param x arity=0 L0 2.4-2.4'
+        '    apply x opkind=FormalParamKind L0 2.10-2.10'
+        '  def I!G arity=0 local=n L0 3.1-3.29'
+        '    substin subs=1 L0 3.1-3.29'
+        '      sub Op <-'
+        '        oparg Id op=Id arity=1 L0 3.28-3.29'
+        '      in'
+        '        apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '          bound i L0 4.9-4.9'
+        '            apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '              num 1 L0 4.16-4.16'
+        '          apply = opkind=BuiltInKind L0 4.21-4.29'
+        '            apply Op opkind=ConstantDeclKind L0 4.21-4.25'
+        '              apply i opkind=FormalParamKind L0 4.24-4.24'
+        '            num 1 L0 4.29-4.29'
+        '  def F arity=0 local=n L0 4.1-4.29'
+        '    apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '      bound i L0 4.9-4.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '          num 1 L0 4.16-4.16'
+        '      apply = opkind=BuiltInKind L0 4.21-4.29'
+        '        apply Id opkind=UserDefinedOpKind L0 4.21-4.25'
+        '          apply i opkind=FormalParamKind L0 4.24-4.24'
+        '        num 1 L0 4.29-4.29'
+        '  instance name=I module=B local=n L0 3.1-3.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={i<=3,i<=3}'
+        'lvl Id L0 ml=[3] w=[1]'
+        'lvl I!G L0 lc={i<=3}'
+        'lvl F L0 lc={i<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aId(x) == x\0aI == INSTANCE B WITH Op <- Id\0aF == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT Op(_)\0a\0aG == \\E i \\in {1} : Op(i) = 1\0a====\0a'
+  ==
+::
 ++  test-sem-bltopargs
   %+  expect-eq
     !>  ^-  wain

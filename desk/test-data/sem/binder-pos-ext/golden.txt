@@ -1,0 +1,11 @@
+ACCEPT
+MODULE A 1.1-5.4
+  def F arity=0 local=n L0 4.1-4.29
+    apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29
+      bound i L0 4.9-4.9
+        apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17
+          num 1 L0 4.16-4.16
+      apply = opkind=BuiltInKind L0 4.21-4.29
+        apply Id opkind=UserDefinedOpKind L0 4.21-4.25
+          apply i opkind=FormalParamKind L0 4.24-4.24
+        num 1 L0 4.29-4.29

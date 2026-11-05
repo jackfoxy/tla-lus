@@ -142,6 +142,11 @@ carry a function.
   0.4 s for the grid (1.4 ms per state), and about 2–3 s for GameOfLife (9
   ms per state). The ship serves other agents between slices; a `%cancel`
   lands at the next slice boundary.
+- **Front-end latency** (`%parse`/`%analyze`, and the start of every
+  `%check`; R4.4, 2026-11-04, all 373 Examples parse modules through the
+  agent): median about 6 s per module with its imports, 90% under 16 s,
+  99% under 28 s; the slowest, `tcp_proof` (5,661 lines), about 90 s.
+  Unicode spellings cost nothing measurable (same-module A/B within noise).
 - **Throughput** depends on the spec. The grid reaches 90,000 states in
   about 130 s, and GameOfLife 59,000 in 300 s (R4.P5c). Temporal properties add a
   product build per property; CoffeeCan with 100 beans (5,150 states, four

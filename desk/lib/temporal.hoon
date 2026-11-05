@@ -396,7 +396,7 @@
   ?:  =(op '<>')
     =/  r  (ast (hd as) c env)
     ?:(?=(%| -.r) r [%& [%even p.r]])
-  ?:  =(op '$Nop')  (ast (hd as) c env)
+  ?:  =('$Nop' (end [3 4] op))  (ast (hd as) c env)
   ::  R4.2m: a label is its body (`astToLive` LabelKind)
   ?:  =(op '$Label')  (ast (hd as) c env)
   ?:  |(=(op '~>') =(op '-+->'))

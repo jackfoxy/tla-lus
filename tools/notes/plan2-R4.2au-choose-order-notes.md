@@ -12,7 +12,7 @@ had been that way since at least R4.2v.
 - A ship-only generator (`tla-zod-tools/zgraph.hoon`) dumped the port's
   graph: every reachable state (`+render-states`) and its successor edges
   from `+next-states`, through the console path's `+search-ctx`. A Python
-  differ (`scratchpad/gdiff.py`) parses both renderings into canonical
+  differ (`tla-zod-tools/gdiff.py`) parses both renderings into canonical
   values, with sets sorted and records and functions as sorted maps, so the
   approved string/model-value order difference cannot interfere. The result:
   the same 4,122 states, and successors that differ at **26 states**, always
