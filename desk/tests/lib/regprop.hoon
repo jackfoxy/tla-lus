@@ -131,9 +131,12 @@
 ::  +|  Shadowing: a user definition wins
 ::
 ++  test-root-definition-shadows-an-override
+  ::  a root module's own `Len` is not Sequences' (R4.2ar: a root that also
+  ::  EXTENDS Sequences is SANY's "Operator Len already defined", so the
+  ::  root here does not)
   %-  val
   :_  "42"
-  %+  one  "EXTENDS Sequences"
+  %+  one  "EXTENDS Integers"
   ~["Len(s) == 42" "Expr == Len(<<1, 2, 3>>)"]
 ::
 ++  test-imported-definition-shadows-an-override
@@ -145,10 +148,11 @@
 ::
 ++  test-same-name-different-arity-is-a-different-operator
   ::  a user operator sharing a StandardModule name at another arity does not
-  ::  collide with the override
+  ::  collide with the override (R4.2ar: not beside Sequences' own `Len`,
+  ::  which SANY rejects as Multiply-defined)
   %-  val
   :_  "5"
-  %+  one  "EXTENDS Sequences, Integers"
+  %+  one  "EXTENDS Integers"
   ~["Len(a, b) == a + b" "Expr == Len(2, 3)"]
 ::
 ::  +|  Structural properties of the table

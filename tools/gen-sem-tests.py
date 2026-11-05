@@ -83,8 +83,29 @@ SKIPS = {
                       "SemDump lists R!Next before R!vars; the port lists "
                       "declaration order. Dump-only (no verdict moves); "
                       "tracker row R4.2ac",
+    "inst-noparam": "R4.5.1: an INSTANCE of a module with no CONSTANT or "
+                    "VARIABLE -- the port's dump wraps each imported body "
+                    "in `substin subs=0`, SemDump has no SubstIn node there. "
+                    "Dump-only; the wrapper carries the instanced module for "
+                    "the level check and the overrides. Ledger "
+                    "`sem-substin-zero` (approved-difference), asserted by "
+                    "tests/lib/sem-approved",
     #  subst-arity: un-withheld by R4.1c (2026-10-10), when the renderer
     #  stopped masking the instancee's nodes under an error in the root
+}
+
+# Cases whose arm compares only the DIAGS lines (the verdict and its
+# diagnostics), for a dump divergence that is recorded elsewhere.
+DIAGS_ONLY = {
+    "mdef-inner": "R4.2ar: SemDump nests an inner module's own section "
+                  "(MODULE Inner, its definitions and LEVELS rows) in the "
+                  "parent's dump; the port's dump has never rendered inner "
+                  "modules. The diagnostic, found inside the inner module, "
+                  "is the point of the case",
+    "mdef-inner-ext": "R4.2ar: as mdef-inner (the inner module's own "
+                      "section); the point is that NO diagnostic appears -- "
+                      "the inner module's EXTENDS B does not put B's "
+                      "VARIABLE m in the parent's scope",
 }
 
 
@@ -108,27 +129,34 @@ def main() -> None:
         glines = (gold + lvl).split("\n")
         if glines and glines[-1] == "":
             glines.pop()
+        only = case.name in DIAGS_ONLY
+        if only:
+            print(f"  DIAGS-ONLY {case.name}: {DIAGS_ONLY[case.name]}")
+            glines = [l for l in glines if l.startswith("D ")]
         gitems = "\n".join(f"        '{hcord(l)}'" for l in glines)
         mods = []
         for f in sorted(case.glob("*.tla")):
             mods.append(f"      :-  '{f.stem}'\n"
                         f"      '{hcord(f.read_text())}'")
         mitems = "\n".join(mods)
-        arms.append(f"""::
-++  test-sem-{case.name}
-  %+  expect-eq
-    !>  ^-  wain
-    :~
-{gitems}
-    ==
-  !>
-  %+  dump-sem:semantic  'A'
+        dump = (f"""  %+  dump-sem:semantic  'A'
   %-  malt
   ^-  (list [@t @t])
   :~
 {mitems}
   ==
 """)
+        if only:
+            dump = ("  %+  skim\n"
+                    + "".join("  " + l + "\n" for l in dump.splitlines())
+                    + "  |=(l=@t =('D ' (end [3 2] l)))\n")
+        want = (f"    :~\n{gitems}\n    ==\n" if glines else "    ~\n")
+        arms.append(f"""::
+++  test-sem-{case.name}
+  %+  expect-eq
+    !>  ^-  wain
+{want}  !>
+{dump}""")
     OUT.write_text(HEADER + "".join(arms) + "--\n")
     print(f"{len(arms)} cases")
     print(f"TOTAL {len(arms)}")

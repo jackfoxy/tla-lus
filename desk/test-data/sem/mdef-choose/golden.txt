@@ -1,0 +1,9 @@
+ACCEPT
+MODULE A 1.1-4.4
+  var i L1 2.10-2.10
+  def P arity=0 local=n L-1 3.1-3.20
+    apply $UnboundedChoose opkind=BuiltInKind L-1 3.6-3.20
+      ubound i L-1 3.6-3.11
+      apply TRUE opkind=BuiltInKind L-1 3.17-3.20
+DIAGS
+D 4201 ERROR 3.6-3.11 Multiply-defined symbol 'i': this definition or declaration conflicts

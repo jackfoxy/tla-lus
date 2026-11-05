@@ -1,0 +1,13 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def Q arity=0 local=n L-1 2.1-2.9
+    apply nullODN opkind=k0 L-1 0.0-0.0
+  def I!Mk arity=0 local=n L-1 3.1-3.27
+    substin subs=1 L-1 3.1-3.27
+      sub k <-
+        num 1 L-1 3.27-3.27
+      in
+        apply k opkind=ConstantDeclKind L0 3.7-3.7
+  instance name=I module=B local=n L0 3.1-3.27
+DIAGS
+D 4200 ERROR 2.8-2.9 Unknown operator: `Mk'.

@@ -1,0 +1,12 @@
+ACCEPT
+MODULE A 1.1-5.4
+  def P arity=0 local=n L0 2.1-4.22
+    letin lets=2 L0 2.6-4.22
+      def a arity=0 local=n L0 3.9-3.17
+        apply r opkind=UserDefinedOpKind L0 3.14-3.17
+          num 1 L0 3.16-3.16
+      def r arity=1 local=n L0 4.9-4.17
+        param n arity=0 L0 4.11-4.11
+        apply n opkind=FormalParamKind L0 4.17-4.17
+      in
+        apply a opkind=UserDefinedOpKind L0 4.22-4.22

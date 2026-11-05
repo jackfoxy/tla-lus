@@ -445,19 +445,9 @@
   ::  definitions); INSTANCE imports only definitions, handled per unit
   ::  by +inst-syms below, so its module is NOT folded in here (its raw
   ::  VARIABLE/CONSTANT declarations must not leak into this module)
-  ::  R4.1c: an INNER module starts from its enclosing module's EXTENDS
-  ::  context (+analyze stores it under +encl-key), as SANY builds a nested
-  ::  module inside its parent's context
-  =/  encl=ctx
-    =/  nm  (module-name-of:modules tree)
-    ?~(nm ~ (~(gut by deps) (encl-key u.nm) ~))
-  =/  imports=ctx
-    %+  roll  (extends-of tree)
-    |=  [r=@t acc=ctx]
-    (~(uni by acc) (~(gut by deps) r ~))
-  =.  imports  (~(uni by encl) imports)
-  =/  full=ctx  (~(uni by builtins) imports)
-  =/  exported=ctx  imports
+  =/  base  (ctx-base tree deps)
+  =/  full=ctx  full.base
+  =/  exported=ctx  imports.base
   =/  units  (body-of-module tree)
   |-  ^-  [ctx ctx]
   ?~  units  [full exported]
@@ -499,6 +489,99 @@
   =.  full  (~(put by full) name.u.ts s2)
   =?  exported  !local.u.ts  (~(put by exported) name.u.ts s2)
   $(units t.units)
+::
+++  ctx-base
+  ::  what a module sees before its first unit: the builtins and its
+  ::  EXTENDS imports
+  ::  R4.1c: an INNER module starts from its enclosing module's EXTENDS
+  ::  context (+analyze stores it under +encl-key), as SANY builds a nested
+  ::  module inside its parent's context
+  |=  [tree=node deps=(map @t ctx)]
+  ^-  [full=ctx imports=ctx]
+  =/  encl=ctx
+    =/  nm  (module-name-of:modules tree)
+    ?~(nm ~ (~(gut by deps) (encl-key u.nm) ~))
+  =/  imports=ctx
+    %+  roll  (extends-of tree)
+    |=  [r=@t acc=ctx]
+    (~(uni by acc) (~(gut by deps) r ~))
+  =.  imports  (~(uni by encl) imports)
+  [(~(uni by builtins) imports) imports]
+::
+++  unit-names
+  ::  the names one module unit brings into scope, as +build-ctx-upto
+  ::  adds them, each with its entry: a declaration's own, otherwise the
+  ::  computed one in `c` when `c` has this kind of symbol under the name
+  ::  (a later definition of a declared name replaced it there)
+  |=  [u=node deps=(map @t ctx) c=ctx]
+  ^-  (list [@t sym])
+  =/  iu  (unit-instance u)
+  =/  ds  (def-signature u)
+  =/  ts  (thm-signature u)
+  =/  computed
+    |=  [n=@t s=sym]
+    ^-  [@t sym]
+    =/  o  (~(get by c) n)
+    ?:  &(?=(^ o) =(kind.u.o kind.s))  [n u.o]
+    [n s]
+  ;:  weld
+    (turn (decl-syms u) |=([n=@t s=sym *] [n s]))
+    (turn (recursive-syms u) computed)
+    ?~(iu ~ (turn (inst-syms u.iu deps c) computed))
+    ?~(ds ~ ~[(computed name.u.ds s.u.ds)])
+    ?~(ts ~ ~[(computed name.u.ts s.u.ts)])
+  ==
+::
+++  unit-ctxs
+  ::  R4.2at: each unit of a module with the context it is generated in,
+  ::  `c` cut to what the units before it brought into scope, as SANY's
+  ::  Generator sees it: a later definition, declaration, theorem or
+  ::  instance is an unknown operator (`C == A` before `A == 3`). A unit
+  ::  does not see its own name (+gen-module adds a function definition's,
+  ::  for a recursive function; an operator's comes only from RECURSIVE)
+  |=  [tree=node c=ctx deps=(map @t ctx)]
+  ^-  (list [u=node c=ctx])
+  =/  units  (body-of-module tree)
+  =/  nss=(list (list [@t sym]))
+    (turn units |=(u=node `(list [@t sym])`(unit-names u deps c)))
+  =/  base  full:(ctx-base tree deps)
+  ::  the first unit to bring a name in keeps it (a later definition of
+  ::  a declared name does not replace it, R4.2ar)
+  =/  put-names
+    |=  [acc=ctx ns=(list [@t sym])]
+    ^-  ctx
+    ?~  ns  acc
+    ?:  (~(has by acc) -.i.ns)  $(ns t.ns)
+    $(ns t.ns, acc (~(put by acc) -.i.ns +.i.ns))
+  ::  `c` without what this module brings in; a name the base has keeps
+  ::  the base's entry
+  =/  cur=ctx
+    =/  ns=(list [@t sym])  (zing nss)
+    =/  acc=ctx  c
+    |-  ^-  ctx
+    ?~  ns  acc
+    =/  b  (~(get by base) -.i.ns)
+    $(ns t.ns, acc ?~(b (~(del by acc) -.i.ns) (~(put by acc) -.i.ns u.b)))
+  =|  out=(list [u=node c=ctx])
+  |-  ^-  (list [u=node c=ctx])
+  ?~  units  (flop out)
+  %=  $
+    units  t.units
+    nss    ?~(nss ~ t.nss)
+    out    [[i.units cur] out]
+    cur    (put-names cur ?~(nss ~ i.nss))
+  ==
+::
+++  unit-def-ctx
+  ::  a definition's context from its unit's (+unit-ctxs): a function
+  ::  definition also sees its own name, as `full` has it (a recursive
+  ::  function)
+  |=  [u=node c=ctx full=ctx]
+  ^-  ctx
+  ?.  (is-kind u %n-functiondefinition)  c
+  =/  ds  (def-signature u)
+  ?~  ds  c
+  (~(put by c) name.u.ds (~(gut by full) name.u.ds s.u.ds))
 ::
 ++  export-ctx
   |=  [tree=node deps=(map @t ctx)]
@@ -661,14 +744,24 @@
   ==
 ::
 ++  add-params
-  ::  extend a context with formal parameters (they shadow outer names)
+  ::  extend a context with formal parameters; R4.2ar: a name already
+  ::  visible is not rebound (SANY's addSymbol refuses it, 4201 from
+  ::  +redefs), so its uses keep resolving to the visible symbol
   |=  [c=ctx params=(list [@t node @ud])]
   ^-  ctx
   |-  ^-  ctx
   ?~  params  c
   =/  pn  -.i.params
   =/  par  +>.i.params
+  ?:  (visible c pn)  $(params t.params)
   $(params t.params, c (~(put by c) pn [%formal-param par | 0 ~ ~]))
+::
+++  visible
+  ::  bound in `c` to anything but a builtin
+  |=  [c=ctx nm=@t]
+  ^-  ?
+  =/  o  (~(get by c) nm)
+  ?~(o | !=(%builtin kind.u.o))
 ::
 ::  +|  Expression Translation
 ::
@@ -832,12 +925,57 @@
   $(kids t.kids)
 ::
 ++  add-idents
-  ::  extend a context with 0-ary bound identifiers
+  ::  extend a context with 0-ary bound identifiers; one already visible
+  ::  is not rebound (as +add-params)
   |=  [c=ctx vars=(list [@t node])]
   ^-  ctx
   |-  ^-  ctx
   ?~  vars  c
+  ?:  (visible c -.i.vars)  $(vars t.vars)
   $(vars t.vars, c (~(put by c) -.i.vars [%formal-param 0 | 0 ~ ~]))
+::
+++  redefs
+  ::  R4.2ar: SymbolTable.addSymbol for bound identifiers or formal
+  ::  parameters introduced together: a name already visible (anything but
+  ::  a builtin, one bound earlier in the same group included) is 4201
+  |=  [c=ctx vars=(list [nm=@t at=sspan])]
+  ^-  (list sdiag)
+  =|  ds=(list sdiag)
+  |-  ^-  (list sdiag)
+  ?~  vars  (flop ds)
+  ?:  (visible c nm.i.vars)
+    $(vars t.vars, ds [(multiply-defined nm.i.vars at.i.vars) ds])
+  $(vars t.vars, c (~(put by c) nm.i.vars [%formal-param 0 | 0 ~ ~]))
+::
+++  multiply-defined
+  ::  SANY's message names the other symbol's location on a second line;
+  ::  as with the 4801 warning, the port keeps the first
+  |=  [nm=@t at=sspan]
+  ^-  sdiag
+  %^  derr  4.201  at
+  %+  weld  "Multiply-defined symbol '{(trip nm)}': this definition "
+  "or declaration conflicts "
+::
+++  sym-clash
+  ::  R4.2ar: addSymbol for a definition or declaration whose name is
+  ::  already visible: another kind or arity is 4201, the same kind and
+  ::  arity the 4801 warning; ~ when only a builtin (or nothing) has it
+  |=  [c=ctx nm=@t s=sym at=sspan]
+  ^-  (unit sdiag)
+  ?.  (visible c nm)  ~
+  =/  o  (~(got by c) nm)
+  ?:  |(!=(kind.o kind.s) !=(arity.o arity.s))
+    `(multiply-defined nm at)
+  :-  ~
+  %^  dwarn  4.801  at
+  "Multiple declarations or definitions for symbol {(trip nm)}.  "
+::
+++  bind-spans
+  ::  [name span] of each bound identifier
+  |=  vars=(list [@t node])
+  ^-  (list [nm=@t at=sspan])
+  (turn vars |=([vn=@t vnode=node] [vn (span-of:ast vnode)]))
+::
 ++  range-after-in
   ::  the expression following the first \in leaf
   |=  kids=(list node)
@@ -1588,6 +1726,13 @@
     s(op op2, args args2, bound bound2, ubound ub2)
   ::
       %letin
+    ::  R4.5.1: a LET's own names are not siblings (`F == LET G == 1 IN G`
+    ::  before a member `G == 2` names the LET's G)
+    =.  sibs
+      =/  ls  lets.s
+      |-  ^-  (map @t @t)
+      ?~  ls  sibs
+      $(ls t.ls, sibs (~(del by sibs) name.i.ls))
     =/  lets2
       |-  ^-  (list sem-def)
       ?~  lets.s  ~
@@ -1658,9 +1803,9 @@
   =|  ds=(list sdiag)
   |-  ^-  [rs=(list sem) ds=(list sdiag)]
   ?~  ns  [(flop rs) ds]
-  =/  la  (lambda-of i.ns c)
+  =/  la  (lambda-gen i.ns c)
   ?^  la
-    $(ns t.ns, rs [u.la rs])
+    $(ns t.ns, rs [s.u.la rs], ds (weld ds ds.u.la))
   =/  oa  (oparg-of i.ns c)
   ?^  oa
     $(ns t.ns, rs [u.oa rs])
@@ -1690,6 +1835,12 @@
   ::  matching SANY's body-less projection. (R1.3.1.1)
   |=  [n=node c=ctx]
   ^-  (unit sem)
+  (bind (lambda-gen n c) head)
+::
+++  lambda-gen
+  ::  +lambda-of with the diagnostics of its parameters (R4.2ar) and body
+  |=  [n=node c=ctx]
+  ^-  (unit [s=sem ds=(list sdiag)])
   ?.  (is-kind n %n-lambda)  ~
   =/  kids  (kids-of n)
   =/  ids  (skim kids |=(k=node &(?=(%leaf -.k) =(%identifier (leaf-kind k)))))
@@ -1705,7 +1856,9 @@
   ::  which reads only the ubound name and the arity head
   =/  pbinds=(list sbind)
     (turn ids |=(k=node `sbind`[(leaf-text k) & (span-of:ast k)]))
+  =/  prd  (redefs c (turn pbinds |=(b=sbind [name.b at.b])))
   :-  ~
+  :_  (weld prd ds.gb)
   :*  %apply  ['$OpArg' %user-op]  (expr-level body c2)  sp
       [['LAMBDA' | sp] ~]
       ::  a LAMBDA's parameters are never a destructuring binder (R1.3.8)
@@ -2377,8 +2530,8 @@
       ==
     ::  a LAMBDA of the expected arity supplies the operator argument
     ::  directly (SANY's synthesized OpArgNode -> OpDefNode named LAMBDA)
-    =/  la  ?:(=(expect (lam-arity i.nl)) (lambda-of i.nl c) ~)
-    ?^  la  $(nl t.nl, i +(i), out [u.la out])
+    =/  la  ?:(=(expect (lam-arity i.nl)) (lambda-gen i.nl c) ~)
+    ?^  la  $(nl t.nl, i +(i), out [s.u.la out], ds (weld ds ds.u.la))
     =/  ra  (ref-arity i.nl c)
     =/  arity-ok  &(?=(^ ra) =(expect u.ra))
     ?:  arity-ok
@@ -2489,22 +2642,28 @@
   [`(builtin-apply opn n c [~ ~ rs.g]) ds.g]
 ::
 ++  g-qbound-groups
-  ::  quantifier bound groups: vars + range per N_QuantBound
-  |=  [qbounds=(list node) c2=ctx]
+  ::  quantifier bound groups: vars + range per N_QuantBound; R4.2ar: each
+  ::  group's range is generated, then its vars added (Generator
+  ::  processQuantBoundArgs), so a range sees `c0`, the context outside the
+  ::  binder, and the groups before -- not its own vars (`l2 \in {l2 \in S
+  ::  : P}`, BlockDag)
+  |=  [qbounds=(list node) c0=ctx]
   ^-  [bs=(list sem-bound) ds=(list sdiag)]
   =|  bs=(list sem-bound)
   =|  ds=(list sdiag)
   |-  ^-  [bs=(list sem-bound) ds=(list sdiag)]
   ?~  qbounds  [(flop bs) ds]
+  =/  qv  (qbound-vars i.qbounds)
   =/  vars
-    %+  turn  (qbound-vars i.qbounds)
+    %+  turn  qv
     |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  rng  (qbound-range i.qbounds)
-  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
+  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c0))
   %=  $
     qbounds  t.qbounds
+    c0       (add-idents c0 qv)
     bs       [[vars r.gr (qbound-is-tuple i.qbounds)] bs]
-    ds       (weld ds ds.gr)
+    ds       :(weld ds ds.gr (redefs c0 (bind-spans qv)))
   ==
 ::
 ++  g-bound-quant
@@ -2521,7 +2680,7 @@
     |-  ^-  ctx
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
-  =/  gb  (g-qbound-groups qbounds c2)
+  =/  gb  (g-qbound-groups qbounds c)
   =/  gx  (g-x (rear-node kids) c2)
   :-  `(builtin-apply opn n c2 [~ bs.gb (drop-nulls ~[r.gx])])
   (weld ds.gb ds.gx)
@@ -2539,7 +2698,8 @@
     %+  turn  vars
     |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
   =/  gx  (g-x (rear-node kids) c2)
-  [`(builtin-apply opn n c2 [ub ~ (drop-nulls ~[r.gx])]) ds.gx]
+  :-  `(builtin-apply opn n c2 [ub ~ (drop-nulls ~[r.gx])])
+  (weld (redefs c (bind-spans vars)) ds.gx)
 ::
 ++  g-choose
   |=  [n=node c=ctx]
@@ -2563,7 +2723,7 @@
     %+  turn  vars
     |=  [vn=@t vnode=node]
     `sbind`[vn | ?:(bounded (span-of:ast vnode) ch-span)]
-  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
+  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c))
   =/  gx  (g-x (rear-node kids) c2)
   :-  :-  ~
       %^  builtin-apply  opn  n
@@ -2573,7 +2733,11 @@
         ::  (R1.3.8)
         [~ [[sbinds r.gr (lien kids |=(k=node (is-kind k %n-identifiertuple)))] ~] (drop-nulls ~[r.gx])]
       [sbinds ~ (drop-nulls ~[r.gx])]
-  (weld ds.gr ds.gx)
+  ;:  weld
+    ds.gr
+    (redefs c (turn sbinds |=(b=sbind [name.b at.b])))
+    ds.gx
+  ==
 ::
 ++  g-letin
   |=  [n=node c=ctx]
@@ -2584,29 +2748,42 @@
     ?~  defs-node  ~
     (skim (kids-of (snag 0 `(list node)`defs-node)) |=(k=node ?=(%node -.k)))
   =/  body  (rear-node kids)
-  =/  c2=ctx
-    =/  ds  ldefs
-    =/  acc  c
-    |-  ^-  ctx
-    ?~  ds  acc
-    =/  sig  (def-signature i.ds)
-    ?~  sig  $(ds t.ds)
-    $(ds t.ds, acc (~(put by acc) name.u.sig s.u.sig))
+  ::  R4.2at/R4.2ar: in order, as SANY's Generator: a definition sees the
+  ::  ones before it (and RECURSIVE-declared ones); one whose name is
+  ::  already visible stays in the LET but does not shadow it
   =/  glets
     =|  out=(list sem-def)
     =|  ds=(list sdiag)
+    =/  acc=ctx  c
+    =|  pend=(set @t)
     =/  lds  ldefs
-    |-  ^-  [(list sem-def) (list sdiag)]
-    ?~  lds  [(flop out) ds]
-    =/  gd  (g-def i.lds c2)
+    |-  ^-  [(list sem-def) (list sdiag) ctx]
+    ?~  lds  [(flop out) ds acc]
+    =/  rs  (recursive-syms i.lds)
+    ?^  rs
+      %=  $
+        lds   t.lds
+        acc   (put-syms acc rs)
+        pend  (~(gas in pend) (turn rs head))
+      ==
+    =/  sig  (def-signature i.lds)
+    ?~  sig  $(lds t.lds)
+    ::  a RECURSIVE-declared operator is filled in, not redefined
+    =/  clash
+      ?:  (~(has in pend) name.u.sig)  ~
+      (sym-clash acc name.u.sig s.u.sig (span-of:ast i.lds))
+    =/  gd  (g-def-clash i.lds acc clash)
     %=  $
-      lds  t.lds
-      out  ?~(r.gd out [u.r.gd out])
-      ds   (weld ds ds.gd)
+      lds   t.lds
+      pend  (~(del in pend) name.u.sig)
+      out   ?~(r.gd out [u.r.gd out])
+      ds    (weld ds ds.gd)
+      acc   ?^(clash acc (~(put by acc) name.u.sig s.u.sig))
     ==
+  =/  c2=ctx  +>.glets
   =/  gx  (g-x body c2)
   :-  `[%letin -.glets r.gx (expr-level body c2) (span-of:ast n)]
-  (weld +.glets ds.gx)
+  (weld +<.glets ds.gx)
 ::
 ++  g-subsetof
   |=  [n=node c=ctx]
@@ -2619,12 +2796,12 @@
   =/  sbinds
     %+  turn  vars
     |=([vn=@t vnode=node] `sbind`[vn | (span-of:ast vnode)])
-  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c2))
+  =/  gr=gout  ?~(rng [~ ~] (g-x u.rng c))
   =/  gx=gout  ?~(body [~ ~] (g-x u.body c2))
   ::  `{<<i, j>> \in S : P}` destructures, like the quantifiers (R1.3.8)
   =/  tup  (lien kids |=(k=node (is-kind k %n-identifiertuple)))
   :-  `(builtin-apply '$SubsetOf' n c [~ [[sbinds r.gr tup] ~] (drop-nulls ~[r.gx])])
-  (weld ds.gr ds.gx)
+  :(weld ds.gr (redefs c (bind-spans vars)) ds.gx)
 ::
 ++  g-fcnconst
   ::  the function-constructor expression [x \in S |-> e] ($FcnConstructor);
@@ -2642,7 +2819,7 @@
     |-  ^-  ctx
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
-  =/  gb  (g-qbound-groups qbounds c2)
+  =/  gb  (g-qbound-groups qbounds c)
   =/  gx  (g-x body c2)
   :-  :-  ~
       :*  %apply  ['$FcnConstructor' %builtin]  (expr-level body c2)
@@ -2662,7 +2839,7 @@
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
   =/  e  (expr-before-colon kids)
-  =/  gb  (g-qbound-groups qbounds c2)
+  =/  gb  (g-qbound-groups qbounds c)
   =/  gx=gout  ?~(e [~ ~] (g-x u.e c2))
   :-  `(builtin-apply '$SetOfAll' n c [~ bs.gb (drop-nulls ~[r.gx])])
   (weld ds.gb ds.gx)
@@ -2839,13 +3016,15 @@
   ::  a recursive function binds its own name as an unbounded formal
   ::  at the $RecursiveFcnSpec (span = the whole definition), so
   ::  self-references resolve as FormalParamKind
+  =/  c1=ctx
+    ?:(recursive (~(put by c) fname [%formal-param 0 | 0 ~ ~]) c)
   =/  c2=ctx
     =/  qbs  qbounds
-    =/  acc  ?:(recursive (~(put by c) fname [%formal-param 0 | 0 ~ ~]) c)
+    =/  acc  c1
     |-  ^-  ctx
     ?~  qbs  acc
     $(qbs t.qbs, acc (add-idents acc (qbound-vars i.qbs)))
-  =/  gb  (g-qbound-groups qbounds c2)
+  =/  gb  (g-qbound-groups qbounds c1)
   =/  gx  (g-x body c2)
   :-  :-  ~
       :*  %apply  [opn %builtin]  (expr-level body c2)  (span-of:ast u)
@@ -2859,16 +3038,33 @@
   ::  one operator/function definition (Generator + OpDefNode fields)
   |=  [u=node c=ctx]
   ^-  [r=(unit sem-def) ds=(list sdiag)]
+  (g-def-clash u c ~)
+::
+++  g-def-clash
+  ::  +g-def for a definition whose name `c` may already have (R4.2ar):
+  ::  Generator's 4201 "already defined" after the parameters, then the
+  ::  body, then addSymbol's verdict (+sym-clash), SANY's order
+  |=  [u=node c=ctx clash=(unit sdiag)]
+  ^-  [r=(unit sem-def) ds=(list sdiag)]
   =/  dsg  (def-signature u)
   ?~  dsg  [~ ~]
   =/  kids  (kids-of u)
-  ?:  (is-kind u %n-functiondefinition)
+  =/  fcn  (is-kind u %n-functiondefinition)
+  =/  pre=(list sdiag)
+    ?~  clash  ~
+    :_  ~
+    %^  derr  4.201  (span-of:ast u)
+    ?:  fcn
+      "Function name `{(trip name.u.dsg)}' already defined or declared."
+    "Operator {(trip name.u.dsg)} already defined or declared."
+  =/  post=(list sdiag)  ?~(clash ~ ~[u.clash])
+  ?:  fcn
     =/  gb  (g-fcn-body u c)
     :-  :-  ~
         :*  %sdef  name.u.dsg  0  local.u.dsg  (fcn-level u c)
             (span-of:ast u)  ~  r.gb  ''
         ==
-    ds.gb
+    :(weld pre ds.gb post)
   ?~  kids  [~ ~]
   =/  ld  (def-lhs kids)
   ?~  ld  [~ ~]
@@ -2881,11 +3077,14 @@
     %+  turn  params
     |=  [pn=@t pnode=node par=@ud]
     `spar`[pn par (subtree-names-has body pn) (span-of:ast pnode)]
+  =/  prd
+    %+  redefs  c
+    (turn params |=([pn=@t pnode=node *] [pn (span-of:ast pnode)]))
   :-  :-  ~
       :*  %sdef  name.u.dsg  arity.s.u.dsg  local.u.dsg
           (expr-level body c2)  (span-of:ast u)  sps  r.gb  ''
       ==
-  ds.gb
+  :(weld prd pre ds.gb post)
 ::
 ++  newsymb-name
   ::  the declared identifier of an N_NewSymb (inside its ident-decl) and
@@ -3306,7 +3505,8 @@
     %+  roll  subs.ip
     |=  [[param=@t expr=node] acc=@ud]
     (max acc (expr-level expr c))
-  =/  bunits  (body-of-module tree.u.bt)
+  ::  R4.2at: each unit with the context the units before it built
+  =/  bunits=(list [u=node c=ctx])  (unit-ctxs tree.u.bt bctx ctxs)
   ::  R4.2n: the instanced module's OWN instance units, imported recursively
   ::  in its context. SANY exposes a nested instance's members through the
   ::  outer one (`stagesInstance!cleanInstance!primerDepleted`); importing
@@ -3318,9 +3518,9 @@
     =/  bus  bunits
     |-  ^-  (list sem-def)
     ?~  bus  (flop out)
-    =/  niu  (unit-instance i.bus)
+    =/  niu  (unit-instance u.i.bus)
     ?~  niu  $(bus t.bus)
-    =/  ngi  (g-instance i.bus u.niu bctx ctxs mods)
+    =/  ngi  (g-instance u.i.bus u.niu bctx ctxs mods)
     $(bus t.bus, out (weld (flop (weld defs.ngi nds.ngi)) out))
   ::  R4.2 (Sailfish): and what the instanced module INHERITS through its
   ::  EXTENDS, under their PLAIN names, as `+nested-defs` (R4.2o) gives a
@@ -3337,12 +3537,12 @@
     =/  bus  bunits
     |-  ^-  (map @t @t)
     ?~  bus  acc
-    =/  bu  i.bus
+    =/  bu  u.i.bus
     ?.  ?|  (is-kind bu %n-operatordefinition)
             (is-kind bu %n-functiondefinition)
         ==
       $(bus t.bus)
-    =/  gd  (g-def bu bctx)
+    =/  gd  (g-def bu (unit-def-ctx bu c.i.bus bctx))
     ?~  r.gd  $(bus t.bus)
     ::  a LOCAL member is visible to its siblings and NOT exported -- measured
     ::  at the pin, `LOCAL Bound == k` referenced by an imported member runs
@@ -3365,12 +3565,12 @@
     =/  bus  bunits
     |-  ^-  [(list sem-def) (list sdiag)]
     ?~  bus  [(flop out) ds]
-    =/  bu  i.bus
+    =/  bu  u.i.bus
     ?.  ?|  (is-kind bu %n-operatordefinition)
             (is-kind bu %n-functiondefinition)
         ==
       $(bus t.bus)
-    =/  gd  (g-def bu bctx)
+    =/  gd  (g-def bu (unit-def-ctx bu c.i.bus bctx))
     ?~  r.gd  $(bus t.bus, ds (weld ds ds.gd))
     =/  base  u.r.gd
     =/  ilvl  (max lvl.base sub-lvl)
@@ -3442,12 +3642,12 @@
     =/  bus  bunits
     |-  ^-  [(list sem-thm) (list sdiag)]
     ?~  bus  [(flop out) ds]
-    =/  bu  i.bus
+    =/  bu  u.i.bus
     ?.  ?|  (is-kind bu %n-assumption)
             (is-kind bu %n-theorem)
         ==
       $(bus t.bus)
-    =/  gt  (g-thm bu bctx)
+    =/  gt  (g-thm bu c.i.bus)
     ?~  name.r.gt  $(bus t.bus, ds (weld ds ds.gt))
     ?~  body.r.gt  $(bus t.bus, ds (weld ds ds.gt))
     ?:  local.r.gt  $(bus t.bus, ds (weld ds ds.gt))
@@ -3478,26 +3678,24 @@
 ::
 ++  own-decls
   ::  a module tree's own CONSTANT and VARIABLE declarations (name,
-  ::  arity, span), in declaration order
+  ::  arity, span), in declaration order; R4.2ar: a name declared again
+  ::  keeps its first declaration, of either kind (SANY's addSymbol does
+  ::  not add the second; +gen-module reports it)
   |=  tree=node
   ^-  [consts=(list [name=@t arity=@ud at=sspan]) vars=(list [name=@t at=sspan])]
-  =/  units  (body-of-module tree)
-  :_  ^-  (list [name=@t at=sspan])
-      %-  zing
-      %+  turn  units
-      |=  u=node
-      ^-  (list [name=@t at=sspan])
-      ?.  (is-kind u %n-variabledeclaration)  ~
-      %+  turn  (decl-syms u)
-      |=([nm=@t s=sym at=node] [nm (span-of:ast at)])
-  ^-  (list [name=@t arity=@ud at=sspan])
-  %-  zing
-  %+  turn  units
-  |=  u=node
-  ^-  (list [name=@t arity=@ud at=sspan])
-  ?.  (is-kind u %n-paramdeclaration)  ~
-  %+  turn  (decl-syms u)
-  |=([nm=@t s=sym at=node] [nm arity.s (span-of:ast at)])
+  =|  cs=(list [name=@t arity=@ud at=sspan])
+  =|  vs=(list [name=@t at=sspan])
+  =|  seen=(set @t)
+  =/  ds=(list [@t sym node])
+    (zing (turn (body-of-module tree) decl-syms))
+  |-  ^-  [(list [name=@t arity=@ud at=sspan]) (list [name=@t at=sspan])]
+  ?~  ds  [(flop cs) (flop vs)]
+  =/  [nm=@t s=sym at=node]  i.ds
+  ?:  (~(has in seen) nm)  $(ds t.ds)
+  =.  seen  (~(put in seen) nm)
+  ?:  =(%variable kind.s)
+    $(ds t.ds, vs [[nm (span-of:ast at)] vs])
+  $(ds t.ds, cs [[nm arity.s (span-of:ast at)] cs])
 ::
 ++  ext-decls
   ::  a module's own declarations followed by those it inherits through
@@ -3852,20 +4050,10 @@
   ::  `+mod-opdefs`, always with the same inputs -- each module was generated
   ::  three or four times (EWD998ChanID: 22.6 s of semantic generation)
   ~+
-  =/  units  (body-of-module tree)
   =/  ed  (ext-decls tree mods)
   =/  consts  consts.ed
   =/  vars  vars.ed
-  =/  seen
-    =|  acc=(set @t)
-    =/  cs  consts
-    |-  ^-  (set @t)
-    ?~  cs
-      =/  vs  vars
-      |-  ^-  (set @t)
-      ?~  vs  acc
-      $(vs t.vs, acc (~(put in acc) name.i.vs))
-    $(cs t.cs, acc (~(put in acc) name.i.cs))
+  =/  full=ctx  c
   =/  walk
     =|  defs=(list sem-def)
     =|  thmdefs=(list sem-thm)
@@ -3883,7 +4071,7 @@
     =|  snames=(list @t)
     =|  srecs=(list @t)
     =|  pending=(set @t)
-    =/  us  units
+    =/  us  (unit-ctxs tree c ctxs)
     |-  ^-  $:  defs=(list sem-def)  thmdefs=(list sem-thm)
                 assumes=(list sem-thm)  theorems=(list sem-thm)
                 insts=(list sem-inst)  ds=(list sdiag)
@@ -3896,7 +4084,8 @@
           ?.  secopen  secs
           [[(flop snames) (flop srecs)] secs]
       ==
-    =/  u  i.us
+    =/  u  u.i.us
+    =/  c  c.i.us
     ::  theorem / assumption units
     ?:  ?|  (is-kind u %n-assumption)
             (is-kind u %n-theorem)
@@ -3942,6 +4131,29 @@
     ::  facts (EC 4357), a USE is unchecked (R1.3.5.4.3)
     ?:  (is-kind u %n-useorhide)
       $(us t.us, ds (weld ds (g-usehide u c)))
+    ::  R4.2ar: SANY generates an inner module inside its parent, so its
+    ::  diagnostics are the parent's, in place (`VARIABLE i` before
+    ::  `---- MODULE Inner ----` with a binder `i`)
+    ?:  (is-kind u %n-module)
+      =/  nm  (module-name-of:modules u)
+      =/  ld  ?~(nm ~ (~(get by mods) u.nm))
+      ?~  ld  $(us t.us)
+      =/  ic  (put-encl name.u.ld mods ctxs)
+      =/  gm  (gen-module tree.u.ld (full-ctx tree.u.ld ic) ic mods)
+      $(us t.us, ds (weld ds diags.gm))
+    ::  R4.2ar: a declaration whose name is already visible (SANY's
+    ::  addSymbol: 4201 for another kind or arity, else the 4801 warning)
+    =/  dl  (decl-syms u)
+    ?^  dl
+      =/  dd
+        =|  out=(list sdiag)
+        =/  cc=ctx  c
+        =/  l=(list [@t sym node])  dl
+        |-  ^-  (list sdiag)
+        ?~  l  (flop out)
+        =/  k  (sym-clash cc -.i.l +<.i.l (span-of:ast +>.i.l))
+        $(l t.l, out ?~(k out [u.k out]), cc (~(put by cc) -.i.l +<.i.l))
+      $(us t.us, ds (weld ds dd))
     ?.  ?|  (is-kind u %n-operatordefinition)
             (is-kind u %n-functiondefinition)
         ==
@@ -3955,7 +4167,6 @@
       =/  closed  &(secopen =(~ p2))
       %=  $
         us       t.us
-        seen     (~(put in seen) name.u.dsg)
         pending  p2
         ds       (weld ds ds.gd)
         secopen  ?:(closed | secopen)
@@ -3969,16 +4180,13 @@
                  ?:  =(name.i.dl name.u.dsg)  [u.r.gd t.dl]
                  [i.dl $(dl t.dl)]
       ==
-    ?:  (~(has in seen) name.u.dsg)
-      %=  $
-        us  t.us
-        ds  %+  weld  ds
-            :~  %^  derr  4.201  (span-of:ast u)
-                "Operator {(trip name.u.dsg)} already defined or declared."
-                %^  dwarn  4.801  (span-of:ast u)
-                "Multiple declarations or definitions for symbol {(trip name.u.dsg)}.  "
-            ==
-      ==
+    ::  R4.2ar: a name already visible -- an earlier definition, a
+    ::  declaration, an import -- keeps the first; this one's body is
+    ::  still generated, for its diagnostics (+g-def-clash)
+    =/  clash  (sym-clash c name.u.dsg s.u.dsg (span-of:ast u))
+    ?^  clash
+      $(us t.us, ds (weld ds ds:(g-def-clash u c clash)))
+    =.  c  (unit-def-ctx u c full)
     ::  R4.1c: an INSTANCE inside a LET of this definition (`G == INSTANCE
     ::  Graphs`, Examples' EWD687a) needs the module graph, which expression
     ::  generation does not carry; its `G!op` definitions are generated here
@@ -3987,7 +4195,6 @@
     =/  gd  (g-def u (put-syms c syms.li))
     %=  $
       us      t.us
-      seen    (~(put in seen) name.u.dsg)
       defs    =.  defs  (weld (flop defs.li) defs)
               ?~(r.gd defs [u.r.gd defs])
       thmdefs  (weld (flop thms.li) thmdefs)
@@ -4023,7 +4230,8 @@
 ::
 ::  A post-generation pass over the typed IR. Parameters are identified
 ::  by lkey (owner + name + kind): module declarations own '', formal
-::  parameters their definition, bound identifiers 'b', NEW symbols 'n'.
+::  parameters their definition, bound identifiers 'b' with their module
+::  and position (+bound-key), NEW symbols 'n'.
 ::  Level constraints min-merge (SetOfLevelConstraints), arg-level
 ::  constraints max-merge (SetOfArgLevelConstraints). Diagnostics carry
 ::  SANY's full message and deduplicate on [code location message]
@@ -5650,7 +5858,9 @@
   ?~(sp [0 0] [line.from.u.sp col.from.u.sp])
 ::
 ++  extends-of
-  ::  the EXTENDS names of a module tree, in appearance order
+  ::  the EXTENDS names of a module tree, in appearance order; R4.2ar: not
+  ::  a nested module's (JointActionMemory's inner InnerMemoryComponent
+  ::  EXTENDS InternalMemory, whose VARIABLE mem the parent does not see)
   |=  tree=node
   ^-  (list @t)
   ?.  ?=(%node -.tree)  ~
@@ -5661,7 +5871,12 @@
     ?.  ?=(%leaf -.k)  ~
     ?.  =(%identifier kind.token.k)  ~
     `text.token.k
-  (zing (turn kids.tree |=(k=node ^$(tree k))))
+  %-  zing
+  %+  turn  kids.tree
+  |=  k=node
+  ^-  (list @t)
+  ?:  &(?=(%node -.k) =(%n-module kind.k))  ~
+  ^$(tree k)
 ::
 ::  +|  LEVELS projection (the SemDump per-definition constraint dump)
 ::

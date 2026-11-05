@@ -1,0 +1,6 @@
+ACCEPT
+MODULE A 1.1-3.4
+  def RM arity=0 local=n L0 2.1-2.22
+    apply $UnboundedChoose opkind=BuiltInKind L0 2.7-2.22
+      ubound RM L-1 2.7-2.12
+      apply TRUE opkind=BuiltInKind L0 2.19-2.22

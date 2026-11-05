@@ -65,10 +65,12 @@ python3 tools/validate.py --check      ::  regenerate + verify goldens vs the pi
 
 The parity ledger was **closed at R3 — 134 rows, none owed (2026-09-05)**, when
 `tools/release-gate.sh` passed every clause and `tools/r3-acceptance.py
---suite-log` reported **R3 ACCEPTED** on 5/5. **R4 (in progress) re-opened two
-rows on measurement and created a third** (`tlc-monolith`, `semantic-graph`,
-`op-wire-failure`; 2026-10-08), so the release gate's ledger
-clause is red until R4.1c closes it. See
+--suite-log` reported **R3 ACCEPTED** on 5/5. **R4** (the tlaplus-Examples
+corpus, PlusCal excluded) re-opened three rows on measurement and closed
+them again; the ledger stands at **140 rows, none owed**, and R4's clauses
+are measured clause by clause in
+[testing.md](desk/doc/testing.md) (§*Examples coverage at R4*), pending the
+acceptance run (R4.5.2–R4.5.3). See
 [parity-manifest.md](desk/doc/parity-manifest.md) for the ledger and
 [port-map.md](desk/doc/port-map.md) for which units own what. Everything
 unsupported is unsupported by decision and is a **typed rejection naming what

@@ -1,0 +1,14 @@
+ACCEPT
+MODULE A 1.1-7.4
+  var i L1 2.10-2.10
+  def Q arity=0 local=n L-1 6.1-6.9
+    apply TRUE opkind=BuiltInKind L-1 6.6-6.9
+  MODULE Inner 3.1-5.4
+    def P arity=0 local=n L-1 4.1-4.24
+      apply $BoundedExists opkind=BuiltInKind L-1 4.6-4.24
+        bound i L-1 4.9-4.9
+          apply $SetEnumerate opkind=BuiltInKind L-1 4.15-4.17
+            num 1 L-1 4.16-4.16
+        apply TRUE opkind=BuiltInKind L-1 4.21-4.24
+DIAGS
+D 4201 ERROR 4.9-4.9 Multiply-defined symbol 'i': this definition or declaration conflicts

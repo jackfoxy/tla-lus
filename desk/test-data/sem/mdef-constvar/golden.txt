@@ -1,0 +1,5 @@
+ACCEPT
+MODULE A 1.1-4.4
+  const x arity=0 L0 2.10-2.10
+DIAGS
+D 4201 ERROR 3.10-3.10 Multiply-defined symbol 'x': this definition or declaration conflicts
