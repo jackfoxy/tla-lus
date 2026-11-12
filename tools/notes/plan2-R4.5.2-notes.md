@@ -98,3 +98,28 @@ Every `timed-out.json` row is covered by a pass or by `r4-fallback.json`.
    Arm `tests/lib/sem-approved` `test-inner-module-section-not-rendered`
    (port side; the pin's is `sem/mdef-inner-ext/golden.txt`).
    `check-portmap.py`'s number words stopped at fifteen; extended.
+
+## The dojo entry point, as the user ran it (2026-11-11)
+
+`:tla-lus|submit ~.job-1 %check` from the `%base` dojo failed with
+`%generator-build-fail` (`file-not-found /gen/tla-lus/submit/hoon` in
+`%base`). Measured on the ship:
+
+1. The short poke form names a generator in the dojo's CURRENT desk. From
+   `%base` the working forms are `:tla-lus +tla-lus!tla-lus/submit ~.job-1
+   %check` and `+tla-lus!tla-lus/status ~.job-1`; the short forms work after
+   `=dir /=tla-lus=`.
+2. `submit.hoon`'s demo was an EMPTY module with no config, so `%check` was
+   rejected at submit (`+tla-lus/status` gave `~`). It is now the four-state
+   counter with its config: `%ok`, 5 generated, 4 distinct, depth 4, in both
+   forms.
+3. The documented dojo examples did not run as written: users-guide's built
+   a 5-field request (rejected since R4.2c/g added `env` and `props`); api.md's
+   used `*limits`, `job` and `artifact` with nothing bound (`-find.limits`).
+   Both now bind `=tla -build-file /=tla-lus=/sur/tla-lus/hoon` and `=job-lib
+   -build-file /=tla-lus=/lib/job/hoon` first; every api.md line re-run
+   verbatim. users-guide gained a *Dojo generators* section.
+
+The skills pack's recipes and agent SKILL had the same casts and generator
+forms; fixed. `r4-acceptance.py` clause 7c also accepts the status
+generator's `[%ok` line.

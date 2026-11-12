@@ -258,7 +258,7 @@ nineteen** entries naming rows that do not exist. See
 below is a census through the agent's public wire (`tools/examples.py`) or
 a ship generator, with its file named; R4's acceptance sentence numbers
 the clauses (`R4-examples-work-breakdown-r16.md`), and
-`tools/r4-acceptance.py` (R4.5.2) computes them.
+`tools/r4-acceptance.py` (R4.5.2) computes them; on the user's runs (R4.5.3, 2026-11-12) it printed **R4 ACCEPTED, 11/11 clauses** (`tools/notes/r4-acceptance-output.txt`).
 
 | clause | measured | evidence |
 |---|---|---|
@@ -267,7 +267,7 @@ the clauses (`R4-examples-work-breakdown-r16.md`), and
 | 3 large models (31), smoke budget 1,000 states | **31/31**, MCInnerSerial at its per-model wall (≈63 min; plan r3 decision 1 A) | `logs/census-q9-large.txt` |
 | 4 ledger | **141 rows, 0 owed** (16 approved differences) | `tools/check-parity.py` |
 | 5 throughput | reported, no gate: tier 3 against the R2 baseline, every workload 17–73% faster | `logs/tier3-q9.json` |
-| 6 gates | release gate and the user's full suite and Examples runner: R4.5.3 | — |
+| 6 gates | release gate PASS; the user's full suite `ok=%.y` (2,458 OK, every declared arm run); the user's runner census covers all 158 models | `tools/notes/r4-acceptance-output.txt` |
 | 7 black box through the wire | the clause 2–3 censuses are this wire, against the manifest | as clauses 2–3 |
 | 8 Unicode: 373 modules converted by pinned `tlauc --skip numsets` | **373/373** verdict = SANY (2,902 s, median 5.6 s); **373/373** semantic graph identical to the ASCII original (3,942 s, median 7.5 s); R4.5.1 engine, as at R4.4 | `desk/test-data/blackbox/parse-census-unicode.txt`, `unicode-identity-census.txt` |
 

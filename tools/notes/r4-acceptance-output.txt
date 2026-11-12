@@ -1,0 +1,39 @@
+R4 acceptance — each clause computed, none asserted by hand
+
+  HOLDS  1 parse: 373 modules, `%analyze` verdict = pinned SANY
+           parse-census.txt: 373/373 agree
+  HOLDS  2 small: 127 models report the pin's outcome, or a recorded exception
+           100 = pin, 27 recorded (fallback 23 time-bound + 1 not run, 2 approved refusals, 1 order-dependent counts)
+  REPORT 2 small: upstream CI's own skip
+           ewd840/EWD840.cfg run and reported: success
+  HOLDS  3 large: 31 models pass the smoke projection
+           31/31
+  REPORT 3 large: upstream's skip
+           KnuthYao/SimKnuthYao.cfg is not in the work list (mirrored)
+  HOLDS  4 ledger: every row terminal, none owed
+           141 terminal, 0 owed
+  REPORT 5 throughput (tier 3)
+           no --tier3-log. REPORT-ONLY for R4 by the user's decision (2026-11-05), although R2.8.1a's noise criterion now passes on all three legs (warm 4.5%, fresh boot 3.0%, rebuild 3.4%; `live` alone spread 20.7%). Read, never asserted
+  HOLDS  6a release gate passes
+           RELEASE GATE: PASS
+  HOLDS  6b the user's full suite: ok=%.y, every arm
+           R4-census-tests-results.txt: ok=%.y, 2458 OK, 0 FAILED, 0 declared arms not run
+  HOLDS  6c the user's Examples runner census covers every model
+           157 rows from 5 file(s); 0 of 158 models missing
+  HOLDS  7a black box: every selected model reports its manifest outcome
+           selected 158 = work list 158; 132 agree, 26 recorded exceptions (clause 2's)
+  HOLDS  7b black box: the failure arms pass, exclusions carry reasons
+           44/44 blackbox arms OK, 0 failed; 7 excluded with reasons
+  HOLDS  7c one model through the documented dojo generator
+           r453-dojo.txt: a successful run
+  HOLDS  8 unicode: 373 converted modules, verdict = SANY and the graph = the ASCII original's
+           parse-census-unicode.txt 373 rows, unicode-identity-census.txt 373 rows
+
+11/11 clauses hold.
+
+R4 ACCEPTED.
+  the 373 modules parse with the pin's verdict, in ASCII and in
+  Unicode with identical graphs; the small models report the pin's
+  outcome or a recorded exception; the large models pass the smoke
+  projection; the ledger owes nothing; the gates, the user's suite
+  and runner logs, and the black box hold. (Tier 3 is REPORTED.)

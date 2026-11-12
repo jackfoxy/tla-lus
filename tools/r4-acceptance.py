@@ -364,7 +364,9 @@ def c_blackbox(models: list, rows: dict, fb: dict, suite: Path | None,
                "no --dojo-log: a required input")
     else:
         text = dojo.read_text(errors="replace")
-        held = bool(re.search(r"No error has been found|success", text))
+        #  the status generator prints the job (`result=[~ [%ok ...]]`), the
+        #  report scry the text
+        held = bool(re.search(r"No error has been found|\[%ok |success", text))
         clause("7c one model through the documented dojo generator", held,
                f"{dojo.name}: " + ("a successful run" if held else "no success in the log"))
 
