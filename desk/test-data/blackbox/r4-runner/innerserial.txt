@@ -1,0 +1,1 @@
+{"stage": "terminal", "status": "success", "generated": 6181, "distinct": 195, "queued": 0, "depth": 5, "peak_rss_mb": 176, "id": "model-e0bdc2caaeee", "model": "specifications/SpecifyingSystems/AdvancedExamples/MCInnerSerial.cfg", "expected": "success", "size": "large", "secs": 2962.9, "manifest": {"distinctStates": null, "totalStates": null, "stateDepth": null}}

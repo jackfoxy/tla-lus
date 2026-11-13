@@ -51,6 +51,8 @@ Inv  == x < 4
 - [compatibility.md](desk/doc/compatibility.md) — pinned upstream commit,
   supported features, and deliberate differences.
 - [testing.md](desk/doc/testing.md) — the differential validation tiers.
+- [performance.md](desk/doc/performance.md) — how fast it is against TLC, and
+  which tlaplus-Examples models finish.
 - [port-map.md](desk/doc/port-map.md) — Java-to-Hoon traceability and test
   ownership, unit by unit.
 

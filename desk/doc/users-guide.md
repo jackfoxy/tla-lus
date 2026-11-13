@@ -144,6 +144,9 @@ idempotent. Remove a finished job's stored result with `[%delete-result
 
 ## Runtime envelope
 
+For speed against TLC and which Examples models finish, see
+[performance.md](performance.md).
+
 Measured on a fake ship, vere 4.6 (R4.P8, 2026-10-12). Workloads: a
 two-integer grid, and the Examples' GameOfLife, whose 16-cell states each
 carry a function.
