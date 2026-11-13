@@ -1,0 +1,13 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def P arity=0 local=n L-1 2.1-3.19
+    letin lets=2 L-1 2.6-3.19
+      def a arity=0 local=n L-1 2.10-2.15
+        num 1 L-1 2.15-2.15
+      def a arity=0 local=n L-1 3.9-3.14
+        num 2 L-1 3.14-3.14
+      in
+        apply a opkind=UserDefinedOpKind L-1 3.19-3.19
+DIAGS
+D 4201 ERROR 3.9-3.14 Operator a already defined or declared.
+D 4801 WARNING 3.9-3.14 Multiple declarations or definitions for symbol a.

@@ -1,4 +1,4 @@
-::  +tla-lus/status ~.job-1
+::  +tla-lus/status ~.job-1   (from %base: +tla-lus!tla-lus/status)
 ::
 /-  *tla-lus
 :-  %say

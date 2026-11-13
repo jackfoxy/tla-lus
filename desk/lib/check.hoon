@@ -2582,7 +2582,7 @@
     $(work [u.body.u.d rest])
   ?:  |(=(op '$ConjList') =(op '\\land'))
     $(work (weld-sem args.p rest))
-  ?:  =(op '$Nop')
+  ?:  =('$Nop' (end [3 4] op))
     ?~  args.p  $(work rest)
     $(work [i.args.p rest])
   ?:  =(op '[]')
@@ -2697,7 +2697,7 @@
     $(work rest, out [name.op.p out])
   ?:  &(?=(%builtin kind.op.p) =('$Tuple' name.op.p))
     $(work (weld-sem args.p rest))
-  ?:  &(?=(%builtin kind.op.p) =('$Nop' name.op.p))
+  ?:  &(?=(%builtin kind.op.p) =('$Nop' (end [3 4] name.op.p)))
     ?~(args.p $(work rest) $(work [i.args.p rest]))
   ::  every other built-in is ignored, exactly as the Java ignores it
   ?:  ?=(%builtin kind.op.p)  $(work rest)
@@ -5495,7 +5495,7 @@
       seen  (~(put in seen) name.op.s)
       mo    om
     ==
-  ?:  =('$Nop' name.op.s)
+  ?:  =('$Nop' (end [3 4] name.op.s))
     ?~  args.s  ~[[name s ws mo]]
     $(s i.args.s)
   ?.  |(=('$ConjList' name.op.s) =('\\land' name.op.s))

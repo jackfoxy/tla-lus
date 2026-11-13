@@ -1,0 +1,8 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def Z arity=0 local=y L-1 2.1-2.12
+    apply nullODN opkind=k0 L-1 0.0-0.0
+  def W arity=0 local=n L-1 3.1-3.6
+    num 1 L-1 3.6-3.6
+DIAGS
+D 4200 ERROR 2.12-2.12 Unknown operator: `W'.

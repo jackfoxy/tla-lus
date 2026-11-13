@@ -1822,9 +1822,22 @@
   ::  CHOOSE x \in S : P  — deterministic first satisfying element in TLC
   ::  enumeration order (stable across pause/resume: a pure fn of the
   ::  cursor); typed failure when no element satisfies P
+  ::  R4.2au: tlc2's CHOOSE NORMALIZES its domain first (`inVal.normalize()`,
+  ::  then `elements(Ordering.NORMALIZED)`, Tool.java OPCODE_bc). Every other
+  ::  domain already streams in storage order; a `\cup` streams its operands
+  ::  one after the other, so `CHOOSE e \in {e2} \cup {e1} : TRUE` took `e2`.
+  ::  MultiCarElevator's `DispatchElevator` chose the stationary car on a tie
+  ::  and grew 26 edges the pin does not have (ElevatorSafetySmall: depth 32,
+  ::  the pin's 36)
   |=  [x=sexp p=vpred]
   ^-  (each value eval-err)
-  =/  r  (stream-find x p)
+  =/  nx=(each sexp eval-err)
+    ?.  ?=(%cup -.x)  [%& x]
+    =/  f  (force x 0)
+    ?:  ?=(%| -.f)  f
+    [%& [%set p.f]]
+  ?:  ?=(%| -.nx)  nx
+  =/  r  (stream-find p.nx p)
   ?:  ?=(%| -.r)  r
   ?~  p.r
     [%| 0 'CHOOSE: no element of the domain satisfies the predicate.']

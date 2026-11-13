@@ -78,3 +78,48 @@ succeeds at the ≈63-minute per-model wall (r3 decision 1, option A) →
 Against the R2 baseline (vere 4.6, 2026-09-02): enum −62%, eval −59%,
 ex-coffeecan −17%, ex-gameoflife −32%, fp −73%, live −72%, queue −40%.
 Report only, no gate.
+
+## R4.Qb — the 11 near/explored rows at `--wall 3600` (2026-11-03)
+
+Plan r16 decision 2: A, a recorded R4 fallback, plus this census for the
+number. Code at `2161b178` (R4.2au), `logs/census-qb.txt`.
+
+| model | result | vs manifest |
+|---|---|---|
+| MCPaxosTiny | **success 1,266 s** | 3,921 / 23,563 / 17 = manifest |
+| MCVoting | **success 1,198 s** | 6,752 / 41,017 / 16 = manifest |
+| SimplifiedFastPaxos/Paxos | **success 1,668 s** | 1,207 / 13,290 / 22 = manifest |
+| Disruptor_MPMC_liveliness | **success 1,070 s** | 14,365 / 44,581 / 61 = manifest |
+| ElevatorLivenessMedium | **success 1,899 s** | 4,122 / 14,296 / 36 = manifest (depth right since R4.2au) |
+| TokenRing | **success 1,428 s** | 46,656 / 248,832 / 1 = manifest |
+| nbacg_guer01 | **success 934 s** | 24,922 / 159,538 / 16 = manifest |
+| bcastByz | limited time 3,605 s | explored (14,424 / 227,344 = manifest), out of time in liveness |
+| AllocatorImplementation | limited time 3,627 s | explored (17,701 / 64,414 = manifest), out of time in liveness |
+| CoffeeCan1000Beans | limited time 3,607 s | 501,500 distinct (= manifest), 1.70 M of 2.00 M generated |
+| GameOfLife | limited time 3,621 s | 65,536 distinct (= manifest), 73,551 of 131,072 generated |
+
+(`--only bcastByz/bcastByz` also re-ran bcastByzNoBcast: success, 30.6 s,
+as before.)
+
+**7 of the 11 complete within an hour**, every one equal to the
+manifest. The 4 others have found every distinct state and run out of time
+in liveness or in the last expansions.
+
+## Clause 2 at the R4.Q close: the recorded fallback (plan r16 decision 2, A)
+
+- 93 small models report the pin's outcome at a 900 s wall, and **7 more
+  at 3,600 s** (above).
+- 2 end in approved refusals (SmokeEWD998, EWD998ChanTrace).
+- **24 remain time-bound at an hour**, R4's recorded fallback, with each
+  row's class and gap as listed under *Clause 2* above:
+  - startup class: MCBakery, CarTalkPuzzle Model_1, TransitiveClosure,
+    MCBinarySearch, YoYoAllGraphs;
+  - explored but out of time: bcastByz, AllocatorImplementation,
+    CoffeeCan1000Beans, GameOfLife;
+  - 2–10×: MCQuicksort, MCCRDT, Disruptor_MPMC;
+  - 10–100×: braf, MCLamportMutex, FastPaxos, MCNanoMedium, btree,
+    MultiPaxos_MC_small;
+  - over 100×: TLCSailfish1;
+  - no manifest count: MCCheckpointCoordinationFailure, SlidingPuzzles ×2,
+    SpanTreeRandom;
+  - and MCChangRoberts, not run (the known runaway).

@@ -1569,6 +1569,8 @@
   ::  path and does render the alias — a `?=(^ pp)` guard here would over-refuse
   ::  R4.2e: VIEW with a temporal PROPERTY runs; the liveness product keys
   ::  states as the graph build did (`+live-key:lv`)
+  ::  R4.2i: ALIAS on those two paths runs too; the lasso prefix and the
+  ::  simulated behavior render through it, so nothing above is refused
   ::  R4.2l: the VARIABLEs of the whole EXTENDS closure, from the semantic
   ::  graph (the root's own first, in declaration order, then the imported
   ::  ones); the root tree alone dropped an extended module's variables

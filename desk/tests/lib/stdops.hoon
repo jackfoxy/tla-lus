@@ -124,15 +124,17 @@
 ::
 ++  test-user-shadows-standard
   ::  a root definition of the same name is the root's own, so its body is
-  ::  evaluated rather than the Sequences override
+  ::  evaluated rather than the Sequences override (R4.2ar: beside EXTENDS
+  ::  Sequences it is SANY's "Operator Len already defined", so the root
+  ::  extends Integers)
   %-  val
-  :+  (one "EXTENDS Sequences" ~["Len(s) == 42" "Expr == Len(<<1, 2, 3>>)"])
+  :+  (one "EXTENDS Integers" ~["Len(s) == 42" "Expr == Len(<<1, 2, 3>>)"])
     'Expr'
   "42"
 ::
 ++  test-user-shadow-binding
   %-  bind
-  :^    (one "EXTENDS Sequences" ~["Len(s) == 42" "Expr == Len(<<1, 2>>)"])
+  :^    (one "EXTENDS Integers" ~["Len(s) == 42" "Expr == Len(<<1, 2>>)"])
       'Len'
     1
   %body

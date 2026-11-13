@@ -254,7 +254,31 @@ nineteen** entries naming rows that do not exist. See
 `tools/notes/plan2-R2.8.2b-examples-coverage-notes.md` and
 `tools/notes/plan2-R3.0-refusals-notes.md`.
 
-**Examples coverage, measured after R3 (2026-10-08).** R3's acceptance covers
+**Examples coverage at R4 (re-derived 2026-11-05, R4.5.1).** Every figure
+below is a census through the agent's public wire (`tools/examples.py`) or
+a ship generator, with its file named; R4's acceptance sentence numbers
+the clauses (`R4-examples-work-breakdown-r16.md`), and
+`tools/r4-acceptance.py` (R4.5.2) computes them; on the user's runs (R4.5.3, 2026-11-12) it printed **R4 ACCEPTED, 11/11 clauses** (`tools/notes/r4-acceptance-output.txt`).
+
+| clause | measured | evidence |
+|---|---|---|
+| 1 parse: `%analyze` verdict = pinned SANY, 373 modules | **373/373** agree (2,862 s in all, median 5.6 s, R4.5.1 engine) | `tla-zod-tools/logs/parse-census-r451.txt`; R4.1b's `desk/test-data/blackbox/parse-census.txt` |
+| 2 small models (127) | **101** report the pin's outcome (93 at a 900 s wall, ElevatorSafetySmall after R4.2au, 7 at 3,600 s); **2** approved refusals (SmokeEWD998 `TLCGet("duration")`, EWD998ChanTrace `ndJsonDeserialize`); **24** are R4's recorded fallback: 23 time-bound at an hour, plus MCChangRoberts, not run (a known runaway) | `tools/notes/plan2-R4.Q9-notes.md` (the list, by class); `logs/census-q9-small.txt`, `logs/census-qb.txt` |
+| 3 large models (31), smoke budget 1,000 states | **31/31**, MCInnerSerial at its per-model wall (≈63 min; plan r3 decision 1 A) | `logs/census-q9-large.txt` |
+| 4 ledger | **141 rows, 0 owed** (16 approved differences) | `tools/check-parity.py` |
+| 5 throughput | reported, no gate: tier 3 against the R2 baseline, every workload 17–73% faster | `logs/tier3-q9.json` |
+| 6 gates | release gate PASS; the user's full suite `ok=%.y` (2,458 OK, every declared arm run); the user's runner census covers all 158 models | `tools/notes/r4-acceptance-output.txt` |
+| 7 black box through the wire | the clause 2–3 censuses are this wire, against the manifest | as clauses 2–3 |
+| 8 Unicode: 373 modules converted by pinned `tlauc --skip numsets` | **373/373** verdict = SANY (2,902 s, median 5.6 s); **373/373** semantic graph identical to the ASCII original (3,942 s, median 7.5 s); R4.5.1 engine, as at R4.4 | `desk/test-data/blackbox/parse-census-unicode.txt`, `unicode-identity-census.txt` |
+
+Three wrong ACCEPTs were closed on the way out (R4.5.1): forward references
+(R4.2at), "Multiply-defined symbol" (R4.2ar, wider than recorded) and a LET
+name renamed to an instanced sibling. The first run of the parse census
+after them found 13 wrong REJECTS, each a place the port's context was wider
+than SANY's; all fixed, then 373/373 (`tools/notes/plan2-R4.5.1-notes.md`).
+
+**Examples coverage, measured after R3 (2026-10-08)** (superseded by the
+section above; kept as the baseline R4 started from). R3's acceptance covers
 the **measured corpus**, and for `tlaplus-Examples` that corpus is small. At the
 pin (`47b0e2cc0`) the manifests list **408 modules and 224 models**. Leaving out
 the PlusCal modules (35 modules, 15 models — PlusCal is out of the project)
@@ -320,10 +344,8 @@ CI's *small* set (recorded TLC runtime ≤ 30 s) is **127 TLC models totalling
 724 274, and tier 3's fastest workload runs at a few hundred distinct states
 per second.
 
-The work to close all of this is planned, not scheduled, in
-`R4-examples-work-breakdown-r4.md` (the plan corpus, beside `R3-work-breakdown.md`).
-Until that runs, treat any statement that `%tla-lus` handles a given Examples
-spec as unmeasured.
+R4 ran that work (`R4-examples-work-breakdown-r16.md`, the plan corpus,
+beside `R3-work-breakdown.md`); its measured result is the section above.
 
 **Subdir batch (R1.1.6–R1.1.9, completed R1.1.R2).**
 `desk/tests/lib/tier2-sub.hoon` runs **every in-scope test-model subdir spec
@@ -447,6 +469,7 @@ So a close-out unit runs, in this order:
 | gate | `bash tools/scaffold-gate.sh` | scaffold hygiene, 13 gates (runs tier 1 as its gate 2; gate 12: every file under `desk/` names a mark; gate 13: `tools/test-examples.py`, the Examples runner's offline checks) |
 | release | `bash tools/release-gate.sh` | **PASSES as of 2026-09-05** (R3.0d closed the last owed row). It failed by design from R2.0 to then — see below. The real gate (R1.9.3): the scaffold gate **plus** ledger closure, tier 2, no stubs, refusals documented both ways, upgrade/restart, reproducible artifacts |
 | acceptance | `python3 tools/r3-acceptance.py --suite-log <captured suite output>` (R3.3.2; `r1-acceptance.py` is R1's and stays red, by design) | R1's acceptance sentence, **computed** (R1.9.4): ledger closed, docs coherent, release gate green, ship suite green. The suite clause is evidence the caller supplies — omitting it FAILS the clause rather than skipping it |
+| R4 acceptance | `tools/r4-examples-run.sh OUTDIR` (the runner passes, about a day on a live ship) then `python3 tools/r4-acceptance.py --suite-log SUITE --examples-census OUTDIR/{small,timed-out,hour,large,innerserial}.txt --dojo-log DOJO [--tier3-log T3]` (R4.5.2; r1-/r3-acceptance.py untouched) | R4's eight clauses, **computed**: parse (373, `parse-census.txt`), small (127, against the PIN's verdict/distinct/depth, generated for a success), large (31, smoke), ledger, tier 3 (REPORTED), gates (release gate + the user's suite covering every declared arm + the user's runner census covering every model), black box (`coverage.md`: manifest outcome, the 44 failure arms, the 7 exclusions, one dojo-generator run), Unicode (373, both halves). Every exception is data in `desk/test-data/blackbox/r4-fallback.json` (plan r16 decision 2 A, the approved refusals, an order-dependent violation count). A missing input FAILS its clause |
 | suite | `-test /=tla-lus=/tests ~` on the ship | `ok=%.y` — the only thing that sees cross-shard breakage |
 
 A gate that never runs is not a gate. It is a claim.
@@ -521,6 +544,16 @@ What R2 built:
   the R2.8.1a baseline after R4.P. The warm leg passes the criterion (median
   workload ±5.3%); the fresh-boot leg that failed in R2 was not re-run, so
   tier 3 stays report-only. `tools/notes/plan2-R4.P9-tier3-notes.md`.
+* **R4.5.1 (2026-11-05) — all three legs re-measured, seven workloads.**
+  Warm (5 runs): median workload ±4.5%. **Fresh boot (5 clean restarts, one
+  run each): ±3.0%** — the leg that failed R2.8.1a at 15.6%. Rebuild (a
+  comment-only edit to `lib/value.hoon`, 5 runs): ±3.4%, every workload
+  within 5% of its fresh-boot median. **The criterion passes on all three
+  legs.** One workload is noisy on its own: `live` (≈300 ms) spread 20.7% on
+  the fresh-boot leg from a single 354 ms run. Whether tier 3 becomes a gate
+  (clause 5) is the R4.5.2 decision. Raw:
+  `tla-zod-tools/logs/tier3-{warm,fresh,rebuild}-r451*.json`;
+  `tools/notes/plan2-R4.5.1-notes.md`.
 
 **`release-gate.sh` gets NO tier-3 clause**, deliberately. R2.8.1a's own
 criterion decided it: a threshold a single ordinary run can cross is the flaky
