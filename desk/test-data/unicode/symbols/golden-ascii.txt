@@ -1,0 +1,239 @@
+ACCEPT
+MODULE A 1.1-49.68
+  const S arity=0 L0 4.10-4.10
+  var x L1 5.11-5.11
+  var y L1 5.14-5.14
+  def B!Q arity=0 local=n L0 7.1-7.27
+    substin subs=1 L0 7.1-7.27
+      sub c <-
+        apply S opkind=ConstantDeclKind L0 7.27-7.27
+      in
+        apply $BoundedForall opkind=BuiltInKind L0 3.6-3.53
+          bound z L0 3.9-3.9
+            apply c opkind=ConstantDeclKind L0 3.15-3.15
+          apply \land opkind=BuiltInKind L0 3.19-3.53
+            apply \in opkind=BuiltInKind L0 3.19-3.25
+              apply z opkind=FormalParamKind L0 3.19-3.19
+              apply c opkind=ConstantDeclKind L0 3.25-3.25
+            apply $BoundedExists opkind=BuiltInKind L0 3.30-3.53
+              bound w L0 3.33-3.33
+                apply c opkind=ConstantDeclKind L0 3.39-3.39
+              apply \notin opkind=BuiltInKind L0 3.43-3.53
+                apply w opkind=FormalParamKind L0 3.43-3.43
+                apply $SetEnumerate opkind=BuiltInKind L0 3.52-3.53
+  def TypeOK arity=0 local=n L1 9.1-11.37
+    apply $ConjList opkind=BuiltInKind L1 9.11-11.37
+      apply \in opkind=BuiltInKind L1 9.14-9.27
+        apply x opkind=VariableDeclKind L1 9.14-9.14
+        apply SUBSET opkind=BuiltInKind L0 9.20-9.27
+          apply S opkind=ConstantDeclKind L0 9.27-9.27
+      apply \in opkind=BuiltInKind L1 10.14-10.32
+        apply y opkind=VariableDeclKind L1 10.14-10.14
+        apply $CartesianProd opkind=BuiltInKind L0 10.20-10.32
+          apply Seq opkind=UserDefinedOpKind L0 10.20-10.25
+            apply S opkind=ConstantDeclKind L0 10.24-10.24
+          apply Nat opkind=UserDefinedOpKind L0 10.30-10.32
+      apply $BoundedForall opkind=BuiltInKind L1 11.14-11.37
+        bound e L0 11.17-11.17
+          apply x opkind=VariableDeclKind L1 11.23-11.23
+        apply \notin opkind=BuiltInKind L0 11.27-11.37
+          apply e opkind=FormalParamKind L0 11.27-11.27
+          apply $SetEnumerate opkind=BuiltInKind L0 11.36-11.37
+  def Sets arity=0 local=n L1 13.1-13.73
+    apply \land opkind=BuiltInKind L1 13.9-13.73
+      apply \subseteq opkind=BuiltInKind L1 13.9-13.45
+        apply \intersect opkind=BuiltInKind L1 13.9-13.33
+          apply \union opkind=BuiltInKind L1 13.10-13.18
+            apply x opkind=VariableDeclKind L1 13.10-13.10
+            apply $SetEnumerate opkind=BuiltInKind L0 13.17-13.18
+          apply \ opkind=BuiltInKind L0 13.27-13.32
+            apply S opkind=ConstantDeclKind L0 13.27-13.27
+            apply $SetEnumerate opkind=BuiltInKind L0 13.31-13.32
+        apply S opkind=ConstantDeclKind L0 13.45-13.45
+      apply \lor opkind=BuiltInKind L0 13.51-13.72
+        apply \subseteq opkind=BuiltInKind L0 13.51-13.64
+          apply $SetEnumerate opkind=BuiltInKind L0 13.51-13.52
+          apply S opkind=ConstantDeclKind L0 13.64-13.64
+        apply TRUE opkind=BuiltInKind L0 13.69-13.72
+  def Logic arity=2 local=n L0 15.1-15.66
+    param p arity=0 L0 15.7-15.7
+    param q arity=0 L0 15.10-15.10
+    apply \land opkind=BuiltInKind L0 15.16-15.66
+      apply \land opkind=BuiltInKind L0 15.16-15.55
+        apply \land opkind=BuiltInKind L0 15.16-15.39
+          apply => opkind=BuiltInKind L0 15.17-15.22
+            apply p opkind=FormalParamKind L0 15.17-15.17
+            apply q opkind=FormalParamKind L0 15.22-15.22
+          apply \equiv opkind=BuiltInKind L0 15.29-15.38
+            apply \lnot opkind=BuiltInKind L0 15.29-15.30
+              apply p opkind=FormalParamKind L0 15.30-15.30
+            apply \lnot opkind=BuiltInKind L0 15.36-15.38
+              apply \lnot opkind=BuiltInKind L0 15.37-15.38
+                apply p opkind=FormalParamKind L0 15.38-15.38
+        apply \equiv opkind=BuiltInKind L0 15.45-15.54
+          apply p opkind=FormalParamKind L0 15.45-15.45
+          apply p opkind=FormalParamKind L0 15.54-15.54
+      apply /= opkind=BuiltInKind L0 15.61-15.65
+        apply p opkind=FormalParamKind L0 15.61-15.61
+        apply q opkind=FormalParamKind L0 15.65-15.65
+  def Cmp arity=2 local=n L0 17.1-23.25
+    param a arity=0 L0 17.5-17.5
+    param b arity=0 L0 17.8-17.8
+    apply $ConjList opkind=BuiltInKind L0 17.14-23.25
+      apply \leq opkind=UserDefinedOpKind L0 17.17-17.22
+        apply a opkind=FormalParamKind L0 17.17-17.17
+        apply b opkind=FormalParamKind L0 17.22-17.22
+      apply \geq opkind=UserDefinedOpKind L0 18.17-18.22
+        apply b opkind=FormalParamKind L0 18.17-18.17
+        apply a opkind=FormalParamKind L0 18.22-18.22
+      apply \leq opkind=UserDefinedOpKind L0 19.17-19.22
+        apply a opkind=FormalParamKind L0 19.17-19.17
+        apply b opkind=FormalParamKind L0 19.22-19.22
+      apply \lor opkind=BuiltInKind L0 20.17-20.36
+        apply \leq opkind=UserDefinedOpKind L0 20.17-20.24
+          apply a opkind=FormalParamKind L0 20.17-20.17
+          apply b opkind=FormalParamKind L0 20.24-20.24
+        apply \geq opkind=UserDefinedOpKind L0 20.29-20.36
+          apply a opkind=FormalParamKind L0 20.29-20.29
+          apply b opkind=FormalParamKind L0 20.36-20.36
+      apply $DisjList opkind=BuiltInKind L0 21.17-23.25
+        apply < opkind=UserDefinedOpKind L0 21.20-21.24
+          apply a opkind=FormalParamKind L0 21.20-21.20
+          apply b opkind=FormalParamKind L0 21.24-21.24
+        apply > opkind=UserDefinedOpKind L0 22.20-22.24
+          apply a opkind=FormalParamKind L0 22.20-22.20
+          apply b opkind=FormalParamKind L0 22.24-22.24
+        apply /= opkind=BuiltInKind L0 23.20-23.25
+          apply a opkind=FormalParamKind L0 23.20-23.20
+          apply b opkind=FormalParamKind L0 23.25-23.25
+  def Tup arity=0 local=n L0 25.1-25.33
+    apply \o opkind=UserDefinedOpKind L0 25.8-25.33
+      apply $Tuple opkind=BuiltInKind L0 25.8-25.24
+        num 1 L0 25.11-25.11
+        apply $Tuple opkind=BuiltInKind L0 25.14-25.21
+          num 2 L0 25.16-25.16
+          num 3 L0 25.19-25.19
+      apply $Tuple opkind=BuiltInKind L0 25.29-25.33
+        num 4 L0 25.31-25.31
+  def F arity=0 local=n L0 27.1-27.20
+    apply $FcnConstructor opkind=BuiltInKind L0 27.6-27.20
+      bound e L0 27.7-27.7
+        apply S opkind=ConstantDeclKind L0 27.13-27.13
+      apply e opkind=FormalParamKind L0 27.19-27.19
+  def G arity=0 local=n L0 29.1-29.13
+    apply $SetOfFcns opkind=BuiltInKind L0 29.6-29.13
+      apply S opkind=ConstantDeclKind L0 29.7-29.7
+      apply S opkind=ConstantDeclKind L0 29.12-29.12
+  def H arity=0 local=n L0 31.1-31.36
+    apply $BoundedExists opkind=BuiltInKind L0 31.6-31.36
+      bound e L0 31.9-31.9
+        apply S opkind=ConstantDeclKind L0 31.15-31.15
+      apply $BoundedForall opkind=BuiltInKind L0 31.19-31.36
+        bound f L0 31.22-31.22
+          apply S opkind=ConstantDeclKind L0 31.28-31.28
+        apply = opkind=BuiltInKind L0 31.32-31.36
+          apply e opkind=FormalParamKind L0 31.32-31.32
+          apply f opkind=FormalParamKind L0 31.36-31.36
+  def Init arity=0 local=n L1 33.1-33.35
+    apply \land opkind=BuiltInKind L1 33.9-33.35
+      apply = opkind=BuiltInKind L1 33.9-33.14
+        apply x opkind=VariableDeclKind L1 33.9-33.9
+        apply $SetEnumerate opkind=BuiltInKind L0 33.13-33.14
+      apply = opkind=BuiltInKind L1 33.19-33.35
+        apply y opkind=VariableDeclKind L1 33.19-33.19
+        apply $Tuple opkind=BuiltInKind L0 33.23-33.35
+          apply $Tuple opkind=BuiltInKind L0 33.26-33.29
+          num 0 L0 33.32-33.32
+  def Next arity=0 local=n L2 35.1-36.22
+    apply $ConjList opkind=BuiltInKind L2 35.9-36.22
+      apply = opkind=BuiltInKind L2 35.12-35.17
+        apply ' opkind=BuiltInKind L2 35.12-35.13
+          apply x opkind=VariableDeclKind L1 35.12-35.12
+        apply x opkind=VariableDeclKind L1 35.17-35.17
+      apply UNCHANGED opkind=BuiltInKind L2 36.12-36.22
+        apply y opkind=VariableDeclKind L1 36.22-36.22
+  def Spec arity=0 local=n L3 38.1-38.54
+    apply \land opkind=BuiltInKind L3 38.9-38.54
+      apply \land opkind=BuiltInKind L3 38.9-38.33
+        apply Init opkind=UserDefinedOpKind L1 38.9-38.12
+        apply [] opkind=BuiltInKind L3 38.17-38.33
+          apply $SquareAct opkind=BuiltInKind L2 38.19-38.33
+            apply Next opkind=UserDefinedOpKind L2 38.20-38.23
+            apply $Tuple opkind=BuiltInKind L1 38.26-38.33
+              apply x opkind=VariableDeclKind L1 38.28-38.28
+              apply y opkind=VariableDeclKind L1 38.31-38.31
+      apply $WF opkind=BuiltInKind L3 38.38-38.54
+        apply $Tuple opkind=BuiltInKind L1 38.41-38.48
+          apply x opkind=VariableDeclKind L1 38.43-38.43
+          apply y opkind=VariableDeclKind L1 38.46-38.46
+        apply Next opkind=UserDefinedOpKind L2 38.50-38.53
+  def Live arity=0 local=n L3 40.1-40.62
+    apply \land opkind=BuiltInKind L3 40.9-40.62
+      apply \land opkind=BuiltInKind L3 40.9-40.36
+        apply <> opkind=BuiltInKind L3 40.9-40.20
+          apply [] opkind=BuiltInKind L3 40.11-40.20
+            apply = opkind=BuiltInKind L1 40.14-40.19
+              apply x opkind=VariableDeclKind L1 40.14-40.14
+              apply $SetEnumerate opkind=BuiltInKind L0 40.18-40.19
+        apply [] opkind=BuiltInKind L3 40.25-40.36
+          apply <> opkind=BuiltInKind L3 40.27-40.36
+            apply = opkind=BuiltInKind L1 40.30-40.35
+              apply x opkind=VariableDeclKind L1 40.30-40.30
+              apply $SetEnumerate opkind=BuiltInKind L0 40.34-40.35
+      apply ~> opkind=BuiltInKind L3 40.42-40.61
+        apply = opkind=BuiltInKind L1 40.43-40.48
+          apply x opkind=VariableDeclKind L1 40.43-40.43
+          apply $SetEnumerate opkind=BuiltInKind L0 40.47-40.48
+        apply = opkind=BuiltInKind L1 40.55-40.60
+          apply x opkind=VariableDeclKind L1 40.55-40.55
+          apply $SetEnumerate opkind=BuiltInKind L0 40.59-40.60
+  def Arrow arity=0 local=n L3 42.1-42.31
+    apply -+-> opkind=BuiltInKind L3 42.10-42.31
+      apply = opkind=BuiltInKind L1 42.11-42.16
+        apply x opkind=VariableDeclKind L1 42.11-42.11
+        apply $SetEnumerate opkind=BuiltInKind L0 42.15-42.16
+      apply = opkind=BuiltInKind L1 42.25-42.30
+        apply x opkind=VariableDeclKind L1 42.25-42.25
+        apply $SetEnumerate opkind=BuiltInKind L0 42.29-42.30
+  def Range arity=0 local=n L0 44.1-44.13
+    apply .. opkind=UserDefinedOpKind L0 44.10-44.13
+      num 1 L0 44.10-44.10
+      num 3 L0 44.13-44.13
+  def Lam arity=0 local=n L0 46.1-46.40
+    letin lets=1 L0 46.8-46.40
+      def Twice arity=1 local=n L0 46.12-46.28
+        param a arity=0 L0 46.18-46.18
+        apply + opkind=UserDefinedOpKind L0 46.24-46.28
+          apply a opkind=FormalParamKind L0 46.24-46.24
+          apply a opkind=FormalParamKind L0 46.28-46.28
+      in
+        apply Twice opkind=UserDefinedOpKind L0 46.33-46.40
+          num 1 L0 46.39-46.39
+  thmdef Thm local=n L1 48.1-48.29
+    apply => opkind=BuiltInKind L1 48.16-48.29
+      apply TypeOK opkind=UserDefinedOpKind L1 48.16-48.21
+      apply TRUE opkind=BuiltInKind L0 48.26-48.29
+  theorem name=Thm L1 48.1-48.29
+    apply => opkind=BuiltInKind L1 48.16-48.29
+      apply TypeOK opkind=UserDefinedOpKind L1 48.16-48.21
+      apply TRUE opkind=BuiltInKind L0 48.26-48.29
+  instance name=B module=B local=n L0 7.1-7.27
+LEVELS
+lvl MODULE A L-1 lp={S} lc={CS<=3,F<=3,S<=0,T<=3,e<=3,e<=3,e<=3,f<=3,i<=3,i<=3,i<=3,i<=3,n<=2,n<=2,n<=2,n<=3,s<=3,seq<=3,w<=3,x<=1,x<=2,y<=1,z<=3}
+lvl B!Q L0 lp={S} lc={S<=2,w<=3,z<=3}
+lvl TypeOK L1 lp={S,x,y} lc={S<=2,e<=3,n<=2,x<=2,y<=2}
+lvl Sets L1 lp={S,x} lc={S<=2,x<=2}
+lvl Logic L0 ml=[2,2] w=[1,1]
+lvl Cmp L0 ml=[2,2] w=[1,1]
+lvl Tup L0 lc={i<=3,n<=2,n<=2}
+lvl F L0 lp={S} lc={e<=3}
+lvl G L0 lp={S} lc={S<=2}
+lvl H L0 lp={S} lc={S<=3,e<=3,f<=3}
+lvl Init L1 lp={x,y} lc={x<=2,y<=2}
+lvl Next L2 lp={x} lc={x<=1,y<=1} nlp={x,y}
+lvl Spec L3 lp={x,y} lc={x<=1,y<=1} nlp={x,y}
+lvl Live L3 lc={x<=2} nlp={x}
+lvl Arrow L3 lc={x<=2} nlp={x}
+lvl Range L0
+lvl Lam L0
+lvl Thm L1 lp={S,x,y} lc={S<=2,e<=3,n<=2,x<=2,y<=2}

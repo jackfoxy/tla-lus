@@ -43,9 +43,13 @@ running check resumes from its last completed stage.
 
 ## Workflow: inline model checking
 
-Submit a `%check` request whose source is an inline module with a config:
+Submit a `%check` request whose source is an inline module with a config.
+A fresh dojo has none of `%tla-lus`'s molds or libraries in scope, so bind
+the two the example uses first:
 
 ```
+=tla      -build-file /=tla-lus=/sur/tla-lus/hoon
+=job-lib  -build-file /=tla-lus=/lib/job/hoon
 =spec '''
 ---- MODULE Counter ----
 EXTENDS Naturals
@@ -57,10 +61,12 @@ Inv  == x < 4
 '''
 =cfg  'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
 ::  check-opts is [translate view difftrace continue cfg coverage
-::  postconditions mode]; request is [op src limits write promote]
+::  postconditions mode]; request is [op src limits write promote env props]
 =req  :*  [%check [| | | | ~ | ~ [%exhaustive & 0]]]
           [%inline 'Counter' (malt ~[['Counter' spec]]) `cfg]
           default-limits:job-lib
+          ~
+          ~
           ~
           ~
       ==
@@ -70,9 +76,29 @@ Inv  == x < 4
 Then read the result:
 
 ```
-.^((unit job) %gx /=tla-lus=/job/counter/noun)
-.^(artifact %gx /=tla-lus=/job/counter/artifact/report/noun)
+.^((unit job:tla) %gx /=tla-lus=/job/counter/noun)
+.^(artifact:tla %gx /=tla-lus=/job/counter/artifact/report/noun)
 ```
+
+The report is `Model checking completed. No error has been found.` with 5
+states generated, 4 distinct, depth 4.
+
+## Dojo generators
+
+Three generators wrap the same actions with a demo request (the four-state
+counter above, with its config). From the `%base` dojo:
+
+```
+:tla-lus +tla-lus!tla-lus/submit ~.job-1 %check     ::  or %analyze
++tla-lus!tla-lus/status ~.job-1                     ::  the (unit job)
+:tla-lus +tla-lus!tla-lus/cancel ~.job-1
+```
+
+or, with the dojo on the `%tla-lus` desk (`=dir /=tla-lus=`, back with
+`=dir`), the short forms `:tla-lus|submit ~.job-1 %check`,
+`+tla-lus/status ~.job-1` and `:tla-lus|cancel ~.job-1`. The short poke form
+names a generator in the dojo's CURRENT desk, so from `%base` it fails with
+`%generator-build-fail`.
 
 A passing model reports `%ok` with `run-stats` (states generated / distinct /
 depth). A failing invariant reports `%violated [%invariant <name>]` and the
@@ -118,6 +144,9 @@ idempotent. Remove a finished job's stored result with `[%delete-result
 
 ## Runtime envelope
 
+For speed against TLC and which Examples models finish, see
+[performance.md](performance.md).
+
 Measured on a fake ship, vere 4.6 (R4.P8, 2026-10-12). Workloads: a
 two-integer grid, and the Examples' GameOfLife, whose 16-cell states each
 carry a function.
@@ -142,6 +171,11 @@ carry a function.
   0.4 s for the grid (1.4 ms per state), and about 2–3 s for GameOfLife (9
   ms per state). The ship serves other agents between slices; a `%cancel`
   lands at the next slice boundary.
+- **Front-end latency** (`%parse`/`%analyze`, and the start of every
+  `%check`; R4.4, 2026-11-04, all 373 Examples parse modules through the
+  agent): median about 6 s per module with its imports, 90% under 16 s,
+  99% under 28 s; the slowest, `tcp_proof` (5,661 lines), about 90 s.
+  Unicode spellings cost nothing measurable (same-module A/B within noise).
 - **Throughput** depends on the spec. The grid reaches 90,000 states in
   about 130 s, and GameOfLife 59,000 in 300 s (R4.P5c). Temporal properties add a
   product build per property; CoffeeCan with 100 beans (5,150 states, four

@@ -1,0 +1,3 @@
+LEVELS
+lvl MODULE A L-1 lc={l<=2}
+lvl P L0 lc={l<=2}

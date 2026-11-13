@@ -1,0 +1,7 @@
+ACCEPT
+MODULE A 1.1-4.4
+  var x L1 3.10-3.10
+  def P arity=0 local=n L-1 2.1-2.6
+    apply nullODN opkind=k0 L-1 0.0-0.0
+DIAGS
+D 4200 ERROR 2.6-2.6 Unknown operator: `x'.

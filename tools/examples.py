@@ -19,6 +19,7 @@ oracle there is the MANIFEST (clause 7). Clause 2's comparison against the
 pin's projection reads the same census.
 
   tools/examples.py --stage DIR       write the %tla-ex desk tree to DIR
+  tools/examples.py --parse [--unicode] [--only S] [--parse-secs N]
   tools/examples.py --run [--only S] [--size small|large] [--census FILE] [--budget N]
   tools/examples.py --resume --census FILE
 
@@ -31,6 +32,7 @@ import os
 import re
 import shutil
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -44,6 +46,7 @@ REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = Path("/mnt/mars/gitrepos/tlaplus-Examples")
 DEPS = Path(os.environ.get("R4_DEPS", "/mnt/mars/gitrepos/r4-deps"))
 TLAPM = Path("/mnt/mars/gitrepos/tlapm/library")
+TLAUC = DEPS / "tlauc"
 JAR = Path("/mnt/mars/gitrepos/tlaplus/tlatools/org.lamport.tlatools/dist/"
            "tla2tools.jar")
 PIER = os.environ.get("PIER", "/mnt/mars/piers/tla-zod")
@@ -85,7 +88,12 @@ STAGE_LICENSES = {
     "community": "communitymodules-license.txt",
     "apalache": "apalache-license.txt",
     "specifications": "tlaplus-examples-license.txt",
+    "unicode": "tlauc-license.txt",
+    "unicode/specifications": "tlaplus-examples-license.txt",
 }
+#  R4.4 (clause 8): the corpus as CI's Unicode leg converts it, under this
+#  prefix; the library roots stay ASCII, as CI leaves them
+UNI = "unicode"
 
 
 def stage_licenses(out: Path):
@@ -101,6 +109,7 @@ def stage(out: Path):
     std = std_names()
     dirs = sorted({os.path.dirname(m["module"])
                    for m in work["models"] + work["parse"]})
+    conv = {m["module"] for m in work["parse"]}
     n = 0
     for d in dirs:
         for f in sorted((EXAMPLES / d).iterdir()):
@@ -108,6 +117,16 @@ def stage(out: Path):
                 dst = out / low(d) / low(f.name)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dst)
+                n += 1
+                #  CI converts each manifest module in place with
+                #  `tlauc --skip numsets` (unicode_conversion.py); the rest
+                #  of the directory (PlusCal modules, configs) is copied
+                udst = out / UNI / low(d) / low(f.name)
+                udst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, udst)
+                if f"{d}/{f.name}" in conv:
+                    subprocess.run([str(TLAUC), str(udst), "--skip", "numsets"],
+                                   check=True, capture_output=True)
                 n += 1
     with zipfile.ZipFile(DEPS / "apalache/lib/apalache.jar") as z:
         for nm in z.namelist():
@@ -181,11 +200,14 @@ def request(m: dict, case_ud: int, budget: int, wall: float):
     return u.tup(op, src, limits, 0, 0, 0, props)
 
 
-def request_parse(mod: str, case_ud: int, secs: int = 600):
+def request_parse(mod: str, case_ud: int, secs: int = 600, uni: bool = False):
     """R4.1: an `%analyze` of one module (SANY's parse + semantic + level +
     lint), its imports resolved from the module's own directory and then the
-    three library roots, as CI's classpath orders them"""
+    three library roots, as CI's classpath orders them; R4.4: `uni` reads
+    the module's tlauc conversion"""
     sdir = low(os.path.dirname(mod))
+    if uni:
+        sdir = f"{UNI}/{sdir}"
     root = Path(mod).stem
     op = u.tup(u.cord("analyze"), u.tup(YES, YES, YES, YES))
     roots = u.lst([u.path(*sdir.split("/"))] + [u.path(r) for r in ROOTS])
@@ -197,11 +219,13 @@ def request_parse(mod: str, case_ud: int, secs: int = 600):
 
 def run_parse(a) -> int:
     """R4.1: the parse census -- every module of `parse.json` through
-    `%analyze`; the pin's SANY accepts all 373 (tier2/examples/sany)"""
+    `%analyze`; the pin's SANY accepts all 373 (tier2/examples/sany), and
+    all 373 of their tlauc conversions (sany-unicode; `--unicode`)"""
     work = json.loads(PARSE.read_text())["parse"]
     if a.only:
         work = [m for m in work if a.only in m["module"]]
-    census = Path(a.census or REPO / "desk/test-data/blackbox/parse-census.txt")
+    name = "parse-census-unicode.txt" if a.unicode else "parse-census.txt"
+    census = Path(a.census or REPO / "desk/test-data/blackbox" / name)
     done = set()
     if census.exists():
         done = {json.loads(l)["module"] for l in census.read_text().splitlines() if l}
@@ -214,9 +238,10 @@ def run_parse(a) -> int:
             return 0
         if m["module"] in done:
             continue
-        jid = "p-" + re.sub(r"[^a-z0-9-]", "-", low(m["module"]))[-60:]
+        jid = ("u-" if a.unicode else "p-") \
+            + re.sub(r"[^a-z0-9-]", "-", low(m["module"]))[-60:]
         t0 = time.time()
-        submit(rid, jid, request_parse(m["module"], case, a.parse_secs))
+        submit(rid, jid, request_parse(m["module"], case, a.parse_secs, a.unicode))
         rid += 1
         while True:
             row = summarize(peek_job(rid, jid))
@@ -526,6 +551,7 @@ def main() -> int:
     ap.add_argument("--stage")
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--parse", action="store_true")
+    ap.add_argument("--unicode", action="store_true")
     ap.add_argument("--only", default="")
     ap.add_argument("--parse-secs", type=int, default=600)
     ap.add_argument("--budget", type=int, default=20_000)

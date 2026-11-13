@@ -1,0 +1,10 @@
+ACCEPT
+MODULE A 1.1-4.4
+  def P arity=0 local=n L-1 3.1-3.24
+    apply $BoundedExists opkind=BuiltInKind L-1 3.6-3.24
+      bound k L-1 3.9-3.9
+        apply $SetEnumerate opkind=BuiltInKind L-1 3.15-3.17
+          num 1 L-1 3.16-3.16
+      apply TRUE opkind=BuiltInKind L-1 3.21-3.24
+DIAGS
+D 4201 ERROR 3.9-3.9 Multiply-defined symbol 'k': this definition or declaration conflicts

@@ -143,6 +143,9 @@ scheduling and wake-up is a no-op.
 ## Dojo example
 
 ```
+::  a fresh dojo has none of these molds or libraries: bind them first
+=tla      -build-file /=tla-lus=/sur/tla-lus/hoon
+=job-lib  -build-file /=tla-lus=/lib/job/hoon
 ::  submit a safety check of an inline spec
 =spec '''
 ---- MODULE Counter ----
@@ -157,7 +160,7 @@ Inv  == x < 4
 ::  postconditions mode]; request is [op src limits write promote env props]
 =req  :*  op=[%check [| | | | ~ | ~ [%exhaustive & 0]]]
           src=[%inline 'Counter' (malt ~[['Counter' spec]]) `'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a']
-          limits=*limits          ::  or default-limits:job-lib
+          limits=default-limits:job-lib
           write=~                  ::  or `[%base /tlaout] to persist artifacts
           promote=~                ::  diagnostic codes to raise to errors
           env=~                    ::  the environment IOUtils!IOEnv reads
@@ -168,9 +171,9 @@ Inv  == x < 4
 
 ::  peek results (the %gx care supplies the %x head of the on-peek path)
 .^([api=@ud state=@ud] %gx /=tla-lus=/version/noun)
-.^((list [req-id stage]) %gx /=tla-lus=/jobs/noun)
-.^((unit job) %gx /=tla-lus=/job/counter/noun)
-.^(artifact %gx /=tla-lus=/job/counter/artifact/report/noun)
+.^((list [req-id:tla stage:tla]) %gx /=tla-lus=/jobs/noun)
+.^((unit job:tla) %gx /=tla-lus=/job/counter/noun)
+.^(artifact:tla %gx /=tla-lus=/job/counter/artifact/report/noun)
 
 ::  cancel / clean up
 :tla-lus &tla-lus-action [%cancel ~.counter]

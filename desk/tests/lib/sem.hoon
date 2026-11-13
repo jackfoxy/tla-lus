@@ -113,6 +113,85 @@
       '---- MODULE A ----\0aF(y) == y\0aG == F\0a====\0a'
   ==
 ::
+++  test-sem-binder-pos-ext
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def F arity=0 local=n L0 4.1-4.29'
+        '    apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '      bound i L0 4.9-4.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '          num 1 L0 4.16-4.16'
+        '      apply = opkind=BuiltInKind L0 4.21-4.29'
+        '        apply Id opkind=UserDefinedOpKind L0 4.21-4.25'
+        '          apply i opkind=FormalParamKind L0 4.24-4.24'
+        '        num 1 L0 4.29-4.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={i<=3,i<=3}'
+        'lvl F L0 lc={i<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0a\0aF == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aId(x) == x\0a\0aG == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+  ==
+::
+++  test-sem-binder-pos-inst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def Id arity=1 local=n L0 2.1-2.10'
+        '    param x arity=0 L0 2.4-2.4'
+        '    apply x opkind=FormalParamKind L0 2.10-2.10'
+        '  def I!G arity=0 local=n L0 3.1-3.29'
+        '    substin subs=1 L0 3.1-3.29'
+        '      sub Op <-'
+        '        oparg Id op=Id arity=1 L0 3.28-3.29'
+        '      in'
+        '        apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '          bound i L0 4.9-4.9'
+        '            apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '              num 1 L0 4.16-4.16'
+        '          apply = opkind=BuiltInKind L0 4.21-4.29'
+        '            apply Op opkind=ConstantDeclKind L0 4.21-4.25'
+        '              apply i opkind=FormalParamKind L0 4.24-4.24'
+        '            num 1 L0 4.29-4.29'
+        '  def F arity=0 local=n L0 4.1-4.29'
+        '    apply $BoundedExists opkind=BuiltInKind L0 4.6-4.29'
+        '      bound i L0 4.9-4.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 4.15-4.17'
+        '          num 1 L0 4.16-4.16'
+        '      apply = opkind=BuiltInKind L0 4.21-4.29'
+        '        apply Id opkind=UserDefinedOpKind L0 4.21-4.25'
+        '          apply i opkind=FormalParamKind L0 4.24-4.24'
+        '        num 1 L0 4.29-4.29'
+        '  instance name=I module=B local=n L0 3.1-3.29'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={i<=3,i<=3}'
+        'lvl Id L0 ml=[3] w=[1]'
+        'lvl I!G L0 lc={i<=3}'
+        'lvl F L0 lc={i<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aId(x) == x\0aI == INSTANCE B WITH Op <- Id\0aF == \\E i \\in {1} : Id(i) = 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT Op(_)\0a\0aG == \\E i \\in {1} : Op(i) = 1\0a====\0a'
+  ==
+::
 ++  test-sem-bltopargs
   %+  expect-eq
     !>  ^-  wain
@@ -778,6 +857,253 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aEXTENDS Naturals\0aFac[n \\in Nat] == n\0a====\0a'
+  ==
+::
+++  test-sem-fwd-def
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def C arity=0 local=n L-1 2.1-2.6'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def D arity=0 local=n L-1 3.1-3.6'
+        '    num 3 L-1 3.6-3.6'
+        'DIAGS'
+        'D 4200 ERROR 2.6-2.6 Unknown operator: `D\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl C L-1'
+        'lvl D L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aC == D\0aD == 3\0a====\0a'
+  ==
+::
+++  test-sem-fwd-fcn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def f arity=0 local=n L0 2.1-2.20'
+        '    apply $RecursiveFcnSpec opkind=BuiltInKind L0 2.1-2.20'
+        '      ubound f L0 2.1-2.20'
+        '      bound x L0 2.3-2.3'
+        '        apply $SetEnumerate opkind=BuiltInKind L0 2.9-2.11'
+        '          num 1 L0 2.10-2.10'
+        '      apply $FcnApply opkind=BuiltInKind L0 2.17-2.20'
+        '        apply f opkind=FormalParamKind L0 2.17-2.17'
+        '        apply x opkind=FormalParamKind L0 2.19-2.19'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={f<=3,x<=3}'
+        'lvl f L0 lc={f<=3,x<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0af[x \\in {1}] == f[x]\0a====\0a'
+  ==
+::
+++  test-sem-fwd-inst
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Q arity=0 local=n L-1 2.1-2.9'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def I!Mk arity=0 local=n L-1 3.1-3.27'
+        '    substin subs=1 L-1 3.1-3.27'
+        '      sub k <-'
+        '        num 1 L-1 3.27-3.27'
+        '      in'
+        '        apply k opkind=ConstantDeclKind L0 3.7-3.7'
+        '  instance name=I module=B local=n L0 3.1-3.27'
+        'DIAGS'
+        'D 4200 ERROR 2.8-2.9 Unknown operator: `Mk\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Q L-1'
+        'lvl I!Mk L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aQ == I!Mk\0aI == INSTANCE B WITH k <- 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT k\0aMk == k\0a====\0a'
+  ==
+::
+++  test-sem-fwd-inst-unnamed
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Q arity=0 local=n L-1 2.1-2.7'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def Mk arity=0 local=n L-1 3.1-3.22'
+        '    substin subs=1 L-1 3.1-3.22'
+        '      sub k <-'
+        '        num 1 L-1 3.22-3.22'
+        '      in'
+        '        apply k opkind=ConstantDeclKind L0 3.7-3.7'
+        '  instance module=B local=n L0 3.1-3.22'
+        'DIAGS'
+        'D 4200 ERROR 2.6-2.7 Unknown operator: `Mk\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Q L-1'
+        'lvl Mk L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aQ == Mk\0aINSTANCE B WITH k <- 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT k\0aMk == k\0a====\0a'
+  ==
+::
+++  test-sem-fwd-local
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Z arity=0 local=y L-1 2.1-2.12'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  def W arity=0 local=n L-1 3.1-3.6'
+        '    num 1 L-1 3.6-3.6'
+        'DIAGS'
+        'D 4200 ERROR 2.12-2.12 Unknown operator: `W\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Z L-1'
+        'lvl W L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aLOCAL Z == W\0aW == 1\0a====\0a'
+  ==
+::
+++  test-sem-fwd-recursive
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def R arity=1 local=n L0 4.1-4.9'
+        '    param n arity=0 L0 4.3-4.3'
+        '    apply n opkind=FormalParamKind L0 4.9-4.9'
+        '  def U arity=0 local=n L0 3.1-3.9'
+        '    apply R opkind=UserDefinedOpKind L0 3.6-3.9'
+        '      num 1 L0 3.8-3.8'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl R L0 ml=[2] w=[1]'
+        'lvl U L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aRECURSIVE R(_)\0aU == R(1)\0aR(n) == n\0a====\0a'
+  ==
+::
+++  test-sem-fwd-self
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def F arity=0 local=n L-1 2.1-2.6'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        'DIAGS'
+        'D 4200 ERROR 2.6-2.6 Unknown operator: `F\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl F L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aF == F\0a====\0a'
+  ==
+::
+++  test-sem-fwd-thm
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def Q arity=0 local=n L-1 2.1-2.6'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        '  thmdef T local=n L-1 3.1-3.17'
+        '    apply TRUE opkind=BuiltInKind L-1 3.14-3.17'
+        '  theorem name=T L-1 3.1-3.17'
+        '    apply TRUE opkind=BuiltInKind L-1 3.14-3.17'
+        'DIAGS'
+        'D 4200 ERROR 2.6-2.6 Unknown operator: `T\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Q L-1'
+        'lvl T L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aQ == T\0aTHEOREM T == TRUE\0a====\0a'
+  ==
+::
+++  test-sem-fwd-var
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 3.10-3.10'
+        '  def P arity=0 local=n L-1 2.1-2.6'
+        '    apply nullODN opkind=k0 L-1 0.0-0.0'
+        'DIAGS'
+        'D 4200 ERROR 2.6-2.6 Unknown operator: `x\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == x\0aVARIABLE x\0a====\0a'
   ==
 ::
 ++  test-sem-hidefact
@@ -2735,6 +3061,756 @@
   :~
       :-  'A'
       '---- MODULE A ----\0aVARIABLE x\0aW == WF_x(x\' = x)\0aS == SF_x(x\' = x)\0a====\0a'
+  ==
+::
+++  test-sem-mdef-choose
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=0 local=n L-1 3.1-3.20'
+        '    apply $UnboundedChoose opkind=BuiltInKind L-1 3.6-3.20'
+        '      ubound i L-1 3.6-3.11'
+        '      apply TRUE opkind=BuiltInKind L-1 3.17-3.20'
+        'DIAGS'
+        'D 4201 ERROR 3.6-3.11 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP == CHOOSE i : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-chooseself
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def RM arity=0 local=n L0 2.1-2.22'
+        '    apply $UnboundedChoose opkind=BuiltInKind L0 2.7-2.22'
+        '      ubound RM L-1 2.7-2.12'
+        '      apply TRUE opkind=BuiltInKind L0 2.19-2.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl RM L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aRM == CHOOSE RM : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-constdup
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  const k arity=0 L0 2.10-2.10'
+        'DIAGS'
+        'D 4801 WARNING 3.10-3.10 Multiple declarations or definitions for symbol k.'
+        'LEVELS'
+        'lvl MODULE A L-1 lp={k}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT k\0aCONSTANT k\0a====\0a'
+  ==
+::
+++  test-sem-mdef-constvar
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  const x arity=0 L0 2.10-2.10'
+        'DIAGS'
+        'D 4201 ERROR 3.10-3.10 Multiply-defined symbol \'x\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aCONSTANT x\0aVARIABLE x\0a====\0a'
+  ==
+::
+++  test-sem-mdef-defimp
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        'DIAGS'
+        'D 4201 ERROR 3.1-3.8 Operator Len already defined or declared.'
+        'D 4201 ERROR 3.1-3.8 Multiply-defined symbol \'Len\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Sequences\0aLen == 1\0a====\0a'
+  ==
+::
+++  test-sem-mdef-ext
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def P arity=0 local=n L-1 3.1-3.24'
+        '    apply $BoundedExists opkind=BuiltInKind L-1 3.6-3.24'
+        '      bound k L-1 3.9-3.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.15-3.17'
+        '          num 1 L-1 3.16-3.16'
+        '      apply TRUE opkind=BuiltInKind L-1 3.21-3.24'
+        'DIAGS'
+        'D 4201 ERROR 3.9-3.9 Multiply-defined symbol \'k\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS B\0aP == \\E k \\in {1} : TRUE\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0ak == 1\0a====\0a'
+  ==
+::
+++  test-sem-mdef-fcn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=0 local=n L-1 3.1-3.22'
+        '    apply $FcnConstructor opkind=BuiltInKind L-1 3.6-3.22'
+        '      bound i L-1 3.7-3.7'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.13-3.15'
+        '          num 1 L-1 3.14-3.14'
+        '      num 1 L-1 3.21-3.21'
+        'DIAGS'
+        'D 4201 ERROR 3.7-3.7 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP == [i \\in {1} |-> 1]\0a====\0a'
+  ==
+::
+++  test-sem-mdef-inner
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'D 4201 ERROR 4.9-4.9 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+    ==
+  !>
+  %+  skim
+    %+  dump-sem:semantic  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+        :-  'A'
+        '---- MODULE A ----\0aVARIABLE i\0a---- MODULE Inner ----\0aP == \\E i \\in {1} : TRUE\0a====\0aQ == TRUE\0a====\0a'
+    ==
+  |=(l=@t =('D ' (end [3 2] l)))
+::
+++  test-sem-mdef-inner-ext
+  %+  expect-eq
+    !>  ^-  wain
+    ~
+  !>
+  %+  skim
+    %+  dump-sem:semantic  'A'
+    %-  malt
+    ^-  (list [@t @t])
+    :~
+        :-  'A'
+        '---- MODULE A ----\0a---- MODULE Inner ----\0aEXTENDS B\0aQ == m\0a====\0aP == \\E m \\in {1} : TRUE\0a====\0a'
+        :-  'B'
+        '---- MODULE B ----\0aVARIABLE m\0a====\0a'
+    ==
+  |=(l=@t =('D ' (end [3 2] l)))
+::
+++  test-sem-mdef-inst-later
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def I!Fx arity=0 local=n L0 2.1-2.27'
+        '    substin subs=1 L0 2.1-2.27'
+        '      sub k <-'
+        '        num 1 L0 2.27-2.27'
+        '      in'
+        '        letin lets=1 L0 3.7-3.23'
+        '          def Gx arity=0 local=n L0 3.11-3.17'
+        '            apply k opkind=ConstantDeclKind L0 3.17-3.17'
+        '          in'
+        '            apply Gx opkind=UserDefinedOpKind L0 3.22-3.23'
+        '  def I!Gx arity=0 local=n L0 2.1-2.27'
+        '    substin subs=1 L0 2.1-2.27'
+        '      sub k <-'
+        '        num 1 L0 2.27-2.27'
+        '      in'
+        '        num 2 L0 4.7-4.7'
+        '  instance name=I module=B local=n L0 2.1-2.27'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl I!Fx L0'
+        'lvl I!Gx L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aI == INSTANCE B WITH k <- 1\0a====\0a'
+      :-  'B'
+      '---- MODULE B ----\0aCONSTANT k\0aFx == LET Gx == k IN Gx\0aGx == 2\0a====\0a'
+  ==
+::
+++  test-sem-mdef-lambda
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  var i L1 2.10-2.10'
+        '  def Op arity=1 local=n L-1 3.1-3.16'
+        '    param F arity=1 L-1 3.4-3.7'
+        '    apply F opkind=FormalParamKind L-1 3.13-3.16'
+        '      num 1 L-1 3.15-3.15'
+        '  def P arity=0 local=n L-1 4.1-4.21'
+        '    apply Op opkind=UserDefinedOpKind L-1 4.6-4.21'
+        '      oparg LAMBDA op=LAMBDA arity=1 L-1 4.9-4.20'
+        'DIAGS'
+        'D 4201 ERROR 4.16-4.16 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl Op L-1 ml=? w=? mml=? olc=?'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aOp(F(_)) == F(1)\0aP == Op(LAMBDA i : i)\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letdef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=0 local=n L-1 3.1-3.20'
+        '    letin lets=1 L-1 3.6-3.20'
+        '      def i arity=0 local=n L-1 3.10-3.15'
+        '        num 1 L-1 3.15-3.15'
+        '      in'
+        '        apply i opkind=VariableDeclKind L-1 3.20-3.20'
+        'DIAGS'
+        'D 4201 ERROR 3.10-3.15 Operator i already defined or declared.'
+        'D 4201 ERROR 3.10-3.15 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP == LET i == 1 IN i\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letdup
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def P arity=0 local=n L-1 2.1-3.19'
+        '    letin lets=2 L-1 2.6-3.19'
+        '      def a arity=0 local=n L-1 2.10-2.15'
+        '        num 1 L-1 2.15-2.15'
+        '      def a arity=0 local=n L-1 3.9-3.14'
+        '        num 2 L-1 3.14-3.14'
+        '      in'
+        '        apply a opkind=UserDefinedOpKind L-1 3.19-3.19'
+        'DIAGS'
+        'D 4201 ERROR 3.9-3.14 Operator a already defined or declared.'
+        'D 4801 WARNING 3.9-3.14 Multiple declarations or definitions for symbol a.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == LET a == 1\0a        a == 2 IN a\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letfcn
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def P arity=0 local=n L0 2.1-2.34'
+        '    letin lets=1 L0 2.6-2.34'
+        '      def f arity=0 local=n L0 2.10-2.29'
+        '        apply $RecursiveFcnSpec opkind=BuiltInKind L0 2.10-2.29'
+        '          ubound f L0 2.10-2.29'
+        '          bound n L0 2.12-2.12'
+        '            apply $SetEnumerate opkind=BuiltInKind L0 2.18-2.20'
+        '              num 1 L0 2.19-2.19'
+        '          apply $FcnApply opkind=BuiltInKind L0 2.26-2.29'
+        '            apply f opkind=FormalParamKind L0 2.26-2.26'
+        '            apply n opkind=FormalParamKind L0 2.28-2.28'
+        '      in'
+        '        apply f opkind=UserDefinedOpKind L0 2.34-2.34'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={f<=3,n<=3}'
+        'lvl P L0 lc={f<=3,n<=3}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == LET f[n \\in {1}] == f[n] IN f\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letfwd
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def P arity=0 local=n L-1 2.1-3.19'
+        '    letin lets=2 L-1 2.6-3.19'
+        '      def a arity=0 local=n L-1 2.10-2.15'
+        '        apply nullODN opkind=k0 L-1 0.0-0.0'
+        '      def b arity=0 local=n L-1 3.9-3.14'
+        '        num 1 L-1 3.14-3.14'
+        '      in'
+        '        apply a opkind=UserDefinedOpKind L-1 3.19-3.19'
+        'DIAGS'
+        'D 4200 ERROR 2.15-2.15 Unknown operator: `b\'.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == LET a == b\0a        b == 1 IN a\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letouter
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def C arity=0 local=n L-1 2.1-2.6'
+        '    num 1 L-1 2.6-2.6'
+        '  def P arity=0 local=n L-1 3.1-3.20'
+        '    letin lets=1 L-1 3.6-3.20'
+        '      def C arity=0 local=n L-1 3.10-3.15'
+        '        num 2 L-1 3.15-3.15'
+        '      in'
+        '        apply C opkind=UserDefinedOpKind L-1 3.20-3.20'
+        'DIAGS'
+        'D 4201 ERROR 3.10-3.15 Operator C already defined or declared.'
+        'D 4801 WARNING 3.10-3.15 Multiple declarations or definitions for symbol C.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl C L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aC == 1\0aP == LET C == 2 IN C\0a====\0a'
+  ==
+::
+++  test-sem-mdef-letrec
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-5.4'
+        '  def P arity=0 local=n L0 2.1-4.22'
+        '    letin lets=2 L0 2.6-4.22'
+        '      def a arity=0 local=n L0 3.9-3.17'
+        '        apply r opkind=UserDefinedOpKind L0 3.14-3.17'
+        '          num 1 L0 3.16-3.16'
+        '      def r arity=1 local=n L0 4.9-4.17'
+        '        param n arity=0 L0 4.11-4.11'
+        '        apply n opkind=FormalParamKind L0 4.17-4.17'
+        '      in'
+        '        apply a opkind=UserDefinedOpKind L0 4.22-4.22'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == LET RECURSIVE r(_)\0a        a == r(1)\0a        r(n) == n IN a\0a====\0a'
+  ==
+::
+++  test-sem-mdef-nested
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def P arity=0 local=n L-1 2.1-2.39'
+        '    apply $BoundedExists opkind=BuiltInKind L-1 2.6-2.39'
+        '      bound i L-1 2.9-2.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 2.15-2.17'
+        '          num 1 L-1 2.16-2.16'
+        '      apply $BoundedExists opkind=BuiltInKind L-1 2.21-2.39'
+        '        bound i L-1 2.24-2.24'
+        '          apply $SetEnumerate opkind=BuiltInKind L-1 2.30-2.32'
+        '            num 2 L-1 2.31-2.31'
+        '        apply TRUE opkind=BuiltInKind L-1 2.36-2.39'
+        'DIAGS'
+        'D 4201 ERROR 2.24-2.24 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == \\E i \\in {1} : \\E i \\in {2} : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-param
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=1 local=n L-1 3.1-3.9'
+        '    param i arity=0 L-1 3.3-3.3'
+        '    apply i opkind=VariableDeclKind L-1 3.9-3.9'
+        'DIAGS'
+        'D 4201 ERROR 3.3-3.3 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP(i) == i\0a====\0a'
+  ==
+::
+++  test-sem-mdef-paramdef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def C arity=0 local=n L-1 2.1-2.6'
+        '    num 1 L-1 2.6-2.6'
+        '  def P arity=1 local=n L-1 3.1-3.9'
+        '    param C arity=0 L-1 3.3-3.3'
+        '    apply C opkind=UserDefinedOpKind L-1 3.9-3.9'
+        'DIAGS'
+        'D 4201 ERROR 3.3-3.3 Multiply-defined symbol \'C\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl C L-1'
+        'lvl P L-1 ml=? w=?'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aC == 1\0aP(C) == C\0a====\0a'
+  ==
+::
+++  test-sem-mdef-range
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def P arity=0 local=n L0 2.1-2.35'
+        '    apply $SetOfAll opkind=BuiltInKind L0 2.6-2.35'
+        '      bound l L0 2.11-2.11'
+        '        apply $SubsetOf opkind=BuiltInKind L0 2.17-2.34'
+        '          bound l L-1 2.18-2.18'
+        '            apply $SetEnumerate opkind=BuiltInKind L0 2.24-2.26'
+        '              num 1 L0 2.25-2.25'
+        '          apply TRUE opkind=BuiltInKind L0 2.30-2.33'
+        '      apply l opkind=FormalParamKind L0 2.7-2.7'
+        'LEVELS'
+        'lvl MODULE A L-1 lc={l<=2}'
+        'lvl P L0 lc={l<=2}'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == {l : l \\in {l \\in {1} : TRUE}}\0a====\0a'
+  ==
+::
+++  test-sem-mdef-setof
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=0 local=n L-1 3.1-3.23'
+        '    apply $SubsetOf opkind=BuiltInKind L-1 3.6-3.23'
+        '      bound i L-1 3.7-3.7'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.13-3.15'
+        '          num 1 L-1 3.14-3.14'
+        '      apply TRUE opkind=BuiltInKind L-1 3.19-3.22'
+        'DIAGS'
+        'D 4201 ERROR 3.7-3.7 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP == {i \\in {1} : TRUE}\0a====\0a'
+  ==
+::
+++  test-sem-mdef-sibling
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  def P arity=0 local=n L0 2.1-2.51'
+        '    apply \\land opkind=BuiltInKind L0 2.6-2.51'
+        '      apply $BoundedExists opkind=BuiltInKind L0 2.7-2.25'
+        '        bound i L-1 2.10-2.10'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 2.16-2.18'
+        '            num 1 L0 2.17-2.17'
+        '        apply TRUE opkind=BuiltInKind L0 2.22-2.25'
+        '      apply $BoundedExists opkind=BuiltInKind L0 2.32-2.50'
+        '        bound i L-1 2.35-2.35'
+        '          apply $SetEnumerate opkind=BuiltInKind L0 2.41-2.43'
+        '            num 2 L0 2.42-2.42'
+        '        apply TRUE opkind=BuiltInKind L0 2.47-2.50'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L0'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aP == (\\E i \\in {1} : TRUE) /\\ (\\E i \\in {2} : TRUE)\0a====\0a'
+  ==
+::
+++  test-sem-mdef-std
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def P arity=0 local=n L-1 3.1-3.26'
+        '    apply $BoundedExists opkind=BuiltInKind L-1 3.6-3.26'
+        '      bound Len L-1 3.9-3.11'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.17-3.19'
+        '          num 1 L-1 3.18-3.18'
+        '      apply TRUE opkind=BuiltInKind L-1 3.23-3.26'
+        'DIAGS'
+        'D 4201 ERROR 3.9-3.11 Multiply-defined symbol \'Len\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aEXTENDS Sequences\0aP == \\E Len \\in {1} : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-top
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var i L1 2.10-2.10'
+        '  def P arity=0 local=n L-1 3.1-3.24'
+        '    apply $BoundedExists opkind=BuiltInKind L-1 3.6-3.24'
+        '      bound i L-1 3.9-3.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.15-3.17'
+        '          num 1 L-1 3.16-3.16'
+        '      apply TRUE opkind=BuiltInKind L-1 3.21-3.24'
+        'DIAGS'
+        'D 4201 ERROR 3.9-3.9 Multiply-defined symbol \'i\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE i\0aP == \\E i \\in {1} : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-topdef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  def C arity=0 local=n L-1 2.1-2.6'
+        '    num 1 L-1 2.6-2.6'
+        '  def P arity=0 local=n L-1 3.1-3.24'
+        '    apply $BoundedExists opkind=BuiltInKind L-1 3.6-3.24'
+        '      bound C L-1 3.9-3.9'
+        '        apply $SetEnumerate opkind=BuiltInKind L-1 3.15-3.17'
+        '          num 1 L-1 3.16-3.16'
+        '      apply TRUE opkind=BuiltInKind L-1 3.21-3.24'
+        'DIAGS'
+        'D 4201 ERROR 3.9-3.9 Multiply-defined symbol \'C\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+        'lvl C L-1'
+        'lvl P L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aC == 1\0aP == \\E C \\in {1} : TRUE\0a====\0a'
+  ==
+::
+++  test-sem-mdef-vardef
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-4.4'
+        '  var x L1 2.10-2.10'
+        'DIAGS'
+        'D 4201 ERROR 3.1-3.6 Operator x already defined or declared.'
+        'D 4201 ERROR 3.1-3.6 Multiply-defined symbol \'x\': this definition or declaration conflicts'
+        'LEVELS'
+        'lvl MODULE A L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x\0ax == 1\0a====\0a'
+  ==
+::
+++  test-sem-mdef-vardup
+  %+  expect-eq
+    !>  ^-  wain
+    :~
+        'ACCEPT'
+        'MODULE A 1.1-3.4'
+        '  var x L1 2.10-2.10'
+        'DIAGS'
+        'D 4801 WARNING 2.13-2.13 Multiple declarations or definitions for symbol x.'
+        'LEVELS'
+        'lvl MODULE A L-1'
+    ==
+  !>
+  %+  dump-sem:semantic  'A'
+  %-  malt
+  ^-  (list [@t @t])
+  :~
+      :-  'A'
+      '---- MODULE A ----\0aVARIABLE x, x\0a====\0a'
   ==
 ::
 ++  test-sem-nary

@@ -1,0 +1,12 @@
+ACCEPT
+MODULE A 1.1-7.4
+  def P arity=0 local=n L0 6.1-6.24
+    apply $BoundedExists opkind=BuiltInKind L0 6.6-6.24
+      bound m L-1 6.9-6.9
+        apply $SetEnumerate opkind=BuiltInKind L0 6.15-6.17
+          num 1 L0 6.16-6.16
+      apply TRUE opkind=BuiltInKind L0 6.21-6.24
+  MODULE Inner 2.1-5.4
+    var m L1 2.10-2.10
+    def Q arity=0 local=n L1 4.1-4.6
+      apply m opkind=VariableDeclKind L1 4.6-4.6

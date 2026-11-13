@@ -1176,6 +1176,25 @@
     !>((bundle-stats 'spec' ~[['spec' sp]] 'INIT Init\0aNEXT Next\0aINVARIANT Bad\0a'))
   ==
 ::
+++  test-choose-normalizes-cup-printing
+  ::  R4.2au: a CHOOSE whose body prints is evaluated on the carrier
+  ::  (`+eval-quant-rs`), and takes the first element of its NORMALIZED
+  ::  domain too: `{3} \\cup {1}` gives 1 (`Inv` holds). Pin: 2/1/1
+  =/  sp
+    %-  of-wain:format
+    :~  '---- MODULE spec ----'
+        'EXTENDS Naturals, TLC'
+        'VARIABLE x'
+        'Init == x = CHOOSE y \\in {3} \\cup {1} : PrintT(y)'
+        'Next == UNCHANGED x'
+        'Inv == x = 1'
+        '===='
+    ==
+  %+  expect-eq  !>([%& [2 1 1]])
+  !>  %^  bundle-stats  'spec'
+        ~[['spec' sp]]
+      'INIT Init\0aNEXT Next\0aINVARIANT Inv\0a'
+::
 ++  test-action-argument-solved
   ::  an ACTION passed as an operator argument is bound by name and solved
   ::  where the body uses it (LockHS's `NoStutter(NoHistoryChange(l0(self)))`

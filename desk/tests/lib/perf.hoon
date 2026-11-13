@@ -44,7 +44,7 @@
   ::  measured median: 1909 ms median of 15 runs (R2.8.1a: 5 warm + 5 fresh-boot + 5 post-rebuild)
   %+  expect-eq
     !>  [13 13 0 13 [0 1 1 1]]
-  !>  (prof '---- MODULE A ----\0a\\* Hot path: ENUMERATION. SUBSET and \\X over small bases, forced inside a\0a\\* quantifier at every state -- the cursor / +force path, not the queue.\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == x < 12 /\\ x\' = x + 1\0aInv  == /\\ \\A s \\in SUBSET (1..6) : Card1(s) >= 0\0a        /\\ \\A p \\in (1..8) \\X (1..8) : p[1] >= 1\0aCard1(s) == IF s = {} THEN 0 ELSE 1\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a')
+  !>  (prof '---- MODULE A ----\0a\\* Hot path: ENUMERATION. SUBSET and \\X over small bases, forced inside a\0a\\* quantifier at every state -- the cursor / +force path, not the queue.\0aEXTENDS Integers\0aVARIABLE x\0aInit == x = 0\0aNext == x < 12 /\\ x\' = x + 1\0aCard1(s) == IF s = {} THEN 0 ELSE 1\0aInv  == /\\ \\A s \\in SUBSET (1..6) : Card1(s) >= 0\0a        /\\ \\A p \\in (1..8) \\X (1..8) : p[1] >= 1\0a====\0a' 'INIT Init\0aNEXT Next\0aINVARIANT Inv\0aCHECK_DEADLOCK FALSE\0a')
 ::
 ++  test-perf-eval
   ::  hot path: evaluator  (safety engine)
